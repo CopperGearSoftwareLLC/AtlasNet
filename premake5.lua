@@ -36,20 +36,20 @@ workspace "GuacNet"
         optimize "On"
 
 project "God"
-    dependson {"AtlasNet"}
-        links{"AtlasNet"}
+    dependson {"KDNet"}
+        links{"KDNet"}
     kind "ConsoleApp"
     language "C++"
     files { "src_runners/GodRun.cpp" }
 
 project "Partition"
-    dependson "AtlasNet"
+    dependson "KDNet"
     kind "ConsoleApp"
     language "C++"
     files { "src_runners/PartitionRun.cpp" }
-    links{"AtlasNet"}
+    links{"KDNet"}
 
-project "AtlasNet"
+project "KDNet"
     kind "StaticLib"
     language "C++"
     files { "src/**.hpp","src/**.cpp" }
@@ -65,7 +65,7 @@ function customClean()
 
     local filesToRemove = {
         "Makefile",
-        "AtlasNet.make",
+        "KDNet.make",
         "Partition.make",
         "God.make",
         "imgui.ini",
