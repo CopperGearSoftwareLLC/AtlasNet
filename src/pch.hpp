@@ -6,6 +6,7 @@
 
 #ifdef _DISPLAY 
 #define GLEW_STATIC
+#define GLEW_NO_GLU
 #include <GL/glew.h>
 #include <GLFW/glfw3.h>
 #define IMGUI_IMPL_OPENGL_LOADER_CUSTOM
