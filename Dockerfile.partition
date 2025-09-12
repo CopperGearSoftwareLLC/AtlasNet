@@ -1,0 +1,17 @@
+# Dockerfile.partition
+FROM ubuntu:25.04
+
+WORKDIR /partition
+
+RUN apt-get update && \
+    apt-get install -y gdbserver
+
+COPY bin/DebugDocker/Partition/Partition /partition/
+
+EXPOSE 1234 7777
+
+# ENV lets you pass parameters when starting container
+ENV PARTITION_ID=0
+ENV REGION="root"
+
+CMD ["bash", "-c", "gdbserver :1234 ./Partition --id $PARTITION_ID --region $REGION"]

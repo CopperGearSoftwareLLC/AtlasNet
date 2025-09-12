@@ -1,5 +1,5 @@
 sudo apt update
-sudo apt install bear libx11-dev libxrandr-dev libwayland-dev -y
+sudo apt install bear libx11-dev libxrandr-dev libwayland-dev libcurl4-openssl-dev -y
 
 
  extensions=(

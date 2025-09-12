@@ -67,18 +67,35 @@
       }
     },
     {
-      "label": "Build Docker Image",
+      "label": "Build God Docker Image",
       "type": "shell",
       "dependsOn": "Remove All Docker Containers",
       "command": "docker",
-      "args": ["build","-f","GodDockerFile", "-t", "godimage:latest", "."]
+      "args": ["build","-f","Dockerfile.god", "-t", "godimage:latest", "."]
+    },
+    {
+      "label": "Build Partition Docker Image",
+      "type": "shell",
+      "dependsOn": "Build God Docker Image",
+      "command": "docker",
+      "args": ["build","-f","Dockerfile.partition", "-t", "partitionimage:latest", "."]
     },
     {
       "label": "Run Docker Container",
       "type": "shell",
-      "dependsOn": "Build Docker Image",
+      "dependsOn": "Build Partition Docker Image",
       "command": "docker",
-      "args": ["run","--cap-add=SYS_PTRACE", "--security-opt", "seccomp=unconfined", "--name", "God_container", "-d", "-p", "1234:1234", "godimage:latest"],
+      "args": ["run", "-v", "/var/run/docker.sock:/var/run/docker.sock", "--cap-add=SYS_PTRACE", "--security-opt", "seccomp=unconfined", "--name", "God_container", "-d", "-p", "1234:1234", "godimage:latest"],
+    },
+    {
+      "label": "Build Partition Image",
+      "type": "shell",
+      "command": "docker build -t partition_server -f Dockerfile.partition .",
+      "problemMatcher": [],
+      "group": {
+        "kind": "build",
+        "isDefault": true
+      }
     }
   ],
   "inputs": [

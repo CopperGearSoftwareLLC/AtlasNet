@@ -12,7 +12,7 @@ workspace "GuacNet"
     targetdir "bin/%{cfg.buildcfg}/%{prj.name}"
     objdir "obj/%{cfg.buildcfg}/%{prj.name}"
     includedirs{"lib/GNS/include","lib/glm"}
-    links{"GameNetworkingSockets_s"}
+    links{"GameNetworkingSockets_s","curl"}
     libdirs{"lib/GNS/lib"}
     filter "configurations:DebugDocker"
         symbols "On"
