@@ -7,12 +7,12 @@ workspace "GuacNet"
     includedirs {"src"}
     pchheader "src/pch.hpp"
     pchsource "src/pch.cpp"
-
+    location "build"
     cppdialect "C++20"
     targetdir "bin/%{cfg.buildcfg}/%{prj.name}"
     objdir "obj/%{cfg.buildcfg}/%{prj.name}"
     includedirs{"lib/GameNetworkingSockets/include","lib/glm"}
-    links{"GameNetworkingSockets_s","protobuf","crypto","ssl"}
+    links{"GameNetworkingSockets_s","protobuf","crypto","ssl","curl"}
     libdirs{"lib/GameNetworkingSockets/lib"}
     filter "configurations:DebugDocker"
         symbols "On"
@@ -48,18 +48,21 @@ workspace "GuacNet"
         kind "ConsoleApp"
         language "C++"
         files { "src/God/**.cpp" }
+        defines "_GOD"
    project "GodView"
         dependson {"God","Interlink"}
         links {"God","Interlink"}
         kind "ConsoleApp"
         language "C++"
         files { "src/GodView/**.cpp" }
+        defines "_GODVIEW"
     project "Partition"
         dependson "Interlink"
         links "Interlink"
         kind "ConsoleApp"
         language "C++"
         files { "src/Partition/**.cpp" }
+        defines "_PARTITION"
 
     project "SampleGame"
         kind "ConsoleApp"
@@ -67,13 +70,17 @@ workspace "GuacNet"
         links {"KDNet","Interlink"}
         language "C++"
         files { "src/SampleGame/**.cpp" }
+        defines {"_GAMECLIENT","_GAMESERVER"}
 function customClean()
     -- Specify the directories or files to be cleaned
     local dirsToRemove = {
         "bin",
         "obj",
         "Intermediate",
-        ".cache"
+        ".cache",
+        "build",
+        "docker"
+        
     }
 
     local filesToRemove = {
@@ -83,7 +90,7 @@ function customClean()
     }
 
     local extensionsToRemove = {
-        ".make",
+--        ".make",
     }
     -- Remove specified directories
     for _, dir in ipairs(dirsToRemove) do

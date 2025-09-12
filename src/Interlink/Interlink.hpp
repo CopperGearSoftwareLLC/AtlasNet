@@ -1,7 +1,7 @@
 #include "Connection.hpp"
 #include "Singleton.hpp"
 #include "pch.hpp"
-
+#include "Globals.hpp"
 enum class InterlinkType {
     eInvalid = -1,
     ePartition = 1,   // partition Server
@@ -14,13 +14,12 @@ struct InterlinkProperties {
     InterlinkType Type = InterlinkType::eInvalid;
 };
 class Interlink : public Singleton<Interlink> {
-    std::unordered_map<InterlinkType, Connection> OpenConnections;
+    std::unordered_map<InterlinkType, std::shared_ptr<Connection>> OpenConnections;
     ISteamNetworkingSockets* networkInterface;
     InterlinkType ThisType;
     private:
-    void ConnectToGod();
    public:
     Interlink() {};
     void Initialize(const InterlinkProperties& properties);
-    std::weak_ptr<Connection> OpenConnection()
+    std::weak_ptr<Connection> OpenConnection();
 };

@@ -33,6 +33,8 @@ template <glm::length_t L, typename T>
 using vec = glm::vec<L, T>;
 
 
+#include <cassert>
+#define ASSERT(check,message) assert(check && message)
 #include <iostream>
 #include <cstdlib>
 #include <thread>
@@ -40,6 +42,5 @@ using vec = glm::vec<L, T>;
 #include <vector>
 #include <functional>
 #include <chrono>
-#include <cassert>
 #include <unordered_map>
-#define ASSERT(check,message) assert(check && message)
+#include <memory>

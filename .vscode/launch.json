@@ -52,11 +52,12 @@
       "name": "Attach To Docker",
       "type": "cppdbg",
       "request": "launch",
-      "program": "${workspaceFolder}/bin/DebugLocal/Partition/Partition",
+      "program": "${workspaceFolder}/bin/DebugDocker/Partition/Partition",
       "cwd": "${workspaceFolder}",
       "MIMode": "gdb",
       "miDebuggerServerAddress": "localhost:${input:debugPort}",
       "stopAtEntry": false,
+      "preLaunchTask": "Compile For Docker",
     },
   ],
   "inputs": [

@@ -73,7 +73,7 @@ int main() {
         scene.update(dt);
 
         // Print positions every second
-        scene.printPositions();
+        //scene.printPositions();
 
 
         // Sleep a bit to avoid burning CPU (simulate frame time)

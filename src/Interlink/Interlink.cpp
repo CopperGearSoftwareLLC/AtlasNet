@@ -15,8 +15,3 @@ void Interlink::Initialize(const InterlinkProperties& Properties)
     SteamNetworkingIPAddr serverLocalAddr;
 		serverLocalAddr.Clear();
 }
-
-void Interlink::ConnectToGod()
-{
-    
-}
