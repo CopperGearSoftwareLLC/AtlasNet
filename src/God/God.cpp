@@ -16,8 +16,7 @@ God::God()
 
 God::~God()
 {
-  // never runs
-  cleanupPartitions();
+  //cleanupPartitions();
 }
 
 // Signal handler function

@@ -22,12 +22,12 @@ ARG="$1"
 case "$ARG" in
     God)
         # Launch watcher in background to clean up partitions when God stops
-        nohup bash ./god_watcher.sh & disown
+        # nohup bash ./god_watcher.sh & disown
 
         echo "Runing God"
         docker rm -f $GOD_CONTAINER_NAME 2>/dev/null || true 
-        docker run --init --stop-timeout=4 -v /var/run/docker.sock:/var/run/docker.sock --cap-add=SYS_PTRACE --security-opt seccomp=unconfined --name $GOD_CONTAINER_NAME -d -p 1234:1234 $GOD_IMAGE_NAME
-        
+        docker run --init -v /var/run/docker.sock:/var/run/docker.sock --cap-add=SYS_PTRACE --security-opt seccomp=unconfined --name $GOD_CONTAINER_NAME -d -p 1234:1234 $GOD_IMAGE_NAME
+        #docker run --init --stop-timeout=4 --stop-signal=SIGTERM -v /var/run/docker.sock:/var/run/docker.sock --cap-add=SYS_PTRACE --security-opt seccomp=unconfined --name $GOD_CONTAINER_NAME -d -p 1234:1234 $GOD_IMAGE_NAME
 
         ;;
 

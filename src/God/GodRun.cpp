@@ -19,7 +19,7 @@ int main(int argc, char **argv) {
       god.spawnPartition(i, port);
     }
 
-    std::this_thread::sleep_for(std::chrono::seconds(4));
+    //std::this_thread::sleep_for(std::chrono::seconds(4));
     god.removePartition(4);
 
     for (size_t i = 4; i < 8; i++)
@@ -28,8 +28,7 @@ int main(int argc, char **argv) {
       god.spawnPartition(i, port);
     }
 
-    std::this_thread::sleep_for(std::chrono::seconds(100));
-    god.cleanupPartitions();
+    std::this_thread::sleep_for(std::chrono::seconds(200));
     return 0;
 }
 

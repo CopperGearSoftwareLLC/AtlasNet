@@ -32,16 +32,19 @@ WORKDIR /app
 # Copy local files into the image
 # Install dependencies
 RUN apt-get update && \
-apt-get install -y gdbserver docker.io libprotobuf-dev protobuf-compiler libssl-dev libcurl4-openssl-dev curl
+apt-get install -y gdbserver docker.io libprotobuf-dev protobuf-compiler libssl-dev libcurl4-openssl-dev curl tini
 
 
 COPY {EXECUTABLE_PATH} /app/
 COPY $NAME_OF_THIS_FILE /app/
 COPY "Start.sh" /app/
+
 # For GDBserver
 EXPOSE 1234 
-# Set default command
-CMD /bin/bash -c \"source $NAME_OF_THIS_FILE && gdbserver :${GDBSERVER_INTERNAL_PORT} {EXECUTABLE_NAME} \"
+# Set default command use debugger or not (warning: debugger wont let sigterm go to program)
+CMD [\"gdbserver\", \"0.0.0.0:1234\", \"/app/{EXECUTABLE_NAME}\"]
+# CMD [\"/app/{EXECUTABLE_NAME}\"]
+
 "
 
 BASE_PARTITION_COMPOSE_DOCKER_FILE="

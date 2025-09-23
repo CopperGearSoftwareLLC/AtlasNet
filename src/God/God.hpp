@@ -7,19 +7,39 @@ class God : public Singleton<God> {
     God();
     ~God();
 
+    /**
+     * @brief Spawns a new partition by invoking an external script.
+     */
     bool spawnPartition(int32 id, int32 port);
+
+    /**
+     * @brief Removes a partition by its ID.
+     */
     bool removePartition(int32 id);
+
+    /**
+     * @brief Cleans up all active partitions.
+     */
     bool cleanupPartitions();
 
+    /**
+     * @brief Retrieves a set of all active partition IDs.
+     */
     std::set<int32> getPartitionIDs();
 
-    // returns null for now
+    /**
+     * @brief Get the Partition object (returns null for now)
+     */
     void* getPartition(int32 id);
 
     private:
-    // hold all ids
+    /**
+     * @brief Set of active partition IDs.
+     */
     std::set<int32> partitionIds;
 
-    //in case of SIGINT or SIGTERM (doesnt work atm. cannot catch SIGs)
+    /**
+     * @brief Handles termination signals to ensure cleanup of partitions before exiting. (doesnt work rn)
+     */
     static void handleSignal(int32 signum);
 };
