@@ -91,7 +91,7 @@
       "type": "shell",
       "dependsOn": "Setup Docker Images. SampleGame",
       "command": "./Start.sh",
-      "args": ["Partition",],
+      "args": ["Partition","0","1234"],
       "options": {
         "cwd": "${workspaceFolder}" // working directory
       },

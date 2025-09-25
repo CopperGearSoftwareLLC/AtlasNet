@@ -1,7 +1,7 @@
 #!/bin/bash
 
 sudo apt update
-sudo apt install bear libx11-dev libxrandr-dev libwayland-dev libprotobuf-dev protobuf-compiler libssl-dev libcurl4-openssl-dev -y
+sudo apt install bear libx11-dev libxrandr-dev libwayland-dev libprotobuf-dev protobuf-compiler libssl-dev libcurl4-openssl-dev libboost-all-dev -y
 
 
  extensions=(

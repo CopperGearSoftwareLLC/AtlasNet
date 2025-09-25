@@ -6,6 +6,5 @@
 #include "pch.hpp"
 int main(void)
 {
-    Partition part;
-    part.Run();
+    Partition::Get();
 }

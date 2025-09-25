@@ -44,11 +44,15 @@ case "$ARG" in
                       \"PARTITION_ID=$ID\"
                   ],
                   \"ExposedPorts\": {
-                      \"1234/tcp\": {}
+                      \"1234/tcp\": {},
+                    \"1235/tcp\": {},
+                    \"1236/tcp\": {}
                   },
                   \"HostConfig\": {
                       \"PortBindings\": {
-                          \"1234/tcp\": [{\"HostPort\": \"$PORT\"}]
+                        \"1234/tcp\": [{\"HostPort\": \"$PORT\"}],
+                        \"1235/tcp\": [{\"HostPort\": \"1235\"}],
+                        \"1236/tcp\": [{\"HostPort\": \"1236\"}]
                       }
                   }
                 }" \
@@ -64,7 +68,7 @@ case "$ARG" in
 
     *)
         echo "Unknown argument: $ARG"
-        echo "Usage: $0 God|Partition|GameServer <path>"
+        echo "Usage: $0 God|Partition"
         exit 1
         ;;
 esac
