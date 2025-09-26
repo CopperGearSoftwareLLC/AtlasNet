@@ -8,4 +8,4 @@ bin
 docker
 god_watcher.log
 nohup.out
-/TestUnityAPI/build-win
+/src/TestUnityAPI/build-win

@@ -1,4 +1,8 @@
 #include <cstdio>
+#include <string>
+#include <sstream>
+#include "curl/curl.h"   // requires libcurl
+#include "KDNetUnityAPIHelper.hpp"  // Include helper functions
 
 // ---- Export macros (cross-platform) ----
 #if defined(_WIN32)
@@ -8,13 +12,6 @@
   #define KDNET_API extern "C" __attribute__((visibility("default")))
   #define KDNET_CALL
 #endif
-
-// Return codes
-enum KDNetStatus {
-    KDNET_OK = 0,
-    KDNET_ERR_NULL_ID = 1,
-    KDNET_ERR_OTHER = 2
-};
 
 // -----------------------------------------------------------------------------
 // Function: KDNetHelloWorld
@@ -38,11 +35,18 @@ KDNET_API int KDNET_CALL KDNetRegisterEntity(
     float rx, float ry, float rz, float rw,
     float sx, float sy, float sz)
 {
-    std::printf("[KDNet] Entity Registered:\n");
-    std::printf("  ID: %s\n", entityId);
-    std::printf("  Position: (%.2f, %.2f, %.2f)\n", px, py, pz);
-    std::printf("  Rotation (quat): (%.2f, %.2f, %.2f, %.2f)\n", rx, ry, rz, rw);
-    std::printf("  Scale: (%.2f, %.2f, %.2f)\n", sx, sy, sz);
+    // Build JSON
+    std::ostringstream oss;
+    oss << "{"
+        << "\"id\":\"" << entityId << "\","
+        << "\"position\":[" << px << "," << py << "," << pz << "],"
+        << "\"rotation\":[" << rx << "," << ry << "," << rz << "," << rw << "],"
+        << "\"scale\":[" << sx << "," << sy << "," << sz << "]"
+        << "}";
 
-    return (entityId == nullptr) ? KDNET_ERR_NULL_ID : KDNET_OK;
+    std::string json = oss.str();
+    std::printf("[KDNet] Sending: %s\n", json.c_str());
+
+    // Quick & dirty: fixed URL of your server mesher container
+    return send_entity_to_server(json, "http://localhost:5000/entity");
 }
