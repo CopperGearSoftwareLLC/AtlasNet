@@ -12,7 +12,7 @@
   #define KDNET_CALL
 #endif
 
-static std::string g_endpoint = "http://127.0.0.1:18080/entity";
+static std::string g_endpoint = "http://127.0.0.1:7001/entity";
 
 // -----------------------------------------------------------------------------
 // Function: KDNetHelloWorld

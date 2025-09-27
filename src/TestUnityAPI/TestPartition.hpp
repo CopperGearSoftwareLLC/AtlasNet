@@ -1,4 +1,4 @@
-// FakePartitionRaw.hpp
+// TestPartitionRaw.hpp
 // Minimal, single-threaded HTTP listener using POSIX sockets.
 // Accepts POST /entity with a JSON body and calls KDNet::PrintEntityFromJson().
 //
@@ -26,9 +26,9 @@
 
 #include "CatchJsonHelper.hpp"  // uses nlohmann/json
 
-class FakePartition {
+class TestPartition {
 public:
-    explicit FakePartition(std::string addr = "0.0.0.0", int port = 18080)
+    explicit TestPartition(std::string addr = "0.0.0.0", int port = 18080)
         : addr_(std::move(addr)), port_(port) {}
 
     bool start() {
@@ -36,7 +36,7 @@ public:
 
         // create socket
         listen_fd_ = ::socket(AF_INET, SOCK_STREAM, 0);
-        if (listen_fd_ < 0) { perror("[FakePartition] socket"); running_ = false; return false; }
+        if (listen_fd_ < 0) { perror("[TestPartition] socket"); running_ = false; return false; }
 
         // reuse addr
         int yes = 1;
@@ -48,7 +48,7 @@ public:
         sa.sin_port = htons(port_);
         sa.sin_addr.s_addr = inet_addr(addr_.c_str());
         if (::bind(listen_fd_, (sockaddr*)&sa, sizeof(sa)) < 0) {
-            perror("[FakePartition] bind");
+            perror("[TestPartition] bind");
             ::close(listen_fd_);
             listen_fd_ = -1;
             running_ = false;
@@ -57,7 +57,7 @@ public:
 
         // listen
         if (::listen(listen_fd_, 16) < 0) {
-            perror("[FakePartition] listen");
+            perror("[TestPartition] listen");
             ::close(listen_fd_);
             listen_fd_ = -1;
             running_ = false;
@@ -65,7 +65,7 @@ public:
         }
 
         th_ = std::thread([this]{ loop(); });
-        std::printf("[FakePartition] Listening on %s:%d\n", addr_.c_str(), port_);
+        std::printf("[TestPartition] Listening on %s:%d\n", addr_.c_str(), port_);
         return true;
     }
 
@@ -73,10 +73,10 @@ public:
         if (!running_.exchange(false)) return;
         if (listen_fd_ >= 0) { ::shutdown(listen_fd_, SHUT_RDWR); ::close(listen_fd_); listen_fd_ = -1; }
         if (th_.joinable()) th_.join();
-        std::printf("[FakePartition] Stopped.\n");
+        std::printf("[TestPartition] Stopped.\n");
     }
 
-    ~FakePartition() { stop(); }
+    ~TestPartition() { stop(); }
 
 private:
     static bool recv_all(int fd, void* buf, size_t len) {
@@ -95,7 +95,7 @@ private:
             sockaddr_in cli{}; socklen_t clilen = sizeof(cli);
             int fd = ::accept(listen_fd_, (sockaddr*)&cli, &clilen);
             if (fd < 0) {
-                if (running_) perror("[FakePartition] accept");
+                if (running_) perror("[TestPartition] accept");
                 continue;
             }
 

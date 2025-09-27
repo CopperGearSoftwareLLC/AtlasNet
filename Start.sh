@@ -22,7 +22,7 @@ ARG="$1"
 case "$ARG" in
     God)
         # Launch watcher in background to clean up partitions when God stops
-        # nohup bash ./god_watcher.sh & disown
+        nohup bash ./god_watcher.sh & disown
 
         echo "Runing God"
         docker rm -f $GOD_CONTAINER_NAME 2>/dev/null || true 
@@ -49,13 +49,18 @@ case "$ARG" in
                       \"PARTITION_ID=$ID\"
                   ],
                   \"ExposedPorts\": {
+                      \"18080/tcp\": {},
                       \"1234/tcp\": {}
                   },
                   \"HostConfig\": {
                       \"PortBindings\": {
-                          \"1234/tcp\": [{\"HostPort\": \"$PORT\"}]
+                      \"18080/tcp\": [{\"HostPort\": \"$PORT\"}],
+                      \"1234/tcp\": [{\"HostPort\": \"\"}]
                       }
-                  }
+                  },
+                  \"Cmd\": [\"/bin/sh\",\"-lc\",
+                    \"/app/Partition & APP_PID=\$!; gdbserver 0.0.0.0:1234 --attach \$APP_PID & wait \$APP_PID\"
+                  ]
                 }" \
             http://localhost/containers/create?name=partition_$ID
 

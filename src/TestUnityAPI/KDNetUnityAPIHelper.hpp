@@ -1,4 +1,3 @@
-// kdnet_plugin.cpp  (only the HTTP helper changed)
 // Build: Windows uses WinHTTP; Linux/macOS use libcurl.
 
 #include <cstdio>

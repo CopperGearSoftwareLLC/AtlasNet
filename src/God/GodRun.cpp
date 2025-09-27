@@ -2,7 +2,6 @@
 #include "God/God.hpp"
 #include "Partition/Partition.hpp"
 #include "pch.hpp"
-#include "TestUnityAPI/FakePartition.hpp"
 
 void SpawnPartitionsTest(God &god) 
 {
@@ -32,11 +31,7 @@ int main(int argc, char** argv) {
 
     God& god = God::Get();
 
-    //SpawnPartitionsTest(god);
-
-    FakePartition fp{};
-    std::cout << fp.start() << std::endl;
-
+    SpawnPartitionsTest(god);
 
     std::this_thread::sleep_for(std::chrono::seconds(10000));
 
