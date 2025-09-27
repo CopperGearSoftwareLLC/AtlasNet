@@ -51,3 +51,10 @@ KDNET_API int KDNET_CALL KDNetRegisterEntity(
     // Quick & dirty: fixed URL of your server mesher container
     return send_entity_to_server(json, g_endpoint);
 }
+
+KDNET_API int KDNET_CALL KDNetSetEndpoint(const char* url) {
+    if (url && url[0]) {
+        g_endpoint = url;
+    }
+    return KDNET_OK;
+}

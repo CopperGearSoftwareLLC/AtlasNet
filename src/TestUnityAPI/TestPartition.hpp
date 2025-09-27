@@ -1,4 +1,4 @@
-// TestPartitionRaw.hpp
+// TestPartition.hpp
 // Minimal, single-threaded HTTP listener using POSIX sockets.
 // Accepts POST /entity with a JSON body and calls KDNet::PrintEntityFromJson().
 //
