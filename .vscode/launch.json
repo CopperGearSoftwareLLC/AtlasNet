@@ -38,6 +38,7 @@
       "stopAtEntry": false,
       
     },
+
     {
       "name": "Debug God Docker",
       "type": "cppdbg",
@@ -68,8 +69,19 @@
       "program": "${workspaceFolder}/bin/DebugDocker/Partition/Partition",
       "cwd": "${workspaceFolder}",
       "MIMode": "gdb",
+      "preLaunchTask": "Run Partition",
+      "miDebuggerServerAddress": "localhost:1235",
+      "stopAtEntry": false,
+    },
+        {
+      "name": "Attach To SampleGame",
+      "type": "cppdbg",
+      "request": "launch",
+      "program": "${workspaceFolder}/bin/DebugDocker/SampleGame/SampleGame",
+      "cwd": "${workspaceFolder}",
+      "MIMode": "gdb",
       "preLaunchTask": "Compile For Docker",
-      "miDebuggerServerAddress": "localhost:${input:debugPort}",
+      "miDebuggerServerAddress": "localhost:1236",
       "stopAtEntry": false,
     },
       {
@@ -91,5 +103,12 @@
       "description": "Enter gdbserver port",
       "default": "1234"
     }
-  ]
+  ],
+
+    "compounds": [
+        {
+            "name": "Debug Partion + Gameserver",
+            "configurations": ["Attach To Partition", "Attach To SampleGame"]
+        }
+    ]
 }

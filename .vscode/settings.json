@@ -4,6 +4,7 @@
         "${workspaceFolder}/src",
         "${workspaceFolder}/lib",
         "${workspaceFolder}/lib/GameNetworkingSockets/include",
+        "${workspaceFolder}/lib/json/single_include"
     ],
     "C_Cpp.intelliSenseEngine": "default",
     "cmake.ignoreCMakeListsMissing": true,
@@ -75,7 +76,28 @@
         "thread": "cpp",
         "cinttypes": "cpp",
         "typeinfo": "cpp",
-        "variant": "cpp"
+        "variant": "cpp",
+        "any": "cpp",
+        "bitset": "cpp",
+        "codecvt": "cpp",
+        "csignal": "cpp",
+        "forward_list": "cpp",
+        "list": "cpp",
+        "regex": "cpp",
+        "fstream": "cpp",
+        "ranges": "cpp",
+        "valarray": "cpp",
+        "strstream": "cpp",
+        "cfenv": "cpp",
+        "complex": "cpp",
+        "coroutine": "cpp",
+        "source_location": "cpp",
+        "rope": "cpp",
+        "slist": "cpp",
+        "future": "cpp",
+        "shared_mutex": "cpp",
+        "stdfloat": "cpp",
+        "typeindex": "cpp"
     },
    
 }

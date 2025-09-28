@@ -1,10 +1,12 @@
 #pragma once
-
-class Partition
+#include "Singleton.hpp"
+#include "Debug/Log.hpp"
+class Partition : public Singleton<Partition>
 {
-public:
-    Partition();
-    ~Partition();
-    void Run();
+	std::shared_ptr<Log> logger = std::make_shared<Log>("Partition");
 
+  public:
+	Partition();
+	~Partition();
+	void Run();
 };

@@ -8,3 +8,5 @@ bin
 docker
 god_watcher.log
 nohup.out
+docs
+nul

@@ -2,6 +2,7 @@
 #include "KDNet/KDNetInterface.hpp"
 #include "Singleton.hpp"
 #include "pch.hpp"
+#include "Debug/Log.hpp"
 enum KDServerRequestType {
     Raycast,
     SphereOverlap,
@@ -12,6 +13,9 @@ struct KDServerRequest {
 };
 using KDServerResponseType = std::vector<std::byte>;
 class KDNetServer : public KDNetInterface, public Singleton<KDNetServer> {
+    
+    std::shared_ptr<Log> logger = std::make_shared<Log>("KDNetServer");
+
    public:
     KDNetServer() {};
     /**

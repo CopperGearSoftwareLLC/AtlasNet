@@ -11,7 +11,7 @@ workspace "GuacNet"
     cppdialect "C++20"
     targetdir "bin/%{cfg.buildcfg}/%{prj.name}"
     objdir "obj/%{cfg.buildcfg}/%{prj.name}"
-    includedirs{"lib/GameNetworkingSockets/include","lib/glm","lib/imgui"}
+    includedirs{"lib/GameNetworkingSockets/include","lib/glm","lib/json/single_include","lib"}
     links{"GameNetworkingSockets_s","protobuf","crypto","ssl","curl"}
     libdirs{"lib/GameNetworkingSockets/lib"}
     
@@ -28,51 +28,43 @@ workspace "GuacNet"
         --files{"lib/imgui/backends/*.cpp"}
         symbols "On"        
         includedirs{"lib/glfw/include","lib/glew/include"}
+        defines {"GLEW_STATIC"}
         links{"GLEW","glfw3","GL","X11"}
         libdirs{"lib/glfw/lib","lib/glew/lib"}
     filter "configurations:Release"
         defines {"_DOCKER"}
         optimize "On"
 
-    project "Interlink"
-        kind "StaticLib"
-        language "C++"
-        files {"src/Interlink/**.cpp"}
     project "KDNet"
         kind "StaticLib"
-        dependson "Interlink"
-        links "Interlink"
         language "C++"
-        files { "src/KDNet/**.cpp" }
-
+        files { "src/**.cpp" }
     project "God"
-        dependson "Interlink"
-        links {"Interlink"}
         kind "ConsoleApp"
         language "C++"
-        files { "src/God/**.cpp" }
+        files { "src/**.cpp","srcRun/GodRun.cpp" }
         defines "_GOD"
    project "GodView"
-        dependson {"God","Interlink"}
-        links {"God","Interlink"}
+        dependson {"God"}
+        links {"God"}
         kind "ConsoleApp"
         language "C++"
-        files { "src/GodView/**.cpp" }
+        includedirs{"src"}
+        files { "src/**.cpp","srcRun/GodViewRun.cpp" }
         defines "_GODVIEW"
     project "Partition"
-        dependson "Interlink"
-        links "Interlink"
+        dependson {"KDNet"}
         kind "ConsoleApp"
         language "C++"
-        files { "src/Partition/**.cpp" }
+        files { "src/**.cpp","srcRun/PartitionRun.cpp" }
         defines "_PARTITION"
 
     project "SampleGame"
         kind "ConsoleApp"
-        dependson {"KDNet","Interlink"}
-        links {"KDNet","Interlink"}
+        dependson {"KDNet"}
+        links {"KDNet"}
         language "C++"
-        files { "src/SampleGame/**.cpp" }
+        files { "examples/SampleGame/**.cpp" }
         defines {"_GAMECLIENT","_GAMESERVER"}
 function customClean()
     -- Specify the directories or files to be cleaned

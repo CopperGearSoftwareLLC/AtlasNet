@@ -6,13 +6,13 @@ WORKDIR /app
 
 # Copy local files into the image
 # Install dependencies
-RUN apt-get update && apt-get install -y gdbserver docker.io libprotobuf-dev protobuf-compiler libssl-dev libcurl4-openssl-dev
-
-
+RUN apt-get update && apt-get install -y gdbserver docker.io libprotobuf-dev protobuf-compiler libssl-dev libcurl4-openssl-dev curl tini
 COPY ../bin/DebugDocker/God/God /app/
 COPY KDNetVars.sh /app/
+COPY Start.sh /app/
+
 # For GDBserver
 EXPOSE 1234 
 # Set default command
-CMD ["./God"]
+CMD ["gdbserver", "0.0.0.0:1234", "god"]
 
