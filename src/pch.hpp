@@ -1,7 +1,7 @@
 #pragma once
 
 
-#ifdef _DISPLAY 
+#ifdef _GODVIEW 
 
 /*GLFW + GLEW*/
 #define GLEW_STATIC
@@ -16,6 +16,7 @@
 #include <backends/imgui_impl_opengl3.h>
 #include <backends/imgui_impl_glfw.h>
 #include <imgui.h>
+#include <implot.h>
 #endif
 
 /* Valve GameNetworkingSockets */

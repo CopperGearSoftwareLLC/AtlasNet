@@ -52,6 +52,17 @@
       
     },
     {
+      "name": "Debug GodView",
+      "type": "cppdbg",
+      "request": "launch",
+      "program": "${workspaceFolder}/bin/DebugDocker/GodView/GodView",
+      "cwd": "${workspaceFolder}",
+      "MIMode": "gdb",
+      "preLaunchTask": "Compile For Docker",
+      "stopAtEntry": false,
+      
+    },
+    {
       "name": "Debug God Local",
       "type": "cppdbg",
       "request": "launch",
