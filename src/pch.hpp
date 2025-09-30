@@ -13,8 +13,8 @@
 #define IMGUI_DISABLE_OBSOLETE_FUNCTIONS
 #define IMGUI_DEFINE_MATH_OPERATORS
 #define IMGUI_IMPL_OPENGL_LOADER_CUSTOM
-#include <backends/imgui_impl_opengl3.h>
-#include <backends/imgui_impl_glfw.h>
+#include <imgui_impl_opengl3.h>
+#include <imgui_impl_glfw.h>
 #include <imgui.h>
 #endif
 

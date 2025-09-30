@@ -13,7 +13,7 @@
       "label": "Compile For Docker",
       "type": "shell",
       "dependsOn": "Premake",
-      "command": "bear -- make -C ./build/ config=debugdocker -j 12",
+      "command": "make -C ./build/ config=debugdocker -j 12",
       "args": [],
       "group": "build",
       "problemMatcher": ["$gcc"]
@@ -23,7 +23,7 @@
       "label": "Compile For Local",
       "type": "shell",
       "dependsOn": "Premake",
-      "command": "bear -- make -C ./build/ config=debuglocal -j 12",
+      "command": "make -C ./build/ config=debuglocal -j 12",
       "args": [],
       "group": "build",
       "problemMatcher": ["$gcc"]
