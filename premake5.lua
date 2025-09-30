@@ -72,62 +72,70 @@ workspace "GuacNet"
         language "C++"
         files { "examples/SampleGame/**.cpp" }
         defines {"_GAMECLIENT","_GAMESERVER"}
-function customClean()
-    -- Specify the directories or files to be cleaned
-    local dirsToRemove = {
-        "bin",
-        "obj",
-        "Intermediate",
-        ".cache",
-        "build",
-        "docker",
-        "vcpkg",
-        "vcpkg_installed",
-        "docs"
-        
-    }
-    local filesToRemove = {
-        "Makefile",
-        "imgui.ini",
-        "compile_commands.json"
-    }
 
-    local extensionsToRemove = {
---        ".make",
-    }
+        -- Generic cleanup function
+function customClean(dirsToRemove, filesToRemove)
     -- Remove specified directories
-    for _, dir in ipairs(dirsToRemove) do
+    for _, dir in ipairs(dirsToRemove or {}) do
         if os.isdir(dir) then
-            os.rmdir(dir,{recursive = true})
+            os.rmdir(dir)
             os.execute('rm -rf "' .. dir .. '"')
             print("Removed directory: " .. dir)
         end
     end
 
     -- Remove specified files
-    for _, file in ipairs(filesToRemove) do
+    for _, file in ipairs(filesToRemove or {}) do
         if os.isfile(file) then
             os.remove(file)
             print("Removed file: " .. file)
         end
     end
-        local rootFiles = os.matchfiles("*") -- only root files
-    for _, file in ipairs(rootFiles) do
-        for _, ext in ipairs(extensionsToRemove) do
-            if file:sub(-#ext) == ext then
-                os.remove(file)
-                print("Removed file by extension: " .. file)
-            end
-        end
-    end
 end
-
+function CleanBin()
+    local dirs = {"bin","obj","build","docker"};
+    local files = {}
+    customClean(dirs,files)
+end
+function CleanDeps()
+     local dirs = {"vcpkg","vcpkg_installed"};
+    local files = {}
+    customClean(dirs,files)
+end
+function CleanDocs()
+     local dirs = {"docs"};
+    local files = {}
+    customClean(dirs,files)
+end
 -- Add the custom clean function to the clean action
 newaction {
-    trigger = "clean",
+    trigger = "CleanBin",
     description = "Custom clean action",
     execute = function()
-        customClean()
+        CleanBin()
+    end
+}
+newaction {
+    trigger = "CleanDeps",
+    description = "Custom clean action",
+    execute = function()
+        CleanDeps()
+    end
+}
+newaction {
+    trigger = "CleanDocs",
+    description = "Custom clean action",
+    execute = function()
+        CleanDocs()
+    end
+}
+newaction {
+    trigger = "CleanAll",
+    description = "Custom clean action",
+    execute = function()
+        CleanBin()
+        CleanDeps()
+        CleanDocs()
     end
 }
 newaction 
