@@ -10,3 +10,5 @@ god_watcher.log
 nohup.out
 /src/TestUnityAPI/build-win
 /src/TestUnityAPI/build-linux
+vcpkg
+vcpkg_installed
