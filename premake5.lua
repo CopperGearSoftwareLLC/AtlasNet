@@ -1,5 +1,6 @@
 -- premake5.lua
 
+local DevPackages = "git tini gdbserver build-essential binutils automake libtool m4 autoconf gdb curl zip less unzip ccache coreutils tar g++ cmake pkg-config uuid-dev libxmu-dev libxi-dev libgl-dev libxinerama-dev libxcursor-dev xorg-dev libglu1-mesa-dev"
 workspace "GuacNet"
     architecture "x86_64"
     configurations { "DebugDocker", "DebugLocal", "Release" }
@@ -21,7 +22,8 @@ workspace "GuacNet"
 
     filter {}     -- clear filter so it doesn’t leak into other settings
     
-    links { "boost_container", "curl", "GameNetworkingSockets", "GLEW", "glfw3", "glm", "imgui","implot","implot3d","GL" }
+    links { "boost_stacktrace_addr2line","boost_container", "curl", "GameNetworkingSockets", "GLEW", "glfw3", "glm", "imgui","implot","implot3d","GL","curl","ssl","crypto","z","dl" }
+    defines {"BOOST_STACKTRACE_LINK","BOOST_STACKTRACE_USE_ADDR2LINE"}
 
     filter "configurations:DebugDocker"
         symbols "On"
@@ -38,6 +40,7 @@ workspace "GuacNet"
         libdirs { "lib/glfw/lib", "lib/glew/lib" }
     filter "configurations:Release"
         defines { "_DOCKER" }
+        symbols "On"
         optimize "On"
 
     project "AtlasNet"
@@ -159,6 +162,7 @@ newaction
             os.execute("vcpkg\\vcpkg install")
         else
             os.execute("./vcpkg/bootstrap-vcpkg.sh")
+            os.execute("sudo apt-get update && sudo apt-get install "..DevPackages.." -y")
             os.execute("./vcpkg/vcpkg install")
         end
     end
@@ -231,11 +235,11 @@ function BuildDockerImage(buildTarget, macros)
     LaunchJsonFile:write(launchtask)
     LaunchJsonFile:close()
     local BaseTemplateBuild = [[
-FROM ubuntu:25.04
+FROM ubuntu:24.04
 
 WORKDIR /app
 
-RUN apt-get update && apt-get install git gdbserver gdb curl zip less unzip ccache coreutils tar g++ cmake pkg-config uuid-dev libxmu-dev libxi-dev libgl-dev libxinerama-dev libxcursor-dev xorg-dev libglu1-mesa-dev -y
+RUN apt-get update && apt-get install ]]..DevPackages..[[ -y
 
 
 RUN git clone https://github.com/microsoft/vcpkg.git
@@ -244,12 +248,13 @@ ENV VCPKG_DEFAULT_TRIPLET=x64-linux
 ENV VCPKG_FEATURE_FLAGS=manifests
 COPY vcpkg.json /app
 #ARG HOST_HOME
-RUN ls -R / | less
 
 #RUN --mount=type=bind,source=${HOST_HOME}/.cache/vcpkg,target=/root/.cache/vcpkg 
 RUN --mount=type=cache,target=/root/.cache/vcpkg \
 ./vcpkg/vcpkg install
-RUN ls -R / | less
+RUN apt-get purge -y 'libprotobuf*' 'protobuf-compiler' 'libprotoc*' || true && \
+    apt-get autoremove -y && \
+    rm -rf /var/lib/apt/lists/*
 ENV LD_LIBRARY_PATH=/app/vcpkg_installed/x64-linux/lib
 
 RUN git clone https://github.com/premake/premake-core.git
@@ -260,9 +265,8 @@ COPY docker/]]..buildTarget..[[/devcontainer.json .devcontainer/devcontainer.jso
 COPY docker/]]..buildTarget..[[/launch.json .vscode/launch.json
 # COPY premake5 /app
 COPY premake5.lua /app
-COPY vcpkg.json /app
 
-COPY Tests /app
+COPY Tests /app/Tests
 COPY src /app/src
 COPY srcRun /app/srcRun
 RUN ./premake-core/bin/release/premake5 gmake
@@ -271,27 +275,15 @@ RUN --mount=type=cache,target=/app/obj \
 
 #CMD ["sh", "-c", "find / -path '*/.cache/vcpkg*' 2>/dev/null | less"]
 #CMD ["top"]
-#CMD ["ls","/.."]
-ENTRYPOINT ["bin/${BUILD_CONFIG}/${BUILD_TARGET}/${BUILD_TARGET}"] 
+#CMD ["ls","/.."]\
+# ENTRYPOINT ["ls","-R","bin"]
+${ENTRYPOINT}
+# ENTRYPOINT ["bin/${BUILD_CONFIG}/${BUILD_TARGET}/${BUILD_TARGET}"] 
 
 
 #CMD ["${RUN_CMD}"]
 ]]
-local BaseTemplate = [[
-FROM ubuntu:25.04
 
-WORKDIR /app
-
-RUN apt-get update && apt-get install gdbserver git curl zip unzip tar g++ cmake pkg-config uuid-dev libxmu-dev libxi-dev libgl-dev libxinerama-dev libxcursor-dev xorg-dev libglu1-mesa-dev -y
-
-ENV LD_LIBRARY_PATH=/app/vcpkg_installed/x64-linux/lib
-COPY vcpkg_installed/ /app/vcpkg_installed/
-RUN apt-get purge -y libprotobuf-dev protobuf-compiler
-
-${COPY_AND_RUN_CMDS}
-]]
-
-    
     -- Replace macros in template
     for key, value in pairs(macros) do
         BaseTemplateBuild = BaseTemplateBuild:gsub("%${" .. key .. "}", value)
@@ -319,20 +311,18 @@ function BuildDockerImageFromTarget(target,build_config,app_bundle)
             BUILD_CONFIG = (build_config),
             BUILD_CONFIG_LC = string.lower(build_config),
             RUN_CMD = target,
-        COPY_AND_RUN_CMDS = [[COPY bin/]] .. build_config .."/".. target.."/"..target.." /app\n" ..
-        "ENTRYPOINT [\"/app/"..target.."\"]"
+            ENTRYPOINT="ENTRYPOINT [\"bin/".. build_config.."/"..target.."/"..target.."\"]",
     })
     elseif target == "Partition" then
       
-        BuildF(string.lower(build_config),target .." ".. app_bundle)
+        BuildF(string.lower(build_config),target .. " "..app_bundle)
         BuildDockerImage(target, {
             RUN_CMD = "/usr/bin/sh -c ls -a",
-            BUILD_TARGET = target,
+            BUILD_TARGET = target .. " "..app_bundle,
             BUILD_CONFIG = (build_config),
             BUILD_CONFIG_LC = string.lower(build_config),
-        COPY_AND_RUN_CMDS = "COPY bin/" .. build_config .."/".. target.."/"..target.." /app\n" ..
-        "COPY bin/" .. build_config .."/".. app_bundle.."/"..app_bundle.." /app\n" ..
-        "ENTRYPOINT [\"/app/"..target.."\"]"
+            ENTRYPOINT = "ENTRYPOINT [\"/usr/bin/tini\",\"--\",\"sh\",\"-c\",\"bin/".. build_config .."/".. target .."/".. target .." & bin/".. build_config .."/".. app_bundle .."/".. app_bundle .."; wait\"]"
+
     })
     end
 end
@@ -352,8 +342,8 @@ function RunDockerImage(_target,_build_config,_app_bundle)
         local app_bundle = _app_bundle or _OPTIONS["app-bundle"] or "INVALID"
         BuildDockerImageFromTarget(target,build_config,app_bundle)
         os.execute("docker rm -f " .. target .. " >/dev/null 2>&1; ")
-        local ok, _, code = os.execute("docker run --init -v /var/run/docker.sock:/var/run/docker.sock "..
-        "--cap-add=SYS_PTRACE --security-opt seccomp=unconfined --name "..target.." -d -p 1234:1234 "..string.lower(target).." UnitTest=" ..(_OPTIONS["testid"] or "-1") )
+        local ok, _, code = os.execute("docker run --init --stop-timeout=999999 -v /var/run/docker.sock:/var/run/docker.sock "..
+        "--cap-add=SYS_PTRACE --security-opt seccomp=unconfined --name "..target.." -d -p 1234:1234 "..string.lower(target))--.." UnitTest=" ..(_OPTIONS["testid"] or "-1") )
         if not ok or code ~= 0 then
             error("(exit code: " .. tostring(code) .. ")", 2)
         end
@@ -391,7 +381,7 @@ newaction {
     trigger = "AtlasNetStart",
     description = "build",
     execute = function()
-         BuildDockerImageFromTarget("Partition","DebugDocker",_OPTIONS["app-bunble"] or "UnitTests")
+         BuildDockerImageFromTarget("Partition","DebugDocker",_OPTIONS["app-bundle"] or "UnitTests")
          RunDockerImage("God","DebugDocker")
     end
 }
@@ -407,7 +397,7 @@ newoption {
 }
 newoption {
     trigger = "app-bundle",
-    value = "Invalid",
+    value = "UnitTests",
     description = "Specify the app to bundle with partition"
 }
 newoption {

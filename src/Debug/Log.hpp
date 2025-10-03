@@ -10,13 +10,16 @@ class Log
 
 	std::string WhoIsTalking;
 
-	template <typename... Args> void Print(std::string_view fmt, Args &&...args) const
+	template <typename... Args> void PrintFormatted(std::string_view fmt, Args &&...args) const
 	{
 		std::string message = std::vformat(fmt, std::make_format_args(args...));
-		std::cerr << Color << WhoIsTalking << "> " << resetColor << message << std::endl;
+		Print(message);
 	}
-
-
+	void Print(std::string_view str) const
+	{
+		std::cerr << Color << WhoIsTalking << "> " << resetColor << str << std::endl;
+	}
+	
 
   private:
 	std::string Color;
@@ -30,7 +33,6 @@ class Log
 		"\033[34m", // Blue
 		"\033[35m", // Magenta
 		"\033[36m", // Cyan
-		"\033[37m", // White
 		"\033[90m", // Bright Black (Gray)
 		"\033[91m", // Bright Red
 		"\033[92m", // Bright Green
@@ -38,7 +40,7 @@ class Log
 		"\033[94m", // Bright Blue
 		"\033[95m", // Bright Magenta
 		"\033[96m", // Bright Cyan
-		"\033[97m", // Bright White
+
 	};
 
 	

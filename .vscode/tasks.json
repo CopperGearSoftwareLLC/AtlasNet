@@ -2,6 +2,16 @@
   "version": "2.0.0",
   "tasks": [
     {
+      "label": "AtlasNet Start",
+      "type": "shell",
+      "dependsOn": "Setup Docker Images. SampleGame",
+      "command": "./premake5",
+      "args": [ "AtlasNetStart","--testid=${input:TestNumber}"],
+      "options": {
+        "cwd": "${workspaceFolder}" // working directory
+      },
+    },
+    {
       "label": "Run God Docker",
       "type": "shell",
       "dependsOn": "Setup Docker Images. SampleGame",

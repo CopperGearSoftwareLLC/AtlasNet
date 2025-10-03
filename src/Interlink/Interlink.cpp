@@ -8,29 +8,29 @@ void Interlink::OnSteamNetConnectionStatusChanged(SteamNetConnectionStatusChange
 	{
 		// Somebody is trying to connect
 	case k_ESteamNetworkingConnectionState_Connecting:
-		Print("k_ESteamNetworkingConnectionState_Connecting");
+		logger->Print("k_ESteamNetworkingConnectionState_Connecting");
 		CallbackOnConnecting(pInfo);
 		break;
 	case k_ESteamNetworkingConnectionState_Connected:
-		Print("k_ESteamNetworkingConnectionState_Connected");
+		logger->Print("k_ESteamNetworkingConnectionState_Connected");
 		CallbackOnConnected(pInfo);
 		break;
 	case k_ESteamNetworkingConnectionState_ClosedByPeer:
-		Print("k_ESteamNetworkingConnectionState_ClosedByPeer");
+		logger->Print("k_ESteamNetworkingConnectionState_ClosedByPeer");
 		break;
 	case k_ESteamNetworkingConnectionState_ProblemDetectedLocally:
-		Print("k_ESteamNetworkingConnectionState_ProblemDetectedLocally");
+		logger->Print("k_ESteamNetworkingConnectionState_ProblemDetectedLocally");
 		break;
 	case k_ESteamNetworkingConnectionState_FinWait:
-		Print("k_ESteamNetworkingConnectionState_FinWait");
+		logger->Print("k_ESteamNetworkingConnectionState_FinWait");
 		break;
 
 	case k_ESteamNetworkingConnectionState_Dead:
-		Print("k_ESteamNetworkingConnectionState_Dead");
+		logger->Print("k_ESteamNetworkingConnectionState_Dead");
 		break;
 
 	default:
-		Print(std::format("Unknown {}", (int64)pInfo->m_info.m_eState));
+		logger->Print(std::format("Unknown {}", (int64)pInfo->m_info.m_eState));
 	};
 }
 static void SteamNetConnectionStatusChanged(SteamNetConnectionStatusChangedCallback_t *info)
@@ -49,13 +49,13 @@ void Interlink::GenerateNewConnections()
 	for (auto it = PreConnectingConnections.first; it != PreConnectingConnections.second; ++it)
 	{
 		const Connection &connection = *it;
-		Print("Connecting to {}", connection.address.ToString());
+		logger->PrintFormatted("Connecting to {}", connection.address.ToString());
 
 		HSteamNetConnection conn =
 			networkInterface->ConnectByIPAddress(connection.address.ToSteamIPAddr(), 1, &opt);
 		if (conn == k_HSteamNetConnection_Invalid)
 		{
-			Print("Failed to Generate New Connection {}", connection.address.ToString());
+			logger->PrintFormatted("Failed to Generate New Connection {}", connection.address.ToString());
 		}
 		else
 		{
@@ -67,7 +67,7 @@ void Interlink::GenerateNewConnections()
 
 void Interlink::OnDebugOutput(ESteamNetworkingSocketsDebugOutputType eType, const char *pszMsg)
 {
-	Print(std::format("[GNS Debug] {}\n", pszMsg));
+	logger->PrintFormatted(std::format("[GNS Debug] {}\n", pszMsg));
 }
 
 void Interlink::CallbackOnConnecting(SteamCBInfo info)
@@ -98,7 +98,7 @@ void Interlink::CallbackOnConnecting(SteamCBInfo info)
 			result != k_EResultOK)
 		{
 
-			Print("Error accepting connection: {}", uint64(result));
+			logger->PrintFormatted("Error accepting connection: {}", uint64(result));
 			networkInterface->CloseConnection(info->m_hConn, 0, nullptr, false);
 			throw std::runtime_error(
 				"This exception is because I have not implemented what to do when it fails "
@@ -116,14 +116,14 @@ void Interlink::CallbackOnConnected(SteamCBInfo info)
 	printf("OnConnected!\n");
 }
 
-void Interlink::Initialize(const InterlinkProperties &Properties)
+void Interlink::Init(const InterlinkProperties &Properties)
 {
 
 	MyIdentity = Properties.ThisID;
 	ASSERT(Properties.logger, "Invalid Logger");
 	logger = Properties.logger;
 
-	Print("Interlink::Initialize called");
+	logger->Print("Interlink init");
 	ASSERT(MyIdentity.Type != InterlinkType::eInvalid, "Invalid Interlink Type");
 
 	ASSERT(Properties.acceptConnectionFunc,
@@ -133,7 +133,7 @@ void Interlink::Initialize(const InterlinkProperties &Properties)
 	if (!GameNetworkingSockets_Init(nullptr, errMsg))
 	{
 
-		Print(std::string("GameNetworkingSockets_Init failed: ") + errMsg);
+		logger->Print(std::string("GameNetworkingSockets_Init failed: ") + errMsg);
 		return;
 	}
 	SteamNetworkingUtils()->SetDebugOutputFunction(
@@ -160,6 +160,11 @@ void Interlink::Initialize(const InterlinkProperties &Properties)
 	}
 }
 
+void Interlink::Shutdown()
+{
+	logger->Print("Interlink Shutdown");
+}
+
 Interlink::ConnectionRef Interlink::ConnectTo(const ConnectionProperties &ConnectProps)
 {
 	Connection connection;
@@ -182,5 +187,5 @@ void Interlink::Tick()
 {
 	GenerateNewConnections();
 	networkInterface->RunCallbacks(); // process events
-									  // Print("tick");
+									  // logger->Print("tick");
 }

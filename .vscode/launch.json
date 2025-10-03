@@ -2,6 +2,14 @@
   "version": "0.2.0",
   "configurations": [
     {
+      "name": "AtlasNet UnitTest",
+      "type": "node",              // any debugger type, doesn't matter
+      "request": "launch",
+      "program": "${workspaceFolder}/noop.js", // dummy, not used
+      "preLaunchTask": "AtlasNet Start",
+      "noDebug": true
+    },
+    {
       "name": "Debug Partition + Unit Tests",
       "type": "cppdbg",
       "request": "launch",

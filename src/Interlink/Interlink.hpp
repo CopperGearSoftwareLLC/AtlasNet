@@ -5,6 +5,7 @@
 #include "Singleton.hpp"
 #include "pch.hpp"
 #include "InterlinkMessage.hpp"
+#include "Docker/DockerIO.hpp"
 const static inline int32 CJ_LOCALHOST_PARTITION_PORT = 25565;
 using AcceptConnectionFunc = std::function<bool(const Connection &)>;
 struct InterlinkProperties
@@ -16,7 +17,7 @@ struct InterlinkProperties
 	PortType ListenSocketPort = -1;
 	AcceptConnectionFunc acceptConnectionFunc;
 };
-
+using InterlinkContainereID = DockerContainerID;
 class Interlink : public Singleton<Interlink>
 {
 	struct IndexByState
@@ -81,7 +82,8 @@ class Interlink : public Singleton<Interlink>
 	void CallbackOnConnecting(SteamCBInfo info);
 	void CallbackOnConnected(SteamCBInfo info);
   public:
-	void Initialize(const InterlinkProperties &properties);
+	void Init(const InterlinkProperties &properties);
+	void Shutdown();
 	ConnectionRef ConnectTo(const ConnectionProperties &ConnectProps);
 	ConnectionRef ConnectToLocalParition();
 

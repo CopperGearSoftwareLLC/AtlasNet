@@ -3,26 +3,27 @@
 #include "pch.hpp"
 Partition::Partition()
 {
-	Interlink::Get().Initialize(
-		InterlinkProperties{.ThisID = InterLinkIdentifier(InterlinkType::ePartition,-1),
-							.logger = logger,
-							.bOpenListenSocket = true,
-							.ListenSocketPort = CJ_LOCALHOST_PARTITION_PORT,
-							.acceptConnectionFunc = [](const Connection &c) { return true; }});
-	Run();
+	
 }
 Partition::~Partition()
 {
 	logger->Print("Goodbye from Partition!");
 }
-void Partition::Run()
+void Partition::Init()
 {
-
-	while (true)
+Interlink::Get().Init(
+		InterlinkProperties{.ThisID = InterLinkIdentifier(InterlinkType::ePartition,-1),
+							.logger = logger,
+							.bOpenListenSocket = true,
+							.ListenSocketPort = CJ_LOCALHOST_PARTITION_PORT,
+							.acceptConnectionFunc = [](const Connection &c) { return true; }});
+	
+	while (!ShouldShutdown)
 	{
 
 		Interlink::Get().Tick();
 
-		std::this_thread::sleep_for(std::chrono::milliseconds(200));
+		
 	}
+	Interlink::Get().Shutdown();
 }

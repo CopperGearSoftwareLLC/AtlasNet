@@ -1,83 +1,94 @@
 #include "God.hpp"
-#include <cstdlib>
-#include <iostream>
-#include <string>
-#include "curl/curl.h"
-#include <csignal>
-
-God::God() 
+#include "Docker/DockerIO.hpp"
+God::God()
 {
-  // Register signal handlers
-  std::signal(SIGINT, handleSignal);
-  std::signal(SIGTERM, handleSignal);
-  std::signal(SIGKILL, handleSignal);
-  std::cout << "[God] Signal handlers registered." << std::endl;
 }
 
 God::~God()
 {
-  //cleanupPartitions();
 }
 
-// Signal handler function
-void God::handleSignal(int32 signum)
+void God::Init()
 {
-  God::Get().cleanupPartitions();
-  std::exit(0);
+  logger->Print("Init");
+  InterlinkProperties InterLinkProps;
+  InterLinkProps.acceptConnectionFunc = [](const Connection &)
+  { return true; };
+  InterLinkProps.ListenSocketPort = 1234;
+  InterLinkProps.logger = logger;
+  InterLinkProps.ThisID = InterLinkIdentifier::MakeIDGod();
+  InterLinkProps.bOpenListenSocket = true;
+  Interlink::Get().Init(InterLinkProps);
+  for (int32 i = 1; i <= 12; i++)
+  {
+
+    spawnPartition();
+  }
+
+  // std::this_thread::sleep_for(std::chrono::seconds(4));
+  // god.removePartition(4);
+
+  while (!ShouldShutdown)
+  {
+  }
+
+  logger->Print("Shutting down");
+  cleanupContainers();
 }
 
-std::set<int32> God::getPartitionIDs()
+const decltype(God::ActiveContainers) &God::GetContainers()
 {
-    return partitionIds;
+  return ActiveContainers;
 }
 
-void* God::getPartition(int32_t id) 
+const God::ActiveContainer &God::GetContainer(const DockerContainerID &id)
 {
-    return nullptr;
+
+  const ActiveContainer &v = *ActiveContainers.get<IndexByID>().find(id);
+  return v;
 }
 
-bool God::spawnPartition(int32_t id, int32_t port) 
+std::optional<God::ActiveContainer> God::spawnPartition()
 {
-    // Build the shell command to invoke Start.sh
-    std::string cmd = "./Start.sh Partition " + std::to_string(id) + " " + std::to_string(port);
+  Json createRequestBody =
+      {
+          {"Image", "partition"},
+          //{"Cmd", {"--testABCD"}},
+          {"ExposedPorts", {}},
+          {"HostConfig", {{"PublishAllPorts", true}}}};
 
-    std::cout << "Running: " << cmd << std::endl;
+  std::string createResp = DockerIO::Get().request("POST", "/containers/create", &createRequestBody);
 
-    // Run the script
-    int result = std::system(cmd.c_str());
-    if (result != 0) {
-        std::cerr << "-----------------------" << "Failed to spawn partition " << id << " on port " << port << "-----------------------" << std::endl;
-        return false;
-    }
+  auto createRespJ = nlohmann::json::parse(createResp);
 
-    std::cout << "+++++++++++++++++++++++" << "Partition " << id << " started on port " << port << "+++++++++++++++++++++++" << std::endl;
-    return true;
+  ActiveContainer newPartition;
+  // logger->Print(createRespJ.dump(4));
+  newPartition.ID = createRespJ["Id"].get<std::string>();
+  newPartition.LatestInformJson = nlohmann::json::parse(DockerIO::Get().InspectContainer(newPartition.ID));
+  std::string StartResponse = DockerIO::Get().request("POST", std::string("/containers/").append(newPartition.ID).append("/start"));
+  logger->PrintFormatted("Created container with ID {}", newPartition.ID); //, newPartition.LatestInformJson.dump(4));
+  ActiveContainers.insert(newPartition);
+
+  return newPartition;
 }
 
-bool God::removePartition(int32_t id) 
+bool God::removePartition(const DockerContainerID &id, uint32 TimeOutSeconds)
 {
-    std::string containerName = "partition_" + std::to_string(id);
-    std::string cmd = "docker rm -f " + containerName;
+  logger->PrintFormatted("Deleting {}", id);
+  std::string RemoveResponse = DockerIO::Get().request("POST", "/containers/" + std::string(id) + "/stop?t=" + std::to_string(TimeOutSeconds));
+  std::string DeleteResponse = DockerIO::Get().request("DELETE", "/containers/" + id);
 
-    std::cout << "Running: " << cmd << std::endl;
-
-    int result = std::system(cmd.c_str());
-    if (result != 0) {
-        std::cerr << "-----------------------" << "Failed to remove partition " << id << "-----------------------" << std::endl;
-        return false;
-    }
-
-    std::cout << "+++++++++++++++++++++++" << "Partition " << id << " removed successfully"<< "+++++++++++++++++++++++" << std::endl;
-    return true;
+  return true;
 }
 
-bool God::cleanupPartitions() 
+bool God::cleanupContainers()
 {
-  std::cout << "[God] Attempting cleanup." << std::endl;
-    int result = std::system("docker rm -f $(docker ps -aq --filter name=partition_)");
-    if (result != 0) {
-        std::cerr << "-----------------------" << "Failed to clean up partitions\n" << "-----------------------" << std::endl;
-        return false;
-    }
-    return true;
+
+  for (const auto &Partition : ActiveContainers)
+  {
+    logger->PrintFormatted("Deleting {}", Partition.ID);
+    removePartition(Partition.ID);
+  }
+  ActiveContainers.clear();
+  return true;
 }

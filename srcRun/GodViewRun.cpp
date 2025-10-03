@@ -1,7 +1,9 @@
 #include <GodView/GodView.hpp>
 #include <GodView/PartitionVisualization.hpp>
-int main(void)
+#include <Debug/Crash/CrashHandler.hpp>
+int main(int argc, char** argv)
 {
+    CrashHandler::Get().Init(argv[0]);
 
     std::cerr << "Hello from AtlasView\n";
     

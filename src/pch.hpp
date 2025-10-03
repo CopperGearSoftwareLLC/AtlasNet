@@ -30,6 +30,8 @@
 #include "GameNetworkingSockets/steam/steamtypes.h"
 #include "GameNetworkingSockets/steam/steamuniverse.h"
 
+#include "curl/curl.h"
+
 #include <boost/multi_index_container.hpp>
 #include <boost/multi_index/ordered_index.hpp>
 #include <boost/multi_index/identity.hpp>
@@ -38,6 +40,7 @@
 #include <boost/describe/enum.hpp>
 #include <boost/describe/enum_to_string.hpp>
 #include <boost/describe/enum_from_string.hpp>
+#include <boost/stacktrace.hpp>
 
 #include "nlohmann/json.hpp"
 using Json = nlohmann::json;
@@ -67,7 +70,12 @@ using vec = glm::vec<L, T>;
 #include <unordered_map>
 #include <memory>
 #include <set>
+#include <execinfo.h>
 #include <cstring>
 #include <unordered_set>
 #include <emmintrin.h> // SSE2
 #include <format>
+#include <string>
+#include <csignal>
+#include <signal.h>
+#include <unistd.h>

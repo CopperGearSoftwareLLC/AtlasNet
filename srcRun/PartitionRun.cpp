@@ -4,7 +4,12 @@
 #include <netinet/in.h>
 #include <unistd.h>
 #include "pch.hpp"
-int main(void)
+#include <Debug/Crash/CrashHandler.hpp>
+#include <Docker/DockerEvents.hpp>
+int main(int argc, char **argv)
 {
-    Partition::Get();
+    CrashHandler::Get().Init(argv[0]);
+    DockerEvents::Get().Init(DockerEventsInit{.OnShutdownRequest = [](SignalType signal)
+                                              { Partition::Get().Shutdown(); }});
+    Partition::Get().Init();
 }
