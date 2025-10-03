@@ -68,12 +68,12 @@ workspace "GuacNet"
         files { "srcRun/PartitionRun.cpp" }
         defines "_PARTITION"
 
-    project "SampleGame"
+    project "UnitTests"
         dependson "AtlasNet"
         links "AtlasNet"
         kind "ConsoleApp"
         language "C++"
-        files { "examples/SampleGame/**.cpp" }
+        files { "Tests/SampleGame/**.cpp" }
         defines { "_GAMECLIENT", "_GAMESERVER" }
 
 -- Generic cleanup function
@@ -150,7 +150,6 @@ newaction
     trigger = "setup",
     description = "Setups up dependencies",
     execute = function()
-        local manifestDir = os.getcwd()
         local isWindows = package.config:sub(1, 1) == '\\' -- check if path separator is '\'
 
         os.execute("git clone https://github.com/microsoft/vcpkg.git")
@@ -176,12 +175,67 @@ newaction
 }
 function BuildDockerImage(buildTarget, macros)
     -- Simple Dockerfile template with macros
+    local devcontainerjson = [[
+    {
+  "name": "]]..buildTarget..[[",
+  "remoteUser": "root",
+   "customizations": {
+    "vscode": {
+      "extensions": ["streetsidesoftware.code-spell-checker","ms-vscode.cpptools-extension-pack","augustocdias.tasks-shell-input"],
+      "settings": [{ "terminal.integrated.defaultProfile.linux": "bash"}]
+    }
+  },
+  "postCreateCommand": "touch test.txt"
+}
+    ]]
+    local launchtask = [[
+   {
+    "version": "0.2.0",
+    "configurations": [
+       {
+      "name": "Attach",
+      "type": "cppdbg",
+        "request": "attach",
+
+      "program": "${workspaceFolder}/bin/${BUILD_CONFIG}/${BUILD_TARGET}/${BUILD_TARGET}",
+      "processId": "${input:findPid}",
+      "cwd": "${workspaceFolder}",
+      "MIMode": "gdb",
+    "miDebuggerPath": "/usr/bin/gdb",
+      "stopAtEntry": false,
+      "useExtendedRemote": true
+      
+    },
+    ],
+"inputs": [
+  {
+    "id": "findPid",
+    "type": "command",
+    "command": "shellCommand.execute",
+    "args": {
+      "command": "pidof ${BUILD_TARGET}",   // can be any script or inline shell,
+      "useFirstResult" : true
+    }
+  }
+]
+}
+    ]]
+    for key, value in pairs(macros) do
+        devcontainerjson = devcontainerjson:gsub("%${" .. key .. "}", value)
+        launchtask = launchtask:gsub("%${" .. key .. "}", value)
+    end
+    local devcontainerFile = io.open("docker/"..buildTarget.."/devcontainer.json", "w")
+    devcontainerFile:write(devcontainerjson)
+    devcontainerFile:close()
+    local LaunchJsonFile = io.open("docker/"..buildTarget.."/launch.json","w")
+    LaunchJsonFile:write(launchtask)
+    LaunchJsonFile:close()
     local BaseTemplateBuild = [[
 FROM ubuntu:25.04
 
 WORKDIR /app
 
-RUN apt-get update && apt-get install git curl zip unzip coreutils tar g++ cmake pkg-config uuid-dev libxmu-dev libxi-dev libgl-dev libxinerama-dev libxcursor-dev xorg-dev libglu1-mesa-dev -y
+RUN apt-get update && apt-get install git gdbserver gdb curl zip less unzip ccache coreutils tar g++ cmake pkg-config uuid-dev libxmu-dev libxi-dev libgl-dev libxinerama-dev libxcursor-dev xorg-dev libglu1-mesa-dev -y
 
 
 RUN git clone https://github.com/microsoft/vcpkg.git
@@ -189,42 +243,50 @@ RUN ./vcpkg/bootstrap-vcpkg.sh
 ENV VCPKG_DEFAULT_TRIPLET=x64-linux
 ENV VCPKG_FEATURE_FLAGS=manifests
 COPY vcpkg.json /app
+#ARG HOST_HOME
+RUN ls -R / | less
 
-RUN ./vcpkg/vcpkg install
+#RUN --mount=type=bind,source=${HOST_HOME}/.cache/vcpkg,target=/root/.cache/vcpkg 
+RUN --mount=type=cache,target=/root/.cache/vcpkg \
+./vcpkg/vcpkg install
+RUN ls -R / | less
 ENV LD_LIBRARY_PATH=/app/vcpkg_installed/x64-linux/lib
 
 RUN git clone https://github.com/premake/premake-core.git
 WORKDIR /app/premake-core
 RUN make -f Bootstrap.mak linux
-
 WORKDIR /app
-
+COPY docker/]]..buildTarget..[[/devcontainer.json .devcontainer/devcontainer.json
+COPY docker/]]..buildTarget..[[/launch.json .vscode/launch.json
 # COPY premake5 /app
 COPY premake5.lua /app
 COPY vcpkg.json /app
-RUN ./premake-core/bin/release/premake5 setup
 
-COPY examples /app
+COPY Tests /app
 COPY src /app/src
 COPY srcRun /app/srcRun
 RUN ./premake-core/bin/release/premake5 gmake
-RUN make -C ./build ${BUILD_TARGET} config=${BUILD_CONFIG} -j $(nproc)
+RUN --mount=type=cache,target=/app/obj \
+    make -C ./build ${BUILD_TARGET} config=${BUILD_CONFIG_LC} -j $(nproc)
+
+#CMD ["sh", "-c", "find / -path '*/.cache/vcpkg*' 2>/dev/null | less"]
+#CMD ["top"]
+#CMD ["ls","/.."]
+ENTRYPOINT ["bin/${BUILD_CONFIG}/${BUILD_TARGET}/${BUILD_TARGET}"] 
 
 
-
-RUN ${BUILD_CMD}
-
-CMD ["${RUN_CMD}"]
+#CMD ["${RUN_CMD}"]
 ]]
 local BaseTemplate = [[
 FROM ubuntu:25.04
 
 WORKDIR /app
 
-RUN apt-get update && apt-get install git curl zip unzip tar g++ cmake pkg-config uuid-dev libxmu-dev libxi-dev libgl-dev libxinerama-dev libxcursor-dev xorg-dev libglu1-mesa-dev -y
+RUN apt-get update && apt-get install gdbserver git curl zip unzip tar g++ cmake pkg-config uuid-dev libxmu-dev libxi-dev libgl-dev libxinerama-dev libxcursor-dev xorg-dev libglu1-mesa-dev -y
 
 ENV LD_LIBRARY_PATH=/app/vcpkg_installed/x64-linux/lib
 COPY vcpkg_installed/ /app/vcpkg_installed/
+RUN apt-get purge -y libprotobuf-dev protobuf-compiler
 
 ${COPY_AND_RUN_CMDS}
 ]]
@@ -245,28 +307,32 @@ ${COPY_AND_RUN_CMDS}
     else
         print("Failed to open " .. dockerFilePath)
     end
-    os.execute("docker build -f "..dockerFilePath.." -t ".. string.lower(buildTarget)..":latest .")
+    os.execute("DOCKER_BUILDKIT=1 docker build --build-arg HOST_HOME=$HOME -f "..dockerFilePath.." -t ".. string.lower(buildTarget)..":latest .")
 end
 
 function BuildDockerImageFromTarget(target,build_config,app_bundle)
      
     if target == "God" or target == "Demigod"or target == "GameCoordinator" then
-         BuildF(string.lower(build_config),target)
-    BuildDockerImage(target, {
-                    BUILD_TARGET = target,
-            BUILD_CONFIG = string.lower(build_config),
+        BuildF(string.lower(build_config),target)
+        BuildDockerImage(target, {
+            BUILD_TARGET = target,
+            BUILD_CONFIG = (build_config),
+            BUILD_CONFIG_LC = string.lower(build_config),
+            RUN_CMD = target,
         COPY_AND_RUN_CMDS = [[COPY bin/]] .. build_config .."/".. target.."/"..target.." /app\n" ..
-        "ENTRYPOINT /app/"..target
+        "ENTRYPOINT [\"/app/"..target.."\"]"
     })
     elseif target == "Partition" then
       
         BuildF(string.lower(build_config),target .." ".. app_bundle)
         BuildDockerImage(target, {
+            RUN_CMD = "/usr/bin/sh -c ls -a",
             BUILD_TARGET = target,
-            BUILD_CONFIG = string.lower(build_config),
+            BUILD_CONFIG = (build_config),
+            BUILD_CONFIG_LC = string.lower(build_config),
         COPY_AND_RUN_CMDS = "COPY bin/" .. build_config .."/".. target.."/"..target.." /app\n" ..
-        "COPY bin/" .. build_config .."/".. target.."/"..target.." /app\n" ..
-        "ENTRYPOINT /app/"..target
+        "COPY bin/" .. build_config .."/".. app_bundle.."/"..app_bundle.." /app\n" ..
+        "ENTRYPOINT [\"/app/"..target.."\"]"
     })
     end
 end
@@ -275,24 +341,28 @@ newaction {
     description = "generate documentation",
     execute = function()
         local target = _OPTIONS["target"] or "INVALID"
-        local build_config = _OPTIONS["build_config"] or "Release"
+        local build_config = _OPTIONS["build-config"] or "Release"
         local app_bundle = _OPTIONS["app-bundle"] or "INVALID"
         BuildDockerImageFromTarget(target,build_config,app_bundle)
     end
 }
+function RunDockerImage(_target,_build_config,_app_bundle)
+     local target = _target or _OPTIONS["target"] or "INVALID"
+        local build_config = _build_config or _OPTIONS["build-config"] or "Release"
+        local app_bundle = _app_bundle or _OPTIONS["app-bundle"] or "INVALID"
+        BuildDockerImageFromTarget(target,build_config,app_bundle)
+        os.execute("docker rm -f " .. target .. " >/dev/null 2>&1; ")
+        local ok, _, code = os.execute("docker run --init -v /var/run/docker.sock:/var/run/docker.sock "..
+        "--cap-add=SYS_PTRACE --security-opt seccomp=unconfined --name "..target.." -d -p 1234:1234 "..string.lower(target).." UnitTest=" ..(_OPTIONS["testid"] or "-1") )
+        if not ok or code ~= 0 then
+            error("(exit code: " .. tostring(code) .. ")", 2)
+        end
+end
 newaction {
     trigger = "run-docker-image",
     description = "generate documentation",
     execute = function()
-        local target = _OPTIONS["target"] or "INVALID"
-        local build_config = _OPTIONS["build_config"] or "Release"
-        local app_bundle = _OPTIONS["app-bundle"] or "INVALID"
-        BuildDockerImageFromTarget(target,build_config,app_bundle)
-        os.execute("docker rm -f " .. target .. " >/dev/null 2>&1; ")
-        local ok, _, code = os.execute("docker run --init -v /var/run/docker.sock:/var/run/docker.sock --cap-add=SYS_PTRACE --security-opt seccomp=unconfined --name "..target.." -d -p 1234:1234 "..string.lower(target))
-        if not ok or code ~= 0 then
-            error("(exit code: " .. tostring(code) .. ")", 2)
-        end
+       RunDockerImage()
     end
 }
 function BuildF(build_config,target)
@@ -314,7 +384,15 @@ newaction {
     trigger = "Build",
     description = "build",
     execute = function()
-         BuildF(string.lower(_OPTIONS["build_config"] or "Release"),(_OPTIONS["target"] or ""))
+         BuildF(string.lower(_OPTIONS["build-config"] or "Release"),(_OPTIONS["target"] or ""))
+    end
+}
+newaction {
+    trigger = "AtlasNetStart",
+    description = "build",
+    execute = function()
+         BuildDockerImageFromTarget("Partition","DebugDocker",_OPTIONS["app-bunble"] or "UnitTests")
+         RunDockerImage("God","DebugDocker")
     end
 }
 newoption {
@@ -323,7 +401,7 @@ newoption {
     description = "Specify which target to generate for"
 }
 newoption {
-    trigger     = "build_config",
+    trigger     = "build-config",
     value       = "Release",
     description = "Specify which build to generate for"
 }
@@ -331,4 +409,9 @@ newoption {
     trigger = "app-bundle",
     value = "Invalid",
     description = "Specify the app to bundle with partition"
+}
+newoption {
+    trigger = "testid",
+    value = "-1",
+    description = "Specify the id to run from unit tests"
 }

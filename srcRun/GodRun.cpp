@@ -26,6 +26,11 @@ int main(int argc, char** argv) {
 	++port;
 	god.spawnPartition(i, port);
     }
+    while (true)
+    {
+        std::this_thread::sleep_for(std::chrono::seconds(2));
+        std::cerr << "Hello\n";
+    }
     return 0;
 }
 
