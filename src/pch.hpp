@@ -38,6 +38,7 @@
 
 /* Databases */
 #include <sw/redis++/redis++.h>
+#include "Database/IDatabase.hpp"
 
 #include "nlohmann/json.hpp"
 using Json = nlohmann::json;

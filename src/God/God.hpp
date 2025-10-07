@@ -39,6 +39,12 @@ class God : public Singleton<God> {
     std::set<int32> partitionIds;
 
     /**
+     * @brief Cache database pointer for storing partition metadata.
+     * 
+     */
+    std::unique_ptr<IDatabase> cache;
+
+    /**
      * @brief Handles termination signals to ensure cleanup of partitions before exiting. (doesnt work rn)
      */
     static void handleSignal(int32 signum);

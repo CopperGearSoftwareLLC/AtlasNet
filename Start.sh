@@ -41,6 +41,8 @@ case "$ARG" in
         PORT=$3
         echo "Spawning Partition $ID on port $PORT"
 
+        docker network inspect AtlasNet >/dev/null 2>&1 || docker network create AtlasNet
+
         # Call Docker REST API via curl (inside WSL with mounted socket)
         curl --unix-socket /var/run/docker.sock -X POST \
             -H "Content-Type: application/json" \
