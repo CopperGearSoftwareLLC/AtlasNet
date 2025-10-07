@@ -1,3 +1,6 @@
+# run the docker container
+docker run -d --name database-redis -p 6379:6379 database --appendonly yesA
+
 # execute inside terminal to directly access redis (very fast short-term cache database)
 docker exec -it database-redis redis-cli
 

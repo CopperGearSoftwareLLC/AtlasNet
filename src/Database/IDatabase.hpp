@@ -9,7 +9,7 @@ public:
     /// Initialize connection (or container in dev)
     virtual bool Connect() = 0;
 
-    /// Set key -> value
+    /// Set key -> value        
     virtual void Set(const std::string& key, const std::string& value) = 0;
 
     /// Get value for key (nullopt if missing)
