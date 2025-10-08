@@ -246,7 +246,18 @@ FROM ubuntu:24.04
 WORKDIR /app
 
 RUN apt-get update && apt-get install ]]..DevPackages..[[ -y
+]]
 
+    -- Inject Redis installation if target is Database
+    if buildTarget == "Database" then
+        BaseTemplateBuild = BaseTemplateBuild .. [[
+# Install Redis
+RUN apt-get update && apt-get install -y redis-server && rm -rf /var/lib/apt/lists/*
+EXPOSE 6379
+]]
+    end
+
+BaseTemplateBuild = BaseTemplateBuild .. [[
 
 RUN git clone https://github.com/microsoft/vcpkg.git
 RUN ./vcpkg/bootstrap-vcpkg.sh

@@ -1,5 +1,8 @@
-# run the docker container
+# run the docker container default c++ binary as entry
 docker run -d --name database-redis -p 6379:6379 database --appendonly yesA
+
+# run docker container override redis as entry
+docker run -d --name database-redis -p 6379:6379 --entrypoint redis-server database --appendonly yes --bind 0.0.0.0
 
 # execute inside terminal to directly access redis (very fast short-term cache database)
 docker exec -it database-redis redis-cli
