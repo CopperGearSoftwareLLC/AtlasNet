@@ -6,21 +6,18 @@ Partition::Partition()
 {
   // just for verifying partitions can connect with databases
 	IDatabase* cacheDB = new RedisCacheDatabase();
-  if (cacheDB->Connect())
+  if (cacheDB && cacheDB->Connect())
   {
-      // Get current time as system clock
-      auto now = std::chrono::system_clock::now();
-
-      // Convert to time_t (seconds since epoch)
-      std::time_t now_c = std::chrono::system_clock::to_time_t(now);
-
-      // set the data in database
-      cacheDB->Set(std::ctime(&now_c), "Partition's Data");
+    // check write capability to database
+      char hostname[128];
+      gethostname(hostname, sizeof(hostname));
+      cacheDB->Set(hostname, "Partition's Data");
   }
 
 }
 Partition::~Partition()
 {
+
 	logger->Print("Goodbye from Partition!");
 }
 void Partition::Init()

@@ -55,7 +55,15 @@ std::optional<God::ActiveContainer> God::spawnPartition()
           {"Image", "partition"},
           //{"Cmd", {"--testABCD"}},
           {"ExposedPorts", {}},
-          {"HostConfig", {{"PublishAllPorts", true}}}};
+          {"HostConfig", {{"PublishAllPorts", true},
+          {"NetworkMode", "AtlasNet"}  // <-- attach to your custom network
+        }},
+        {"NetworkingConfig", {
+        {"EndpointsConfig", {
+            {"AtlasNet", Json::object()}  // tell Docker to connect to that network
+        }}
+    }}
+      };
 
   std::string createResp = DockerIO::Get().request("POST", "/containers/create", &createRequestBody);
 
