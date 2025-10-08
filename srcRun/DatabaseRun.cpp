@@ -1,5 +1,4 @@
 #include "pch.hpp"
-#include "Database/RedisCacheDatabase.hpp"
 
 int main()
 {

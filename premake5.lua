@@ -65,7 +65,7 @@ workspace "GuacNet"
         defines "_GODVIEW"
     project "Partition"
         dependson "AtlasNet"
-        links "AtlasNet"
+        links {"AtlasNet","redis++","hiredis"}
         kind "ConsoleApp"
         language "C++"
         files { "srcRun/PartitionRun.cpp" }

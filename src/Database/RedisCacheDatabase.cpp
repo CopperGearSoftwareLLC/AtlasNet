@@ -1,6 +1,6 @@
 #include "RedisCacheDatabase.hpp"
 
-  RedisCacheDatabase::RedisCacheDatabase(bool createDatabase, const std::string &host,
+RedisCacheDatabase::RedisCacheDatabase(bool createDatabase, const std::string &host,
                 int32 port,
                 const std::string &network)
       : _host(host), _port(port),

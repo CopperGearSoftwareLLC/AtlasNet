@@ -6,6 +6,10 @@
 #include "pch.hpp"
 #include "IDatabase.hpp"
 
+/**
+ * @brief Database w/ Redis. Note: socket connections are TPC. fast, but partitions should still cache its own entity data
+ * 
+ */
 class RedisCacheDatabase : public IDatabase {
 public:
     RedisCacheDatabase(bool createDatabase = false, const std::string &host = "database-redis", int32 port = 6379, const std::string &network = "AtlasNet");
