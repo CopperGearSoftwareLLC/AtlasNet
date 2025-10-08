@@ -15,6 +15,9 @@ public:
     /// Get value for key (nullopt if missing)
     virtual std::optional<std::string> Get(const std::string& key) = 0;
 
+    // Remove a data entry
+    virtual bool Remove(const std::string& key) = 0;
+
     /// Check if key exists
     virtual bool Exists(const std::string& key) = 0;
 

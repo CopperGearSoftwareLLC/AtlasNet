@@ -72,7 +72,7 @@ workspace "GuacNet"
         defines "_PARTITION"
     project "Database"
         dependson "AtlasNet"
-        links "AtlasNet"
+        links {"AtlasNet","redis++","hiredis"}
         kind "ConsoleApp"
         language "C++"
         files { "srcRun/DatabaseRun.cpp" }

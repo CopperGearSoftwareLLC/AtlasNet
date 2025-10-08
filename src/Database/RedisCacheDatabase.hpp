@@ -13,28 +13,57 @@ public:
                   const std::string &network = "AtlasNet")
         : _host(host), _port(port),
           _network(network),
-          _autoStart(createDatabase) {}
+          _autoStart(createDatabase) 
+    {
+          if (_autoStart) {
+        // Start Redis process locally (inside same container)
+        std::string startCmd = "redis-server --appendonly yes --protected-mode no --daemonize yes";
+        int ret = std::system(startCmd.c_str());
+        if (ret != 0) {
+            std::cerr << "❌ Failed to start local Redis process.\n";
+            return;
+        }
+        std::cerr << "🐳 Started local Redis process on host + port " << _host << ":" << _port << "\n";
+    }
+
+    //try {
+    //    std::string uri = "tcp://127.0.0.1:" + std::to_string(_port);
+    //    _redis = std::make_unique<sw::redis::Redis>(uri);
+//
+    //    // Simple ping check
+    //    auto reply = _redis->ping();
+    //    if (reply != "PONG") {
+    //        std::cerr << "⚠️ Redis started but not responding properly.\n";
+    //        return;
+    //    }
+    //} catch (const std::exception &e) {
+    //    std::cerr << "❌ Redis connection failed: " << e.what() << "\n";
+    //    return;
+    //}
+//
+    //std::cerr << "✅ Connected to Redis on 127.0.0.1:" << _port << "\n";
+    }
 
     /**
      * Initializes connection to Redis.
      * If autoStart==true, will spin up container in dev mode.
      */
     bool Connect() override {
-        if (_autoStart) {
-            // Try to remove and restart Redis container (dev mode)
-            std::string cmd =
-                "docker rm -f " + _host + " >/dev/null 2>&1; "
-                "docker run --network " + _network +
-                " -d --name " + _host +
-                " -p " + std::to_string(_port) + ":6379 redis:latest >/dev/null";
-
-            int32 ret = std::system(cmd.c_str());
-            if (ret != 0) {
-                std::cerr << "❌ Failed to start Redis container. Command: " << cmd << "\n";
-                return false;
-            }
-            std::cerr << "🐳 Started Redis container " << _host << " on port " << _port << "\n";
-        }
+        //if (_autoStart) {
+        //    // Try to remove and restart Redis container (dev mode)
+        //    std::string cmd =
+        //        "docker rm -f " + _host + " >/dev/null 2>&1; "
+        //        "docker run --network " + _network +
+        //        " -d --name " + _host +
+        //        " -p " + std::to_string(_port) + ":6379 redis:latest >/dev/null";
+//
+        //    int32 ret = std::system(cmd.c_str());
+        //    if (ret != 0) {
+        //        std::cerr << "❌ Failed to start Redis container. Command: " << cmd << "\n";
+        //        return false;
+        //    }
+        //    std::cerr << "🐳 Started Redis container " << _host << " on port " << _port << "\n";
+        //}
 
         try {
             std::string uri = "tcp://" + _host + ":" + std::to_string(_port);
@@ -57,6 +86,10 @@ public:
         if (!_redis) return std::nullopt;
         auto val = _redis->get(key);
         return val ? std::optional<std::string>(*val) : std::nullopt;
+    }
+
+    bool Remove(const std::string &key) override {
+      return false;
     }
 
     bool Exists(const std::string &key) override {

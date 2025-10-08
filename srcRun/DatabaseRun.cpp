@@ -1,7 +1,15 @@
 #include "pch.hpp"
+#include "Database/RedisCacheDatabase.hpp"
 
 int main()
 {
+  IDatabase* database = new RedisCacheDatabase(true);
+  if (database->Connect())
+  {
+    database->Set("test", "||||||||||||AddSomethingToDatabaseSuccess||||||||||||||");
+    std::string out = database->Get("test").value();
+    std::cerr << out << std::endl;
+  }
 
 
   while (true)
