@@ -22,7 +22,7 @@ workspace "GuacNet"
 
     filter {}     -- clear filter so it doesn’t leak into other settings
     
-    links { "boost_stacktrace_addr2line","boost_container", "curl", "GameNetworkingSockets", "GLEW", "glfw3", "glm", "imgui","implot","implot3d","GL","curl","ssl","crypto","z","dl" }
+    links { "boost_stacktrace_addr2line","boost_container", "curl", "GameNetworkingSockets", "GLEW", "glfw3", "glm", "imgui","implot","implot3d","GL","curl","ssl","crypto","z","dl","redis++","hiredis" }
     defines {"BOOST_STACKTRACE_LINK","BOOST_STACKTRACE_USE_ADDR2LINE"}
 
     filter "configurations:DebugDocker"
@@ -65,14 +65,14 @@ workspace "GuacNet"
         defines "_GODVIEW"
     project "Partition"
         dependson "AtlasNet"
-        links {"AtlasNet","redis++","hiredis"}
+        links {"AtlasNet",}
         kind "ConsoleApp"
         language "C++"
         files { "srcRun/PartitionRun.cpp" }
         defines "_PARTITION"
     project "Database"
         dependson "AtlasNet"
-        links {"AtlasNet","redis++","hiredis"}
+        links {"AtlasNet"}
         kind "ConsoleApp"
         language "C++"
         files { "srcRun/DatabaseRun.cpp" }
@@ -359,7 +359,7 @@ function RunDockerImage(_target,_build_config,_app_bundle)
         local app_bundle = _app_bundle or _OPTIONS["app-bundle"] or "INVALID"
         BuildDockerImageFromTarget(target,build_config,app_bundle)
         os.execute("docker rm -f " .. target .. " >/dev/null 2>&1; ")
-        local ok, _, code = os.execute("docker run --init --stop-timeout=999999 -v /var/run/docker.sock:/var/run/docker.sock "..
+        local ok, _, code = os.execute("docker run --init --network AtlasNet --stop-timeout=999999 -v /var/run/docker.sock:/var/run/docker.sock "..
         "--cap-add=SYS_PTRACE --security-opt seccomp=unconfined --name "..target.." -d -p 1234:1234 "..string.lower(target))--.." UnitTest=" ..(_OPTIONS["testid"] or "-1") )
         if not ok or code ~= 0 then
             error("(exit code: " .. tostring(code) .. ")", 2)

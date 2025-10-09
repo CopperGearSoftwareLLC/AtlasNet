@@ -3,6 +3,7 @@
     #include "Singleton.hpp"
     #include "Debug/Log.hpp"
     #include "Interlink/Interlink.hpp"
+    #include "Heuristic/Heuristic.hpp"
     class God : public Singleton<God>
     {
     public:
@@ -18,6 +19,7 @@
     private:
         CURL *curl;
         std::shared_ptr<Log> logger = std::make_shared<Log>("God");
+        Heuristic heuristic;
         struct IndexByID
         {
         };
@@ -44,7 +46,17 @@
         }
 
         void Init();
-    
+        
+        /**
+         * @brief Computes partition shapes using heuristic algorithms and stores them in the database.
+         * 
+         * This function calls the Heuristic::computePartition() method to generate optimal
+         * partition boundaries, then serializes and stores the resulting shapes in the
+         * cache database for persistence and retrieval by other system components.
+         * 
+         * @return bool True if the operation completed successfully, false otherwise.
+         */
+        bool computeAndStorePartitions();
 
     private:
     /**
