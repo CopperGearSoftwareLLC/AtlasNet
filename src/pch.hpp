@@ -57,6 +57,10 @@ using quat = glm::quat;
 template <glm::length_t L, typename T>
 using vec = glm::vec<L, T>;
 
+/* Database */
+#include <sw/redis++/redis++.h>
+#include "Database/IDatabase.hpp"
+#include "Database/RedisCacheDatabase.hpp"
 
 #include <cassert>
 #define ASSERT(check,message) assert(check && message)

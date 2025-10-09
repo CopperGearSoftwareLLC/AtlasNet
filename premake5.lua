@@ -65,12 +65,18 @@ workspace "GuacNet"
         defines "_GODVIEW"
     project "Partition"
         dependson "AtlasNet"
-        links "AtlasNet"
+        links {"AtlasNet","redis++","hiredis"}
         kind "ConsoleApp"
         language "C++"
         files { "srcRun/PartitionRun.cpp" }
         defines "_PARTITION"
-
+    project "Database"
+        dependson "AtlasNet"
+        links {"AtlasNet","redis++","hiredis"}
+        kind "ConsoleApp"
+        language "C++"
+        files { "srcRun/DatabaseRun.cpp" }
+        defines "_PARTITION"
     project "UnitTests"
         dependson "AtlasNet"
         links "AtlasNet"
@@ -240,7 +246,18 @@ FROM ubuntu:24.04
 WORKDIR /app
 
 RUN apt-get update && apt-get install ]]..DevPackages..[[ -y
+]]
 
+    -- Inject Redis installation if target is Database
+    if buildTarget == "Database" then
+        BaseTemplateBuild = BaseTemplateBuild .. [[
+# Install Redis
+RUN apt-get update && apt-get install -y redis-server && rm -rf /var/lib/apt/lists/*
+EXPOSE 6379
+]]
+    end
+
+BaseTemplateBuild = BaseTemplateBuild .. [[
 
 RUN git clone https://github.com/microsoft/vcpkg.git
 RUN ./vcpkg/bootstrap-vcpkg.sh
@@ -304,7 +321,7 @@ end
 
 function BuildDockerImageFromTarget(target,build_config,app_bundle)
      
-    if target == "God" or target == "Demigod"or target == "GameCoordinator" then
+    if target == "God" or target == "Database"or target == "GameCoordinator" then
         BuildF(string.lower(build_config),target)
         BuildDockerImage(target, {
             BUILD_TARGET = target,
@@ -370,18 +387,25 @@ function BuildF(build_config,target)
         error("(exit code: " .. tostring(mcode) .. ")", 2)
     end
 end
+
+function MakeDockerImages()
+
+         BuildDockerImageFromTarget("Partition","DebugDocker",_OPTIONS["app-bundle"] or "UnitTests")
+         BuildDockerImageFromTarget("Database","DebugDocker")
+         BuildDockerImageFromTarget("God","DebugDocker")
+end
 newaction {
     trigger = "Build",
     description = "build",
     execute = function()
-         BuildF(string.lower(_OPTIONS["build-config"] or "Release"),(_OPTIONS["target"] or ""))
+         MakeDockerImages()
     end
 }
 newaction {
     trigger = "AtlasNetStart",
     description = "build",
     execute = function()
-         BuildDockerImageFromTarget("Partition","DebugDocker",_OPTIONS["app-bundle"] or "UnitTests")
+          MakeDockerImages()
          RunDockerImage("God","DebugDocker")
     end
 }

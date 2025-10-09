@@ -24,6 +24,8 @@
     "boost-describe",
     "boost-stacktrace",
     "gamenetworkingsockets",
-    "curl"
+    "curl",
+    "redis-plus-plus",
+    "hiredis"
   ]
 }
