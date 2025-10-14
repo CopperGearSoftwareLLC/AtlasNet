@@ -3,20 +3,23 @@
 /**
  * @brief A simple entity that moves in a circular path.
  */
-struct Entity {
+struct Entity
+{
     vec2 position{0.0f, 0.0f};
-    float speed;   // radians per second
+    float speed; // radians per second
     float radius;
-    float angle;   // current angle in radians
+    float angle; // current angle in radians
 
-    Entity(float radius_, float speed_) 
-      : speed(speed_), radius(radius_), angle(0.0f) {}
+    Entity(float radius_, float speed_)
+        : speed(speed_), radius(radius_), angle(0.0f) {}
 
     // hard coded circular motion for testing
-    void update(float dt) {
+    void update(float dt)
+    {
         angle += speed * dt;
         const float two_pi = 2.0f * 3.14159265358979323846f;
-        if (angle > two_pi) angle -= two_pi;
+        if (angle > two_pi)
+            angle -= two_pi;
         position.x = radius * std::cos(angle);
         position.y = radius * std::sin(angle);
     }
@@ -25,31 +28,45 @@ struct Entity {
 /**
  * @brief A simple scene managing multiple entities.
  */
-class Scene {
+class Scene
+{
 public:
     std::vector<Entity> entities;
 
-    void update(float dt) {
-        for (auto & e : entities) {
+    void update(float dt)
+    {
+        for (auto &e : entities)
+        {
             e.update(dt);
         }
     }
 
-    void printPositions() const {
-        for (size_t i = 0; i < entities.size(); ++i) {
-            const auto & e = entities[i];
-            std::cout << "Entity[" << i << "] pos = (" 
+    void printPositions() const
+    {
+        for (size_t i = 0; i < entities.size(); ++i)
+        {
+            const auto &e = entities[i];
+            std::cout << "Entity[" << i << "] pos = ("
                       << e.position.x << ", " << e.position.y << ")\n";
         }
     }
 };
 
+bool ShouldShutdown = false;
 /**
  * @brief Main function to run the sample game.
  */
-int main() {
+int main(int argc, char **argv)
+{
+    for (int i = 0; i < argc; i++)
+    {
+        std::cerr << argv[i] << std::endl;
+    }
     AtlasNetServer::InitializeProperties InitProperties;
     AtlasNetServer::Get().Initialize(InitProperties);
+    InitProperties.ExePath = argv[0];
+    InitProperties.OnShutdownRequest = [&](SignalType signal)
+    { ShouldShutdown = true; };
 
     Scene scene;
     // create an entity
@@ -59,25 +76,24 @@ int main() {
     using clock = std::chrono::high_resolution_clock;
     auto previous = clock::now();
 
-    while (true) 
+    while (!ShouldShutdown)
     {
         std::span<AtlasEntity> myspan;
         std::vector<AtlasEntity> Incoming;
         std::vector<AtlasEntityID> Outgoing;
-         AtlasNetServer::Get().Update(myspan,Incoming,Outgoing);
+        AtlasNetServer::Get().Update(myspan, Incoming, Outgoing);
         auto now = clock::now();
         std::chrono::duration<float> delta = now - previous;
         previous = now;
-        float dt = delta.count();  // seconds
+        float dt = delta.count(); // seconds
 
         scene.update(dt);
 
         // Print positions every second
-        //scene.printPositions();
-
+        // scene.printPositions();
 
         // Sleep a bit to avoid burning CPU (simulate frame time)
-        std::this_thread::sleep_for(std::chrono::milliseconds(16));  
+        std::this_thread::sleep_for(std::chrono::milliseconds(16));
         // ~60 updates per second
     }
 

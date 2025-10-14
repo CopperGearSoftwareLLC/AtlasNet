@@ -3,6 +3,7 @@
 #include "Singleton.hpp"
 #include "pch.hpp"
 #include "Debug/Log.hpp"
+#include "Docker/DockerEvents.hpp"
 enum KDServerRequestType {
     Raycast,
     SphereOverlap,
@@ -24,12 +25,14 @@ class AtlasNetServer : public AtlasNetInterface, public Singleton<AtlasNetServer
      */
     struct InitializeProperties {
 	std::function<KDServerRequestType(KDServerRequest)> RequestHandleFunction;
+    std::string ExePath;
+    std::function<void(SignalType signal)>OnShutdownRequest;
     };
     /**
      * @brief Initializes the AtlasNet Front end
      *
      */
-    void Initialize(InitializeProperties properties = {});
+    void Initialize(InitializeProperties& properties);
 
     /**
      * @brief Update tick for AtlasNet.

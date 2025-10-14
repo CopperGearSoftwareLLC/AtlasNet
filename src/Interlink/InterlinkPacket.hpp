@@ -9,6 +9,7 @@ struct InterlinkPacketHeader
 };
 class IInterlinkPacket
 {
+	InterlinkPacketHeader header;
   public:
 	virtual void Serialize(std::vector<std::byte> &data) const = 0;
 	virtual bool Deserialize(const std::vector<std::byte> &data) = 0;

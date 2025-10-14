@@ -1,20 +1,27 @@
 #include "AtlasNetServer.hpp"
 
 #include "Interlink/Interlink.hpp"
-void AtlasNetServer::Initialize(AtlasNetServer::InitializeProperties properties)
+#include "Debug/Crash/CrashHandler.hpp"
+#include "Database/ServerRegistry.hpp"
+#include "Docker/DockerIO.hpp"
+void AtlasNetServer::Initialize(AtlasNetServer::InitializeProperties &properties)
 {
-	logger->Print("AtlasNet Initialize");
+	CrashHandler::Get().Init(properties.ExePath);
+	DockerEvents::Get().Init(DockerEventsInit{.OnShutdownRequest = properties.OnShutdownRequest});
+	InterLinkIdentifier myID = InterLinkIdentifier(InterlinkType::eGameServer, DockerIO::Get().GetSelfContainerName());
+	logger = std::make_shared<Log>(myID.ToString());
+	logger->Debug("AtlasNet Initialize");
 	Interlink::Check();
-
 	Interlink::Get().Init(
-		InterlinkProperties{.ThisID = InterLinkIdentifier(InterlinkType::eGameServer,-1),
+		InterlinkProperties{.ThisID = myID,
 							.logger = logger,
-							.acceptConnectionFunc = [](const Connection &c) { return true; }});
-	Interlink::Get().ConnectToLocalParition();
+							.callbacks = {.acceptConnectionCallback = [](const Connection &c)
+										  { return true; },
+										  .OnConnectedCallback = nullptr}});
 }
 
 void AtlasNetServer::Update(std::span<AtlasEntity> entities, std::vector<AtlasEntity> &IncomingEntities,
-						 std::vector<AtlasEntityID> &OutgoingEntities)
+							std::vector<AtlasEntityID> &OutgoingEntities)
 {
 	Interlink::Get().Tick();
 }

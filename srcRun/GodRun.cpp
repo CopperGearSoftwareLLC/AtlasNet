@@ -8,6 +8,9 @@
 void spawnDatabaseSimple() {
     Json createBody = {
         {"Image", "database"},
+        {"ExposedPorts", {
+            {"6379/tcp", Json::object()}
+        }},
         {"Cmd", {"database-redis", "--appendonly", "yes"}},
         {"HostConfig", {
             {"Binds", Json::array({"redis_data:/data"})},

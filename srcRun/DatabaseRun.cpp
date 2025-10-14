@@ -1,6 +1,5 @@
 #include "pch.hpp"
-
-
+#include "Database/RedisCacheDatabase.hpp"
 int main()
 {
   IDatabase* database = new RedisCacheDatabase(true);

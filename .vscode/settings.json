@@ -110,7 +110,15 @@
         "scoped_allocator": "cpp",
         "spanstream": "cpp",
         "stacktrace": "cpp",
-        "syncstream": "cpp"
+        "syncstream": "cpp",
+        "netfwd": "cpp"
     },
+    "C_Cpp.default.defines": [
+        "_PORT_GOD",
+        "_PORT_GAMESERVER",
+        "_PORT_PARTITION"
+    ],
+    "transparent-win.transparency": 0.9,
+    "workbench.colorTheme": "Default Dark Modern",
    
 }

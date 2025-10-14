@@ -4,44 +4,68 @@
 #include "pch.hpp"
 class Log
 {
-  public:
+public:
 	Log() = default;
 	Log(const std::string &Who);
 
 	std::string WhoIsTalking;
 
-	template <typename... Args> void PrintFormatted(std::string_view fmt, Args &&...args) const
+	template <typename... Args>
+	void ErrorFormatted(std::string_view fmt, Args &&...args) const
 	{
 		std::string message = std::vformat(fmt, std::make_format_args(args...));
-		Print(message);
+		Error(message);
 	}
-	void Print(std::string_view str) const
+	void Error(std::string_view str) const
 	{
-		std::cerr << Color << WhoIsTalking << "> " << resetColor << str << std::endl;
+		std::cerr << GetTerminalColorCode(IdentifierColor, true) << WhoIsTalking << "> " << ResetColor() << GetTerminalColorCode(TerminalColor::Red) << str << ResetColor() << std::endl;
 	}
-	
+	template <typename... Args>
+	void WarningFormatted(std::string_view fmt, Args &&...args) const
+	{
+		std::string message = std::vformat(fmt, std::make_format_args(args...));
+		Warning(message);
+	}
+	void Warning(std::string_view str) const
+	{
+		std::cerr << GetTerminalColorCode(IdentifierColor, true) << WhoIsTalking << "> " << ResetColor() << GetTerminalColorCode(TerminalColor::Yellow) << str << ResetColor() << std::endl;
+	}
+	template <typename... Args>
+	void DebugFormatted(std::string_view fmt, Args &&...args) const
+	{
+		std::string message = std::vformat(fmt, std::make_format_args(args...));
+		Debug(message);
+	}
+	void Debug(std::string_view str) const
+	{
+		std::cerr << GetTerminalColorCode(IdentifierColor, true) << WhoIsTalking << "> " << ResetColor() << str << ResetColor() << std::endl;
+	}
 
-  private:
-	std::string Color;
-	const std::string resetColor = "\033[0m";
-	// Expanded array of ANSI color codes (foreground colors)
-	const std::vector<std::string> Logcolors = {
-		"\033[30m", // Black
-		"\033[31m", // Red
-		"\033[32m", // Green
-		"\033[33m", // Yellow
-		"\033[34m", // Blue
-		"\033[35m", // Magenta
-		"\033[36m", // Cyan
-		"\033[90m", // Bright Black (Gray)
-		"\033[91m", // Bright Red
-		"\033[92m", // Bright Green
-		"\033[93m", // Bright Yellow
-		"\033[94m", // Bright Blue
-		"\033[95m", // Bright Magenta
-		"\033[96m", // Bright Cyan
-
+	enum class TerminalColor
+	{
+		Black,
+		Red,
+		Green,
+		Yellow,
+		Blue,
+		Magenta,
+		Cyan,
+		White,
+		BrightBlack,
+		BrightRed,
+		BrightGreen,
+		BrightYellow,
+		BrightBlue,
+		BrightMagenta,
+		BrightCyan,
+		BrightWhite,
 	};
+	static std::string GetTerminalColorCode(TerminalColor color, bool foreground = true);
 
-	
+	static TerminalColor GetRandomTerminalColor();
+
+private:
+	TerminalColor IdentifierColor;
+
+	static inline std::string ResetColor() { return "\033[0m"; }
 };

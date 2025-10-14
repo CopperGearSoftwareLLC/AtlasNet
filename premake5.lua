@@ -1,5 +1,7 @@
 -- premake5.lua
-
+local _PORT_GOD = 25564
+local _PORT_PARTITION = 25565
+local _PORT_GAMESERVER = 25566
 local DevPackages = "git tini gdbserver build-essential binutils automake libtool m4 autoconf gdb curl zip less unzip ccache coreutils tar g++ cmake pkg-config uuid-dev libxmu-dev libxi-dev libgl-dev libxinerama-dev libxcursor-dev xorg-dev libglu1-mesa-dev"
 workspace "GuacNet"
     architecture "x86_64"
@@ -24,6 +26,11 @@ workspace "GuacNet"
     
     links { "boost_stacktrace_addr2line","boost_container", "curl", "GameNetworkingSockets", "GLEW", "glfw3", "glm", "imgui","implot","implot3d","GL","curl","ssl","crypto","z","dl","redis++","hiredis" }
     defines {"BOOST_STACKTRACE_LINK","BOOST_STACKTRACE_USE_ADDR2LINE"}
+
+
+    defines {"_PORT_GOD=".._PORT_GOD,
+    "_PORT_PARTITION=".._PORT_PARTITION,
+    "_PORT_GAMESERVER=".._PORT_GAMESERVER}
 
     filter "configurations:DebugDocker"
         symbols "On"
@@ -249,13 +256,11 @@ RUN apt-get update && apt-get install ]]..DevPackages..[[ -y
 ]]
 
     -- Inject Redis installation if target is Database
-    if buildTarget == "Database" then
         BaseTemplateBuild = BaseTemplateBuild .. [[
 # Install Redis
 RUN apt-get update && apt-get install -y redis-server && rm -rf /var/lib/apt/lists/*
-EXPOSE 6379
 ]]
-    end
+
 
 BaseTemplateBuild = BaseTemplateBuild .. [[
 
@@ -284,18 +289,15 @@ COPY docker/]]..buildTarget..[[/launch.json .vscode/launch.json
 COPY premake5.lua /app
 
 COPY Tests /app/Tests
-COPY src /app/src
+COPY src  /app/src
 COPY srcRun /app/srcRun
-RUN ./premake-core/bin/release/premake5 gmake
+RUN  ./premake-core/bin/release/premake5 gmake
 RUN --mount=type=cache,target=/app/obj \
     make -C ./build ${BUILD_TARGET} config=${BUILD_CONFIG_LC} -j $(nproc)
 
-#CMD ["sh", "-c", "find / -path '*/.cache/vcpkg*' 2>/dev/null | less"]
-#CMD ["top"]
-#CMD ["ls","/.."]\
-# ENTRYPOINT ["ls","-R","bin"]
+
 ${ENTRYPOINT}
-# ENTRYPOINT ["bin/${BUILD_CONFIG}/${BUILD_TARGET}/${BUILD_TARGET}"] 
+
 
 
 #CMD ["${RUN_CMD}"]
@@ -316,12 +318,22 @@ ${ENTRYPOINT}
     else
         print("Failed to open " .. dockerFilePath)
     end
-    os.execute("DOCKER_BUILDKIT=1 docker build --build-arg HOST_HOME=$HOME -f "..dockerFilePath.." -t ".. string.lower(buildTarget)..":latest .")
+    os.execute("DOCKER_BUILDKIT=1 docker build --pull --build-arg HOST_HOME=$HOME -f "..dockerFilePath.." -t ".. string.lower(buildTarget)..":latest .")
 end
 
 function BuildDockerImageFromTarget(target,build_config,app_bundle)
      
-    if target == "God" or target == "Database"or target == "GameCoordinator" then
+    
+    if target == "God" then
+        BuildF(string.lower(build_config),target)
+        BuildDockerImage(target, {
+            BUILD_TARGET = target,
+            BUILD_CONFIG = (build_config),
+            BUILD_CONFIG_LC = string.lower(build_config),
+            RUN_CMD = target,
+            ENTRYPOINT="ENTRYPOINT [\"bin/".. build_config.."/"..target.."/"..target.."\"]",
+    })
+    elseif target == "Database" then
         BuildF(string.lower(build_config),target)
         BuildDockerImage(target, {
             BUILD_TARGET = target,
@@ -338,7 +350,18 @@ function BuildDockerImageFromTarget(target,build_config,app_bundle)
             BUILD_TARGET = target .. " "..app_bundle,
             BUILD_CONFIG = (build_config),
             BUILD_CONFIG_LC = string.lower(build_config),
-            ENTRYPOINT = "ENTRYPOINT [\"/usr/bin/tini\",\"--\",\"sh\",\"-c\",\"bin/".. build_config .."/".. target .."/".. target .." & bin/".. build_config .."/".. app_bundle .."/".. app_bundle .."; wait\"]"
+            --ENTRYPOINT = "RUN... \nENTRYPOINT [\"/usr/bin/tini\", \"--\", \"sh\", \"-c\", \"bin/"..build_config.."/"..target.."/"..target.. " \\\"$@\\\" & bin/"..build_config.."/"..app_bundle.."/"..app_bundle.. " \\\"$@\\\"; wait\", \"--\"]",
+            ENTRYPOINT = table.concat({
+    'RUN printf \'%%s\\n\' "#!/bin/bash" \\',
+    '    "set -e" \\',
+    '    "trap \\"kill 0\\" SIGINT SIGTERM" \\',
+    '    "bin/' .. build_config .. '/' .. target .. '/' .. target .. ' \\"$@\\" &" \\',
+    '    "bin/' .. build_config .. '/' .. app_bundle .. '/' .. app_bundle .. ' \\"$@\\" &" \\',
+    '    "wait -n" \\',
+    '    "kill 0" > /entrypoint.sh && chmod +x /entrypoint.sh',
+    'ENTRYPOINT ["/usr/bin/tini", "--", "/entrypoint.sh"]'
+}, "\n")
+            --ENTRYPOINT = "ENTRYPOINT [\"/usr/bin/tini\",\"--\",\"sh\",\"-c\",\"bin/".. build_config .."/".. target .."/".. target .." & bin/".. build_config .."/".. app_bundle .."/".. app_bundle .."; wait\"]"
 
     })
     end
@@ -360,7 +383,7 @@ function RunDockerImage(_target,_build_config,_app_bundle)
         BuildDockerImageFromTarget(target,build_config,app_bundle)
         os.execute("docker rm -f " .. target .. " >/dev/null 2>&1; ")
         local ok, _, code = os.execute("docker run --init --network AtlasNet --stop-timeout=999999 -v /var/run/docker.sock:/var/run/docker.sock "..
-        "--cap-add=SYS_PTRACE --security-opt seccomp=unconfined --name "..target.." -d -p 1234:1234 "..string.lower(target))--.." UnitTest=" ..(_OPTIONS["testid"] or "-1") )
+        "--cap-add=SYS_PTRACE --security-opt seccomp=unconfined --name "..target.." -d -p :".._PORT_GOD.." "..string.lower(target))--.." UnitTest=" ..(_OPTIONS["testid"] or "-1") )
         if not ok or code ~= 0 then
             error("(exit code: " .. tostring(code) .. ")", 2)
         end

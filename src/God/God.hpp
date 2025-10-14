@@ -4,6 +4,7 @@
     #include "Debug/Log.hpp"
     #include "Interlink/Interlink.hpp"
     #include "Heuristic/Heuristic.hpp"
+    #include "Database/RedisCacheDatabase.hpp"
     class God : public Singleton<God>
     {
     public:

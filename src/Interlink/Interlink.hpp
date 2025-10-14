@@ -6,17 +6,23 @@
 #include "pch.hpp"
 #include "InterlinkMessage.hpp"
 #include "Docker/DockerIO.hpp"
-const static inline int32 CJ_LOCALHOST_PARTITION_PORT = 25565;
-using AcceptConnectionFunc = std::function<bool(const Connection &)>;
+
+struct InterlinkCallbacks
+{
+	std::function<bool(const Connection &)> acceptConnectionCallback;
+	std::function<void(const InterLinkIdentifier &)> OnConnectedCallback;
+	std::function<void(const Connection &, std::span<const std::byte>)> OnMessageArrival;
+};
 struct InterlinkProperties
 {
 	InterLinkIdentifier ThisID;
 	std::shared_ptr<Log> logger;
-
-	bool bOpenListenSocket = false;
-	PortType ListenSocketPort = -1;
-	AcceptConnectionFunc acceptConnectionFunc;
+	InterlinkCallbacks callbacks;
 };
+inline InterlinkType GetTargetType(const Connection &c)
+{
+	return c.target.Type;
+}
 using InterlinkContainereID = DockerContainerID;
 class Interlink : public Singleton<Interlink>
 {
@@ -24,6 +30,9 @@ class Interlink : public Singleton<Interlink>
 	{
 	};
 	struct IndexByTarget
+	{
+	};
+	struct IndexByTargetType
 	{
 	};
 	struct IndexByHSteamNetConnection
@@ -42,52 +51,60 @@ class Interlink : public Singleton<Interlink>
 			boost::multi_index::ordered_non_unique<
 				boost::multi_index::tag<IndexByState>,
 				boost::multi_index::member<Connection, ConnectionState, &Connection::state>>,
-			// non-unique by target
+			// non-unique by target interlinkType
 			boost::multi_index::ordered_non_unique<
+				boost::multi_index::tag<IndexByTargetType>,
+				boost::multi_index::global_fun<const Connection &, InterlinkType, GetTargetType>>,
+			boost::multi_index::ordered_unique<
 				boost::multi_index::tag<IndexByTarget>,
-				boost::multi_index::member<Connection, InterlinkType, &Connection::TargetType>>,
+				boost::multi_index::member<Connection, InterLinkIdentifier, &Connection::target>>,
 			// Unique By HConnection
 			boost::multi_index::ordered_unique<
 				boost::multi_index::tag<IndexByHSteamNetConnection>,
 				boost::multi_index::member<Connection, HSteamNetConnection,
-										   &Connection::Connection>>
-
-			>>
+										   &Connection::SteamConnection>>>>
 		Connections;
 
-	using ConnectionRef = decltype(Connections)::iterator;
-	// std::multiset<Connection, ConnectionStateHash> ConnectionsByState;
-	// std::unordered_map<ConnectionState, std::multiset<Connection,ConnectionCompareTargetType>>
-	// Connections;
 	std::shared_ptr<Log> logger;
 	ISteamNetworkingSockets *networkInterface;
 	InterLinkIdentifier MyIdentity;
 	std::optional<HSteamListenSocket> ListeningSocket;
 	std::optional<HSteamNetPollGroup> PollGroup;
 
-	AcceptConnectionFunc _acceptConnectionFunc;
+	InterlinkCallbacks callbacks;
+	PortType ListenPort;
 
-  private:
+	const static inline std::unordered_map<InterlinkType, uint32> Type2ListenPort = {{InterlinkType::eGod, _PORT_GOD},
+																					 {InterlinkType::ePartition, _PORT_PARTITION},
+																					 {InterlinkType::eGameServer, _PORT_GAMESERVER}};
+
+private:
 	void GenerateNewConnections();
 
 	void OnDebugOutput(ESteamNetworkingSocketsDebugOutputType eType, const char *pszMsg);
 
-	template <typename... Args> void Print(std::string_view fmt, Args &&...args) const
+	template <typename... Args>
+	void Debug(std::string_view fmt, Args &&...args) const
 	{
 		std::string msg = "Interlink> " + std::string(fmt);
-		logger->Print(msg, std::forward<Args>(args)...);
+		logger->Debug(msg, std::forward<Args>(args)...);
 	}
 
-	using SteamCBInfo = SteamNetConnectionStatusChangedCallback_t*;
+	using SteamCBInfo = SteamNetConnectionStatusChangedCallback_t *;
 	void CallbackOnConnecting(SteamCBInfo info);
 	void CallbackOnConnected(SteamCBInfo info);
-  public:
+	void OpenListenSocket(PortType port);
+	void ReceiveMessages();
+
+	bool EstablishConnectionTo(const InterLinkIdentifier &who);
+	
+	public:
 	void Init(const InterlinkProperties &properties);
 	void Shutdown();
-	ConnectionRef ConnectTo(const ConnectionProperties &ConnectProps);
-	ConnectionRef ConnectToLocalParition();
-
+	
 	void Tick();
 	void OnSteamNetConnectionStatusChanged(SteamNetConnectionStatusChangedCallback_t *pInfo);
-	void SendMessage(const InterlinkMessage& message);
+
+	void SendMessageRaw(const InterLinkIdentifier& who, std::span<const std::byte> data,InterlinkMessageSendFlag sendFlag = InterlinkMessageSendFlag::eReliableBatched);
+	void SendMessage(const InterlinkMessage &message);
 };
