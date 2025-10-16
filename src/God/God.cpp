@@ -3,6 +3,8 @@
 #include "Database/RedisCacheDatabase.hpp"
 #include <ctime>
 #include "Database/ServerRegistry.hpp"
+#include "Interlink/InterlinkEnums.hpp"
+#include "Interlink/Connection.hpp"
 God::God()
 {
 }
@@ -15,12 +17,15 @@ void God::Init()
 {
   logger->Debug("Init");
   InterlinkProperties InterLinkProps;
-  InterLinkProps.callbacks = InterlinkCallbacks{.acceptConnectionCallback = [](const Connection &c)
-                                                { return true; },
-                                                .OnConnectedCallback = [](const InterLinkIdentifier &Connection) {},
-                                                .OnMessageArrival = [](const Connection &conn, std::span<const std::byte> data) {}};
+  InterLinkProps.callbacks = InterlinkCallbacks{
+      .acceptConnectionCallback = [](const Connection &c)
+      { return true; },
+      .OnConnectedCallback = [](const InterLinkIdentifier &Connection) {},
+      .OnMessageArrival = [](const Connection &fromWhom, std::span<const std::byte> data) {},
+  };
   InterLinkProps.logger = logger;
   InterLinkProps.ThisID = InterLinkIdentifier::MakeIDGod();
+  logger->ErrorFormatted("[{}]", InterLinkProps.ThisID.ToString());
   Interlink::Get().Init(InterLinkProps);
 
   for (int32 i = 1; i <= 12; i++)
@@ -34,18 +39,40 @@ void God::Init()
   {
     std::cerr << server.second.identifier.ToString() << " " << server.second.address.ToString() << std::endl;
   }
-  computeAndStorePartitions();
+
   // std::this_thread::sleep_for(std::chrono::seconds(4));
   // god.removePartition(4);
-
+  using clock = std::chrono::steady_clock;
+  auto startTime = clock::now();
+  auto lastCall = startTime;
+  bool firstCalled = false;
   while (!ShouldShutdown)
   {
+    auto now = clock::now();
     Interlink::Get().Tick();
+    if (!firstCalled && now - startTime >= std::chrono::seconds(10))
+    {
+      firstCalled = true;
+      HeuristicUpdate();
+    }
+    if (false && firstCalled && now - lastCall >= std::chrono::seconds(1))
+    {
+      HeuristicUpdate();
+      lastCall = now;
+    }
     std::this_thread::sleep_for(std::chrono::milliseconds(10));
   }
   logger->Debug("Shutting down");
   cleanupContainers();
   Interlink::Get().Shutdown();
+}
+
+void God::HeuristicUpdate()
+{
+  if (computeAndStorePartitions())
+  {
+    notifyPartitionsToFetchShapes();
+  }
 }
 
 const decltype(God::ActiveContainers) &God::GetContainers()
@@ -100,6 +127,19 @@ bool God::removePartition(const DockerContainerID &id, uint32 TimeOutSeconds)
   return true;
 }
 
+void God::notifyPartitionsToFetchShapes()
+{
+  for (const auto &container : ServerRegistry::Get().GetServers())
+  {
+    if (container.first.Type != InterlinkType::ePartition)
+      continue;
+    InterLinkIdentifier id = container.first;
+    std::string Fetch = "Fetch Shape";
+    logger->DebugFormatted("Sending shape notify to {}", id.ToString());
+    Interlink::Get().SendMessageRaw(id, std::as_bytes(std::span(Fetch)));
+  }
+}
+
 bool God::cleanupContainers()
 {
 
@@ -131,11 +171,31 @@ bool God::computeAndStorePartitions()
       }
     }
 
-    // Serialize and store each shape in the database
-    for (size_t i = 0; i < partitionShapes.size(); ++i)
+    // Get all partition servers from registry
+    const auto &servers = ServerRegistry::Get().GetServers();
+    std::vector<InterLinkIdentifier> partitionIds;
+
+    // Filter to get only partition IDs
+    for (const auto &server : servers)
+    {
+      if (server.first.Type == InterlinkType::ePartition)
+      {
+        partitionIds.push_back(server.first);
+      }
+    }
+
+    // Sort partition IDs to ensure consistent assignment
+    std::sort(partitionIds.begin(), partitionIds.end());
+
+    size_t numShapesToAssign = std::min(partitionShapes.size(), partitionIds.size());
+    logger->DebugFormatted("Assigning {} shapes to {} partitions", numShapesToAssign, partitionIds.size());
+
+    // Serialize and store shapes, mapping them to partition IDs
+    for (size_t i = 0; i < numShapesToAssign; ++i)
     {
       std::string shapeData;
       shapeData += "shape_id:" + std::to_string(i) + ";";
+      shapeData += "partition_id:" + partitionIds[i].ToString() + ";";
       shapeData += "triangles:";
 
       // Serialize triangles as simple string format
@@ -148,22 +208,27 @@ bool God::computeAndStorePartitions()
         }
       }
 
-      // Store in database with key "partition_shape_<index>"
-      std::string key = "partition_shape_" + std::to_string(i);
-
-      if (!cache->Set(key, shapeData))
+      if (!cache->HashSet(m_PartitionShapeManifest, partitionIds[i].ToString(), shapeData))
       {
-        logger->ErrorFormatted("Failed to store shape {} in database", i);
+        logger->ErrorFormatted("Failed to store shape for partition {} in database", partitionIds[i].ToString());
         return false;
       }
 
-      logger->ErrorFormatted("Stored shape {} with {} triangles", i, partitionShapes[i].triangles.size());
+      logger->DebugFormatted("Stored shape for partition {} with {} triangles", partitionIds[i].ToString(), partitionShapes[i].triangles.size());
+    }
+
+    // If there's only one shape, log that other partitions are ignored
+    if (partitionShapes.size() == 1 && partitionIds.size() > 1)
+    {
+      logger->Debug("Only one shape available - assigned to first partition, remaining partitions ignored");
     }
 
     // Store metadata about the partition computation
-    std::string metadata = "total_shapes:" + std::to_string(partitionShapes.size()) + ";timestamp:" + std::to_string(std::time(nullptr));
+    std::string metadata = "total_shapes:" + std::to_string(numShapesToAssign) +
+                           ";total_partitions:" + std::to_string(partitionIds.size()) +
+                           ";timestamp:" + std::to_string(std::time(nullptr));
 
-    if (!cache->Set("partition_metadata", metadata))
+    if (!cache->Set("shape_manifest_metadata", metadata))
     {
       logger->Error("Failed to store partition metadata");
       return false;

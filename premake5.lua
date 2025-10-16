@@ -292,8 +292,10 @@ COPY Tests /app/Tests
 COPY src  /app/src
 COPY srcRun /app/srcRun
 RUN  ./premake-core/bin/release/premake5 gmake
-RUN --mount=type=cache,target=/app/obj \
+RUN \
+ --mount=type=cache,target=/app/obj \
     make -C ./build ${BUILD_TARGET} config=${BUILD_CONFIG_LC} -j $(nproc)
+ #COPY bin /app/bin
 
 
 ${ENTRYPOINT}

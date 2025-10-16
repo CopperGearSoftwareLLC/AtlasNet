@@ -1,14 +1,14 @@
 #include "ServerRegistry.hpp"
-
+#include "misc/String_utils.hpp"
 void ServerRegistry::RegisterSelf(const InterLinkIdentifier &ID, IPAddress address)
 {
-    database->HashSet(HashTableNameID_IP, TrimName(ID.ToString()), TrimName(address.ToString()));
+    database->HashSet(HashTableNameID_IP, NukeString(ID.ToString()), NukeString(address.ToString()));
     // database->HashSet(HashTableNameIP_ID, address.ToString(), ID.ToString());
 }
 
 void ServerRegistry::DeRegisterSelf(const InterLinkIdentifier &ID)
 {
-    database->HashRemove(HashTableNameID_IP, TrimName(ID.ToString()));
+    database->HashRemove(HashTableNameID_IP, NukeString(ID.ToString()));
     // database->HashRemove(HashTableNameIP_ID, ID.ToString());
 }
 
@@ -20,7 +20,7 @@ const decltype(ServerRegistry::servers) &ServerRegistry::GetServers()
     {
         ServerRegistryEntry newEntry;
         InterLinkIdentifier ID;
-        auto Type = InterLinkIdentifier::FromString(TrimName(rawEntry.first));
+        auto Type = InterLinkIdentifier::FromString(NukeString(rawEntry.first));
         if (!Type.has_value())
         {
             std::cerr << "Unable to parse " << rawEntry.first << " " << rawEntry.second << std::endl;
@@ -38,7 +38,7 @@ const decltype(ServerRegistry::servers) &ServerRegistry::GetServers()
 
 std::optional<IPAddress> ServerRegistry::GetIPOfID(const InterLinkIdentifier &ID)
 {
-    if (std::string ret = database->HashGet(HashTableNameID_IP, TrimName(ID.ToString())); ret.empty())
+    if (std::string ret = database->HashGet(HashTableNameID_IP, NukeString(ID.ToString())); ret.empty())
     {
         
         return std::nullopt;
@@ -52,26 +52,11 @@ std::optional<IPAddress> ServerRegistry::GetIPOfID(const InterLinkIdentifier &ID
 }
 bool ServerRegistry::ExistsInRegistry(const InterLinkIdentifier &ID) const
 {
-    return database->HashExists(HashTableNameID_IP, TrimName(ID.ToString()));
+    return database->HashExists(HashTableNameID_IP, NukeString(ID.ToString()));
 }
-std::string ServerRegistry::TrimName(const std::string &input)
+void ServerRegistry::ClearAll()
 {
-    std::string s = input;
-
-    // Trim leading whitespace
-    s.erase(s.begin(), std::find_if(s.begin(), s.end(), [](unsigned char ch)
-                                    { return !std::isspace(ch); }));
-
-    // Trim trailing whitespace
-    s.erase(std::find_if(s.rbegin(), s.rend(), [](unsigned char ch)
-                         { return !std::isspace(ch); })
-                .base(),
-            s.end());
-
-    // Trim trailing zeros
-    std::string::size_type end = s.find_last_not_of('\0');
-    s =  (end == std::string::npos) ? "" : s.substr(0, end + 1);
-    return s;
+    database->HashRemoveAll(HashTableNameID_IP);
 }
 /*
 std::optional<InterLinkIdentifier> ServerRegistry::GetIDOfIP(IPAddress IP, bool IgnorePort)

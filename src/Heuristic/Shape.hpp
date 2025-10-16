@@ -1,7 +1,7 @@
 #pragma once
 #include <vector>
 #include <array>
-#include <glm/vec2.hpp>
+
 
 /**
  * @brief A triangle represented as an array of three 2D vertices.
@@ -9,7 +9,7 @@
  * Each triangle is defined by three vertices using glm::vec2 for 2D coordinates.
  * The vertices are ordered counter-clockwise for proper rendering and geometric calculations.
  */
-using Triangle = std::array<glm::vec2, 3>;
+using Triangle = std::array<vec2, 3>;
 
 /**
  * @brief Represents a geometric shape composed of triangular elements.
@@ -26,5 +26,6 @@ struct Shape
      * Each triangle represents a portion of the partition polygon. Together, these triangles
      * form the complete geometric representation of a partition boundary.
      */
-    std::vector<Triangle> triangles;
+    std::vector<Triangle> triangles = {};
 };
+const static inline std::string m_PartitionShapeManifest = "PartitionShapeManifest";

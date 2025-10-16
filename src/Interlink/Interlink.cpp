@@ -15,6 +15,7 @@ void Interlink::OnSteamNetConnectionStatusChanged(SteamNetConnectionStatusChange
 		CallbackOnConnected(pInfo);
 		break;
 	case k_ESteamNetworkingConnectionState_ClosedByPeer:
+		CallbackOnClosedByPear(pInfo);
 		logger->Debug("k_ESteamNetworkingConnectionState_ClosedByPeer");
 		break;
 	case k_ESteamNetworkingConnectionState_ProblemDetectedLocally:
@@ -27,7 +28,8 @@ void Interlink::OnSteamNetConnectionStatusChanged(SteamNetConnectionStatusChange
 	case k_ESteamNetworkingConnectionState_Dead:
 		logger->Debug("k_ESteamNetworkingConnectionState_Dead");
 		break;
-
+	case k_ESteamNetworkingConnectionState_None:
+		break;
 	default:
 		logger->ErrorFormatted(std::format("Unknown {}", (int64)pInfo->m_info.m_eState));
 	};
@@ -89,10 +91,7 @@ void Interlink::CallbackOnConnecting(SteamCBInfo info)
 	else // if it is not then its not mine, this is a new incoming connection
 	{
 		// IdentityPacket identity = IdentityPacket::FromString(info->m_info.m_nUserData);
-		Connection newCon;
-		newCon.SteamConnection = info->m_hConn;
-		newCon.SetNewState(ConnectionState::eConnecting);
-		newCon.address = IPAddress(info->m_info.m_addrRemote);
+		IPAddress address(info->m_info.m_addrRemote);
 		int identityByteStreamSize;
 		const std::byte *identityByteStream = (std::byte *)info->m_info.m_identityRemote.GetGenericBytes(identityByteStreamSize);
 		ASSERT(identityByteStream, "No Bytestream identity");
@@ -105,7 +104,7 @@ void Interlink::CallbackOnConnecting(SteamCBInfo info)
 */
 		if (info->m_info.m_identityRemote.m_eType != k_ESteamNetworkingIdentityType_GenericBytes)
 		{
-			logger->WarningFormatted("UNknown incoming connection {}. NetworkIdentity not a byte stream . Type: {}", newCon.address.ToString(), (int32)info->m_info.m_identityRemote.m_eType);
+			logger->WarningFormatted("UNknown incoming connection {}. NetworkIdentity not a byte stream . Type: {}", address.ToString(), (int32)info->m_info.m_identityRemote.m_eType);
 			ASSERT(false, "Identity has to be byte stream so we can identity by InterlinkIdentifier and server manifest");
 		}
 		const auto ID = InterLinkIdentifier::FromEncodedByteStream(identityByteStream, identityByteStreamSize);
@@ -121,24 +120,55 @@ void Interlink::CallbackOnConnecting(SteamCBInfo info)
 
 			ASSERT(false, "Received connecting from something not in the server registry");
 		}
-		logger->DebugFormatted("Incoming Connection from: {} at {}", ID->ToString(), newCon.address.ToString());
-		newCon.target = ID.value();
+
+		logger->DebugFormatted("Incoming Connection from: {} at {}", ID->ToString(), address.ToString());
+		if (Connections.get<IndexByTarget>().contains(*ID))
+		{
+			auto find = Connections.get<IndexByTarget>().find(*ID);
+			if (find->state == ConnectionState::eConnected)
+			{
+				logger->DebugFormatted("Incoming connection from {} ignored since already connected");
+			}
+			else
+
+			{
+				logger->DebugFormatted("Incoming connection from {} already defined, previous state was {}, rejecting connection", ID->ToString(), boost::describe::enum_to_string(find->state, "Unknown state?"));
+			}
+			networkInterface->CloseConnection(info->m_hConn, 0, nullptr, false);
+		}
 		// request user for permission to connect
-		if (EResult result = networkInterface->AcceptConnection(newCon.SteamConnection);
+		if (EResult result = networkInterface->AcceptConnection(info->m_hConn);
 			result != k_EResultOK)
 		{
 
-			logger->ErrorFormatted("Error accepting connection: {}", uint64(result));
+			logger->ErrorFormatted("Error accepting connection: reason: {}", uint64(result));
 			networkInterface->CloseConnection(info->m_hConn, 0, nullptr, false);
-			throw std::runtime_error(
-				"This exception is because I have not implemented what to do when it fails "
-				"so i want to know when it does and not have undefined behaviour");
 		}
 		else
-		{ // logger->Debug("Establishing connection to ")
-			Connections.insert(newCon);
+		{
+			// if connection has already been defined update existing
+			if (Connections.get<IndexByTarget>().contains(*ID))
+			{
+				Connections.get<IndexByTarget>().modify(Connections.get<IndexByTarget>().find(*ID), [&](Connection &c)
+														{ c.SetNewState(ConnectionState::eConnecting);
+															c.SteamConnection = info->m_hConn; });
+			}
+			else // otherwise register new one
+			{
+				Connection newCon;
+				newCon.SteamConnection = info->m_hConn;
+				newCon.SetNewState(ConnectionState::eConnecting);
+				newCon.address = address;
+				newCon.target = ID.value();
+				Connections.insert(newCon);
+			}
 		}
 	}
+}
+
+void Interlink::CallbackOnClosedByPear(SteamCBInfo info)
+{
+	networkInterface->CloseConnection(info->m_hConn, 0, nullptr, false);
 }
 
 void Interlink::CallbackOnConnected(SteamCBInfo info)
@@ -168,7 +198,7 @@ void Interlink::CallbackOnConnected(SteamCBInfo info)
 	}
 	else
 	{
-		ASSERT(false, "Connected? to non existent connection?");
+		ASSERT(false, "Connected? to non existent connection?, HSteamNetConnection was not found");
 	}
 }
 
@@ -206,7 +236,7 @@ void Interlink::ReceiveMessages()
 		size_t size = msg->m_cbSize;
 		const Connection &sender = *Connections.get<IndexByHSteamNetConnection>().find(msg->m_conn);
 
-		callbacks.OnMessageArrival(sender,std::span<const std::byte>((const std::byte*)data,size));
+		callbacks.OnMessageArrival(sender, std::span<const std::byte>((const std::byte *)data, size));
 		// Example: interpret as string
 		std::string text(reinterpret_cast<const char *>(data), size);
 		logger->DebugFormatted("Message from ({}) \"{}\"", sender.target.ToString(), text);
@@ -302,7 +332,10 @@ bool Interlink::EstablishConnectionTo(const InterLinkIdentifier &id)
 			logger->WarningFormatted("Connection to {} already established", id.ToString());
 		}
 		else if (Existingconnection.state == ConnectionState::eConnecting || Existingconnection.state == ConnectionState::ePreConnecting)
+		{
+			logger->WarningFormatted("already connecting to {}", id.ToString());
 			return true;
+		}
 		else
 		{
 			logger->ErrorFormatted("Undefined connection state in EstablishConnectionTo. State: {}", boost::describe::enum_to_string(Existingconnection.state, "unknownstate?"));
@@ -344,20 +377,52 @@ bool Interlink::EstablishConnectionTo(const InterLinkIdentifier &id)
 	return true;
 }
 
+void Interlink::DebugPrint()
+{
+	for (const auto& connection : Connections)
+	{
+		logger->Debug(connection.ToString());
+	}
+}
+
 void Interlink::SendMessageRaw(const InterLinkIdentifier &who, std::span<const std::byte> data, InterlinkMessageSendFlag sendFlag)
 {
-	if (!Connections.get<IndexByTarget>().contains(who) || Connections.get<IndexByTarget>().find(who)->state != ConnectionState::eConnected)
+	auto QueueMessageOnConnect = [&]()
 	{
-		EstablishConnectionTo(who);
-
 		auto it = Connections.get<IndexByTarget>().find(who);
-		Connections.get<IndexByTarget>().modify(it, [data = data, sendFlag](Connection &c)
+		Connections.get<IndexByTarget>().modify(it, [&](Connection &c)
 												{
 													std::vector<std::byte> newdata;
 													newdata.insert(newdata.end(), data.begin(), data.end());
-													c.MessagesToSendOnConnect.push_back(std::make_pair(sendFlag,std::move(newdata))); });
+													c.MessagesToSendOnConnect.push_back(std::make_pair(sendFlag,newdata)); });
+	};
+	//DebugPrint();
+	if (!Connections.get<IndexByTarget>().contains(who)) // if connection does not exist
+	{
+		logger->DebugFormatted("Connection to \"{}\" was not established, connecting...", who.ToString());
+		// establish and queue message
+		EstablishConnectionTo(who);
+		QueueMessageOnConnect();
 	}
-	else
+	else if (auto find = Connections.get<IndexByTarget>().find(who); find->state != ConnectionState::eConnected) // if an existing connection exists but it is not in connected state
+	{
+		if (find->state == ConnectionState::ePreConnecting || find->state == ConnectionState::eConnecting) // if an active connectio is in the process of connecting
+		{
+			logger->DebugFormatted("Connection to {} is {} , queuing message...", who.ToString(), boost::describe::enum_to_string(Connections.get<IndexByTarget>().find(who)->state, "unknown"));
+
+			// just queue message
+			QueueMessageOnConnect();
+		}
+		else
+		{
+			logger->DebugFormatted("Connection to {} state is {} , connecting...", who.ToString(), boost::describe::enum_to_string(Connections.get<IndexByTarget>().find(who)->state, "unknown"));
+
+			// establish and queue message
+			EstablishConnectionTo(who);
+			QueueMessageOnConnect();
+		}
+	}
+	else // connection exists and is established, send message normally
 	{
 		const Connection &conn = *Connections.get<IndexByTarget>().find(who);
 		const auto SendResult = networkInterface->SendMessageToConnection(conn.SteamConnection, data.data(), data.size_bytes(), (int)sendFlag, nullptr);

@@ -59,7 +59,7 @@ class Interlink : public Singleton<Interlink>
 				boost::multi_index::tag<IndexByTarget>,
 				boost::multi_index::member<Connection, InterLinkIdentifier, &Connection::target>>,
 			// Unique By HConnection
-			boost::multi_index::ordered_unique<
+			boost::multi_index::ordered_non_unique<
 				boost::multi_index::tag<IndexByHSteamNetConnection>,
 				boost::multi_index::member<Connection, HSteamNetConnection,
 										   &Connection::SteamConnection>>>>
@@ -92,12 +92,13 @@ private:
 
 	using SteamCBInfo = SteamNetConnectionStatusChangedCallback_t *;
 	void CallbackOnConnecting(SteamCBInfo info);
+	void CallbackOnClosedByPear(SteamCBInfo info);
 	void CallbackOnConnected(SteamCBInfo info);
 	void OpenListenSocket(PortType port);
 	void ReceiveMessages();
 
 	bool EstablishConnectionTo(const InterLinkIdentifier &who);
-	
+	void DebugPrint();
 	public:
 	void Init(const InterlinkProperties &properties);
 	void Shutdown();

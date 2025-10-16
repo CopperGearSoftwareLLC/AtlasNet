@@ -31,11 +31,11 @@ public:
 
 	bool operator==(const InterLinkIdentifier& other) const noexcept
 	{
-		return Type == other.Type && ID == other.ID;
+		return ToString() == other.ToString();
 	}
 	  bool operator<(const InterLinkIdentifier& other) const noexcept
     {
-        return std::tie(Type, ID) < std::tie(other.Type, other.ID);
+        return ToString() < other.ToString();
     }
 };
 

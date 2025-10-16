@@ -35,6 +35,7 @@ public:
     virtual std::unordered_map<std::string, std::string> HashGetAll(const std::string& key) = 0;
     /// remove a hash
     virtual bool HashRemove(const std::string& key, const std::string& field) = 0;
+    virtual bool HashRemoveAll(const std::string& key) = 0;
     /// check if hash exists
     virtual bool HashExists(const std::string& key, const std::string& field) = 0;
     

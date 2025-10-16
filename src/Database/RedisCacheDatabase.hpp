@@ -24,11 +24,12 @@ public:
     bool Exists(const std::string &key) override;
 
         // --- Hash operations ---
-    bool HashSet(const std::string& key, const std::string& field, const std::string& value);
-    std::string HashGet(const std::string& key, const std::string& field);
-    std::unordered_map<std::string, std::string> HashGetAll(const std::string& key);
-    bool HashRemove(const std::string& key, const std::string& field);
-    bool HashExists(const std::string& key, const std::string& field);
+    bool HashSet(const std::string& key, const std::string& field, const std::string& value) override;
+    std::string HashGet(const std::string& key, const std::string& field) override;
+    std::unordered_map<std::string, std::string> HashGetAll(const std::string& key) override;
+    bool HashRemove(const std::string& key, const std::string& field) override;
+    bool HashRemoveAll(const std::string& key) override;
+    bool HashExists(const std::string& key, const std::string& field) override;
 
     void PrintEntireDB() override;
 sw::redis::Redis& GetRaw()  {return *_redis;}

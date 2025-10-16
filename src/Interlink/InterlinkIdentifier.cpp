@@ -1,12 +1,12 @@
 #include "InterlinkIdentifier.hpp"
 #include "InterlinkEnums.hpp"
-
+#include "misc/String_utils.hpp"
 InterLinkIdentifier InterLinkIdentifier::MakeIDGod()
 
 {
     InterLinkIdentifier id;
     id.Type = InterlinkType::eGod;
-    id.ID = "";
+    id.ID.clear();
     return id;
 }
 
@@ -38,23 +38,35 @@ InterLinkIdentifier InterLinkIdentifier::MakeIDGodView()
 {
     InterLinkIdentifier id;
     id.Type = InterlinkType::eGameClient;
-    id.ID = "";
+    id.ID.clear();
     return id;
 }
 
 std::string InterLinkIdentifier::ToString() const
 {
-    return boost::describe::enum_to_string(Type, "UnknownUnknownType?") + std::string(" ") + (ID);
+    std::string type_string = boost::describe::enum_to_string(Type, "UnknownUnknownType?");
+    if (!ID.empty())
+    {
+        type_string += std::string(" ") + (ID);
+    }
+    return NukeString(type_string);
 }
 
 std::array<std::byte, 32> InterLinkIdentifier::ToEncodedByteStream() const
 {
-    std::array<std::byte, 32> result{};
+    std::array<std::byte, 32> result{std::byte(0)};
     result[0] = (std::byte)Type;
-    ASSERT(ID.size() <= 31, "ID too long to insert into encoded bytestream");
-    for (int i = 0; i < ID.size(); i++)
+    if (!ID.empty())
     {
-        result[i + 1] = (std::byte)ID[i];
+        ASSERT(ID.size() <= 31, "ID too long to insert into encoded bytestream");
+        for (int i = 0; i < ID.size(); i++)
+        {
+            result[i + 1] = (std::byte)ID[i];
+        }
+    }
+    else
+    {
+        result[1] = std::byte(0);
     }
     return result;
 }
@@ -66,22 +78,32 @@ std::optional<InterLinkIdentifier> InterLinkIdentifier::FromEncodedByteStream(co
 
 std::optional<InterLinkIdentifier> InterLinkIdentifier::FromEncodedByteStream(const std::byte *data, size_t size)
 {
+
     ASSERT(size <= 32, "Invalid Byte Stream size");
     InterLinkIdentifier ID;
     ID.Type = (InterlinkType)data[0];
-    ID.ID.resize(32);
-    for (int i = 0; i < 31; i++)
+    if ((char)data[1] != char(0))
     {
-        ID.ID[i] = (char)data[i + 1];
+        
+        ID.ID.resize(32);
+        for (int i = 0; i < 31; i++)
+        {
+            ID.ID[i] = (char)data[i + 1];
+        }
+        ID.ID.push_back(0);
+        ID.ID.shrink_to_fit();
     }
-    ID.ID.push_back(0);
-    ID.ID.shrink_to_fit();
+    else
+    {
+        ID.ID.clear();
+    }
+
     return ID;
 }
 
 std::optional<InterLinkIdentifier> InterLinkIdentifier::FromString(const std::string &input)
 {
-    std::istringstream iss(input);
+    std::istringstream iss(NukeString(input));
     std::string enumName;
     std::string idValue;
 
@@ -111,7 +133,7 @@ std::optional<InterLinkIdentifier> InterLinkIdentifier::FromString(const std::st
     }
     else
     {
-        id.ID = idValue;
+        id.ID = NukeString(idValue);
     }
 
     return id;

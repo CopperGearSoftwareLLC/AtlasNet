@@ -12,17 +12,31 @@
  */
 std::vector<Shape> Heuristic::computePartition()
 {
-    std::vector<Shape> result;
+    HeuristicType theType = BigSquare;
+    switch (theType)
+    {
+    case BigSquare:
+        return computeBigSquareShape();
+    case QuadTree:
+        // Implement QuadTree heuristic logic here
+        break;
+    case KDTree:
+        // Implement KDTree heuristic logic here
+        break;
+    default:
+        // Default case if no heuristic type is matched
+        break;  
+    }
+    return {};
+}
+//(0,1)(1,1)
+//(0,0)(1,0)
+std::vector<Shape> Heuristic::computeBigSquareShape()
+{
+    std::vector<Shape> shapes;
+    Shape Square;
+    Square.triangles = {{vec2{0, 0}, vec2{1, 0},vec2 {0, 1}} , {vec2{1, 1}, vec2{1, 0}, vec2{0, 1}}};
 
-    // Create a simple triangular shape for demonstration
-    Shape s;
-    Triangle t;
-    t[0] = {0.0f, 0.0f};  // Bottom-left vertex
-    t[1] = {1.0f, 0.0f};  // Bottom-right vertex  
-    t[2] = {0.0f, 1.0f};  // Top-left vertex
-
-    s.triangles.push_back(t);
-    result.push_back(std::move(s));
-
-    return result;
+    shapes.push_back(Square);
+    return shapes;
 }

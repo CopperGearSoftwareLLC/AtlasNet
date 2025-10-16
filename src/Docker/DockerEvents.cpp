@@ -8,6 +8,4 @@ void DockerEvents::Init(const DockerEventsInit &init)
               { init_vars.OnShutdownRequest(id); });
   std::signal(SIGTERM, [](SignalType id)
               { init_vars.OnShutdownRequest(id); });
-  std::signal(SIGKILL, [](SignalType id)
-              { init_vars.OnShutdownRequest(id); });
 }

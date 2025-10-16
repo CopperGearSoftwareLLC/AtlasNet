@@ -23,8 +23,7 @@ IDatabase* database;
     const decltype(servers)& GetServers();
     std::optional<IPAddress> GetIPOfID(const InterLinkIdentifier& ID);
     bool ExistsInRegistry(const InterLinkIdentifier& ID) const;
+    void ClearAll();
     //std::optional<InterLinkIdentifier> GetIDOfIP(IPAddress ID,bool IgnorePort);
     
-    private:
-    static std::string TrimName(const std::string& input);
 };
