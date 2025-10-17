@@ -1,0 +1,31 @@
+{
+  "name": "landmark",
+  "version-string": "0.1.0",
+  "dependencies": [
+    "glfw3",
+    "glew",
+    "glm",
+    {
+      "name": "imgui",
+      "features": [
+        "docking-experimental",
+        "glfw-binding",
+        "opengl3-binding"
+      ]
+    },
+    "implot",
+    "implot3d",
+    "nlohmann-json",
+    "stb",
+    "boost-type-traits",
+    "boost-uuid",
+    "boost-multi-index",
+    "boost-container",
+    "boost-describe",
+    "boost-stacktrace",
+    "gamenetworkingsockets",
+    "curl",
+    "redis-plus-plus",
+    "hiredis"
+  ]
+}

@@ -1,14 +1,23 @@
 #pragma once
-#include "pch.hpp"
-#include "TestUnityAPI/EntityJsonReciever.hpp"
 
-class Partition
+#include <memory>
+#include <atomic>
+
+#include "Singleton.hpp"
+#include "Debug/Log.hpp"
+#include "Heuristic/Shape.hpp"
+#include "Interlink/Connection.hpp"
+#include "Interlink/InterlinkEnums.hpp"
+
+class Partition : public Singleton<Partition>
 {
-public:
-    Partition();
-    ~Partition();
-    void Run();
-
-private:
-    std::unique_ptr<EntityJsonReciever> _reciever;
+	std::shared_ptr<Log> logger = std::make_shared<Log>("Partition");
+	std::atomic_bool ShouldShutdown = false;
+  public:
+	Shape partitionShape;
+	Partition();
+	~Partition();
+	void Init();
+	void Shutdown() {ShouldShutdown = true;}
+	void MessageArrived(const Connection &fromWhom, std::span<const std::byte> data);
 };

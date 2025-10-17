@@ -8,7 +8,8 @@ bin
 docker
 god_watcher.log
 nohup.out
-/src/TestUnityAPI/build-win
-/src/TestUnityAPI/build-linux
+docs
+nul
 vcpkg
 vcpkg_installed
+/build

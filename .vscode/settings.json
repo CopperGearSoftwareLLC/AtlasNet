@@ -1,9 +1,13 @@
 {
+    
+  "terminal.integrated.env.linux": {
+    "LD_LIBRARY_PATH": "vcpkg_installed/x64-linux/lib:${LD_LIBRARY_PATH}",
+    "VCPKG_LIBRARY_LINKAGE": "static"
+    },
     "C_Cpp.default.cppStandard": "c++20",
     "C_Cpp.default.includePath": [
         "${workspaceFolder}/src",
-        "${workspaceFolder}/lib",
-        "${workspaceFolder}/lib/GameNetworkingSockets/include",
+        "${workspaceFolder}/vcpkg_installed/x64-linux/include",
     ],
     "C_Cpp.intelliSenseEngine": "default",
     "cmake.ignoreCMakeListsMissing": true,
@@ -75,7 +79,46 @@
         "thread": "cpp",
         "cinttypes": "cpp",
         "typeinfo": "cpp",
-        "variant": "cpp"
+        "variant": "cpp",
+        "any": "cpp",
+        "bitset": "cpp",
+        "codecvt": "cpp",
+        "csignal": "cpp",
+        "forward_list": "cpp",
+        "list": "cpp",
+        "regex": "cpp",
+        "fstream": "cpp",
+        "ranges": "cpp",
+        "valarray": "cpp",
+        "strstream": "cpp",
+        "cfenv": "cpp",
+        "complex": "cpp",
+        "coroutine": "cpp",
+        "source_location": "cpp",
+        "rope": "cpp",
+        "slist": "cpp",
+        "future": "cpp",
+        "shared_mutex": "cpp",
+        "stdfloat": "cpp",
+        "typeindex": "cpp",
+        "*.inc": "cpp",
+        "barrier": "cpp",
+        "expected": "cpp",
+        "generator": "cpp",
+        "latch": "cpp",
+        "print": "cpp",
+        "scoped_allocator": "cpp",
+        "spanstream": "cpp",
+        "stacktrace": "cpp",
+        "syncstream": "cpp",
+        "netfwd": "cpp"
     },
+    "C_Cpp.default.defines": [
+        "_PORT_GOD",
+        "_PORT_GAMESERVER",
+        "_PORT_PARTITION"
+    ],
+    "transparent-win.transparency": 0.9,
+    "workbench.colorTheme": "Default Dark Modern",
    
 }

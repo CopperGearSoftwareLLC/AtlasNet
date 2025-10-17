@@ -1,6 +1,0 @@
-CompileFlags:
-  Add: 
-    - "-I${workspaceFolder}/lib/glew/include"
-    - "-I${workspaceFolder}/lib/glfw/include"
-    - "-I${workspaceFolder}/lib
-    - "-D_DISPLAY"

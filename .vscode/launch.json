@@ -2,39 +2,23 @@
   "version": "0.2.0",
   "configurations": [
     {
-      "name": "Sample Game Launch",
-      "type": "cppdbg",
+      "name": "AtlasNet UnitTest",
+      "type": "node",              // any debugger type, doesn't matter
       "request": "launch",
-      "program": "${workspaceFolder}/bin/DebugDocker/SampleGame/SampleGame",
-      "args": [],
-      "stopAtEntry": false,
-      "cwd": "${workspaceFolder}",
-      "environment": [],
-      "externalConsole": false,
-      "MIMode": "gdb",
-            "preLaunchTask": "Compile For Docker",
-      "setupCommands": [
-          {
-              "description": "Enable pretty-printing for gdb",
-              "text": "-enable-pretty-printing",
-              "ignoreFailures": true
-          },
-          {
-              "description": "Set Disassembly Flavor to Intel",
-              "text": "-gdb-set disassembly-flavor intel",
-              "ignoreFailures": true
-          }
-      ]
+      "program": "${workspaceFolder}/noop.js", // dummy, not used
+      "preLaunchTask": "AtlasNet Start",
+      "noDebug": true
     },
     {
-      "name": "Debug Partition Docker",
+      "name": "Debug Partition + Unit Tests",
       "type": "cppdbg",
       "request": "launch",
       "program": "${workspaceFolder}/bin/DebugDocker/Partition/Partition",
       "cwd": "${workspaceFolder}",
       "MIMode": "gdb",
-      "preLaunchTask": "Run Partition",
+      "preLaunchTask": "Run Partition + Unit Tests Docker",
       "miDebuggerServerAddress": "localhost:1235",
+      "miDebuggerPath": "/usr/bin/gdb",
       "stopAtEntry": false,
       
     },
@@ -45,44 +29,24 @@
       "program": "${workspaceFolder}/bin/DebugDocker/God/God",
       "cwd": "${workspaceFolder}",
       "MIMode": "gdb",
-      "preLaunchTask": "Run God",
+      "preLaunchTask": "Run God Docker",
       "miDebuggerServerAddress": "localhost:1234",
       "stopAtEntry": false,
       
+      
     },
+    
     {
-      "name": "Debug God Local",
+      "name": "Debug GodView",
       "type": "cppdbg",
       "request": "launch",
-      "program": "${workspaceFolder}/bin/DebugLocal/God/God",
-      "envFile": "${workspaceFolder}/KDNetVars.sh",
-      "cwd": "${workspaceFolder}",
-      "MIMode": "gdb",
-      "stopAtEntry": false,
-      "preLaunchTask": "Compile For Local",
-    },
-    {
-      "name": "Attach To Partition",
-      "type": "cppdbg",
-      "request": "launch",
-      "program": "${workspaceFolder}/bin/DebugDocker/Partition/Partition",
+      "program": "${workspaceFolder}/bin/DebugDocker/GodView/GodView",
       "cwd": "${workspaceFolder}",
       "MIMode": "gdb",
       "preLaunchTask": "Compile For Docker",
-      "miDebuggerServerAddress": "localhost:${input:debugPort}",
       "stopAtEntry": false,
-    },
-      {
-      "name": "Attach To God",
-      "type": "cppdbg",
-      "request": "launch",
-      "program": "${workspaceFolder}/bin/DebugDocker/God/God",
-      "cwd": "${workspaceFolder}",
-      "MIMode": "gdb",
-      "preLaunchTask": "Compile For Docker",
-      "miDebuggerServerAddress": "localhost:${input:debugPort}",
-      "stopAtEntry": false,
-    },
+      
+    }
   ],
   "inputs": [
     {
@@ -91,5 +55,12 @@
       "description": "Enter gdbserver port",
       "default": "1234"
     }
-  ]
+  ],
+
+    "compounds": [
+        {
+            "name": "Debug Partion + Gameserver",
+            "configurations": ["Attach To Partition", "Attach To SampleGame"]
+        }
+    ]
 }

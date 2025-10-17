@@ -1,39 +1,450 @@
 #include "Interlink/Interlink.hpp"
 
-void Interlink::Initialize(const InterlinkProperties& Properties)
+#include "Interlink.hpp"
+#include "Database/ServerRegistry.hpp"
+void Interlink::OnSteamNetConnectionStatusChanged(SteamNetConnectionStatusChangedCallback_t *pInfo)
 {
-    std::cerr << "Interlink::Initialize called\n";
-    ThisType = Properties.Type;
-    ASSERT(ThisType!= InterlinkType::eInvalid, "Invalid Interlink Type");
-    SteamDatagramErrMsg errMsg;
-    if (!GameNetworkingSockets_Init(nullptr, errMsg))
-    {
-        std::cerr << "GameNetworkingSockets_Init failed: " << errMsg << std::endl;
-        return;
-    }
-    networkInterface = SteamNetworkingSockets();
-    SteamNetworkingIPAddr serverLocalAddr;
-		serverLocalAddr.Clear();
+	switch (pInfo->m_info.m_eState)
+	{
+		// Somebody is trying to connect
+	case k_ESteamNetworkingConnectionState_Connecting:
 
-    if (ThisType == InterlinkType::ePartition)
-    {
-        //try to connect to game server
-        serverLocalAddr.SetIPv6LocalHost(CJ_GAMESERVER_PORT);
-        HSteamNetConnection connection = networkInterface->ConnectByIPAddress(serverLocalAddr, 0, nullptr);
-        ASSERT(connection != k_HSteamNetConnection_Invalid, "Failed to create connection to game server");
-        std::shared_ptr<Connection> conn = std::make_shared<Connection>();
-    }
-    else if (ThisType == InterlinkType::eGameServer)
-    {
-        //try to listen for an incoming connection from partition
-        serverLocalAddr.SetIPv6LocalHost(CJ_PARTITION_PORT);
-        HSteamListenSocket listenSocket = networkInterface->CreateListenSocketIP(serverLocalAddr, 0, nullptr);
-        ASSERT(listenSocket != k_HSteamListenSocket_Invalid, "Failed to create listen socket");
-        std::shared_ptr<Connection> conn = std::make_shared<Connection>();
-        OpenConnections[InterlinkType::ePartition] = conn;
-    }
+		CallbackOnConnecting(pInfo);
+		break;
+	case k_ESteamNetworkingConnectionState_Connected:
+		CallbackOnConnected(pInfo);
+		break;
+	case k_ESteamNetworkingConnectionState_ClosedByPeer:
+		CallbackOnClosedByPear(pInfo);
+		logger->Debug("k_ESteamNetworkingConnectionState_ClosedByPeer");
+		break;
+	case k_ESteamNetworkingConnectionState_ProblemDetectedLocally:
+		logger->Debug("k_ESteamNetworkingConnectionState_ProblemDetectedLocally");
+		break;
+	case k_ESteamNetworkingConnectionState_FinWait:
+		logger->Debug("k_ESteamNetworkingConnectionState_FinWait");
+		break;
 
-    //if()(ThisType == InterlinkType::eGod)
-        //try to listen for partiions 
-    
+	case k_ESteamNetworkingConnectionState_Dead:
+		logger->Debug("k_ESteamNetworkingConnectionState_Dead");
+		break;
+	case k_ESteamNetworkingConnectionState_None:
+		break;
+	default:
+		logger->ErrorFormatted(std::format("Unknown {}", (int64)pInfo->m_info.m_eState));
+	};
+}
+void Interlink::SendMessage(const InterlinkMessage &message)
+{
+}
+static void SteamNetConnectionStatusChanged(SteamNetConnectionStatusChangedCallback_t *info)
+{
+	Interlink::Get().OnSteamNetConnectionStatusChanged(info);
+}
+
+void Interlink::GenerateNewConnections()
+{
+	auto &IndiciesByState = Connections.get<IndexByState>();
+	auto PreConnectingConnections = IndiciesByState.equal_range(ConnectionState::ePreConnecting);
+	// auto& ByState = Connections.equal_range(ConnectionState::ePreConnecting);
+	SteamNetworkingConfigValue_t opt[1];
+	opt[0].SetPtr(k_ESteamNetworkingConfig_Callback_ConnectionStatusChanged,
+				  (void *)SteamNetConnectionStatusChanged);
+	for (auto it = PreConnectingConnections.first; it != PreConnectingConnections.second; ++it)
+	{
+		const Connection &connection = *it;
+		logger->DebugFormatted("Connecting to {} at {}", connection.target.ToString(), connection.address.ToString());
+
+		HSteamNetConnection conn =
+			networkInterface->ConnectByIPAddress(connection.address.ToSteamIPAddr(), 1, opt);
+		if (conn == k_HSteamNetConnection_Invalid)
+		{
+			logger->ErrorFormatted("Failed to Generate New Connection {}", connection.address.ToString());
+		}
+		else
+		{
+			IndiciesByState.modify(it, [conn = conn](Connection &c)
+								   { c.SteamConnection = conn; });
+		}
+	}
+}
+
+void Interlink::OnDebugOutput(ESteamNetworkingSocketsDebugOutputType eType, const char *pszMsg)
+{
+	logger->DebugFormatted(std::format("[GNS Debug] {}\n", pszMsg));
+}
+
+void Interlink::CallbackOnConnecting(SteamCBInfo info)
+{
+
+	auto &IndiciesBySteamConnection = Connections.get<IndexByHSteamNetConnection>();
+	auto ExistingConnection = IndiciesBySteamConnection.find(info->m_hConn);
+
+	// if connection is already registered then I initiated
+	if (ExistingConnection != IndiciesBySteamConnection.end())
+	{
+		IndiciesBySteamConnection.modify(
+			ExistingConnection, [](Connection &c)
+			{ c.SetNewState(ConnectionState::eConnecting); });
+		return;
+	}
+	else // if it is not then its not mine, this is a new incoming connection
+	{
+		// IdentityPacket identity = IdentityPacket::FromString(info->m_info.m_nUserData);
+		IPAddress address(info->m_info.m_addrRemote);
+		int identityByteStreamSize;
+		const std::byte *identityByteStream = (std::byte *)info->m_info.m_identityRemote.GetGenericBytes(identityByteStreamSize);
+		ASSERT(identityByteStream, "No Bytestream identity");
+		/*
+		std::string byteStream2String;
+		for (int i = 0; i < identityByteStreamSize; i++)
+			byteStream2String.push_back((char)identityByteStream[i]);
+		logger->DebugFormatted("Incoming connection ByteStream identity {} size: {}", byteStream2String, identityByteStreamSize);
+		ASSERT(identityByteStreamSize <= 32, "Invalid Identity Byte Stream");
+*/
+		if (info->m_info.m_identityRemote.m_eType != k_ESteamNetworkingIdentityType_GenericBytes)
+		{
+			logger->WarningFormatted("UNknown incoming connection {}. NetworkIdentity not a byte stream . Type: {}", address.ToString(), (int32)info->m_info.m_identityRemote.m_eType);
+			ASSERT(false, "Identity has to be byte stream so we can identity by InterlinkIdentifier and server manifest");
+		}
+		const auto ID = InterLinkIdentifier::FromEncodedByteStream(identityByteStream, identityByteStreamSize);
+		if (!ID.has_value())
+		{
+			logger->WarningFormatted("unknown byte stream  in networkIdentity");
+			ASSERT(false, "Received connecting from something unknown");
+		}
+
+		if (!ServerRegistry::Get().ExistsInRegistry(ID.value()))
+		{
+			logger->ErrorFormatted("Incoming connection from identity '{}' could not be verified since it was not in the registry", ID->ToString());
+
+			ASSERT(false, "Received connecting from something not in the server registry");
+		}
+
+		logger->DebugFormatted("Incoming Connection from: {} at {}", ID->ToString(), address.ToString());
+		if (Connections.get<IndexByTarget>().contains(*ID))
+		{
+			auto find = Connections.get<IndexByTarget>().find(*ID);
+			if (find->state == ConnectionState::eConnected)
+			{
+				logger->DebugFormatted("Incoming connection from {} ignored since already connected");
+			}
+			else
+
+			{
+				logger->DebugFormatted("Incoming connection from {} already defined, previous state was {}, rejecting connection", ID->ToString(), boost::describe::enum_to_string(find->state, "Unknown state?"));
+			}
+			networkInterface->CloseConnection(info->m_hConn, 0, nullptr, false);
+		}
+		// request user for permission to connect
+		if (EResult result = networkInterface->AcceptConnection(info->m_hConn);
+			result != k_EResultOK)
+		{
+
+			logger->ErrorFormatted("Error accepting connection: reason: {}", uint64(result));
+			networkInterface->CloseConnection(info->m_hConn, 0, nullptr, false);
+		}
+		else
+		{
+			// if connection has already been defined update existing
+			if (Connections.get<IndexByTarget>().contains(*ID))
+			{
+				Connections.get<IndexByTarget>().modify(Connections.get<IndexByTarget>().find(*ID), [&](Connection &c)
+														{ c.SetNewState(ConnectionState::eConnecting);
+															c.SteamConnection = info->m_hConn; });
+			}
+			else // otherwise register new one
+			{
+				Connection newCon;
+				newCon.SteamConnection = info->m_hConn;
+				newCon.SetNewState(ConnectionState::eConnecting);
+				newCon.address = address;
+				newCon.target = ID.value();
+				Connections.insert(newCon);
+			}
+		}
+	}
+}
+
+void Interlink::CallbackOnClosedByPear(SteamCBInfo info)
+{
+	networkInterface->CloseConnection(info->m_hConn, 0, nullptr, false);
+}
+
+void Interlink::CallbackOnConnected(SteamCBInfo info)
+{
+	info->m_hConn;
+	auto &indiciesBySteamConn = Connections.get<IndexByHSteamNetConnection>();
+	if (auto v = indiciesBySteamConn.find(info->m_hConn); v != indiciesBySteamConn.end())
+	{
+		std::vector<std::pair<InterlinkMessageSendFlag, std::vector<std::byte>>> MessagesToSend;
+		indiciesBySteamConn.modify(v, [&MessagesToSend = MessagesToSend](Connection &c)
+								   { c.SetNewState(ConnectionState::eConnected);
+								MessagesToSend =std::move(c.MessagesToSendOnConnect); });
+		bool result = networkInterface->SetConnectionPollGroup(v->SteamConnection, PollGroup.value());
+		if (!result)
+		{
+			logger->ErrorFormatted("Failed to assign connection from {} to pollgroup", v->target.ToString());
+		}
+		logger->DebugFormatted(" - {} Connected", v->target.ToString());
+		if (!MessagesToSend.empty())
+		{
+			for (const auto &msg : MessagesToSend)
+			{
+				SendMessageRaw(v->target, msg.second, msg.first);
+			}
+			logger->DebugFormatted("Sent {} messages on Connect to {}", MessagesToSend.size(), v->target.ToString());
+		}
+	}
+	else
+	{
+		ASSERT(false, "Connected? to non existent connection?, HSteamNetConnection was not found");
+	}
+}
+
+void Interlink::OpenListenSocket(PortType port)
+{
+	SteamNetworkingConfigValue_t opt;
+	opt.SetPtr(k_ESteamNetworkingConfig_Callback_ConnectionStatusChanged,
+			   (void *)SteamNetConnectionStatusChanged);
+	SteamNetworkingIPAddr addr;
+	addr.ParseString("0.0.0.0");
+	addr.m_port = port;
+	ListeningSocket = networkInterface->CreateListenSocketIP(
+		addr, 1, &opt);
+	if (ListeningSocket.value() == k_HSteamListenSocket_Invalid)
+	{
+		logger->ErrorFormatted("Failed to listen on port {}", port);
+
+		throw std::runtime_error(
+			std::format("Failed to listen on port {}", port));
+	}
+	logger->DebugFormatted("Opened listen socket on port {}", port);
+}
+
+void Interlink::ReceiveMessages()
+{
+	ISteamNetworkingMessage *pIncomingMessages[32];
+	int numMsgs = networkInterface->ReceiveMessagesOnPollGroup(PollGroup.value(), pIncomingMessages, 32);
+
+	for (int i = 0; i < numMsgs; ++i)
+	{
+		ISteamNetworkingMessage *msg = pIncomingMessages[i];
+
+		// Access message data
+		const void *data = msg->m_pData;
+		size_t size = msg->m_cbSize;
+		const Connection &sender = *Connections.get<IndexByHSteamNetConnection>().find(msg->m_conn);
+
+		callbacks.OnMessageArrival(sender, std::span<const std::byte>((const std::byte *)data, size));
+		// Example: interpret as string
+		std::string text(reinterpret_cast<const char *>(data), size);
+		logger->DebugFormatted("Message from ({}) \"{}\"", sender.target.ToString(), text);
+		// Free message when done
+		msg->Release();
+	}
+}
+
+void Interlink::Init(const InterlinkProperties &Properties)
+{
+
+	MyIdentity = Properties.ThisID;
+	ASSERT(Properties.logger, "Invalid Logger");
+	logger = Properties.logger;
+
+	logger->Debug("Interlink init");
+	ASSERT(MyIdentity.Type != InterlinkType::eInvalid, "Invalid Interlink Type");
+
+	ASSERT(Properties.callbacks.acceptConnectionCallback,
+		   "You must provide a function for accepting connections");
+	callbacks = Properties.callbacks;
+	SteamDatagramErrMsg errMsg;
+	if (!GameNetworkingSockets_Init(nullptr, errMsg))
+	{
+
+		logger->Error(std::string("GameNetworkingSockets_Init failed: ") + errMsg);
+		return;
+	}
+	SteamNetworkingUtils()->SetDebugOutputFunction(
+		k_ESteamNetworkingSocketsDebugOutputType_Warning,
+		[](ESteamNetworkingSocketsDebugOutputType eType, const char *pszMsg)
+		{
+			Interlink::Get().OnDebugOutput(eType, pszMsg);
+		});
+	networkInterface = SteamNetworkingSockets();
+	const auto IdentityByteStream = MyIdentity.ToEncodedByteStream();
+	logger->DebugFormatted("Settings Networking Identity");
+	SteamNetworkingIdentity identity;
+	const bool SetIdentity = identity.SetGenericBytes(IdentityByteStream.data(), IdentityByteStream.size());
+	//=identity.SetGenericString(NetworkingIdentityString.c_str());
+	ASSERT(SetIdentity, "Failed Identity set");
+	networkInterface->ResetIdentity(&identity);
+	// ASSERT(identity.GetGenericBytes() == NetworkingIdentityString, "Invalid Identity set");
+	/*
+
+	SteamNetworkingIdentity Getidentity;
+	if (bool GetIdentity = networkInterface->GetIdentity(&Getidentity); !GetIdentity || (Getidentity.GetGenericString() != MyIdentity.ToString()))
+	{
+		logger->ErrorFormatted("Failure to set networking identity: {}", Getidentity.GetGenericString());
+	}*/
+	PollGroup = networkInterface->CreatePollGroup();
+	IPAddress ipAddress;
+	ListenPort = Type2ListenPort.at(MyIdentity.Type);
+	ipAddress.Parse(DockerIO::Get().GetSelfContainerIP() + ":" + std::to_string(ListenPort));
+	ServerRegistry::Get().RegisterSelf(MyIdentity, ipAddress);
+	logger->DebugFormatted("Registered in ServerRegistry as {}", MyIdentity.ToString());
+	OpenListenSocket(ListenPort);
+	switch (MyIdentity.Type)
+	{
+	case InterlinkType::eGameServer:
+	{
+
+		InterLinkIdentifier PartitionID = MyIdentity;
+		PartitionID.Type = InterlinkType::ePartition;
+		EstablishConnectionTo(PartitionID);
+	}
+	break;
+	case InterlinkType::ePartition:
+
+		EstablishConnectionTo(InterLinkIdentifier::MakeIDGod());
+
+		break;
+	case InterlinkType::eGod:
+
+		break;
+	default:
+		break;
+	}
+}
+
+void Interlink::Shutdown()
+{
+	logger->Debug("Interlink Shutdown");
+}
+
+bool Interlink::EstablishConnectionTo(const InterLinkIdentifier &id)
+{
+	if (Connections.get<IndexByTarget>().contains(id))
+	{
+		const Connection &Existingconnection = *Connections.get<IndexByTarget>().find(id);
+		if (Existingconnection.state == ConnectionState::eConnected)
+		{
+			logger->WarningFormatted("Connection to {} already established", id.ToString());
+		}
+		else if (Existingconnection.state == ConnectionState::eConnecting || Existingconnection.state == ConnectionState::ePreConnecting)
+		{
+			logger->WarningFormatted("already connecting to {}", id.ToString());
+			return true;
+		}
+		else
+		{
+			logger->ErrorFormatted("Undefined connection state in EstablishConnectionTo. State: {}", boost::describe::enum_to_string(Existingconnection.state, "unknownstate?"));
+		}
+
+		return true;
+	}
+	auto IP = ServerRegistry::Get().GetIPOfID(id);
+
+	for (int i = 0; i < 5; i++)
+	{
+		if (!IP.has_value())
+		{
+			logger->ErrorFormatted("IP not found for {} in Server Registry. Trying again in 1 second", id.ToString());
+			std::this_thread::sleep_for(std::chrono::seconds(1));
+			IP = ServerRegistry::Get().GetIPOfID(id);
+		}
+	}
+	if (!IP.has_value())
+	{
+		logger->ErrorFormatted("Failed to establish connection after 5 tries. IP not found in Server Registry {}", id.ToString());
+		ASSERT(false, "Failed to establish connection, could not find IP");
+		return false;
+	}
+	Connection connec;
+	SteamNetworkingIPAddr addr = IP->ToSteamIPAddr();
+	addr.m_port = _PORT_GOD;
+	// std::string s = std::string(":")+ std::to_string(_PORT_GOD);
+	// addr.ParseString(s.c_str());
+	IPAddress ip2(addr);
+
+	logger->DebugFormatted("Establishing connection to {}", id.ToString());
+	connec.address = IP.value();
+	connec.target = id;
+	connec.SetNewState(ConnectionState::ePreConnecting);
+	// connections.push_back(connection);
+	// AddToConnections(connection);
+	Connections.insert(connec);
+	return true;
+}
+
+void Interlink::DebugPrint()
+{
+	for (const auto& connection : Connections)
+	{
+		logger->Debug(connection.ToString());
+	}
+}
+
+void Interlink::SendMessageRaw(const InterLinkIdentifier &who, std::span<const std::byte> data, InterlinkMessageSendFlag sendFlag)
+{
+	auto QueueMessageOnConnect = [&]()
+	{
+		auto it = Connections.get<IndexByTarget>().find(who);
+		Connections.get<IndexByTarget>().modify(it, [&](Connection &c)
+												{
+													std::vector<std::byte> newdata;
+													newdata.insert(newdata.end(), data.begin(), data.end());
+													c.MessagesToSendOnConnect.push_back(std::make_pair(sendFlag,newdata)); });
+	};
+	//DebugPrint();
+	if (!Connections.get<IndexByTarget>().contains(who)) // if connection does not exist
+	{
+		logger->DebugFormatted("Connection to \"{}\" was not established, connecting...", who.ToString());
+		// establish and queue message
+		EstablishConnectionTo(who);
+		QueueMessageOnConnect();
+	}
+	else if (auto find = Connections.get<IndexByTarget>().find(who); find->state != ConnectionState::eConnected) // if an existing connection exists but it is not in connected state
+	{
+		if (find->state == ConnectionState::ePreConnecting || find->state == ConnectionState::eConnecting) // if an active connectio is in the process of connecting
+		{
+			logger->DebugFormatted("Connection to {} is {} , queuing message...", who.ToString(), boost::describe::enum_to_string(Connections.get<IndexByTarget>().find(who)->state, "unknown"));
+
+			// just queue message
+			QueueMessageOnConnect();
+		}
+		else
+		{
+			logger->DebugFormatted("Connection to {} state is {} , connecting...", who.ToString(), boost::describe::enum_to_string(Connections.get<IndexByTarget>().find(who)->state, "unknown"));
+
+			// establish and queue message
+			EstablishConnectionTo(who);
+			QueueMessageOnConnect();
+		}
+	}
+	else // connection exists and is established, send message normally
+	{
+		const Connection &conn = *Connections.get<IndexByTarget>().find(who);
+		const auto SendResult = networkInterface->SendMessageToConnection(conn.SteamConnection, data.data(), data.size_bytes(), (int)sendFlag, nullptr);
+
+		if (SendResult != k_EResultOK)
+		{
+
+			logger->ErrorFormatted("Unable to send message. SteamNetworkingSockets returned result code {}", (int)SendResult);
+			ASSERT(false, "Unable to send message");
+		}
+		else
+		{
+
+			logger->DebugFormatted("Message of size {} bytes sent to {}", data.size_bytes(), who.ToString());
+		}
+	}
+}
+
+void Interlink::Tick()
+{
+	GenerateNewConnections();
+	ReceiveMessages();
+	networkInterface->RunCallbacks(); // process events
+									  // logger->Debug("tick");
 }

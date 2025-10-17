@@ -1,0 +1,12 @@
+{
+  "recommendations": [
+    "ms-vscode.cpptools-extension-pack",   // C++ Extension Pack
+    "llvm-vs-code-extensions.vscode-clangd", // Clangd
+    "ms-azuretools.vscode-docker",         // Docker
+    "docker.docker",                       // Docker DX
+    "yzhang.markdown-all-in-one",          // Markdown All in One
+    "pkief.material-icon-theme",           // Material Icon Theme
+    "cschlosser.doxdocgen",                // Doxygen doc generator
+    "mhutchie.git-graph"                   // Git Graph
+  ]
+}

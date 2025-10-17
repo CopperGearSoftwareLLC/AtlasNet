@@ -2,123 +2,42 @@
   "version": "2.0.0",
   "tasks": [
     {
-      "label": "Premake",
+      "label": "AtlasNet Start",
       "type": "shell",
-      "command": "./premake5 gmake",
-      "args": [],
-      "group": "build",
-      "problemMatcher": ["$gcc"]
-    },
-    {
-      "label": "Compile For Docker",
-      "type": "shell",
-      "dependsOn": "Premake",
-      "command": "bear -- make -C ./build/ config=debugdocker -j 12",
-      "args": [],
-      "group": "build",
-      "problemMatcher": ["$gcc"]
-    },
-    
-    {
-      "label": "Compile For Local",
-      "type": "shell",
-      "dependsOn": "Premake",
-      "command": "bear -- make -C ./build/ config=debuglocal -j 12",
-      "args": [],
-      "group": "build",
-      "problemMatcher": ["$gcc"]
-    },
-    {
-      "label": "Startup Docker",
-      "type": "shell",
-      "command": "docker ps -aq | xargs -r docker rm -f",
-      "dependsOn": "Compile For Docker",
-      "problemMatcher": [],
-      "group": {
-          "kind": "build",
-          "isDefault": false
-      },
-      "presentation": {
-          "echo": true,
-          "reveal": "always",
-          "focus": false,
-          "panel": "shared",
-          "showReuseMessage": true,
-          "clear": true
-      }
-    },
-    {
-      "label": "Remove All Docker Containers",
-      "type": "shell",
-      "command": "docker ps -aq >nul 2>&1 && docker rm -f $(docker ps -aq) || echo $USER",
-      "dependsOn": "Startup Docker",
-      "problemMatcher": [],
-      "group": {
-          "kind": "build",
-          "isDefault": false
-      },
-      "presentation": {
-          "echo": true,
-          "reveal": "always",
-          "focus": false,
-          "panel": "shared",
-          "showReuseMessage": true,
-          "clear": true
-      }
-    },
-    {
-      "label": "Setup Docker Images. SampleGame",
-      "type": "shell",
-      "dependsOn": "Remove All Docker Containers",
-      "command": "./Setup.sh",
-      "args":["SampleGame"],
-        "options": {
+      "dependsOn": "Setup Docker Images. SampleGame",
+      "command": "./premake5",
+      "args": [ "AtlasNetStart","--testid=${input:TestNumber}"],
+      "options": {
         "cwd": "${workspaceFolder}" // working directory
       },
     },
     {
-      "label": "Run God",
+      "label": "Run God Docker",
       "type": "shell",
       "dependsOn": "Setup Docker Images. SampleGame",
-      "command": "./Start.sh",
-      "args": ["God",],
+      "command": "./premake5",
+      "args": [ "run-docker-image","--target=God","--build-config=DebugDocker","--testid=${input:TestNumber}"],
       "options": {
         "cwd": "${workspaceFolder}" // working directory
       },
     },
      {
-      "label": "Run Partition",
+      "label": "Run Partition + Unit Tests Docker",
       "type": "shell",
       "dependsOn": "Setup Docker Images. SampleGame",
-      "command": "./Start.sh",
-      "args": ["Partition",],
+    "command": "./premake5",
+      "args": [ "run-docker-image","--target=Partition","--build-config=DebugDocker","--app-bundle=UnitTests","--testid=${input:TestNumber}"],
       "options": {
         "cwd": "${workspaceFolder}" // working directory
       },
-    },
-    {
-      "label": "get-god-gdb-port",
-      "type": "shell",
-      "command": "./GetGDBPort.sh god-image ",   // or your actual command
-      "problemMatcher": [],
-      
-     
     }
   ],
   "inputs": [
     {
-      "id": "buildConfigDocker",
-      "type": "pickString",
-      "description": "Select build configuration",
-      "options": ["DebugDocker","debuglocal", "Release"],
-      "default": "debuglocal"
-    },
-    {
-      "id": "buildConfig",
-      "type": "pickString",
-      "description": "Select build configuration",
-      "options": ["Debug", "Release"],
-      "default": "Debug"
+      "id": "TestNumber",
+      "type": "promptString",
+      "description": "Enter an Test ID: (0 for unitTests)",
+      "default": "-1"
     }
   ]
 }

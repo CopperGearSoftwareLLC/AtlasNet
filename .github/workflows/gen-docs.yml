@@ -1,0 +1,32 @@
+name: Generate Docs
+
+on:
+  push:
+    branches:
+      - main
+      - master
+      - Development
+  pull_request:
+    types: [closed] # runs when PR is merged
+    branches:
+      - main
+      - master
+      - Development
+
+jobs:
+  generate-docs:
+    if: github.event_name == 'push' || (github.event_name == 'pull_request' && github.event.pull_request.merged == true)
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Make script executable
+        run: chmod +x ./premake5
+
+      - name: Premake Clean
+        run: ./premake5 clean
+
+      - name: Run GenDocs
+        run: ./premake5 GenDocs

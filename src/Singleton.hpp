@@ -5,8 +5,11 @@ template <typename Type, typename ConstructorArguments = void> class Singleton
   private:
     static inline std::unique_ptr<Type> Instance;
 
+
   public:
-    // if constructor arguments
+    Singleton() = default;
+    Singleton(const Singleton& o) = delete;  
+  // if constructor arguments
     template <typename T = ConstructorArguments, std::enable_if_t<!std::is_void_v<T>, int> = 0>
     [[nodiscard]] static Type &Get()
     {
