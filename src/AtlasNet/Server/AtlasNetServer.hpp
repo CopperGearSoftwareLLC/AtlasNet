@@ -1,3 +1,4 @@
+#pragma once
 #include "AtlasNet/AtlasEntity.hpp"
 #include "AtlasNet/AtlasNetInterface.hpp"
 #include "Singleton.hpp"
