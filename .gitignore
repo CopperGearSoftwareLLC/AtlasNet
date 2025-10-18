@@ -13,3 +13,4 @@ nul
 vcpkg
 vcpkg_installed
 /build
+/src/TestUnityAPI/Server/build

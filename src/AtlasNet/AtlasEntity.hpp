@@ -1,5 +1,4 @@
 #pragma once
-#include "pch.hpp"
 
 using AtlasEntityID = uint32;
 struct AtlasEntity
