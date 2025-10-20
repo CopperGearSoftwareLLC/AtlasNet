@@ -63,7 +63,7 @@ int main(int argc, char **argv)
         std::cerr << argv[i] << std::endl;
     }
     AtlasNetServer::InitializeProperties InitProperties;
-    AtlasNetServer::Get().Initialize(InitProperties);
+    //AtlasNetServer::Get().Initialize(InitProperties);
     InitProperties.ExePath = argv[0];
     InitProperties.OnShutdownRequest = [&](SignalType signal)
     { ShouldShutdown = true; };
@@ -76,12 +76,18 @@ int main(int argc, char **argv)
     using clock = std::chrono::high_resolution_clock;
     auto previous = clock::now();
 
+    std::this_thread::sleep_for(std::chrono::milliseconds(1000));
+
     while (!ShouldShutdown)
     {
-        std::span<AtlasEntity> myspan;
-        std::vector<AtlasEntity> Incoming;
-        std::vector<AtlasEntityID> Outgoing;
-        AtlasNetServer::Get().Update(myspan, Incoming, Outgoing);
+      std::vector<AtlasEntity> Incoming;
+      AtlasEntity entity;
+      entity.ID = 0;
+      entity.IsSpawned = true;
+      Incoming.push_back(entity);
+      std::span<AtlasEntity> myspan(Incoming);
+      std::vector<AtlasEntityID> Outgoing;
+      //  AtlasNetServer::Get().Update(myspan, Incoming, Outgoing);
         auto now = clock::now();
         std::chrono::duration<float> delta = now - previous;
         previous = now;

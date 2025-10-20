@@ -1,9 +1,36 @@
+# build commands for windows for clients
 cd /mnt/d/KDNet/KDNet
-./premake5 gmake2
+premake5 vs2022
+msbuild AtlasUnityBridge.sln /p:Configuration=Release # doesnt work rn and has build errors
+
+# build commands for linux for servers
+cd /mnt/d/KDNet/KDNet
+./premake5 gmake
 cd build
 make AtlasUnityBridge config=release
 
 
-cd /mnt/d/KDNet/KDNet
-premake5 vs2022
-msbuild AtlasUnityBridge.sln /p:Configuration=Release # doesnt work rn and has build errors
+# manual install into container and run
+ # replace admiring_cori w/ the container name in question
+CONTAINER=admiring_cori
+docker exec -it $CONTAINER bash -lc "mkdir -p /atlasnet/GameServer && mkdir -p /atlasnet/logs"
+docker cp /mnt/d/KDNet/KDnetServerUnity/KDnetServer/Build/. $CONTAINER:/atlasnet/GameServer
+
+# install unity dependnecies if needed
+# replace admiring_cori w/ the container name in question
+docker exec -it admiring_cori bash -lc \
+  "apt-get update && apt-get install -y \
+   libglib2.0-0 libnss3 libx11-6 libxcomposite1 libxcursor1 \
+   libxi6 libxtst6 libxrandr2 libasound2 libcurl4 ca-certificates"
+
+# run it inside the container
+# replace admiring_cori w/ the container name in question
+docker exec -d admiring_cori bash -lc '
+  cd /atlasnet/GameServer && \
+  chmod +x KDNetServer.x86_64 && \
+  export LD_LIBRARY_PATH=$PWD:/usr/local/lib:$LD_LIBRARY_PATH && \
+  ./KDNetServer.x86_64 -batchmode -logfile /atlasnet/logs/gameserver.log'
+
+# look at unity logs to confirm connection
+# replace admiring_cori w/ the container name in question
+docker exec -it admiring_cori bash -lc "tail -f /atlasnet/logs/gameserver.log"

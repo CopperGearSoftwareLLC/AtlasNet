@@ -5,9 +5,29 @@
 
 static std::unique_ptr<AtlasNetServer> g_server;
 
+static void RedirectStdToUnityLog()
+{
+    // Unity’s Player.log path at runtime
+    const char* logPath = "/atlasnet/logs/gameserver.log";
+    FILE* logFile = fopen(logPath, "a");
+    if (!logFile)
+        return;
+
+    int fd = fileno(logFile);
+    dup2(fd, STDOUT_FILENO);
+    dup2(fd, STDERR_FILENO);
+    setvbuf(stdout, nullptr, _IONBF, 0);
+    setvbuf(stderr, nullptr, _IONBF, 0);
+}
+
 // --------- Initialize ----------
 extern "C" int atlas_initialize(const AtlasInitializeProperties* props)
 {
+    RedirectStdToUnityLog();   // <-- add this line
+    printf("[AtlasUnityBridge] Redirected stdout/stderr to Unity log\n");
+    fflush(stdout);
+
+
     try {
         g_server = std::make_unique<AtlasNetServer>();
 

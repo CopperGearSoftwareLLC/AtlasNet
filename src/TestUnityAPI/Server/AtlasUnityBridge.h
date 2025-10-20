@@ -1,3 +1,9 @@
+/**
+ * @file AtlasUnityBridge.h
+ * @brief Unity plugin wrapped from AtlasNetServer + additional features
+ * 
+ */
+
 #pragma once
 #include <stdint.h>
 #include "../../AtlasNet/AtlasEntity.hpp"

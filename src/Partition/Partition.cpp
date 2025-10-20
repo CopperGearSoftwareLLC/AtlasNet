@@ -5,6 +5,7 @@
 #include "Database/RedisCacheDatabase.hpp"
 #include "Database/ServerRegistry.hpp"
 #include "Heuristic/Shape.hpp"
+
 Partition::Partition()
 {
 }
@@ -45,6 +46,20 @@ void Partition::Init()
 
 void Partition::MessageArrived(const Connection &fromWhom, std::span<const std::byte> data)
 {
+    // Detect snapshot packets
+    if (data.size() % sizeof(AtlasEntity) == 0 && data.size() > 0)
+    {
+        size_t entityCount = data.size() / sizeof(AtlasEntity);
+        std::vector<AtlasEntity> snapshot(entityCount);
+
+        std::memcpy(snapshot.data(), data.data(), data.size());
+        logger->DebugFormatted("Received snapshot with {} entities from {}", entityCount, fromWhom.target.ID);
+
+        // Store or apply to in-memory state
+        this->CachedEntities = std::move(snapshot);
+        return;
+    }
+
 	std::string msg(reinterpret_cast<const char*>(std::data(data)), std::size(data));
 	if(msg == "Fetch Shape")
 	{
