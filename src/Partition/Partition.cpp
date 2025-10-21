@@ -53,10 +53,16 @@ void Partition::MessageArrived(const Connection &fromWhom, std::span<const std::
         std::vector<AtlasEntity> snapshot(entityCount);
 
         std::memcpy(snapshot.data(), data.data(), data.size());
-        logger->DebugFormatted("Received snapshot with {} entities from {}", entityCount, fromWhom.target.ID);
-
         // Store or apply to in-memory state
         this->CachedEntities = std::move(snapshot);
+
+        logger->DebugFormatted("Cached {} entities from {}", entityCount, fromWhom.target.ID);
+
+        for (const auto &entity : this->CachedEntities)
+        {
+            logger->DebugFormatted("Entity ID: {}, Pos: ({}, {}, {})", entity.ID, entity.Position.x, entity.Position.y, entity.Position.z);
+        }
+
         return;
     }
 
