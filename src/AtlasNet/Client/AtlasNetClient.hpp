@@ -26,7 +26,7 @@ public:
     void Update();
     void SendInputIntent(const AtlasEntity& playerIntent);
     void Shutdown();
-
+    bool IsConnected() const { return connected; }
 private:
     std::shared_ptr<Log> logger;
     InterLinkIdentifier serverID;

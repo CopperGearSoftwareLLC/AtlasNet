@@ -63,7 +63,7 @@ int main(int argc, char **argv)
         std::cerr << argv[i] << std::endl;
     }
     AtlasNetServer::InitializeProperties InitProperties;
-    //AtlasNetServer::Get().Initialize(InitProperties);
+    AtlasNetServer::Get().Initialize(InitProperties);
     InitProperties.ExePath = argv[0];
     InitProperties.OnShutdownRequest = [&](SignalType signal)
     { ShouldShutdown = true; };
@@ -87,7 +87,7 @@ int main(int argc, char **argv)
       Incoming.push_back(entity);
       std::span<AtlasEntity> myspan(Incoming);
       std::vector<AtlasEntityID> Outgoing;
-      //  AtlasNetServer::Get().Update(myspan, Incoming, Outgoing);
+        AtlasNetServer::Get().Update(myspan, Incoming, Outgoing);
         auto now = clock::now();
         std::chrono::duration<float> delta = now - previous;
         previous = now;
