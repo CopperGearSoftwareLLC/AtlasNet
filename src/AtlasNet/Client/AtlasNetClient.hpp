@@ -1,8 +1,7 @@
 #pragma once
 #include "pch.hpp"
 #include <memory>
-#include <vector>
-#include <span>
+#include <mutex>
 #include "AtlasNet/AtlasNetInterface.hpp"
 #include "Singleton.hpp"
 #include "../AtlasEntity.hpp"
@@ -16,19 +15,19 @@ public:
     struct InitializeProperties
     {
         std::string ExePath;
-        std::string TargetServerName;
-        std::string TargetServerIP;     // direct IP for now
+        std::string ClientName;
+        std::string ServerName;
     };
 
 public:
     AtlasNetClient() = default;
     void Initialize(InitializeProperties& props);
-    void Update();
-    void SendInputIntent(const AtlasEntity& playerIntent);
+    void SendEntityUpdate(const AtlasEntity &entity);
+    int GetRemoteEntities(AtlasEntity *buffer, int maxCount);
     void Shutdown();
-    bool IsConnected() const { return connected; }
 private:
     std::shared_ptr<Log> logger;
+    std::unordered_map<AtlasEntityID, AtlasEntity> RemoteEntities;
+    std::mutex Mutex;
     InterLinkIdentifier serverID;
-    bool connected = false;
 };

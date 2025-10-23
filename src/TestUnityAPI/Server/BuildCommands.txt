@@ -11,26 +11,26 @@ make AtlasUnityBridge config=release
 
 
 # manual install into container and run
- # replace affectionate_wozniak w/ the container name in question
-CONTAINER=affectionate_wozniak
+ # replace cool_liskov w/ the container name in question
+CONTAINER=cool_liskov
 docker exec -it $CONTAINER bash -lc "mkdir -p /atlasnet/GameServer && mkdir -p /atlasnet/logs"
 docker cp /mnt/d/KDNet/KDnetServerUnity/KDnetServer/Build/. $CONTAINER:/atlasnet/GameServer
 
 # install unity dependnecies if needed
-# replace affectionate_wozniak w/ the container name in question
-docker exec -it affectionate_wozniak bash -lc \
+# replace cool_liskov w/ the container name in question
+docker exec -it cool_liskov bash -lc \
   "apt-get update && apt-get install -y \
    libglib2.0-0 libnss3 libx11-6 libxcomposite1 libxcursor1 \
    libxi6 libxtst6 libxrandr2 libasound2 libcurl4 ca-certificates"
 
 # run it inside the container
-# replace affectionate_wozniak w/ the container name in question
-docker exec -d affectionate_wozniak bash -lc '
+# replace cool_liskov w/ the container name in question
+docker exec -d cool_liskov bash -lc '
   cd /atlasnet/GameServer && \
   chmod +x KDNetServer.x86_64 && \
   export LD_LIBRARY_PATH=$PWD:/usr/local/lib:$LD_LIBRARY_PATH && \
   ./KDNetServer.x86_64 -batchmode -logfile /atlasnet/logs/gameserver.log'
 
 # look at unity logs to confirm connection
-# replace affectionate_wozniak w/ the container name in question
-docker exec -it affectionate_wozniak bash -lc "tail -f /atlasnet/logs/gameserver.log"
+# replace cool_liskov w/ the container name in question
+docker exec -it cool_liskov bash -lc "tail -f /atlasnet/logs/gameserver.log"

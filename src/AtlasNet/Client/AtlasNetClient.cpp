@@ -6,51 +6,52 @@ void AtlasNetClient::Initialize(AtlasNetClient::InitializeProperties& props)
 {
     CrashHandler::Get().Init(props.ExePath);
 
-    InterLinkIdentifier myID(InterlinkType::eGameClient, DockerIO::Get().GetSelfContainerName());
+    std::string serverName = props.ServerName;
+    if (serverName.empty())
+        serverName = DockerIO::Get().GetSelfContainerName();
+
+    InterLinkIdentifier myID(InterlinkType::eGameClient, serverName);
     logger = std::make_shared<Log>(myID.ToString());
     logger->Debug("AtlasNetClient Initialize");
+    logger->DebugFormatted("Client ID: {}", myID.ID);
+    logger->DebugFormatted("Client identifier: {}", myID.ToString());
 
-    Interlink::Check();
-    Interlink::Get().Init({
-        .ThisID = myID,
-        .logger = logger,
-        .callbacks = {
-            .acceptConnectionCallback = [](const Connection&) { return true; },
-            .OnConnectedCallback = [this](const InterLinkIdentifier& id)
-            {
-                if (id.Type == InterlinkType::eGameServer)
-                {
-                    connected = true;
-                    logger->DebugFormatted("Connected to GameServer {}", id.ToString());
-                }
-            },
-            .OnMessageArrival = [this](const Connection& fromWhom, std::span<const std::byte> data)
-            {
-                logger->DebugFormatted("[Client] Snapshot {} bytes from {}", data.size(), fromWhom.target.ToString());
-            }
-        }
-    });
+    SteamDatagramErrMsg errMsg;
+    if (!GameNetworkingSockets_Init(nullptr, errMsg))
+    {
+      logger->Error(std::string("GameNetworkingSockets_Init failed: ") + errMsg);
+      return;
+    }
+    else
+    {
+      logger->Debug("GameNetworkingSockets_Init succeeded");
+      system("ping www.google.com"); // keep for debug purposes
+    }
 
     logger->Debug("Waiting for Interlink auto-connect to GameServer...");
 }
 
-void AtlasNetClient::Update()
+void AtlasNetClient::SendEntityUpdate(const AtlasEntity &entity)
 {
     Interlink::Get().Tick();
+    Interlink::Get().SendMessageRaw(serverID, std::as_bytes(std::span(&entity, 1)));
 }
 
-void AtlasNetClient::SendInputIntent(const AtlasEntity& intent)
+int AtlasNetClient::GetRemoteEntities(AtlasEntity *buffer, int maxCount)
 {
-    if (!connected) return;
-
-    const std::byte* ptr = reinterpret_cast<const std::byte*>(&intent);
-    std::span<const std::byte> span(ptr, sizeof(AtlasEntity));
-    Interlink::Get().SendMessageRaw(serverID, span);
+    std::lock_guard lock(Mutex);
+    int count = std::min<int>(maxCount, RemoteEntities.size());
+    int i = 0;
+    for (auto &[id, e] : RemoteEntities)
+    {
+        if (i >= count) break;
+        buffer[i++] = e;
+    }
+    return count;
 }
 
 void AtlasNetClient::Shutdown()
 {
     Interlink::Get().Shutdown();
-    connected = false;
     logger.reset();
 }

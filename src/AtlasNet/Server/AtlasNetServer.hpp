@@ -5,6 +5,7 @@
 #include "pch.hpp"
 #include "Debug/Log.hpp"
 #include "Docker/DockerEvents.hpp"
+#include "Interlink/Interlink.hpp"
 enum KDServerRequestType {
     Raycast,
     SphereOverlap,
@@ -17,6 +18,8 @@ using KDServerResponseType = std::vector<std::byte>;
 class AtlasNetServer : public AtlasNetInterface, public Singleton<AtlasNetServer> {
     
     std::shared_ptr<Log> logger = std::make_shared<Log>("AtlasNetServer");
+    std::unordered_map<AtlasEntityID, AtlasEntity> CachedEntities;
+    std::unordered_set<InterLinkIdentifier> ConnectedClients;
 
    public:
     AtlasNetServer() {};
@@ -44,4 +47,12 @@ class AtlasNetServer : public AtlasNetInterface, public Singleton<AtlasNetServer
      */
     void Update(std::span<AtlasEntity> entities, std::vector<AtlasEntity>& IncomingEntities,
 		std::vector<AtlasEntityID>& OutgoingEntities);
+
+    /**
+     * @brief Handles incoming messages from Interlink.
+     * 
+     * @param fromWhom 
+     * @param data 
+     */
+    void HandleMessage(const Connection& fromWhom, std::span<const std::byte> data);
 };

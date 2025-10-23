@@ -553,7 +553,6 @@ project "AtlasClientBridge"
     pchheader "src/pch.hpp"
     pchsource "src/pch.cpp"
 
-    -- If you already use "src/**.cpp" globally, this is enough:
     files {
         "src/AtlasNet/Client/**.cpp",
         "src/AtlasNet/Client/**.hpp",
@@ -566,16 +565,14 @@ project "AtlasClientBridge"
     includedirs {
         "src",
         "vcpkg_installed/x64-linux/include",
-        "vcpkg_installed/x64-windows/include"
+        "vcpkg_installed/x64-windows/include" -- harmless on linux
     }
 
     defines {
         "_PORT_GOD=25564",
         "_PORT_PARTITION=25565",
         "_PORT_GAMESERVER=25566",
-        -- Reserve a port; you can ignore opening a listen socket for clients if not needed.
-        -- Add to Type2ListenPort map too.
-        -- "_PORT_CLIENT=25567",
+        "_PORT_CLIENT=25567",
         "BOOST_STACKTRACE_LINK",
         "BOOST_STACKTRACE_USE_ADDR2LINE"
     }
@@ -586,6 +583,7 @@ project "AtlasClientBridge"
         "hiredis",
         "boost_stacktrace_addr2line",
         "boost_container",
+        "curl",
         "GL",
         "dl",
         "z",
@@ -597,11 +595,6 @@ project "AtlasClientBridge"
         pic "on"
         defines { "PLATFORM_LINUX" }
         libdirs { "vcpkg_installed/x64-linux/lib" }
-
-    filter "system:windows"
-        systemversion "latest"
-        defines { "PLATFORM_WINDOWS" }
-        libdirs { "vcpkg_installed/x64-windows/lib" }
 
     filter "configurations:Debug"
         symbols "On"

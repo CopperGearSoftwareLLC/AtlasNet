@@ -4,35 +4,35 @@
 
 static std::unique_ptr<AtlasNetClient> g_client;
 
-extern "C" int atlas_client_initialize(const AtlasClientInitProperties* props)
+extern "C" int atlas_client_initialize(const char *exe_path, const char *client_name, const char *server_name)
 {
-    try
-    {
-        AtlasNetClient::InitializeProperties init{};
-        init.ExePath = (props && props->exe_path) ? props->exe_path : ".";
-        //if (props && props->client_name)        init.ClientNameOverride       = props->client_name;
-        //if (props && props->target_server_name) init.TargetServerNameOverride = props->target_server_name;
+    g_client = std::make_unique<AtlasNetClient>();
+    AtlasNetClient::InitializeProperties props{
+        .ExePath = exe_path,
+        .ClientName = client_name,
+        .ServerName = server_name
+    };
 
-        g_client = std::make_unique<AtlasNetClient>();
-        g_client->Initialize(init);
-        return 0;
+    try {
+        g_client->Initialize(props);
+    } catch (const std::exception &e) {
+        fprintf(stderr, "[AtlasClientBridge] Exception during init: %s\n", e.what());
+        return -2;
     }
-    catch (...)
-    {
-        return -1;
-    }
+    return 0;
 }
 
-extern "C" void atlas_client_update(void)
+extern "C" void atlas_client_send_entity(AtlasEntity entity)
 {
-    if (g_client) g_client->Update();
+    if (g_client) g_client->SendEntityUpdate(entity);
 }
 
-extern "C" void atlas_client_send_input(AtlasEntity* player_intent)
+extern "C" int atlas_client_get_entities(AtlasEntity *buffer, int maxCount)
 {
-    if (g_client && player_intent) g_client->SendInputIntent(*player_intent);
+  return 0;
+    if (!g_client) return 0;
+    return g_client->GetRemoteEntities(buffer, maxCount);
 }
-
 extern "C" void atlas_client_shutdown(void)
 {
     if (g_client)
