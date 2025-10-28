@@ -813,27 +813,9 @@ void AtlasNetBootstrap::GetWorkersSSHCredentials()
             "ssh -i " + privateKeyPath + " -o StrictHostKeyChecking=no " + sshUser + "@" +
             worker.IP + " echo 'SSH connection successful'";
         system(testCmd.c_str());
-        CommandResult archResult = RunCommand(
-            "ssh -i \"" + privateKeyPath + "\" -o StrictHostKeyChecking=no " + sshUser + "@" +
-            worker.IP + " uname -m");
-
-        std::string arch = archResult.output;
-        arch.erase(std::remove(arch.begin(), arch.end(), '\n'), arch.end());
-        arch.erase(std::remove(arch.begin(), arch.end(), '\r'), arch.end());
-
-        if (arch.empty())
-        {
-            logger.WarningFormatted("⚠️ Could not determine architecture for worker {}. assuming amd64", worker.Name);
-            arch = "amd64";
-        }
-        else
-        {
-            logger.DebugFormatted("🧠 Worker {} architecture detected: {}", worker.Name, arch);
-        }
 
         OnlineWorker ow;
         ow.worker = worker;
-        ow.arch = arch;
         ow.sshUser = sshUser;
         ow.publicKeyPath = publicKeyPath;
         ow.PrivateKeyPath = privateKeyPath;
