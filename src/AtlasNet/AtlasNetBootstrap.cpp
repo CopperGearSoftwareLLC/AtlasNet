@@ -296,6 +296,7 @@ bool AtlasNetBootstrap::BuildDockerImage(const std::string &DockerFile, const st
 {
     const std::string registry = ManagerPcAdvertiseAddr + ":5000";
     std::vector<std::string> fullTags;
+    std::vector<std::string> imageDigests;
     for (const auto &arch : arches)
     {
         std::string archn = arch;
@@ -323,44 +324,42 @@ bool AtlasNetBootstrap::BuildDockerImage(const std::string &DockerFile, const st
 
         logger.DebugFormatted("✅ Successfully built & pushed '{}' (arch '{}')", ImageName, archn);
     }
-    /*
-    // 2️⃣ Create multi-arch manifest
-    const std::string manifestTag = std::format("{}/{}:latest", registry, ImageName);
+    // 2️⃣ Create and push manifest list (multi-arch tag)
+    std::string manifestName = std::format("{}/{}:latest", registry, ImageName);
+    std::string manifestCmd = std::format("docker manifest create {}", manifestName);
 
-    // Check if manifest already exists
-    std::string inspectCmd = std::format("docker manifest inspect {} > /dev/null 2>&1", manifestTag);
-    if (std::system(inspectCmd.c_str()) == 0)
-    {
-        logger.DebugFormatted("🗑️ Existing manifest found for '{}', deleting it first", manifestTag);
-        std::string deleteCmd = std::format("docker manifest rm {} > /dev/null 2>&1", manifestTag);
-        if (std::system(deleteCmd.c_str()) != 0)
-        {
-            logger.WarningFormatted("⚠️ Failed to delete existing manifest '{}', continuing anyway", manifestTag);
-        }
-    }
+    for (const auto &fullTag : fullTags)
+        manifestCmd += std::format(" {}", fullTag);
 
-    // Create new manifest
-    std::string manifestCmd = std::format("docker manifest create {} --insecure", manifestTag);
-    for (const auto &tag : fullTags)
-        manifestCmd += " " + tag;
+    logger.DebugFormatted("🧩 Creating manifest '{}'", manifestName);
 
-    logger.DebugFormatted("🧩 Creating manifest for '{}'", manifestTag);
     if (std::system(manifestCmd.c_str()) != 0)
     {
-        logger.ErrorFormatted("❌ Failed to create manifest for '{}'", manifestTag);
+        logger.ErrorFormatted("❌ Failed to create manifest '{}'", manifestName);
         throw std::runtime_error("Manifest creation failed");
     }
 
-    // 3️⃣ Push the manifest
-    std::string pushManifestCmd = std::format("docker manifest push {} > /dev/null 2>&1", manifestTag);
-    if (std::system(pushManifestCmd.c_str()) != 0)
+    // 3️⃣ Annotate each arch in the manifest
+    for (const auto &arch : arches)
     {
-        logger.ErrorFormatted("❌ Failed to push manifest for '{}'", manifestTag);
+        std::string archn = arch;
+        archn.erase(std::remove_if(archn.begin(), archn.end(), ::isspace), archn.end());
+        std::string fullTag = std::format("{}/{}:{}", registry, ImageName, archn);
+
+        std::string annotateCmd = std::format(
+            "docker manifest annotate {} {} --os linux --arch {}", manifestName, fullTag, archn);
+        std::system(annotateCmd.c_str());
+    }
+
+    // 4️⃣ Push manifest
+    logger.DebugFormatted("🚀 Pushing manifest '{}'", manifestName);
+    if (std::system(std::format("docker manifest push {}", manifestName).c_str()) != 0)
+    {
+        logger.ErrorFormatted("❌ Failed to push manifest '{}'", manifestName);
         throw std::runtime_error("Manifest push failed");
     }
 
-    logger.DebugFormatted("✅ Successfully pushed manifest '{}'", manifestTag);
-    */
+    logger.DebugFormatted("✅ Multi-arch manifest pushed successfully: '{}'", manifestName);
     return true;
 }
 
@@ -370,7 +369,7 @@ void AtlasNetBootstrap::RunGod()
     system(removeCommand.c_str());
 
     logger.Debug("Running God");
-    std::string Command = "docker run --init  --stop-timeout=999999 --network " + NetworkName + " -v /var/run/docker.sock:/var/run/docker.sock --cap-add=SYS_PTRACE --security-opt seccomp=unconfined --name God -d -p :" + std::to_string(_PORT_GOD) + " " + GodImageName;
+    std::string Command = "docker run --init  --stop-timeout=999999 --network " + NetworkName + " -v /var/run/docker.sock:/var/run/docker.sock --cap-add=SYS_PTRACE --security-opt seccomp=unconfined --name God -d -p :" + std::to_string(_PORT_GOD) + " "+ ManagerPcAdvertiseAddr+":5000/" + GodImageName;
     system(Command.c_str());
 }
 
@@ -381,7 +380,7 @@ void AtlasNetBootstrap::RunDatabase()
 
     // Create the container
     std::string runCommand =
-        "docker create --name Database --network " + NetworkName + " -v redis_data:/data -p 6379:6379 " + DatabaseImageName + " /bin/bash -c \"redis-server --appendonly yes & ./Database\"";
+        "docker create --name Database --network " + NetworkName + " -v redis_data:/data -p 6379:6379 " +ManagerPcAdvertiseAddr+":5000/"+ DatabaseImageName + " /bin/bash -c \"redis-server --appendonly yes & ./Database\"";
     system(runCommand.c_str());
 
     // Start it
