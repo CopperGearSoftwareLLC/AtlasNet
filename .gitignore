@@ -13,3 +13,5 @@ nul
 vcpkg
 vcpkg_installed
 /build
+docker_cache
+keys

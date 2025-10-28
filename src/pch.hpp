@@ -61,16 +61,22 @@ using vec = glm::vec<L, T>;
 
 /* Database */
 #include <sw/redis++/redis++.h>
-
+#include <netdb.h>  
+#include <ifaddrs.h>
+#include <arpa/inet.h>
+#include <netinet/in.h>
 #include <cassert>
 #define ASSERT(check,message) assert(check && message)
 #include <iostream>
+#include <regex>
 #include <cstdlib>
 #include <thread>
 #include <span>
 #include <vector>
 #include <functional>
 #include <chrono>
+#include <execution>
+#include <termios.h>
 #include <bitset>
 #include <unordered_map>
 #include <memory>

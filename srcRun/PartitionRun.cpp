@@ -11,7 +11,6 @@
 int main(int argc, char **argv)
 {
 
-    std::cerr << "Contaienr Name: " << DockerIO::Get().GetSelfContainerName() << std::endl;
     CrashHandler::Get().Init(argv[0]);
     DockerEvents::Get().Init(DockerEventsInit{.OnShutdownRequest = [](SignalType signal)
                                               { Partition::Get().Shutdown(); }});

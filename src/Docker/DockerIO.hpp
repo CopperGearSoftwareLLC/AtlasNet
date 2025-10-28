@@ -2,6 +2,20 @@
 #include <pch.hpp>
 #include <Singleton.hpp>
 
+class Curl:public Singleton<Curl>
+{
+    public:
+    Curl()
+    {
+        curl_global_init(CURL_GLOBAL_DEFAULT);
+
+    }
+    ~Curl()
+    {
+        curl_global_cleanup();
+
+    }
+};
 using DockerContainerID = std::string;
 class DockerIO : public Singleton<DockerIO>
 {
@@ -10,10 +24,9 @@ class DockerIO : public Singleton<DockerIO>
 public:
     DockerIO(const std::string &sockPath = "/var/run/docker.sock") : unixSocket(sockPath)
     {
-        curl_global_init(CURL_GLOBAL_DEFAULT);
+        Curl::Check();
     }
     ~DockerIO() {
-        curl_global_cleanup();
     }
     std::string request(const std::string& method,
                         const std::string& endpoint,

@@ -12,7 +12,7 @@
  */
 class RedisCacheDatabase : public IDatabase {
 public:
-    RedisCacheDatabase(bool createDatabase = false, const std::string &host = "database-redis", int32 port = 6379, const std::string &network = "AtlasNet");
+    RedisCacheDatabase(bool createDatabase = false, const std::string &host = "Database", int32 port = 6379, const std::string &network = "AtlasNet");
 
     bool Connect() override;
     std::future<bool> ConnectAsync() override;

@@ -273,7 +273,7 @@ void Interlink::Init(const InterlinkProperties &Properties)
 		});
 	networkInterface = SteamNetworkingSockets();
 	const auto IdentityByteStream = MyIdentity.ToEncodedByteStream();
-	logger->DebugFormatted("Settings Networking Identity");
+	logger->DebugFormatted("Setting Networking Identity");
 	SteamNetworkingIdentity identity;
 	const bool SetIdentity = identity.SetGenericBytes(IdentityByteStream.data(), IdentityByteStream.size());
 	//=identity.SetGenericString(NetworkingIdentityString.c_str());
