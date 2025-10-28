@@ -268,7 +268,7 @@ ENTRYPOINT ["/usr/bin/tini", "--", "/entrypoint.sh"])",
                                                          {"WORKDIR", WorkDir},
                                                          {"DEV_PACKAGES", packages},
                                                          {"EXECUTABLE", "Partition"}});
-    
+
     OutputDockerFile("Partition/Dockerfile", DockerFileContents);
     BuildDockerImage("Partition/Dockerfile", PartitionImageName, AtlasNet::Get().GetSettings().RuntimeArches);
 }
@@ -310,6 +310,7 @@ bool AtlasNetBootstrap::BuildDockerImage(const std::string &DockerFile, const st
         std::string buildCmd = std::format(
             "docker buildx build --builder {} "
             "--platform linux/{} "
+            "--provenance=false "
             "-f {}/{} -t {} "
             "--cache-from type=local,src={} "
             "--cache-to type=local,dest={},mode=max --push .",
@@ -324,42 +325,32 @@ bool AtlasNetBootstrap::BuildDockerImage(const std::string &DockerFile, const st
 
         logger.DebugFormatted("✅ Successfully built & pushed '{}' (arch '{}')", ImageName, archn);
     }
-    // 2️⃣ Create and push manifest list (multi-arch tag)
-    std::string manifestName = std::format("{}/{}:latest", registry, ImageName);
-    std::string manifestCmd = std::format("docker manifest create {}", manifestName);
+    // After building all architecture images, create and push a manifest list
+    std::string manifestTag = std::format("{}/{}:latest", registry, ImageName);
 
+    logger.DebugFormatted("🧩 Creating manifest list '{}'", manifestTag);
+
+    // Build the manifest creation command
+    std::string manifestCmd = std::format("docker manifest create {}", manifestTag);
     for (const auto &fullTag : fullTags)
         manifestCmd += std::format(" {}", fullTag);
 
-    logger.DebugFormatted("🧩 Creating manifest '{}'", manifestName);
-
+    // Create manifest
     if (std::system(manifestCmd.c_str()) != 0)
     {
-        logger.ErrorFormatted("❌ Failed to create manifest '{}'", manifestName);
+        logger.ErrorFormatted("❌ Failed to create manifest list '{}'", manifestTag);
         throw std::runtime_error("Manifest creation failed");
     }
 
-    // 3️⃣ Annotate each arch in the manifest
-    for (const auto &arch : arches)
+    // Push the manifest list
+    if (std::system(std::format("docker manifest push {}", manifestTag).c_str()) != 0)
     {
-        std::string archn = arch;
-        archn.erase(std::remove_if(archn.begin(), archn.end(), ::isspace), archn.end());
-        std::string fullTag = std::format("{}/{}:{}", registry, ImageName, archn);
-
-        std::string annotateCmd = std::format(
-            "docker manifest annotate {} {} --os linux --arch {}", manifestName, fullTag, archn);
-        std::system(annotateCmd.c_str());
-    }
-
-    // 4️⃣ Push manifest
-    logger.DebugFormatted("🚀 Pushing manifest '{}'", manifestName);
-    if (std::system(std::format("docker manifest push {}", manifestName).c_str()) != 0)
-    {
-        logger.ErrorFormatted("❌ Failed to push manifest '{}'", manifestName);
+        logger.ErrorFormatted("❌ Failed to push manifest list '{}'", manifestTag);
         throw std::runtime_error("Manifest push failed");
     }
 
-    logger.DebugFormatted("✅ Multi-arch manifest pushed successfully: '{}'", manifestName);
+    logger.DebugFormatted("✅ Successfully pushed multi-arch manifest '{}'", manifestTag);
+
     return true;
 }
 
@@ -369,7 +360,7 @@ void AtlasNetBootstrap::RunGod()
     system(removeCommand.c_str());
 
     logger.Debug("Running God");
-    std::string Command = "docker run --init  --stop-timeout=999999 --network " + NetworkName + " -v /var/run/docker.sock:/var/run/docker.sock --cap-add=SYS_PTRACE --security-opt seccomp=unconfined --name God -d -p :" + std::to_string(_PORT_GOD) + " "+ ManagerPcAdvertiseAddr+":5000/" + GodImageName;
+    std::string Command = "docker run --init  --stop-timeout=999999 --network " + NetworkName + " -v /var/run/docker.sock:/var/run/docker.sock --cap-add=SYS_PTRACE --security-opt seccomp=unconfined --name God -d -p :" + std::to_string(_PORT_GOD) + " " + ManagerPcAdvertiseAddr + ":5000/" + GodImageName;
     system(Command.c_str());
 }
 
@@ -380,7 +371,7 @@ void AtlasNetBootstrap::RunDatabase()
 
     // Create the container
     std::string runCommand =
-        "docker create --name Database --network " + NetworkName + " -v redis_data:/data -p 6379:6379 " +ManagerPcAdvertiseAddr+":5000/"+ DatabaseImageName + " /bin/bash -c \"redis-server --appendonly yes & ./Database\"";
+        "docker create --name Database --network " + NetworkName + " -v redis_data:/data -p 6379:6379 " + ManagerPcAdvertiseAddr + ":5000/" + DatabaseImageName + " /bin/bash -c \"redis-server --appendonly yes & ./Database\"";
     system(runCommand.c_str());
 
     // Start it
@@ -701,13 +692,13 @@ void AtlasNetBootstrap::GenerateTSLCertificate()
     logger.DebugFormatted("🔒 Generating new self-signed TLS certificate with SANs at '{}'", tlsPath);
     std::filesystem::create_directories(tlsPath);
 
-    // Detect hostname and IP address
+    // 🔹 Detect hostname and use ManagerPcAdvertiseAddr as main IP
     std::string hostname = RunCommand("hostname").output;
     hostname.erase(std::remove(hostname.begin(), hostname.end(), '\n'), hostname.end());
-    std::string ip = RunCommand("hostname -I | awk '{print $1}'").output; // get first IP
-    ip.erase(std::remove(ip.begin(), ip.end(), '\n'), ip.end());
 
-    // Generate OpenSSL SAN config
+    std::string ip = ManagerPcAdvertiseAddr; // use provided cluster advertise IP
+
+    // 🔹 Generate OpenSSL SAN config
     std::ofstream config(configPath);
     config << "[ req ]\n";
     config << "default_bits       = 4096\n";
@@ -724,7 +715,7 @@ void AtlasNetBootstrap::GenerateTSLCertificate()
     config << "IP.1 = " << ip << "\n";
     config.close();
 
-    // Generate certificate with SANs
+    // 🔹 Generate certificate with SANs
     std::string command = std::format(
         "openssl req -x509 -nodes -newkey rsa:4096 "
         "-keyout '{}' "
@@ -804,7 +795,8 @@ void AtlasNetBootstrap::GetWorkersSSHCredentials()
             worker.IP + " > /dev/null 2>&1";
         auto copyResult = RunCommand(copyCmd.c_str());
         if (copyResult.exitCode != 0)
-        {   std::cerr << copyResult.output << std::endl;
+        {
+            std::cerr << copyResult.output << std::endl;
             logger.ErrorFormatted("❌ Failed to copy SSH key to {}", worker.IP);
             continue;
         }
