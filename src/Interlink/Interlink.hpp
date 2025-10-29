@@ -76,7 +76,9 @@ class Interlink : public Singleton<Interlink>
 
 	const static inline std::unordered_map<InterlinkType, uint32> Type2ListenPort = {{InterlinkType::eGod, _PORT_GOD},
 																					 {InterlinkType::ePartition, _PORT_PARTITION},
-																					 {InterlinkType::eGameServer, _PORT_GAMESERVER}};
+																					 {InterlinkType::eGameServer, _PORT_GAMESERVER},
+                                           {InterlinkType::eGameClient, 25567 } // temp client port
+                                         };
 
 private:
 	void GenerateNewConnections();

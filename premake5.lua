@@ -439,6 +439,7 @@ newaction {
     execute = function()
 
       os.execute("docker volume create redis_data")
+      os.execute("docker network create AtlasNet 2>/dev/null || true")
           MakeDockerImages()
          RunDockerImage("God","DebugDocker")
     end
@@ -463,3 +464,149 @@ newoption {
     value = "-1",
     description = "Specify the id to run from unit tests"
 }
+
+
+--
+-- Unity Plugin: AtlasUnityBridge
+--
+project "AtlasUnityBridge"
+    kind "SharedLib"
+    language "C++"
+    cppdialect "C++20"
+    staticruntime "off"
+
+    targetdir ("%{wks.location}/bin/%{cfg.buildcfg}")
+    objdir ("%{wks.location}/bin-int/%{cfg.buildcfg}")
+
+    pchheader "src/pch.hpp"
+    pchsource "src/pch.cpp"
+
+    files {
+        "src/**.cpp",
+        "src/**.hpp",
+        "src/**.h",
+        "src/**.c"
+    }
+
+    includedirs {
+        "src"
+    }
+
+    defines {
+        "_PORT_GOD=25564",
+        "_PORT_PARTITION=25565",
+        "_PORT_GAMESERVER=25566",
+        "BOOST_STACKTRACE_LINK",
+        "BOOST_STACKTRACE_USE_ADDR2LINE",
+        "ATLAS_UNITY_PLUGIN"
+    }
+
+    links {
+        "boost_stacktrace_addr2line",
+        "boost_container",
+        "curl",
+        "GameNetworkingSockets",
+        "GLEW",
+        "glfw3",
+        "glm",
+        "imgui",
+        "implot",
+        "GL",
+        "ssl",
+        "crypto",
+        "z",
+        "dl",
+        "redis++",
+        "hiredis"
+    }
+
+    filter "system:windows"
+        systemversion "latest"
+        defines { "PLATFORM_WINDOWS" }
+        includedirs {
+            "vcpkg_installed/x64-windows/include",
+            "vcpkg_installed/x64-windows/include/steam"
+        }
+        libdirs { "vcpkg_installed/x64-windows/lib" }
+
+    filter "system:linux"
+        pic "on"
+        defines { "PLATFORM_LINUX" }
+        includedirs {
+            "vcpkg_installed/x64-linux/include",
+            "vcpkg_installed/x64-linux/include/steam"
+        }
+        libdirs { "vcpkg_installed/x64-linux/lib" }
+
+        postbuildcommands {
+            "{MKDIR} ../../YourUnityProject/Assets/Plugins/Linux/x86_64",
+            "{COPY} %{cfg.buildtarget.relpath} ../../YourUnityProject/Assets/Plugins/Linux/x86_64/%{cfg.buildtarget.name}"
+        }
+
+    filter "configurations:Debug"
+        symbols "On"
+
+    filter "configurations:Release"
+        optimize "On"
+
+
+project "AtlasClientBridge"
+    kind "SharedLib"
+    language "C++"
+    cppdialect "C++20"
+    staticruntime "off"
+
+    targetdir ("%{wks.location}/bin/%{cfg.buildcfg}")
+    objdir ("%{wks.location}/bin-int/%{cfg.buildcfg}")
+
+    pchheader "src/pch.hpp"
+    pchsource "src/pch.cpp"
+
+    files {
+        "src/AtlasNet/Client/**.cpp",
+        "src/AtlasNet/Client/**.hpp",
+        "src/TestUnityAPI/Client/**.cpp",
+        "src/TestUnityAPI/Client/**.hpp",
+        "src/**.cpp",
+        "src/**.hpp"
+    }
+
+    includedirs {
+        "src",
+        "vcpkg_installed/x64-linux/include",
+        "vcpkg_installed/x64-windows/include" -- harmless on linux
+    }
+
+    defines {
+        "_PORT_GOD=25564",
+        "_PORT_PARTITION=25565",
+        "_PORT_GAMESERVER=25566",
+        "_PORT_CLIENT=25567",
+        "BOOST_STACKTRACE_LINK",
+        "BOOST_STACKTRACE_USE_ADDR2LINE"
+    }
+
+    links {
+        "GameNetworkingSockets",
+        "redis++",
+        "hiredis",
+        "boost_stacktrace_addr2line",
+        "boost_container",
+        "curl",
+        "GL",
+        "dl",
+        "z",
+        "ssl",
+        "crypto"
+    }
+
+    filter "system:linux"
+        pic "on"
+        defines { "PLATFORM_LINUX" }
+        libdirs { "vcpkg_installed/x64-linux/lib" }
+
+    filter "configurations:Debug"
+        symbols "On"
+
+    filter "configurations:Release"
+        optimize "On"

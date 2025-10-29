@@ -39,6 +39,8 @@ public:
     /// check if hash exists
     virtual bool HashExists(const std::string& key, const std::string& field) = 0;
     
+    /// Get all keys matching a pattern (for cleanup operations)
+    virtual std::vector<std::string> GetKeysMatching(const std::string& pattern) = 0;
 
     virtual void PrintEntireDB() = 0;
 };

@@ -305,6 +305,13 @@ void Interlink::Init(const InterlinkProperties &Properties)
 		EstablishConnectionTo(PartitionID);
 	}
 	break;
+  case InterlinkType::eGameClient:
+{
+    InterLinkIdentifier targetServer(MyIdentity);
+    targetServer.Type = InterlinkType::eGameServer;
+    EstablishConnectionTo(targetServer);
+    break;
+}
 	case InterlinkType::ePartition:
 
 		EstablishConnectionTo(InterLinkIdentifier::MakeIDGod());

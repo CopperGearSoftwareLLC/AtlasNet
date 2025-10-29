@@ -158,8 +158,7 @@ std::string RedisCacheDatabase::HashGet(const std::string &key, const std::strin
 
 std::unordered_map<std::string, std::string> RedisCacheDatabase::HashGetAll(const std::string &key)
 {
-    if (!_redis)
-        return {};
+    ASSERT(_redis,"Invalid redis");
 
     try
     {
@@ -224,6 +223,28 @@ bool RedisCacheDatabase::HashExists(const std::string &key, const std::string &f
                   << " (" << e.what() << ")\n";
         return false;
     }
+}
+
+std::vector<std::string> RedisCacheDatabase::GetKeysMatching(const std::string &pattern)
+{
+    std::vector<std::string> keys;
+    if (!_redis)
+        return keys;
+
+    try
+    {
+        // Use Redis KEYS command to find all keys matching the pattern
+        // Note: KEYS is not recommended for production use due to performance,
+        // but it's fine for cleanup operations during startup
+        _redis->keys(pattern, std::back_inserter(keys));
+    }
+    catch (const std::exception &e)
+    {
+        std::cerr << "⚠️ Redis GetKeysMatching error for pattern: " << pattern
+                  << " (" << e.what() << ")\n";
+    }
+    
+    return keys;
 }
 
 void RedisCacheDatabase::PrintEntireDB()

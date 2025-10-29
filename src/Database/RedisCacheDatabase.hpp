@@ -30,6 +30,7 @@ public:
     bool HashRemove(const std::string& key, const std::string& field) override;
     bool HashRemoveAll(const std::string& key) override;
     bool HashExists(const std::string& key, const std::string& field) override;
+    std::vector<std::string> GetKeysMatching(const std::string& pattern) override;
 
     void PrintEntireDB() override;
 sw::redis::Redis& GetRaw()  {return *_redis;}
