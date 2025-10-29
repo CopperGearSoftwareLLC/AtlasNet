@@ -117,7 +117,7 @@ bool RedisCacheDatabase::Exists(const std::string &key)
 {
     if (!_redis)
         return false;
-    return _redis->exists(key) > 0;
+    return _redis->exits(key) > 0;
 }
 
 bool RedisCacheDatabase::HashSet(const std::string &key, const std::string &field, const std::string &value)
@@ -224,6 +224,165 @@ bool RedisCacheDatabase::HashExists(const std::string &key, const std::string &f
                   << " (" << e.what() << ")\n";
         return false;
     }
+}
+
+std::optional<std::string> ListGetAtIndex(const std::string_view key, long long index) const {
+    if(!_redis) return false;
+    try
+    {
+        return _redis->lindex(key, index);
+    }
+    catch(const std::exception& e) {
+        std::cerr << "⚠️ Redis ListGetAtIndex error for key: " << key << " at index: " << index << " (" << e.what() << ")\n";
+        return false;
+    }
+}
+
+std::future<std::optional<std::string>> ListGetAtIndexAsync(const std::string_view key, long long index) const {
+    return std::async(std::launch::async, ListGetAtIndex, key, index);
+}
+
+long long ListInsert(const std::string_view key, const bool before, const std::string_view pivot, const std::string_view val) {
+    if(!_redis) return false;
+    try
+    {
+        return _redis->linsert(key, before, pivot, val);
+    }
+    catch(const std::exception& e) {
+        std::cerr << "⚠️ Redis ListInsert error for key: " << key << " before?: " << before << " pivot point: " << pivot << " when inserting: " << val << " (" << e.what() << ")\n";
+        return false;
+    }
+}
+
+std::future<long long> ListInsertAsync(const std::string_view key, const bool before, const std::string_view pivot, const std::string_view val) {
+    return std::async(std::launch::async, ListInsert, key, before, pivot, val);
+}
+
+long long ListLength(const std::string_vew key) const {
+    if(!_redis) return false;
+    try
+    {
+        return _redis->llen(key);
+    }
+    catch(const std::exception& e) {
+        std::cerr << "⚠️ Redis ListLength error for key: " << key << " (" << e.what() << ")\n";
+        return false;
+    }  
+}
+
+std::future<long long> ListLengthAsync(const std::string_vew key) const {
+    return std::async(std::launch::async, ListLength, key);
+}
+
+std::optional<std::string> RedisCacheDatabase::ListPop(const std::string_view& key, const bool front){
+    if(!_redis) return std::nullopt;
+    try
+    {
+        return ((front) ? _redis->lpop(key) : _redis->rpop(key));
+    }
+    catch(const std::exception& e) {
+        std::cerr << "⚠️ Redis ListPop error for key: " << key << " front?: " << front " (" << e.what() << ")\n";
+        return std::nullopt;
+    }
+}
+
+std::future<std::optional<std::string>> RedisCacheDatabase::ListPopAsync(const std::string_view& key, const bool front){
+    return std::async(std::launch::async, ListPop, key, front);
+}
+
+long long ListPush(const std::string_view key, const string_view val, const bool front) {
+    if(!_redis) return false;
+    try
+    {
+        return ((front) ? _redis->lpush(key) : _redis->rpush(key));
+    }
+    catch(const std::exception& e) {
+        std::cerr << "⚠️ Redis ListPush error for key: " << key << " front?: " << front " and value: " << val << " (" << e.what() << ")\n";
+        return false;
+    }    
+}
+
+std::future<long long> ListPushAsync(const std::string_view key, const string_view val, const bool front) {
+    return std::async(std::launch::async, ListPush, key, val, front);
+}
+
+long long ListPushx(const std::string_view key, const std::string_view val, const bool front) {
+    if(!_redis) return false;
+    try
+    {
+        return ((front) ? _redis->lpushx(key, val) : _redis->rpushx(key, val));
+    }
+    catch(const std::exception& e) {
+        std::cerr << "⚠️ Redis ListPushx error for key: " << key << " front?: " << front << " and value: " << val << " (" << e.what() << ")\n";
+        return false;
+    }    
+}
+
+std::future<long long> ListPushxAsync(const std::string_view key, const std::string_view val, const bool front) {
+    return std::async(std::launch::async, ListPushx, key, val, front);
+}
+
+long long ListRemoveN(const std::string_view key, const long long count, const std::string_view val) {
+    if(!_redis) return false;
+    try
+    {
+        return _redis->lrem(key, count, val);
+    }
+    catch(const std::exception& e) {
+        std::cerr << "⚠️ Redis ListRemoveN error for key: " << key << " count: " << count << " and value: " << val << " (" << e.what() << ")\n";
+        return false;
+    }
+}
+
+std::future<long long> ListRemoveNAsync(const std::string_view key, const long long count, const std::string_view val) {
+    return std::async(std::launch::async, ListRemoveN, key, count, val);
+}
+
+void ListSet(const std::string_view key, long long index, const std::string_view val) {
+    if(!_redis) return;
+    try
+    {
+        _redis->lset(key, index, val);
+    }
+    catch(const std::exception& e) {
+        std::cerr << "⚠️ Redis ListSet error for key: " << key << " index: " << index << " and value: " << val << " (" << e.what() << ")\n";
+    }
+}
+
+std::future<void> ListSetAsync(const std::string_view key, long long index, const std::string_view val) {
+    return std::async(std::launch::async, ListSet, key, index, val);
+}
+
+void ListTrim(const std::string_view key, long long start, long long stop) {
+    if(!_redis) return;
+    try
+    {
+        _redis->ltrim(key, start, stop);
+    }
+    catch(const std::exception& e) {
+        std::cerr << "⚠️ Redis ListTrim error for key: " << key << " start: " << start << " stop: " << stop << " (" << e.what() << ")\n";
+    }
+}
+
+std::future<void> ListTrimAsync(const std::string_view key, long long start, long long stop) {
+    return std::async(std::launch::async, ListTrim, key, start, stop);
+}
+
+std::optional<std::string> ListPopPush(const std::string_view source, const std::string_view destination) {
+    if(!_redis) return std::nullopt;
+    try
+    {
+        auto result = _redis->rpoplpush(source, destination);
+        return result ? std::make_optional(*result) : std::nullopt;
+    }
+    catch(const std::exception& e) {
+        std::cerr << "⚠️ Redis ListPopPush error for source: " << source << " destination: " << destination << " (" << e.what() << ")\n";
+        return std::nullopt;
+    }
+}
+
+std::future<std::optional<std::string>> ListPopPushAsync(const std::string_view source, const std::string_view destination) {
+    return std::async(std::launch::async, ListPopPush, source, destination);
 }
 
 void RedisCacheDatabase::PrintEntireDB()
