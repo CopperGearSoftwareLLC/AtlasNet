@@ -4,31 +4,16 @@
 
 void AtlasNetClient::Initialize(AtlasNetClient::InitializeProperties& props)
 {
+    logger->Debug("[AtlasNetClient] Initialize");
     CrashHandler::Get().Init(props.ExePath);
-
-    std::string serverName = props.ServerName;
-    if (serverName.empty())
-        serverName = DockerIO::Get().GetSelfContainerName();
-
-    InterLinkIdentifier myID(InterlinkType::eGameClient, serverName);
-    logger = std::make_shared<Log>(myID.ToString());
-    logger->Debug("AtlasNetClient Initialize");
-    logger->DebugFormatted("Client ID: {}", myID.ID);
-    logger->DebugFormatted("Client identifier: {}", myID.ToString());
-
-    SteamDatagramErrMsg errMsg;
-    if (!GameNetworkingSockets_Init(nullptr, errMsg))
-    {
-      logger->Error(std::string("GameNetworkingSockets_Init failed: ") + errMsg);
-      return;
-    }
-    else
-    {
-      logger->Debug("GameNetworkingSockets_Init succeeded");
-      system("ping www.google.com"); // keep for debug purposes
-    }
-
-    logger->Debug("Waiting for Interlink auto-connect to GameServer...");
+    InterLinkIdentifier myID(InterlinkType::eGameClient, props.ClientName);
+    InterLinkIdentifier God =  InterLinkIdentifier::MakeIDGod();
+    logger->Debug("[AtlasNetClient] Made GodID");
+    IPAddress GodIP;
+    GodIP.SetIPv4(127,0,0,1,50866);
+    logger->Debug("[AtlasNetClient] Set God IPv4");
+    Interlink::Get().EstablishConnectionAtIP(God, GodIP);
+    logger->Debug("[AtlasNetClient] establishing connection to God");
 }
 
 void AtlasNetClient::SendEntityUpdate(const AtlasEntity &entity)

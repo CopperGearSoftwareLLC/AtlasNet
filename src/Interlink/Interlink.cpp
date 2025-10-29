@@ -118,7 +118,8 @@ void Interlink::CallbackOnConnecting(SteamCBInfo info)
 		{
 			logger->ErrorFormatted("Incoming connection from identity '{}' could not be verified since it was not in the registry", ID->ToString());
 
-			ASSERT(false, "Received connecting from something not in the server registry");
+      // for now, allow clients to join without needing to register
+			//ASSERT(false, "Received connecting from something not in the server registry");
 		}
 
 		logger->DebugFormatted("Incoming Connection from: {} at {}", ID->ToString(), address.ToString());
@@ -140,7 +141,7 @@ void Interlink::CallbackOnConnecting(SteamCBInfo info)
 		if (EResult result = networkInterface->AcceptConnection(info->m_hConn);
 			result != k_EResultOK)
 		{
-
+      // Note: We always accept external clients for now (they won’t have valid registry identities)
 			logger->ErrorFormatted("Error accepting connection: reason: {}", uint64(result));
 			networkInterface->CloseConnection(info->m_hConn, 0, nullptr, false);
 		}
@@ -290,9 +291,13 @@ void Interlink::Init(const InterlinkProperties &Properties)
 	PollGroup = networkInterface->CreatePollGroup();
 	IPAddress ipAddress;
 	ListenPort = Type2ListenPort.at(MyIdentity.Type);
-	ipAddress.Parse(DockerIO::Get().GetSelfContainerIP() + ":" + std::to_string(ListenPort));
-	ServerRegistry::Get().RegisterSelf(MyIdentity, ipAddress);
-	logger->DebugFormatted("Registered in ServerRegistry as {}", MyIdentity.ToString());
+
+  if (MyIdentity.Type != InterlinkType::eGameClient)
+  {
+    ipAddress.Parse(DockerIO::Get().GetSelfContainerIP() + ":" + std::to_string(ListenPort)); // check before running
+    ServerRegistry::Get().RegisterSelf(MyIdentity, ipAddress);
+    logger->DebugFormatted("Registered in ServerRegistry as {}", MyIdentity.ToString());
+  }
 	OpenListenSocket(ListenPort);
 	switch (MyIdentity.Type)
 	{
@@ -305,12 +310,13 @@ void Interlink::Init(const InterlinkProperties &Properties)
 	}
 	break;
   case InterlinkType::eGameClient:
-{
-    InterLinkIdentifier targetServer(MyIdentity);
-    targetServer.Type = InterlinkType::eGameServer;
-    EstablishConnectionTo(targetServer);
+  {
+    //EstablishConnectionAtIP(InterLinkIdentifier::MakeIDGod(),);
+    //InterLinkIdentifier targetServer(MyIdentity);
+    //targetServer.Type = InterlinkType::eGameServer;
+    //EstablishConnectionTo(targetServer);
     break;
-}
+  }
 	case InterlinkType::ePartition:
 
 		EstablishConnectionTo(InterLinkIdentifier::MakeIDGod());
@@ -326,7 +332,41 @@ void Interlink::Init(const InterlinkProperties &Properties)
 
 void Interlink::Shutdown()
 {
+  GameNetworkingSockets_Kill();
 	logger->Debug("Interlink Shutdown");
+}
+
+bool Interlink::EstablishConnectionAtIP(const InterLinkIdentifier &who, const IPAddress &ip)
+{
+  if (Connections.get<IndexByTarget>().contains(who))
+  {
+    const Connection &Existingconnection = *Connections.get<IndexByTarget>().find(who);
+    if (Existingconnection.state == ConnectionState::eConnected)
+    {
+      logger->WarningFormatted("Connection to {} already established", who.ToString());
+    }
+    else if (Existingconnection.state == ConnectionState::eConnecting || Existingconnection.state == ConnectionState::ePreConnecting)
+    {
+      logger->WarningFormatted("already connecting to {}", who.ToString());
+      return true;
+    }
+    else
+    {
+      logger->ErrorFormatted("Undefined connection state in EstablishConnectionTo. State: {}", boost::describe::enum_to_string(Existingconnection.state, "unknownstate?"));
+    }
+
+    return true;
+  }
+
+  Connection connec;
+  SteamNetworkingIPAddr addr = ip.ToSteamIPAddr();
+  addr.m_port = _PORT_GOD;
+  logger->DebugFormatted("Establishing connection to {} at {}", who.ToString(), ip.ToString());
+  connec.address = ip;
+  connec.target = who;
+  connec.SetNewState(ConnectionState::ePreConnecting);
+  Connections.insert(connec);
+  return true;
 }
 
 bool Interlink::EstablishConnectionTo(const InterLinkIdentifier &id)
@@ -350,6 +390,7 @@ bool Interlink::EstablishConnectionTo(const InterLinkIdentifier &id)
 
 		return true;
 	}
+
 	auto IP = ServerRegistry::Get().GetIPOfID(id);
 
 	for (int i = 0; i < 5; i++)
