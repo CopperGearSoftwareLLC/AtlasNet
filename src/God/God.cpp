@@ -5,7 +5,6 @@
 #include "Database/ServerRegistry.hpp"
 #include "Interlink/InterlinkEnums.hpp"
 #include "Interlink/Connection.hpp"
-#include "GameCoordinator/GameCoordinator.hpp"
 God::God()
 {
 }
@@ -19,16 +18,16 @@ void God::Init()
   logger->Debug("Init");
   InterlinkProperties InterLinkProps;
   InterLinkProps.callbacks = InterlinkCallbacks{
-      .acceptConnectionCallback = [](const Connection &c)
-      { return true; },
-      .OnConnectedCallback = [](const InterLinkIdentifier &Connection) {},
-      .OnMessageArrival = [](const Connection &fromWhom, std::span<const std::byte> data) {},
+    .acceptConnectionCallback = [](const Connection &c)
+    { return true; },
+    .OnConnectedCallback = [](const InterLinkIdentifier &Connection) {},
+    .OnMessageArrival = [](const Connection &fromWhom, std::span<const std::byte> data) {},
   };
   InterLinkProps.logger = logger;
   InterLinkProps.ThisID = InterLinkIdentifier::MakeIDGod();
   logger->ErrorFormatted("[{}]", InterLinkProps.ThisID.ToString());
   Interlink::Get().Init(InterLinkProps);
-
+  
   for (int32 i = 1; i <= 12; i++)
   {
 
@@ -40,8 +39,6 @@ void God::Init()
   {
     std::cerr << server.second.identifier.ToString() << " " << server.second.address.ToString() << std::endl;
   }
-
-  GameCoordinator::Get().Init();
 
   // std::this_thread::sleep_for(std::chrono::seconds(4));
   // god.removePartition(4);

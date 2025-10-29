@@ -2,68 +2,92 @@
 #include "pch.hpp"
 #include "Debug/Log.hpp"
 #include <future>
+#include <string_view>
 
-/// A backend-agnostic connection identifier
 struct ExternlinkConnection
 {
-    uint64_t id = 0;
-    bool operator==(const ExternlinkConnection& other) const noexcept { return id == other.id; }
+    uint64_t id = 0; // internal short id mapped to HSteamNetConnection
 };
 
-/// Externlink configuration
 struct ExternlinkProperties
 {
-    std::string uuid;
-    uint16_t port;
-    bool tickAsyncOnStartListening = false;
+    uint16_t port = 9000;                ///< Port to listen on / connect to
+    bool     startPollingAsync = true;   ///< If true, StartServer/StartClient launches Poll() loop on a worker
+    bool     isServer = false;           ///< Choose mode explicitly
+    void*    logger = nullptr;           ///< Optional: your logger object (kept as void* to avoid deps)
 };
 
-/// @brief Lightweight, backend-agnostic networking interface built over Valve GameNetworkingSockets
 class Externlink
 {
 public:
-    using OnConnectedFn = std::function<void(const ExternlinkConnection&)>;
+    using OnConnectedFn    = std::function<void(const ExternlinkConnection&)>;
     using OnDisconnectedFn = std::function<void(const ExternlinkConnection&)>;
-    using OnMessageFn = std::function<void(const ExternlinkConnection&, const std::string&)>;
+    using OnMessageFn      = std::function<void(const ExternlinkConnection&, std::string_view)>;
 
+public:
     Externlink();
     ~Externlink();
 
-    bool Start(const ExternlinkProperties& props);
-    bool StartListening();
-    std::future<void> PollAsync();
-    void Poll();
+    // Lifecycle
+    bool Start(const ExternlinkProperties& props, bool initSocket = true);
+    bool StartServer();                                  ///< Creates listen socket on props_.port
+    bool StartClient(const std::string& host, uint16_t port); ///< Connects to host:port
+    void Stop();                                         ///< Stops polling, closes sockets, kills GNS
 
-    bool Externlink::Connect(const std::string& address, uint16_t port);
+    // Polling
+    void Poll();                                         ///< Manual tick (if not async)
+    std::future<void> StartPollingAsync();               ///< Starts background poller; Stop() joins
 
-    void Send(const ExternlinkConnection& conn, const std::string& msg);
-    void Broadcast(const ExternlinkConnection& sender, const std::string& msg);
-    void Stop();
+    // Messaging
+    EResult Send(const ExternlinkConnection& to, const void* data, size_t sz, int sendFlags = k_nSteamNetworkingSend_Reliable);
+    EResult SendString(const ExternlinkConnection& to, std::string_view text, int sendFlags = k_nSteamNetworkingSend_Reliable);
+    void    Broadcast(const ExternlinkConnection& from, std::string_view text, int sendFlags = k_nSteamNetworkingSend_Reliable);
 
+    // Callbacks
     void SetOnConnected(OnConnectedFn fn);
     void SetOnDisconnected(OnDisconnectedFn fn);
     void SetOnMessage(OnMessageFn fn);
 
+    // Utilities
+    bool IsServer() const noexcept { return props_.isServer; }
+
 private:
-    std::shared_ptr<Log> logger = std::make_shared<Log>("Externlink");
+    // Static -> instance trampoline for GNS callback
+    static void SteamNetConnectionStatusChanged(SteamNetConnectionStatusChangedCallback_t* info);
 
-    ISteamNetworkingSockets* Interface = nullptr;
-    HSteamListenSocket ListenSocket = k_HSteamListenSocket_Invalid;
-    HSteamNetPollGroup PollGroup = k_HSteamNetPollGroup_Invalid;
+    // Internal helpers
+    void HandleConnecting(SteamNetConnectionStatusChangedCallback_t* info);
+    void HandleConnected(SteamNetConnectionStatusChangedCallback_t* info);
+    void HandleClosedOrProblem(SteamNetConnectionStatusChangedCallback_t* info);
 
-    ExternlinkProperties Props;
-    std::unordered_map<uint64_t, HSteamNetConnection> IdToConn;
-    std::unordered_map<HSteamNetConnection, uint64_t> ConnToId;
-    std::atomic<uint64_t> NextId = 1;
+    // Mapping helpers
+    ExternlinkConnection RegisterConnection(HSteamNetConnection hconn);
+    void UnregisterConnection(HSteamNetConnection hconn, uint64_t* outId = nullptr);
+
+private:
+    // GNS handles
+    ISteamNetworkingSockets*   iface_       = nullptr;
+    HSteamListenSocket         listen_      = k_HSteamListenSocket_Invalid;
+    HSteamNetPollGroup         pollGroup_   = k_HSteamNetPollGroup_Invalid;
+
+    // State
+    std::atomic<bool>          running_{false};
+    std::future<void>          pollTask_;
+
+    // Config
+    ExternlinkProperties       props_{};
+
+    // Connection maps (protected by mutex_)
+    std::mutex                 mutex_;
+    uint64_t                   nextId_      = 1;
+    std::unordered_map<uint64_t, HSteamNetConnection> idToConn_;
+    std::unordered_map<HSteamNetConnection, uint64_t> connToId_;
 
     // Callbacks
-    OnConnectedFn OnConnected;
-    OnDisconnectedFn OnDisconnected;
-    OnMessageFn OnMessage;
+    OnConnectedFn              onConnected_;
+    OnDisconnectedFn           onDisconnected_;
+    OnMessageFn                onMessage_;
 
-    std::future<void> pollTask;
-    std::atomic<bool> running = false;
-
-    static Externlink* s_Instance;
-    static void SteamNetConnectionStatusChanged(SteamNetConnectionStatusChangedCallback_t* info);
+    // Single instance for the C-style callback (same assumption as your current Externlink)
+    static Externlink*         s_Instance;
 };

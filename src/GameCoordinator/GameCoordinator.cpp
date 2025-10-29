@@ -7,16 +7,21 @@ GameCoordinator::~GameCoordinator() { Shutdown(); }
 
 bool GameCoordinator::Init()
 {
-  uint16_t port = 9000;
-    ExternlinkProperties props = {"Coordinator", port, true};
-    if (!Link.Start(props))
+    uint16_t port = 9000;
+
+    ExternlinkProperties props;
+    props.port = port;
+    props.isServer = true;
+    props.startPollingAsync = true;
+
+    if (!Link.Start(props, false))
         return false;
 
     Link.SetOnConnected([this](const ExternlinkConnection& conn) { OnClientConnected(conn); });
     Link.SetOnDisconnected([this](const ExternlinkConnection& conn) { OnClientDisconnected(conn); });
-    Link.SetOnMessage([this](const ExternlinkConnection& conn, const std::string& msg) { OnClientMessage(conn, msg); });
+    Link.SetOnMessage([this](const ExternlinkConnection& conn, std::string_view msg) { OnClientMessage(conn, msg); });
 
-    if (!Link.StartListening())
+    if (!Link.StartServer())
         return false;
 
     logger->DebugFormatted("[Coordinator] Initialized and listening on port {}", port);
@@ -27,7 +32,7 @@ void GameCoordinator::Run()
 {
     while (!ShouldShutdown)
     {
-        Link.Poll();
+        //Link.Poll();
         std::this_thread::sleep_for(std::chrono::milliseconds(10));
     }
 }
@@ -50,7 +55,7 @@ void GameCoordinator::OnClientDisconnected(const ExternlinkConnection& conn)
     logger->DebugFormatted("[Coordinator] Disconnected: {}", conn.id);
 }
 
-void GameCoordinator::OnClientMessage(const ExternlinkConnection& conn, const std::string& msg)
+void GameCoordinator::OnClientMessage(const ExternlinkConnection& conn, std::string_view msg)
 {
     logger->DebugFormatted("[Coordinator] Message from {}: {}", conn.id, msg);
     Link.Broadcast(conn, msg);

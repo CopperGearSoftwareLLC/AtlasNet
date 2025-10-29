@@ -25,5 +25,5 @@ private:
 
     void OnClientConnected(const ExternlinkConnection& conn);
     void OnClientDisconnected(const ExternlinkConnection& conn);
-    void OnClientMessage(const ExternlinkConnection& conn, const std::string& msg);
+    void OnClientMessage(const ExternlinkConnection& conn, std::string_view msg);
 };
