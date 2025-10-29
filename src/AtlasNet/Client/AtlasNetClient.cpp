@@ -4,14 +4,24 @@
 
 void AtlasNetClient::Initialize(AtlasNetClient::InitializeProperties& props)
 {
-    logger->Debug("[AtlasNetClient] Initialize");
-    CrashHandler::Get().Init(props.ExePath);
-    InterLinkIdentifier myID(InterlinkType::eGameClient, props.ClientName);
-    InterLinkIdentifier God =  InterLinkIdentifier::MakeIDGod();
-    logger->Debug("[AtlasNetClient] Made GodID");
-    IPAddress GodIP;
-    GodIP.SetIPv4(127,0,0,1,50866);
-    logger->Debug("[AtlasNetClient] Set God IPv4");
+  logger->Debug("[AtlasNetClient] Initialize");
+  InterLinkIdentifier myID(InterlinkType::eGameClient, props.ClientName);
+  InterLinkIdentifier God =  InterLinkIdentifier::MakeIDGod();
+  serverID = God;
+  logger->Debug("[AtlasNetClient] Made my & GodID");
+  IPAddress GodIP;
+  GodIP.SetIPv4(127,18,0,2,25564);
+  logger->Debug("[AtlasNetClient] Set God IPv4");
+  
+  Interlink::Get().Init(
+  InterlinkProperties{
+    .ThisID = myID,
+    .logger = logger,
+    .callbacks = {.acceptConnectionCallback = [](const Connection &c)
+            { return true; },
+            .OnConnectedCallback = [](const InterLinkIdentifier &Connection) {},
+            .OnMessageArrival = [](const Connection &fromWhom, std::span<const std::byte> data) {}}});
+  
     Interlink::Get().EstablishConnectionAtIP(God, GodIP);
     logger->Debug("[AtlasNetClient] establishing connection to God");
 }

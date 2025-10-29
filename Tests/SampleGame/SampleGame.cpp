@@ -1,5 +1,6 @@
 #include "pch.hpp"
 #include "AtlasNet/AtlasNet.hpp"
+#include "AtlasNet/Client/AtlasNetClient.hpp"
 /**
  * @brief A simple entity that moves in a circular path.
  */
@@ -51,7 +52,7 @@ public:
         }
     }
 };
-
+static std::unique_ptr<AtlasNetClient> g_client;
 bool ShouldShutdown = false;
 /**
  * @brief Main function to run the sample game.
@@ -78,6 +79,15 @@ int main(int argc, char **argv)
 
     std::this_thread::sleep_for(std::chrono::milliseconds(1000));
 
+
+        g_client = std::make_unique<AtlasNetClient>();
+    AtlasNetClient::InitializeProperties props{
+        .ExePath = "./AtlasNetClient.exe",
+        .ClientName = "GodViewClient",
+        .ServerName = "GodViewServer"
+    };
+    g_client->Initialize(props);
+
     while (!ShouldShutdown)
     {
       std::vector<AtlasEntity> Incoming;
@@ -87,7 +97,8 @@ int main(int argc, char **argv)
       Incoming.push_back(entity);
       std::span<AtlasEntity> myspan(Incoming);
       std::vector<AtlasEntityID> Outgoing;
-      //  AtlasNetServer::Get().Update(myspan, Incoming, Outgoing);
+      //AtlasNetServer::Get().Update(myspan, Incoming, Outgoing);
+        g_client->SendEntityUpdate(entity);
         auto now = clock::now();
         std::chrono::duration<float> delta = now - previous;
         previous = now;
