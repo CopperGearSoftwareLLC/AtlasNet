@@ -315,6 +315,7 @@ void Interlink::Init(const InterlinkProperties &Properties)
     //InterLinkIdentifier targetServer(MyIdentity);
     //targetServer.Type = InterlinkType::eGameServer;
     //EstablishConnectionTo(targetServer);
+    //EstablishConnectionTo(InterLinkIdentifier::MakeIDGod());
     break;
   }
 	case InterlinkType::ePartition:
@@ -336,34 +337,38 @@ void Interlink::Shutdown()
 	logger->Debug("Interlink Shutdown");
 }
 
-bool Interlink::EstablishConnectionAtIP(const InterLinkIdentifier &who, const IPAddress &ip)
+bool Interlink::EstablishConnectionAtIP(const InterLinkIdentifier &id, const IPAddress &ip)
 {
-  if (Connections.get<IndexByTarget>().contains(who))
-  {
-    const Connection &Existingconnection = *Connections.get<IndexByTarget>().find(who);
-    if (Existingconnection.state == ConnectionState::eConnected)
-    {
-      logger->WarningFormatted("Connection to {} already established", who.ToString());
-    }
-    else if (Existingconnection.state == ConnectionState::eConnecting || Existingconnection.state == ConnectionState::ePreConnecting)
-    {
-      logger->WarningFormatted("already connecting to {}", who.ToString());
-      return true;
-    }
-    else
-    {
-      logger->ErrorFormatted("Undefined connection state in EstablishConnectionTo. State: {}", boost::describe::enum_to_string(Existingconnection.state, "unknownstate?"));
-    }
+  // just directly connect to god. IP join doesn't seem to work
+  return EstablishConnectionTo(id);
 
-    return true;
-  }
+	if (Connections.get<IndexByTarget>().contains(id))
+	{
+		const Connection &Existingconnection = *Connections.get<IndexByTarget>().find(id);
+		if (Existingconnection.state == ConnectionState::eConnected)
+		{
+			logger->WarningFormatted("Connection to {} already established", id.ToString());
+		}
+		else if (Existingconnection.state == ConnectionState::eConnecting || Existingconnection.state == ConnectionState::ePreConnecting)
+		{
+			logger->WarningFormatted("already connecting to {}", id.ToString());
+			return true;
+		}
+		else
+		{
+			logger->ErrorFormatted("Undefined connection state in EstablishConnectionTo. State: {}", boost::describe::enum_to_string(Existingconnection.state, "unknownstate?"));
+		}
+
+		return true;
+	}
 
   Connection connec;
   SteamNetworkingIPAddr addr = ip.ToSteamIPAddr();
   addr.m_port = _PORT_GOD;
-  logger->DebugFormatted("Establishing connection to {} at {}", who.ToString(), ip.ToString());
+  IPAddress ip2(addr);
+  logger->DebugFormatted("Establishing connection to {} at {}", id.ToString(), ip2.ToString());
   connec.address = ip;
-  connec.target = who;
+  connec.target = id;
   connec.SetNewState(ConnectionState::ePreConnecting);
   Connections.insert(connec);
   return true;

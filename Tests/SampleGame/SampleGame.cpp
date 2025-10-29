@@ -83,10 +83,11 @@ int main(int argc, char **argv)
         g_client = std::make_unique<AtlasNetClient>();
     AtlasNetClient::InitializeProperties props{
         .ExePath = "./AtlasNetClient.exe",
-        .ClientName = "GodViewClient",
+        .ClientName = "SampleGame:" + DockerIO::Get().GetSelfContainerName(),
         .ServerName = "GodViewServer"
     };
-    //g_client->Initialize(props);
+    g_client->Initialize(props);
+
     std::this_thread::sleep_for(std::chrono::milliseconds(500));
     while (!ShouldShutdown)
     {
@@ -98,7 +99,7 @@ int main(int argc, char **argv)
       std::span<AtlasEntity> myspan(Incoming);
       std::vector<AtlasEntityID> Outgoing;
       //AtlasNetServer::Get().Update(myspan, Incoming, Outgoing);
-        //g_client->SendEntityUpdate(entity);
+        g_client->SendEntityUpdate(entity);
         auto now = clock::now();
         std::chrono::duration<float> delta = now - previous;
         previous = now;
