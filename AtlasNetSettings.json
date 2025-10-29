@@ -3,18 +3,24 @@
     "HeuristicMode": "Automatic",
     "GameServerBinary": "bin/DebugDocker/UnitTests/UnitTests",
     "GameCoordinatorBinary": "UnitGameCoordinator",
-    "Worker--s": [
+    "Workers": [
         {
             "Name": "Dumpster",
             "Address": "192.168.2.101"
         },
         {
-            "Name": "Dannys Raspberry Pi 5",
+            "Name": "Camila Thinkpad",
+            "Address": "192.168.2.104"
+        },
+        {
+            "Name": "Raspberry pi 5",
             "Address": "192.168.2.103"
         }
     ],
     "RuntimeArches": [
-        "x86_64"
-
-    ]
+        "x86_64",
+        "arm64"
+    ],
+    "BuildCacheDir" : "docker_cache",
+    "NetworkInterface" : "eno1"
 }

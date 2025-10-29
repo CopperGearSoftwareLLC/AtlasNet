@@ -28,10 +28,12 @@ AtlasNetSettings AtlasNet::ParseSettingsFile()
     settings.GameServerBinary = parsedJson.contains("GameServerBinary") ? parsedJson["GameServerBinary"] : "";
     settings.GameServerBinary = parsedJson["GameServerBinary"];
     settings.RuntimeArches;
-    for (const auto& arch : parsedJson["RuntimeArches"])
+    for (const auto &arch : parsedJson["RuntimeArches"])
     {
         settings.RuntimeArches.insert(arch);
     }
+    settings.BuildCacheDir = parsedJson.contains("BuildCacheDir") ? parsedJson["BuildCacheDir"] : "";
+    settings.NetworkInterface = parsedJson.contains("NetworkInterface") ? parsedJson["NetworkInterface"] : "";
     return settings;
 }
 

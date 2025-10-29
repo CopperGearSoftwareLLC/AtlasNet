@@ -4,7 +4,7 @@ local _PORT_PARTITION = 25565
 local _PORT_GAMESERVER = 25566
 local DevPackages = "git tini gdbserver build-essential binutils automake libtool m4 autoconf gdb curl zip less unzip ccache coreutils tar g++ cmake pkg-config uuid-dev libxmu-dev libxi-dev libgl-dev libxinerama-dev libxcursor-dev xorg-dev libglu1-mesa-dev"
 workspace "GuacNet"
-    architecture "x86_64"
+    --architecture "x86_64"
     configurations { "DebugDocker", "DebugLocal", "Release" }
     startproject "God"
     includedirs { "src" }

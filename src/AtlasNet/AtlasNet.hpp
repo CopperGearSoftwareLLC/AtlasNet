@@ -13,6 +13,8 @@ struct AtlasNetSettings
     std::string GameServerBinary;
     std::string GameServerFiles;
     std::unordered_set<std::string> RuntimeArches;
+    std::string BuildCacheDir;
+    std::string NetworkInterface;
 };
 class AtlasNet : public Singleton<AtlasNet>
 {
@@ -22,6 +24,6 @@ class AtlasNet : public Singleton<AtlasNet>
     
     static AtlasNetSettings ParseSettingsFile();
     public:
-    auto GetSettings() const {return settings;}
+    const auto& GetSettings() const {return settings;}
     AtlasNet();
 };

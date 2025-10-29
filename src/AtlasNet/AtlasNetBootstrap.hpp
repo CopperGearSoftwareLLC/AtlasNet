@@ -80,21 +80,20 @@ RUN \
         {"remoteUser", "root"},
         {"customizations", {{"vscode", {{"extensions", {"streetsidesoftware.code-spell-checker", "ms-vscode.cpptools-extension-pack", "augustocdias.tasks-shell-input"}}, {"settings", {{{"terminal.integrated.defaultProfile.linux", "bash"}}}}}}}},
         {"postCreateCommand", "touch test.txt"}};
-        struct OnlineWorker
-        {
-            Worker worker;
-            std::string arch;
-            std::string sshUser;
-            std::string publicKeyPath,PrivateKeyPath;
-        };
-        std::vector<OnlineWorker> onlineWorkers;
-        const std::string KeysPath = "keys";
-        const std::string tlsPath = KeysPath+ "/tls";
-        const std::string tlsCertificateExpirationDays = "365";
-        const std::string registryPort = "5000";
-        const std::string AtlasNetRemoteUserName = "AtlasNet";
-        const std::string BuilderName = "AtlasNetBuilder";
-        const std::string BuilderCacheDir = "docker_cache";
+    struct OnlineWorker
+    {
+        Worker worker;
+        std::string arch;
+        std::string sshUser;
+        std::string publicKeyPath, PrivateKeyPath;
+    };
+    std::vector<OnlineWorker> onlineWorkers;
+    const std::string KeysPath = "keys";
+    const std::string tlsPath = KeysPath + "/tls";
+    const std::string tlsCertificateExpirationDays = "365";
+    const std::string registryPort = "5000";
+    const std::string AtlasNetRemoteUserName = "AtlasNet";
+    const std::string BuilderName = "AtlasNetBuilder";
 
 public:
     void Run();
@@ -103,6 +102,7 @@ public:
 private:
     std::string WorkerJoinToken;
     std::string ManagerPcAdvertiseAddr;
+    std::mutex AskInputMutex;
     std::string MacroParse(std::string input, std::unordered_map<std::string, std::string> macros);
     void CreateLaunchJson(const std::string &LaunchJsonDir, const std::vector<std::string> &executables);
     void CreateDevContainerJson();
@@ -122,9 +122,9 @@ private:
     void GetWorkersSSHCredentials();
     void SendTLSCertificateToWorkers();
     void SetupRegistry();
-    //void AddInsecureRegistry();
+    // void AddInsecureRegistry();
     void MakeDockerBuilder();
-    //std::string EnsureDockerLogin();
+    // std::string EnsureDockerLogin();
     std::string GetRegistrysIP();
     static std::string SanitizeString(std::string_view string);
 };

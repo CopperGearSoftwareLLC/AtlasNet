@@ -56,18 +56,21 @@ void AtlasNetBootstrap::Run()
     SetupNetwork();
     GenerateTSLCertificate();
     SetupRegistry();
-
     // 2. SSH to workers. muist happen first so their arches can be retrieved
     GetWorkersSSHCredentials();
     SendTLSCertificateToWorkers();
     JoinWorkerToSwarm();
-
     CreateDevContainerJson();
     MakeDockerBuilder();
+    // auto Godfut = std::async(std::launch::async,[this](){CreateGodImage();});
+    // auto Partfut = std::async(std::launch::async,[this](){CreatePartitionImage();});
+    // auto Datafut = std::async(std::launch::async,[this](){CreateDatabaseImage();});
+    // Godfut.wait();
+    // Partfut.wait();
+    // Datafut.wait();
     CreateGodImage();
     CreatePartitionImage();
     CreateDatabaseImage();
-
     RunDatabase();
     SetupPartitionService();
     RunGod();
@@ -307,14 +310,15 @@ bool AtlasNetBootstrap::BuildDockerImage(const std::string &DockerFile, const st
         fullTags.push_back(fullTag);
 
         // Build the image
+        const auto &cacheDir = AtlasNet::Get().GetSettings().BuildCacheDir;
+        std::string BuildCacheArgument = cacheDir.empty() ? "" : "--cache-from type=local,src=" + cacheDir + " --cache-to type=local,dest=" + cacheDir + ",mode=max";
         std::string buildCmd = std::format(
             "docker buildx build --builder {} "
             "--platform linux/{} "
             "--provenance=false "
             "-f {}/{} -t {} "
-            "--cache-from type=local,src={} "
-            "--cache-to type=local,dest={},mode=max --push .",
-            BuilderName, archn, DockerFilesFolder, DockerFile, fullTag, BuilderCacheDir, BuilderCacheDir);
+            "{} --push .",
+            BuilderName, archn, DockerFilesFolder, DockerFile, fullTag, BuildCacheArgument);
 
         logger.DebugFormatted("🏗️ Building image '{}' for arch '{}' using '{}'", ImageName, archn, DockerFile);
         if (std::system(buildCmd.c_str()) != 0)
@@ -331,7 +335,7 @@ bool AtlasNetBootstrap::BuildDockerImage(const std::string &DockerFile, const st
     logger.DebugFormatted("🧩 Creating manifest list '{}'", manifestTag);
 
     // Build the manifest creation command
-    std::string manifestCmd = std::format("docker manifest create {}", manifestTag);
+    std::string manifestCmd = std::format("docker manifest create --amend {}", manifestTag);
     for (const auto &fullTag : fullTags)
         manifestCmd += std::format(" {}", fullTag);
 
@@ -377,7 +381,6 @@ void AtlasNetBootstrap::RunDatabase()
     // Start it
     system("docker start Database");
 }
-
 void AtlasNetBootstrap::SetupSwarm()
 {
     int leaveResult = system("docker swarm leave --force");
@@ -385,10 +388,54 @@ void AtlasNetBootstrap::SetupSwarm()
         logger.Warning("Leaving existing docker swarm");
 
     logger.Debug("Initializing Docker Swarm");
-    Json swarmInit{{"ListenAddr", "0.0.0.0:2377"}};
-    std::string initResult = DockerIO::Get().request("POST", "/swarm/init", &swarmInit);
 
+    // Attempt to use configured network interface
+    std::string preferredInterface = AtlasNet::Get().GetSettings().NetworkInterface;
+    std::string interfaceIP;
+
+    if (!preferredInterface.empty())
+    {
+        struct ifaddrs *ifaddr;
+        if (getifaddrs(&ifaddr) == -1)
+        {
+            perror("getifaddrs");
+            return;
+        }
+
+        for (auto *ifa = ifaddr; ifa != nullptr; ifa = ifa->ifa_next)
+        {
+            if (ifa->ifa_addr == nullptr || ifa->ifa_addr->sa_family != AF_INET)
+                continue;
+
+            if (preferredInterface == ifa->ifa_name)
+            {
+                char addr[INET_ADDRSTRLEN];
+                void *in_addr = &((struct sockaddr_in *)ifa->ifa_addr)->sin_addr;
+                inet_ntop(AF_INET, in_addr, addr, sizeof(addr));
+                interfaceIP = addr;
+                break;
+            }
+        }
+        freeifaddrs(ifaddr);
+
+        if (interfaceIP.empty())
+            logger.WarningFormatted("⚠️ Configured network interface '{}' not found or has no IPv4 address.", preferredInterface);
+        else
+            logger.DebugFormatted("✅ Using configured interface '{}' with IP '{}'", preferredInterface, interfaceIP);
+    }
+    else
+    {
+        logger.Warning("⚠️ No preferred network interface specified in settings.");
+    }
+
+    // Try swarm init using preferred interface if available
+    Json swarmInit = interfaceIP.empty()
+                         ? Json{{"ListenAddr", "0.0.0.0:2377"}}
+                         : Json{{"ListenAddr", "0.0.0.0:2377"}, {"AdvertiseAddr", interfaceIP + ":2377"}};
+
+    std::string initResult = DockerIO::Get().request("POST", "/swarm/init", &swarmInit);
     auto parsed = Json::parse(initResult);
+
     if (parsed.contains("message") &&
         parsed["message"].get<std::string>().find("could not choose an IP address") != std::string::npos)
     {
@@ -669,7 +716,7 @@ void AtlasNetBootstrap::SetupPartitionService()
 
     std::string imageTag = std::format("{}/{}:latest", registry, PartitionImageName);
     logger.DebugFormatted("Creating partition service from public image '{}'", imageTag);
-    std::string CreatePartitionServiceCmd = std::string("docker service create --name ") + PartitionServiceName + " --network " + NetworkName + " --mount type=bind,source=/var/run/docker.sock,target=/var/run/docker.sock --replicas 0 " + imageTag;
+    std::string CreatePartitionServiceCmd = std::string("docker service create --name ") + PartitionServiceName + " --network " + NetworkName + " --mount type=bind,source=/var/run/docker.sock,target=/var/run/docker.sock --replicas 0 --detach=true " + imageTag;
     int createResult = system(CreatePartitionServiceCmd.c_str());
     if (createResult != 0)
         logger.ErrorFormatted("Failed to create partition service. Error Code {}", createResult);
@@ -748,8 +795,9 @@ void AtlasNetBootstrap::GetWorkersSSHCredentials()
 
     std::filesystem::create_directories(KeysPath);
 
-    for (const auto &worker : AtlasNet::Get().GetSettings().workers)
-    {
+    const auto &workers = AtlasNet::Get().GetSettings().workers;
+    std::for_each(workers.begin(), workers.end(), [&](const Worker &worker)
+                  {
         std::string userFile = KeysPath + "/user_" + worker.Name + ".txt";
         std::replace(userFile.begin(), userFile.end(), ' ', '_');
 
@@ -763,6 +811,7 @@ void AtlasNetBootstrap::GetWorkersSSHCredentials()
         }
         else
         {
+            std::unique_lock lock(AskInputMutex);
             std::cout << "Enter SSH username for worker '" << worker.Name
                       << "' (" << worker.IP << ") [default: root]: ";
             if (std::cin.peek() == '\n')
@@ -788,7 +837,9 @@ void AtlasNetBootstrap::GetWorkersSSHCredentials()
             logger.DebugFormatted("Generating SSH key for {} ...", worker.Name);
             system(keygenCmd.c_str());
         }
-        logger.DebugFormatted("Copying SSH key to worker {} ({}) ...", worker.Name, worker.IP);
+        {
+            std::unique_lock lock(AskInputMutex);
+            logger.DebugFormatted("Copying SSH key to worker {} ({}) ...", worker.Name, worker.IP);
         std::string copyCmd =
             "ssh-copy-id -i " + publicKeyPath + " -o StrictHostKeyChecking=no " +
             sshUser + "@" +
@@ -798,8 +849,10 @@ void AtlasNetBootstrap::GetWorkersSSHCredentials()
         {
             std::cerr << copyResult.output << std::endl;
             logger.ErrorFormatted("❌ Failed to copy SSH key to {}", worker.IP);
-            continue;
+            return;
         }
+        }
+      
         std::string testCmd =
             "ssh -i " + privateKeyPath + " -o StrictHostKeyChecking=no " + sshUser + "@" +
             worker.IP + " echo 'SSH connection successful'";
@@ -810,11 +863,13 @@ void AtlasNetBootstrap::GetWorkersSSHCredentials()
         ow.sshUser = sshUser;
         ow.publicKeyPath = publicKeyPath;
         ow.PrivateKeyPath = privateKeyPath;
-        onlineWorkers.push_back(ow);
-    }
+        static std::mutex pushVectorMutex;
+        std::unique_lock(pushVectorMutex);
+        onlineWorkers.push_back(ow); });
 }
 void AtlasNetBootstrap::SendTLSCertificateToWorkers()
 {
+
     const std::string certPath = tlsPath + "/server.crt";
     const std::string keyPath = tlsPath + "/server.key";
 
@@ -872,7 +927,83 @@ void AtlasNetBootstrap::SendTLSCertificateToWorkers()
         }
     }
 
-    // === Apply certificate to workers ===
+    std::for_each(std::execution::par_unseq, onlineWorkers.begin(), onlineWorkers.end(), [&](const OnlineWorker &onlineworker)
+                  {
+logger.DebugFormatted("📡 Checking TLS certificate for worker {}@{}", onlineworker.worker.Name, onlineworker.worker.IP);
+
+        const std::string remoteCertPath = std::format("/etc/docker/certs.d/{}:{}/ca.crt", managerHost, registryPort);
+
+        // Compute hash on worker
+        std::string remoteHashCmd = std::format(
+    "ssh -i '{}' -o StrictHostKeyChecking=no {}@{} "
+    "'[ -f \"{}\" ] && sha256sum \"{}\" | awk \"{{print $1}}\" || echo MISSING'",
+    onlineworker.PrivateKeyPath,
+    onlineworker.sshUser,
+    onlineworker.worker.IP,
+    remoteCertPath,
+    remoteCertPath);
+
+        auto remoteHashRes = RunCommand(remoteHashCmd);
+        std::string remoteHash = remoteHashRes.output;
+        remoteHash.erase(std::remove(remoteHash.begin(), remoteHash.end(), '\n'), remoteHash.end());
+        if (auto spaceLoc = remoteHash.find(' ');spaceLoc != remoteHash.npos)
+        {
+            remoteHash = remoteHash.substr(0,spaceLoc);
+        }
+        remoteHash.erase(std::remove(remoteHash.begin(), remoteHash.end(), ' '), remoteHash.end());
+
+        if (remoteHash == localHash)
+        {
+            logger.DebugFormatted("🔁 {}@{} already has the same TLS certificate — skipping", onlineworker.worker.Name, onlineworker.worker.IP);
+            return;
+        }
+
+        logger.DebugFormatted("📤 Sending TLS certificate to worker {}@{}", onlineworker.worker.Name, onlineworker.worker.IP);
+
+        
+        // Send the file to a temp directory
+        std::string scpCmd = std::format(
+            "scp -i \"{}\" -o StrictHostKeyChecking=no {} {}@{}:~/atlasnet_certs_tmp/ca.crt",
+            onlineworker.PrivateKeyPath, certPath, onlineworker.sshUser, onlineworker.worker.IP);
+        RunCommand(std::format("ssh -i \"{}\" -o StrictHostKeyChecking=no {}@{} \"mkdir -p ~/atlasnet_certs_tmp\"",
+                               onlineworker.PrivateKeyPath, onlineworker.sshUser, onlineworker.worker.IP));
+
+        auto scpRes = RunCommand(scpCmd);
+        if (scpRes.exitCode != 0)
+        {
+            logger.ErrorFormatted("❌ Failed to copy TLS certificate to {}@{}:\n{}", onlineworker.worker.Name, onlineworker.worker.IP, scpRes.output);
+            return;
+        }
+        std::string password;
+        {
+            std::lock_guard guard(AskInputMutex);
+             std::cout << "Enter sudo password for " << onlineworker.sshUser
+                  << "@" << onlineworker.worker.IP << ": ";
+                password = GetHiddenInput("");
+        }
+       
+
+        std::string trustCmd = std::format(
+            "ssh -i \"{}\" -o StrictHostKeyChecking=no {}@{} "
+            "\"echo '{}' | sudo -S mkdir -p /etc/docker/certs.d/{}:{} && "
+            "echo '{}' | sudo -S cp ~/atlasnet_certs_tmp/ca.crt /etc/docker/certs.d/{}:{}/ca.crt && "
+            "echo '{}' | sudo -S systemctl restart docker\"",
+            onlineworker.PrivateKeyPath,
+            onlineworker.sshUser,
+            onlineworker.worker.IP,
+            password,
+            managerHost, registryPort,
+            password,
+            managerHost, registryPort,
+            password);
+
+        auto trustRes = RunCommand(trustCmd);
+        if (trustRes.exitCode == 0)
+            logger.DebugFormatted("✅ TLS certificate installed on {}@{}", onlineworker.worker.Name, onlineworker.worker.IP);
+        else
+            logger.ErrorFormatted("❌ Failed to install TLS certificate on {}@{}:\n{}", onlineworker.worker.Name, onlineworker.worker.IP, trustRes.output); });
+    /*
+    // === Apply cer;tificate to workers ===
     for (const auto &onlineworker : onlineWorkers)
     {
         logger.DebugFormatted("📡 Checking TLS certificate for worker {}@{}", onlineworker.worker.Name, onlineworker.worker.IP);
@@ -881,17 +1012,22 @@ void AtlasNetBootstrap::SendTLSCertificateToWorkers()
 
         // Compute hash on worker
         std::string remoteHashCmd = std::format(
-            "ssh -i \"{}\" -o StrictHostKeyChecking=no {}@{} "
-            "\"[ -f '{}' ] && sha256sum '{}' | awk '{{print $1}}' || echo MISSING\"",
-            onlineworker.PrivateKeyPath,
-            onlineworker.sshUser,
-            onlineworker.worker.IP,
-            remoteCertPath,
-            remoteCertPath);
+    "ssh -i '{}' -o StrictHostKeyChecking=no {}@{} "
+    "'[ -f \"{}\" ] && sha256sum \"{}\" | awk \"{{print $1}}\" || echo MISSING'",
+    onlineworker.PrivateKeyPath,
+    onlineworker.sshUser,
+    onlineworker.worker.IP,
+    remoteCertPath,
+    remoteCertPath);
 
         auto remoteHashRes = RunCommand(remoteHashCmd);
         std::string remoteHash = remoteHashRes.output;
         remoteHash.erase(std::remove(remoteHash.begin(), remoteHash.end(), '\n'), remoteHash.end());
+        if (auto spaceLoc = remoteHash.find(' ');spaceLoc != remoteHash.npos)
+        {
+            remoteHash = remoteHash.substr(0,spaceLoc);
+        }
+        remoteHash.erase(std::remove(remoteHash.begin(), remoteHash.end(), ' '), remoteHash.end());
 
         if (remoteHash == localHash)
         {
@@ -938,7 +1074,7 @@ void AtlasNetBootstrap::SendTLSCertificateToWorkers()
             logger.DebugFormatted("✅ TLS certificate installed on {}@{}", onlineworker.worker.Name, onlineworker.worker.IP);
         else
             logger.ErrorFormatted("❌ Failed to install TLS certificate on {}@{}:\n{}", onlineworker.worker.Name, onlineworker.worker.IP, trustRes.output);
-    }
+    }*/
 }
 
 void AtlasNetBootstrap::SetupRegistry()
@@ -1006,120 +1142,6 @@ void AtlasNetBootstrap::SetupRegistry()
         logger.WarningFormatted("⚠️ Registry service '{}' may not be running yet:\n{}", registryName, result.output);
     }
 }
-/*
-void AtlasNetBootstrap::MakeDockerBuilder()
-{
-    std::filesystem::create_directories(BuilderCacheDir);
-
-    std::string registryHost = ManagerPcAdvertiseAddr + ":5000";
-    std::string localCertDir = std::format("keys/tls/{}", registryHost);
-    std::filesystem::create_directories(localCertDir);
-
-    // Ensure the correct file exists as ca.crt
-    std::filesystem::copy_file("keys/tls/server.crt", localCertDir + "/ca.crt",
-                               std::filesystem::copy_options::overwrite_existing);
-
-    // 1️⃣ Remove old builder if it exists
-    auto check = RunCommand(std::format("docker buildx ls | grep -w {}", BuilderName));
-    if (check.exitCode == 0)
-    {
-        logger.DebugFormatted("⚙️ Builder {} already exists. Deleting it...", BuilderName);
-        auto remove = RunCommand(std::format("docker buildx rm -f {}", BuilderName));
-        if (remove.exitCode != 0)
-        {
-            logger.ErrorFormatted("❌ Failed to remove existing builder {}:\n{}", BuilderName, remove.output);
-            throw std::runtime_error("Failed to remove existing builder");
-        }
-        logger.DebugFormatted("🗑️ Removed existing builder {}", BuilderName);
-    }
-
-    logger.DebugFormatted("🧱 Creating new builder {} (cache stored in '{}')", BuilderName, BuilderCacheDir);
-
-    // 3️⃣ Create builder (remove invalid driver options)
-    std::string createCmd = std::format(
-        "docker buildx create "
-        "--name {} "
-        "--driver docker-container "
-        "--use "
-        "--driver-opt network=host "
-        "--driver-opt image=moby/buildkit:latest "
-        "--driver-opt \"mount={}:/etc/docker/certs.d/{}\"",
-        BuilderName,
-        std::filesystem::absolute("keys/tls").string(),
-        registryHost);
-    auto create = RunCommand(createCmd);
-    if (create.exitCode != 0)
-    {
-        logger.ErrorFormatted("❌ Failed to create builder '{}':\n{}", BuilderName, create.output);
-        throw std::runtime_error("Failed to create builder");
-    }
-    /*
-        // 🕐 Trigger builder startup
-        logger.DebugFormatted("🚀 Bootstrapping builder '{}' (starting BuildKit container)...", BuilderName);
-        auto bootstrap = RunCommand(std::format("docker buildx inspect {} --bootstrap", BuilderName));
-        if (bootstrap.exitCode != 0)
-            logger.WarningFormatted("⚠️ Bootstrap returned non-zero (may still succeed):\n{}", bootstrap.output);
-
-        // 🧩 Wait for builder container to appear
-        std::string builderContainerName;
-        for (int i = 0; i < 30; ++i) // up to ~6 seconds (30 * 200ms)
-        {
-            auto ps = RunCommand(
-                "docker ps -a --filter 'name=builder' --format '{{.Names}}' | head -n1");
-            builderContainerName = ps.output;
-            builderContainerName.erase(
-                std::remove(builderContainerName.begin(), builderContainerName.end(), '\n'),
-                builderContainerName.end());
-
-            if (!builderContainerName.empty())
-            {
-                logger.DebugFormatted("✅ Builder container '{}' is now running", builderContainerName);
-                break;
-            }
-            else
-            {
-                std::this_thread::sleep_for(std::chrono::milliseconds(200));
-            }
-        }
-
-        if (builderContainerName.empty())
-        {
-            logger.ErrorFormatted("❌ Timed out waiting for builder container '{}' to appear", BuilderName);
-            throw std::runtime_error("Builder container did not start in time");
-        }
-
-        // builderContainerName.erase(std::find(builderContainerName.begin(), builderContainerName.end(), '\n'));
-
-        if (builderContainerName.empty())
-        {
-            logger.WarningFormatted("⚠️ Could not locate builder container for '{}'", BuilderName);
-        }
-        else if (hasCert)
-        {
-            // 6️⃣ Copy TLS cert into the builder container
-            logger.DebugFormatted("📦 Copying TLS cert '{}' into builder container '{}'", caCertPath, builderContainerName);
-
-            RunCommand(std::format("docker exec {} mkdir -p {}", builderContainerName, certsDirInDocker));
-            auto copy = RunCommand(std::format(
-                "docker cp {} {}:{}", caCertPath, builderContainerName, certsDirInDocker + "/ca.crt"));
-
-            if (copy.exitCode == 0)
-            {
-                logger.DebugFormatted("✅ Installed TLS cert into builder container at '{}'", certsDirInDocker);
-                system(std::format("docker restart {}", builderContainerName).c_str());
-            }
-            else
-                logger.WarningFormatted("⚠️ Failed to copy TLS cert into builder container:\n{}", copy.output);
-        }
-
-
-    // 7️⃣ Verify
-    auto inspect = RunCommand(std::format("docker buildx inspect {}", BuilderName));
-    if (inspect.exitCode == 0)
-        logger.DebugFormatted("✅ Builder '{}' ready for use. Registry trust configured for '{}'", BuilderName, registryHost);
-    else
-        logger.WarningFormatted("⚠️ Builder '{}' created but inspection failed:\n{}", BuilderName, inspect.output);
-}*/
 void AtlasNetBootstrap::MakeDockerBuilder()
 {
     const std::string registryHost = ManagerPcAdvertiseAddr + ":5000";
