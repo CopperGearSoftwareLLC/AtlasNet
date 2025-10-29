@@ -86,8 +86,8 @@ int main(int argc, char **argv)
         .ClientName = "GodViewClient",
         .ServerName = "GodViewServer"
     };
-    g_client->Initialize(props);
-
+    //g_client->Initialize(props);
+    std::this_thread::sleep_for(std::chrono::milliseconds(500));
     while (!ShouldShutdown)
     {
       std::vector<AtlasEntity> Incoming;
@@ -98,7 +98,7 @@ int main(int argc, char **argv)
       std::span<AtlasEntity> myspan(Incoming);
       std::vector<AtlasEntityID> Outgoing;
       //AtlasNetServer::Get().Update(myspan, Incoming, Outgoing);
-        g_client->SendEntityUpdate(entity);
+        //g_client->SendEntityUpdate(entity);
         auto now = clock::now();
         std::chrono::duration<float> delta = now - previous;
         previous = now;
@@ -110,8 +110,9 @@ int main(int argc, char **argv)
         // scene.printPositions();
 
         // Sleep a bit to avoid burning CPU (simulate frame time)
-        std::this_thread::sleep_for(std::chrono::milliseconds(16));
+        //std::this_thread::sleep_for(std::chrono::milliseconds(16));
         // ~60 updates per second
+        std::this_thread::sleep_for(std::chrono::milliseconds(1000));
     }
 
     return 0;

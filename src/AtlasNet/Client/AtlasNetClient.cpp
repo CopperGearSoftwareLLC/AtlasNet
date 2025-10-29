@@ -22,7 +22,7 @@ void AtlasNetClient::Initialize(AtlasNetClient::InitializeProperties& props)
             .OnConnectedCallback = [](const InterLinkIdentifier &Connection) {},
             .OnMessageArrival = [](const Connection &fromWhom, std::span<const std::byte> data) {}}});
   
-    Interlink::Get().EstablishConnectionAtIP(God, GodIP);
+    //Interlink::Get().EstablishConnectionAtIP(God, GodIP);
     logger->Debug("[AtlasNetClient] establishing connection to God");
 }
 
