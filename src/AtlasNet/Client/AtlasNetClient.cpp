@@ -10,7 +10,7 @@ void AtlasNetClient::Initialize(AtlasNetClient::InitializeProperties& props)
   serverID = God;
   logger->Debug("[AtlasNetClient] Made my & GodID");
   IPAddress GodIP;
-  GodIP.SetIPv4(127,18,0,2,25564);
+  GodIP.SetIPv4(127,0,0,1,64041);
   logger->Debug("[AtlasNetClient] Set God IPv4");
   
   Interlink::Get().Init(
