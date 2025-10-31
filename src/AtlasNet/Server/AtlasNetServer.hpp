@@ -21,6 +21,8 @@ class AtlasNetServer : public AtlasNetInterface, public Singleton<AtlasNetServer
     std::shared_ptr<Log> logger = std::make_shared<Log>("AtlasNetServer");
     std::unordered_map<AtlasEntityID, AtlasEntity> CachedEntities;
     std::unordered_set<InterLinkIdentifier> ConnectedClients;
+    std::vector<AtlasEntity> IncomingCache;
+    std::vector<AtlasEntityID> OutgoingCache;
 
    public:
     AtlasNetServer() {};

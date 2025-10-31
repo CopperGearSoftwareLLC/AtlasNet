@@ -23,7 +23,14 @@ void Partition::Init()
 			.logger = logger,
 			.callbacks = {.acceptConnectionCallback = [](const Connection &c)
 						  { return true; },
-						  .OnConnectedCallback = [](const InterLinkIdentifier &Connection) {},
+						  .OnConnectedCallback = [this](const InterLinkIdentifier &Connection) 
+              {
+                if (Connection.Type == InterlinkType::eGameServer)
+                {
+                  ConnectedGameServer = std::make_unique<InterLinkIdentifier>(Connection);
+                  printf("[Partition] Connected to GameServer: %s\n", Connection.ToString().c_str());
+                }
+              },
 						  .OnMessageArrival = [](const Connection &fromWhom, std::span<const std::byte> data) {Partition::Get().MessageArrived(fromWhom,data);}}});
 
 	std::string TestMessageStr = "Hello This is a test message from " + partitionIdentifier.ToString();
@@ -47,7 +54,7 @@ void Partition::Init()
 void Partition::MessageArrived(const Connection &fromWhom, std::span<const std::byte> data)
 {
     // Detect snapshot packets
-    if (data.size() % sizeof(AtlasEntity) == 0 && data.size() > 0)
+    if (data.size() - 1 % sizeof(AtlasEntity) == 0 && data.size() - 1 > 0)
     {
         size_t entityCount = data.size() / sizeof(AtlasEntity);
         std::vector<AtlasEntity> snapshot(entityCount);
@@ -62,7 +69,7 @@ void Partition::MessageArrived(const Connection &fromWhom, std::span<const std::
         {
             logger->DebugFormatted("Entity ID: {}, Pos: ({}, {}, {})", entity.ID, entity.Position.x, entity.Position.y, entity.Position.z);
         }
-
+        Interlink::Get().SendMessageRaw(*ConnectedGameServer, std::span(data));
         return;
     }
 

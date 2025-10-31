@@ -2,7 +2,7 @@
 //#include "Server/AtlasNetServer.hpp"
 //#include "Client/AtlasNetClient.hpp"
 
-enum AtlasNetMessageHeader
+enum class AtlasNetMessageHeader : uint8_t
 {
     EntityUpdate = 0,
     EntityIncoming = 1,
