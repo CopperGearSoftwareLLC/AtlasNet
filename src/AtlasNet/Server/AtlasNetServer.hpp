@@ -6,6 +6,7 @@
 #include "Debug/Log.hpp"
 #include "Docker/DockerEvents.hpp"
 #include "Interlink/Interlink.hpp"
+#include "../AtlasNet.hpp"
 enum KDServerRequestType {
     Raycast,
     SphereOverlap,

@@ -45,7 +45,6 @@ void AtlasNetServer::Initialize(AtlasNetServer::InitializeProperties &properties
 void AtlasNetServer::Update(std::span<AtlasEntity> entities, std::vector<AtlasEntity> &IncomingEntities,
 							std::vector<AtlasEntityID> &OutgoingEntities)
 {
-  
   Interlink::Get().Tick();
   
   // If no entities, skip sending
@@ -62,12 +61,6 @@ void AtlasNetServer::Update(std::span<AtlasEntity> entities, std::vector<AtlasEn
 
     CachedEntities[entity.ID] = entity;
   }
-  
-  
-  // Send snapshot to Partition
-  //InterLinkIdentifier partitionID(InterlinkType::ePartition, DockerIO::Get().GetSelfContainerName());
-  //logger->DebugFormatted("try send snapshot with entities {} to {}", entities.size(), partitionID.ToString());
-  //Interlink::Get().SendMessageRaw(partitionID, std::as_bytes(std::span(buffer)), InterlinkMessageSendFlag::eImmidiateOrDrop);
 
     if (CachedEntities.empty())
         return;
@@ -86,26 +79,39 @@ void AtlasNetServer::Update(std::span<AtlasEntity> entities, std::vector<AtlasEn
 
 void AtlasNetServer::HandleMessage(const Connection &fromWhom, std::span<const std::byte> data)
 {
-    if (fromWhom.target.Type == InterlinkType::eGameClient)
+
+    AtlasEntity entity{};
+    if (data.size() == sizeof(AtlasEntity))
     {
-        if (data.size() == sizeof(AtlasEntity))
+        std::memcpy(&entity, data.data(), sizeof(AtlasEntity));
+
+        CachedEntities[entity.ID] = entity;
+
+        logger->DebugFormatted("[Server] Received transform from client {} (Entity {}) -> Pos({:.2f}, {:.2f}, {:.2f})",
+            fromWhom.target.ToString(), entity.ID, entity.Position.x, entity.Position.y, entity.Position.z);
+    }
+    else
+    {
+      logger->ErrorFormatted("[Server] Received non-AtlasEntity message size {} from {}, aborting", data.size(), fromWhom.target.ToString());
+      return;
+    }
+
+    switch (fromWhom.target.Type)
+    {
+      case InterlinkType::eGameClient:
+        // rebroadcast to other clients
+        for (const auto& id : ConnectedClients)
         {
-            AtlasEntity entity{};
-            std::memcpy(&entity, data.data(), sizeof(AtlasEntity));
-
-            CachedEntities[entity.ID] = entity;
-
-            logger->DebugFormatted("[Server] Received transform from client {} (Entity {}) -> Pos({:.2f}, {:.2f}, {:.2f})",
-                fromWhom.target.ToString(), entity.ID, entity.Position.x, entity.Position.y, entity.Position.z);
-
-            // rebroadcast to other clients
-            for (const auto& id : ConnectedClients)
+            if (id != fromWhom.target)
             {
-                if (id != fromWhom.target)
-                {
-                    Interlink::Get().SendMessageRaw(id, std::as_bytes(std::span(&entity, 1)));
-                }
+                Interlink::Get().SendMessageRaw(id, std::as_bytes(std::span(&entity, 1)));
             }
         }
-    }
+        break;
+        case InterlinkType::ePartition:
+        
+        break;
+      default:
+        logger->ErrorFormatted("[Server] Received message from unknown InterlinkType {} from {}", static_cast<int>(fromWhom.target.Type), fromWhom.target.ToString());
+    };
 }

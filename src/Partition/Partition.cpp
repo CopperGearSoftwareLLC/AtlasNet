@@ -14,12 +14,6 @@ Partition::~Partition()
 }
 void Partition::Init()
 {
-	while (!ShouldShutdown)
-	{
-		std::this_thread::sleep_for(std::chrono::milliseconds(20));
-  }
-  return;
-
 	InterLinkIdentifier partitionIdentifier(InterlinkType::ePartition, DockerIO::Get().GetSelfContainerName());
 	
 	logger = std::make_shared<Log>(partitionIdentifier.ToString());
