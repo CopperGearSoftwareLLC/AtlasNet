@@ -52,26 +52,24 @@ void AtlasNetBootstrap::Run()
 
     // 1. setup swarm + network + registry
     // EnsureDockerLogin();
+    // ClearOldCache();
+    RunningLocally = AtlasNet::Get().GetSettings().workers.empty();
     SetupSwarm();
     SetupNetwork();
-    GenerateTSLCertificate();
-    SetupRegistry();
-    // 2. SSH to workers. muist happen first so their arches can be retrieved
-    GetWorkersSSHCredentials();
-    SendTLSCertificateToWorkers();
-    JoinWorkerToSwarm();
+
+    if (!RunningLocally)
+    {
+        GenerateTSLCertificate();
+        SetupRegistry();
+        GetWorkersSSHCredentials();
+        SendTLSCertificateToWorkers();
+        JoinWorkerToSwarm();
+        MakeDockerBuilder();
+    }
     CreateDevContainerJson();
-    MakeDockerBuilder();
-    // auto Godfut = std::async(std::launch::async,[this](){CreateGodImage();});
-    // auto Partfut = std::async(std::launch::async,[this](){CreatePartitionImage();});
-    // auto Datafut = std::async(std::launch::async,[this](){CreateDatabaseImage();});
-    // Godfut.wait();
-    // Partfut.wait();
-    // Datafut.wait();
     CreateGodImage();
     CreatePartitionImage();
     CreateDatabaseImage();
-    // ParallelBuild();
     RunDatabase();
     SetupPartitionService();
     RunGod();
@@ -263,7 +261,7 @@ kill -TERM "$pid1" "$pid2" 2>/dev/null || true
 wait
 exit $exit_code
 EOF
-
+COPY ${exe2} ${WORKDIR}/${exe2}
 RUN chmod +x /entrypoint.sh
 ENTRYPOINT ["/usr/bin/tini", "--", "/entrypoint.sh"])",
                                                  {{"exe1", "bin/" + BuildConfig + "/Partition/Partition"}, {"exe2", AtlasNet::Get().GetSettings().GameServerBinary}});
@@ -309,20 +307,41 @@ bool AtlasNetBootstrap::BuildDockerImage(const std::string &DockerFile, const st
         std::string archn = arch;
         archn.erase(std::remove_if(archn.begin(), archn.end(), ::isspace), archn.end());
 
-        std::string tag = std::format("{}:{}", ImageName, archn);
-        std::string fullTag = std::format("{}/{}", registry, tag);
-        fullTags.push_back(fullTag);
+        std::string tag;
+        if (!RunningLocally)
+        {
+
+            tag = std::format("{}/{}:{}", registry, ImageName, archn);
+        }
+        else
+        {
+            tag = ImageName;
+        }
+        fullTags.push_back(tag);
 
         // Build the image
         const auto &cacheDir = AtlasNet::Get().GetSettings().BuildCacheDir;
         std::string BuildCacheArgument = cacheDir.empty() ? "" : "--cache-from type=local,src=" + cacheDir + " --cache-to type=local,dest=" + cacheDir + ",mode=max";
-        std::string buildCmd = std::format(
-            "docker buildx build --builder {} "
-            "--platform linux/{} "
-            "--provenance=false "
-            "-f {}/{} -t {} "
-            "{} --push .",
-            BuilderName, archn, DockerFilesFolder, DockerFile, fullTag, BuildCacheArgument);
+        std::string buildCmd;
+        if (RunningLocally)
+        {
+            buildCmd = std::format(
+                "docker build "
+                "-f {}/{} "
+                "-t {} "
+                "{} .",
+                DockerFilesFolder, DockerFile, tag, "");
+        }
+        else
+        {
+            buildCmd = std::format(
+                "docker buildx build --builder {} "
+                "--platform linux/{} "
+                "--provenance=false "
+                "-f {}/{} -t {} "
+                "{} --push .",
+                BuilderName, archn, DockerFilesFolder, DockerFile, tag, BuildCacheArgument);
+        }
 
         logger.DebugFormatted("🏗️ Building image '{}' for arch '{}' using '{}'", ImageName, archn, DockerFile);
         if (std::system(buildCmd.c_str()) != 0)
@@ -333,31 +352,34 @@ bool AtlasNetBootstrap::BuildDockerImage(const std::string &DockerFile, const st
 
         logger.DebugFormatted("✅ Successfully built & pushed '{}' (arch '{}')", ImageName, archn);
     }
-    // After building all architecture images, create and push a manifest list
-    std::string manifestTag = std::format("{}/{}:latest", registry, ImageName);
-
-    logger.DebugFormatted("🧩 Creating manifest list '{}'", manifestTag);
-
-    // Build the manifest creation command
-    std::string manifestCmd = std::format("docker manifest create --amend {}", manifestTag);
-    for (const auto &fullTag : fullTags)
-        manifestCmd += std::format(" {}", fullTag);
-
-    // Create manifest
-    if (std::system(manifestCmd.c_str()) != 0)
+    if (!RunningLocally)
     {
-        logger.ErrorFormatted("❌ Failed to create manifest list '{}'", manifestTag);
-        throw std::runtime_error("Manifest creation failed");
-    }
+        // After building all architecture images, create and push a manifest list
+        std::string manifestTag = std::format("{}/{}:latest", registry, ImageName);
 
-    // Push the manifest list
-    if (std::system(std::format("docker manifest push {}", manifestTag).c_str()) != 0)
-    {
-        logger.ErrorFormatted("❌ Failed to push manifest list '{}'", manifestTag);
-        throw std::runtime_error("Manifest push failed");
-    }
+        logger.DebugFormatted("🧩 Creating manifest list '{}'", manifestTag);
 
-    logger.DebugFormatted("✅ Successfully pushed multi-arch manifest '{}'", manifestTag);
+        // Build the manifest creation command
+        std::string manifestCmd = std::format("docker manifest create --amend {}", manifestTag);
+        for (const auto &fullTag : fullTags)
+            manifestCmd += std::format(" {}", fullTag);
+
+        // Create manifest
+        if (std::system(manifestCmd.c_str()) != 0)
+        {
+            logger.ErrorFormatted("❌ Failed to create manifest list '{}'", manifestTag);
+            throw std::runtime_error("Manifest creation failed");
+        }
+
+        // Push the manifest list
+        if (std::system(std::format("docker manifest push {}", manifestTag).c_str()) != 0)
+        {
+            logger.ErrorFormatted("❌ Failed to push manifest list '{}'", manifestTag);
+            throw std::runtime_error("Manifest push failed");
+        }
+
+        logger.DebugFormatted("✅ Successfully pushed multi-arch manifest '{}'", manifestTag);
+    }
 
     return true;
 }
@@ -426,7 +448,9 @@ void AtlasNetBootstrap::RunGod()
     system(removeCommand.c_str());
 
     logger.Debug("Running God");
-    std::string Command = "docker run --init  --stop-timeout=999999 --network " + NetworkName + " -v /var/run/docker.sock:/var/run/docker.sock --cap-add=SYS_PTRACE --security-opt seccomp=unconfined --name God -d -p :" + std::to_string(_PORT_GOD) + " " + ManagerPcAdvertiseAddr + ":5000/" + GodImageName;
+    std::string ImageName = RunningLocally ? GodImageName : (ManagerPcAdvertiseAddr + ":5000/") + GodImageName;
+
+    std::string Command = "docker run --init  --stop-timeout=999999 --network " + NetworkName + " -v /var/run/docker.sock:/var/run/docker.sock --cap-add=SYS_PTRACE --security-opt seccomp=unconfined --name God -d -p :" + std::to_string(_PORT_GOD) + " " + ImageName;
     system(Command.c_str());
 }
 
@@ -436,25 +460,56 @@ void AtlasNetBootstrap::RunDatabase()
     system("docker rm -f Database");
 
     // Create the container
+    std::string ImageName = RunningLocally ? DatabaseImageName : (ManagerPcAdvertiseAddr + ":5000/") + DatabaseImageName;
     std::string runCommand =
-        "docker create --name Database --network " + NetworkName + " -v redis_data:/data -p 6379:6379 " + ManagerPcAdvertiseAddr + ":5000/" + DatabaseImageName + " /bin/bash -c \"redis-server --appendonly yes & ./Database\"";
+        "docker create --name Database --network " + NetworkName + " -v redis_data:/data -p 6379:6379 " + ImageName + " /bin/bash -c \"redis-server --appendonly yes & ./Database\"";
     system(runCommand.c_str());
 
     // Start it
     system("docker start Database");
 }
+
 void AtlasNetBootstrap::SetupSwarm()
 {
-    int leaveResult = system("docker swarm leave --force");
-    if (leaveResult == 0)
-        logger.Warning("Leaving existing docker swarm");
+    auto isPortInUse = [](int port) -> bool {
+        int sock = socket(AF_INET, SOCK_STREAM, 0);
+        if (sock < 0) return true;
+        sockaddr_in addr{};
+        addr.sin_family = AF_INET;
+        addr.sin_addr.s_addr = inet_addr("0.0.0.0");
+        addr.sin_port = htons(port);
+        bool inUse = bind(sock, (sockaddr*)&addr, sizeof(addr)) < 0;
+        close(sock);
+        return inUse;
+    };
 
-    logger.Debug("Initializing Docker Swarm");
+    // Pick a free port starting from 2377
+    int swarmPort = 2377;
+    while (isPortInUse(swarmPort))
+    {
+        logger.WarningFormatted("⚠️ Port {} already in use, trying {}", swarmPort, swarmPort + 1);
+        swarmPort++;
+        if (swarmPort > 2400)
+            throw std::runtime_error("No available ports found for swarm init (2377–2400)");
+    }
 
-    // Attempt to use configured network interface
+    // Leave any existing swarm first
+    system("docker swarm leave --force >/dev/null 2>&1");
+
+    // Check if already a manager
+    std::string infoResp = DockerIO::Get().request("GET", "/info");
+    auto infoJson = Json::parse(infoResp);
+    if (infoJson["Swarm"]["LocalNodeState"] == "active" && infoJson["Swarm"]["ControlAvailable"] == true)
+    {
+        logger.Debug("Already a swarm manager — skipping init.");
+        return;
+    }
+
+    logger.DebugFormatted("🧩 Initializing Docker Swarm on port {}", swarmPort);
+
+    // Resolve configured network interface
     std::string preferredInterface = AtlasNet::Get().GetSettings().NetworkInterface;
     std::string interfaceIP;
-
     if (!preferredInterface.empty())
     {
         struct ifaddrs *ifaddr;
@@ -468,7 +523,6 @@ void AtlasNetBootstrap::SetupSwarm()
         {
             if (ifa->ifa_addr == nullptr || ifa->ifa_addr->sa_family != AF_INET)
                 continue;
-
             if (preferredInterface == ifa->ifa_name)
             {
                 char addr[INET_ADDRSTRLEN];
@@ -481,103 +535,52 @@ void AtlasNetBootstrap::SetupSwarm()
         freeifaddrs(ifaddr);
 
         if (interfaceIP.empty())
-            logger.WarningFormatted("⚠️ Configured network interface '{}' not found or has no IPv4 address.", preferredInterface);
+            logger.WarningFormatted("⚠️ Configured interface '{}' not found or has no IPv4 address.", preferredInterface);
         else
-            logger.DebugFormatted("✅ Using configured interface '{}' with IP '{}'", preferredInterface, interfaceIP);
-    }
-    else
-    {
-        logger.Warning("⚠️ No preferred network interface specified in settings.");
+            logger.DebugFormatted("✅ Using interface '{}' with IP '{}'", preferredInterface, interfaceIP);
     }
 
-    // Try swarm init using preferred interface if available
+    // Construct swarm init payload
     Json swarmInit = interfaceIP.empty()
-                         ? Json{{"ListenAddr", "0.0.0.0:2377"}}
-                         : Json{{"ListenAddr", "0.0.0.0:2377"}, {"AdvertiseAddr", interfaceIP + ":2377"}};
+        ? Json{{"ListenAddr", std::format("0.0.0.0:{}", swarmPort)}}
+        : Json{{"ListenAddr", std::format("0.0.0.0:{}", swarmPort)},
+               {"AdvertiseAddr", std::format("{}:{}", interfaceIP, swarmPort)}};
 
+    // Attempt swarm init
     std::string initResult = DockerIO::Get().request("POST", "/swarm/init", &swarmInit);
-    auto parsed = Json::parse(initResult);
-
-    if (parsed.contains("message") &&
-        parsed["message"].get<std::string>().find("could not choose an IP address") != std::string::npos)
-    {
-        logger.Warning("⚠️ Docker swarm could not choose an IP address automatically.");
-
-        // --- List interfaces and IPs ---
-        std::vector<std::pair<std::string, std::string>> interfaces;
-        struct ifaddrs *ifaddr;
-        if (getifaddrs(&ifaddr) == -1)
-        {
-            perror("getifaddrs");
-            return;
-        }
-
-        for (auto *ifa = ifaddr; ifa != nullptr; ifa = ifa->ifa_next)
-        {
-            if (ifa->ifa_addr == nullptr || ifa->ifa_addr->sa_family != AF_INET)
-                continue;
-
-            char addr[INET_ADDRSTRLEN];
-            void *in_addr = &((struct sockaddr_in *)ifa->ifa_addr)->sin_addr;
-            inet_ntop(AF_INET, in_addr, addr, sizeof(addr));
-            interfaces.emplace_back(ifa->ifa_name, addr);
-        }
-        freeifaddrs(ifaddr);
-
-        if (interfaces.empty())
-        {
-            logger.Error("No IPv4 interfaces found!");
-            return;
-        }
-
-        // --- Ask user to select one ---
-        std::cout << "\nAvailable network interfaces:\n";
-        for (size_t i = 0; i < interfaces.size(); ++i)
-        {
-            std::cout << "  [" << i << "] " << interfaces[i].first
-                      << " -> " << interfaces[i].second << "\n";
-        }
-
-        std::cout << "Select interface number to advertise: ";
-        size_t choice = 0;
-        std::cin >> choice;
-
-        if (choice >= interfaces.size())
-        {
-            logger.Error("Invalid choice");
-            return;
-        }
-
-        std::string chosenIP = interfaces[choice].second;
-        logger.DebugFormatted("Selected interface {} ({})", interfaces[choice].first, chosenIP);
-
-        // --- Retry swarm init with chosen IP ---
-        Json swarmInitRetry{
-            {"ListenAddr", "0.0.0.0:2377"},
-            {"AdvertiseAddr", chosenIP + ":2377"}};
-
-        initResult = DockerIO::Get().request("POST", "/swarm/init", &swarmInitRetry);
-    }
-    else
-    {
-        logger.DebugFormatted("Swarm init response:\n{}", parsed.dump(4));
+    Json parsed;
+    try {
+        parsed = Json::parse(initResult);
+    } catch (...) {
+        logger.ErrorFormatted("Invalid swarm init response: {}", initResult);
+        return;
     }
 
-    std::string infoResp = DockerIO::Get().request("GET", "/info");
-    auto infoJson = Json::parse(infoResp);
+    if (parsed.contains("message"))
+    {
+        logger.ErrorFormatted("❌ Swarm init failed: {}", parsed["message"].get<std::string>());
+        return;
+    }
+
+    logger.DebugFormatted("Swarm init successful:\n{}", parsed.dump(4));
+
+    // Refresh info to capture advertise address
+    infoResp = DockerIO::Get().request("GET", "/info");
+    infoJson = Json::parse(infoResp);
     ManagerPcAdvertiseAddr = infoJson["Swarm"]["NodeAddr"];
+    logger.DebugFormatted("📡 Manager address set to {}", ManagerPcAdvertiseAddr);
 }
 
 void AtlasNetBootstrap::SetupNetwork()
 {
     // Delete existing network if it exists
     system("docker network rm AtlasNet > /dev/null 2>&1");
-    std::string NetworkCommand = "docker network create --driver overlay --attachable " + NetworkName;
-    int netResult = system(NetworkCommand.c_str());
+    std::string NetworkCommand = std::format("docker network create {} --attachable {}", "--driver overlay", NetworkName);
+    auto netResult = RunCommand(NetworkCommand.c_str());
     // 256 = network already exists
-    if (netResult != 0 && netResult != 256)
+    if (netResult.exitCode != 0)
     {
-        logger.ErrorFormatted("Failed to create network. Error code {}", netResult);
+        logger.ErrorFormatted("Failed to create network. Error code {}", netResult.output);
         throw std::runtime_error("Failed to create network");
     }
     else
@@ -800,7 +803,7 @@ void AtlasNetBootstrap::SetupPartitionService()
     std::string CleanupPartitionServiceCommand = std::string("docker service rm ") + PartitionServiceName + "> /dev/null 2>&1";
     int deleteResult = system(CleanupPartitionServiceCommand.c_str());
 
-    std::string imageTag = std::format("{}/{}:latest", registry, PartitionImageName);
+    std::string imageTag = RunningLocally ? PartitionImageName : std::format("{}/{}:latest", registry, PartitionImageName);
     logger.DebugFormatted("Creating partition service from public image '{}'", imageTag);
     std::string CreatePartitionServiceCmd = std::string("docker service create --name ") + PartitionServiceName + " --network " + NetworkName + " --mount type=bind,source=/var/run/docker.sock,target=/var/run/docker.sock --replicas 0 --detach=true " + imageTag;
     int createResult = system(CreatePartitionServiceCmd.c_str());
@@ -1266,6 +1269,10 @@ void AtlasNetBootstrap::SetupRegistry()
         logger.WarningFormatted("⚠️ Registry service '{}' may not be running yet:\n{}", registryName, result.output);
     }
 }
+void AtlasNetBootstrap::ClearOldCache()
+{
+    system("docker builder prune -a --filter=24h --force");
+}
 void AtlasNetBootstrap::MakeDockerBuilder()
 {
     const std::string registryHost = ManagerPcAdvertiseAddr + ":5000";
@@ -1279,7 +1286,7 @@ void AtlasNetBootstrap::MakeDockerBuilder()
     bool certSame = false;
 
     // 🔹 Check if cert exists and is valid
-    if (std::filesystem::exists(certPath))
+    if (!RunningLocally && std::filesystem::exists(certPath))
     {
         auto validityCheck = RunCommand(std::format("openssl x509 -checkend 86400 -noout -in {}", certPath));
         certValid = (validityCheck.exitCode == 0);
@@ -1309,7 +1316,7 @@ void AtlasNetBootstrap::MakeDockerBuilder()
     }
 
     // 🔹 If builder exists and certificate is valid and identical, skip
-    if (builderExists && certValid && certSame)
+    if (builderExists && (RunningLocally || (certValid && certSame)))
     {
         logger.DebugFormatted(
             "✅ Builder '{}' already exists and certificate '{}' is still valid and unchanged. Skipping recreation.",
@@ -1354,29 +1361,32 @@ void AtlasNetBootstrap::MakeDockerBuilder()
         return;
     }
 
-    // 🔹 Copy certificate into container
-    logger.DebugFormatted("📦 Copying registry certificate '{}' into builder '{}'", certPath, containerName);
-    RunCommand(std::format(
-        "docker exec {} mkdir -p /usr/local/share/ca-certificates/{}",
-        containerName, registryHost));
-
-    std::string copyCmd = std::format(
-        "docker cp {} {}:/usr/local/share/ca-certificates/{}/registry.crt",
-        certPath, containerName, registryHost);
-    const auto copyResult = RunCommand(copyCmd);
-    if (copyResult.exitCode != 0)
+    if (!RunningLocally)
     {
-        std::cerr << copyResult.output << std::endl;
-        logger.ErrorFormatted("❌ Failed to copy certificate into builder container '{}'", containerName);
-        return;
-    }
+        // 🔹 Copy certificate into container
+        logger.DebugFormatted("📦 Copying registry certificate '{}' into builder '{}'", certPath, containerName);
+        RunCommand(std::format(
+            "docker exec {} mkdir -p /usr/local/share/ca-certificates/{}",
+            containerName, registryHost));
 
-    logger.DebugFormatted("🔑 Installing registry certificate manually (BusyBox environment detected)");
-    const auto manualAdd = RunCommand(std::format(
-        "docker exec {} sh -c 'mkdir -p /etc/ssl/certs && cat /usr/local/share/ca-certificates/{}/registry.crt >> /etc/ssl/certs/ca-certificates.crt'",
-        containerName, registryHost));
-    std::cerr << manualAdd.output << std::endl;
-    logger.DebugFormatted("✅ Registry certificate successfully installed in builder '{}'", containerName);
+        std::string copyCmd = std::format(
+            "docker cp {} {}:/usr/local/share/ca-certificates/{}/registry.crt",
+            certPath, containerName, registryHost);
+        const auto copyResult = RunCommand(copyCmd);
+        if (copyResult.exitCode != 0)
+        {
+            std::cerr << copyResult.output << std::endl;
+            logger.ErrorFormatted("❌ Failed to copy certificate into builder container '{}'", containerName);
+            return;
+        }
+
+        logger.DebugFormatted("🔑 Installing registry certificate manually (BusyBox environment detected)");
+        const auto manualAdd = RunCommand(std::format(
+            "docker exec {} sh -c 'mkdir -p /etc/ssl/certs && cat /usr/local/share/ca-certificates/{}/registry.crt >> /etc/ssl/certs/ca-certificates.crt'",
+            containerName, registryHost));
+        std::cerr << manualAdd.output << std::endl;
+        logger.DebugFormatted("✅ Registry certificate successfully installed in builder '{}'", containerName);
+    }
 }
 
 /*

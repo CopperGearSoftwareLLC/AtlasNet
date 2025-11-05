@@ -61,9 +61,9 @@ COPY Tests ${WORKDIR}/Tests
 COPY src  ${WORKDIR}/src
 COPY srcRun ${WORKDIR}/srcRun
 RUN  ./premake-core/bin/release/premake5 gmake
-RUN \
- --mount=type=cache,target=${WORKDIR}/obj \
-    make -C ./build config=${BUILD_CONFIG} ${PROJ_TO_BUILD} -j $(nproc)
+ RUN \
+   --mount=type=cache,target=${WORKDIR}/obj \
+     make -C ./build config=${BUILD_CONFIG} ${PROJ_TO_BUILD} -j $(nproc)
 
     FROM ${OS_VERSION}
     WORKDIR ${WORKDIR}
@@ -88,6 +88,7 @@ RUN \
         std::string publicKeyPath, PrivateKeyPath;
     };
     std::vector<OnlineWorker> onlineWorkers;
+    bool RunningLocally = true;
     const std::string KeysPath = "keys";
     const std::string tlsPath = KeysPath + "/tls";
     const std::string tlsCertificateExpirationDays = "365";
@@ -124,6 +125,7 @@ private:
     void GetWorkersSSHCredentials();
     void SendTLSCertificateToWorkers();
     void SetupRegistry();
+    void ClearOldCache();
     // void AddInsecureRegistry();
     void MakeDockerBuilder();
     // std::string EnsureDockerLogin();
