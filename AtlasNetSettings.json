@@ -1,0 +1,22 @@
+{
+    "TickRatePerSecond": 20,
+    "HeuristicMode": "Automatic",
+    "GameServerBinary": "bin/DebugDocker/UnitTests/UnitTests",
+    "GameCoordinatorBinary": "UnitGameCoordinator",
+    "Workers--": [
+        {
+            "Name": "Dumpster",
+            "Address": "192.168.2.101"
+        },
+        {
+            "Name": "Camila Thinkpad",
+            "Address": "192.168.2.104"
+        }
+    ],
+    "RuntimeArches": [
+        "x86_64"
+    ],
+    "BuildCacheDir" : "docker_cache",
+    "NetworkInterface" : "eno1",
+    "BuilderMemoryGb": 15
+}

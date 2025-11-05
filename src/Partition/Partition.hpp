@@ -15,7 +15,7 @@
 #include "AtlasNet/AtlasEntity.hpp"
 #include "Database/IDatabase.hpp"
 #include "Database/RedisCacheDatabase.hpp"
-
+#undef ATLAS_UNITY_PLUGIN
 #if defined(ATLAS_UNITY_PLUGIN)
 // Plugin build — use absolute path for now
 #include "/mnt/d/KDNet/KDNet/src/AtlasNet/AtlasEntity.hpp"

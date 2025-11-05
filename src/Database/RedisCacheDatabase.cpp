@@ -158,8 +158,7 @@ std::string RedisCacheDatabase::HashGet(const std::string &key, const std::strin
 
 std::unordered_map<std::string, std::string> RedisCacheDatabase::HashGetAll(const std::string &key)
 {
-    if (!_redis)
-        return {};
+    ASSERT(_redis,"Invalid redis");
 
     try
     {

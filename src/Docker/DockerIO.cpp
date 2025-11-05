@@ -22,9 +22,14 @@ std::string DockerIO::request(const std::string &method, const std::string &endp
         headers = curl_slist_append(headers, h.c_str());
     }
 
-    std::string url = "http://localhost" + endpoint;
+        std::string url;
+    if (unixSocket.rfind("http", 0) == 0) { // remote TCP
+        url = unixSocket + endpoint;
+    } else { // local UNIX socket
+        url = "http://localhost" + endpoint;
+        curl_easy_setopt(curl, CURLOPT_UNIX_SOCKET_PATH, unixSocket.c_str());
+    }
 
-    curl_easy_setopt(curl, CURLOPT_UNIX_SOCKET_PATH, unixSocket.c_str());
     curl_easy_setopt(curl, CURLOPT_URL, url.c_str());
     curl_easy_setopt(curl, CURLOPT_CUSTOMREQUEST, method.c_str());
     curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, WriteCallback);
@@ -74,16 +79,41 @@ nlohmann::json DockerIO::InspectSelf() const
 std::string DockerIO::GetSelfContainerName() const
 {
     nlohmann::json info = InspectSelf();
-    std::string name = info.value("Name", "");
-    if (!name.empty() && name[0] == '/')
-        name.erase(0, 1);
+    std::string name;
+    try
+    {
+        name = info.value("Name", "");
+        if (!name.empty() && name[0] == '/')
+            name.erase(0, 1); // remove leading slash
+        if (name.find('.') != name.npos)
+        {
+            name = name.substr(name.find_last_of('.')+1);
+        }
+    }
+    catch (const std::exception &e)
+    {
+        std::cerr << e.what() << '\n'
+                  << info.dump(4);
+    }
+
     return name;
 }
 
 std::string DockerIO::GetSelfContainerIP() const
 {
     nlohmann::json info = InspectSelf();
-    std::string ip = info["NetworkSettings"]["Networks"]["AtlasNet"]["IPAddress"].get<std::string>();
+    std::string ip;
+    try
+    {
+        ip = info["NetworkSettings"]["Networks"]["AtlasNet"]["IPAddress"].get<std::string>();
+    }
+    catch (const std::exception &e)
+    {
+        std::cerr << e.what() << '\n';
+        std::cerr << "Inspect Contents \n"
+                  << info.dump(4);
+    }
+
     return ip;
 }
 
@@ -105,8 +135,9 @@ std::vector<std::pair<uint32, uint32>> DockerIO::GetSelfExposedPorts() const
 std::optional<uint32> DockerIO::GetSelfExposedPortForInternalBind(uint32 InternalPort) const
 {
     const auto ports = GetSelfExposedPorts();
-    const auto find = std::find_if(ports.begin(), ports.end(), [InternalPort](std::pair<uint32, uint32> p)
-                                   { return InternalPort == p.first; });
+    std::cerr << "Looking for " << InternalPort << std::endl;
+    const auto find = std::find_if(ports.begin(), ports.end(), [InternalPort = InternalPort](std::pair<uint32, uint32> p)
+                                   { std::cerr << p.first << std::endl; return InternalPort == p.first; });
     if (find == ports.end())
         return std::nullopt;
     return find->second;

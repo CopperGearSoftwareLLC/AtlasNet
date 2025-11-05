@@ -2,22 +2,12 @@
   "version": "0.2.0",
   "configurations": [
     {
-      "name": "AtlasNet UnitTest",
-      "type": "node",              // any debugger type, doesn't matter
-      "request": "launch",
-      "program": "${workspaceFolder}/noop.js", // dummy, not used
-      "preLaunchTask": "AtlasNet Start",
-      "noDebug": true
-    },
-    {
-      "name": "Debug Partition + Unit Tests",
+      "name": "AtlasNet bootstrap",
       "type": "cppdbg",
       "request": "launch",
-      "program": "${workspaceFolder}/bin/DebugDocker/Partition/Partition",
+      "program": "${workspaceFolder}/bin/DebugDocker/AtlasNet/AtlasNet",
       "cwd": "${workspaceFolder}",
       "MIMode": "gdb",
-      "preLaunchTask": "Run Partition + Unit Tests Docker",
-      "miDebuggerServerAddress": "localhost:1235",
       "miDebuggerPath": "/usr/bin/gdb",
       "stopAtEntry": false,
       
@@ -37,13 +27,13 @@
     },
     
     {
-      "name": "Debug GodView",
+      "name": "Debug Cartograph",
       "type": "cppdbg",
       "request": "launch",
-      "program": "${workspaceFolder}/bin/DebugDocker/GodView/GodView",
+      "program": "${workspaceFolder}/bin/DebugDocker/Cartograph/Cartograph",
       "cwd": "${workspaceFolder}",
       "MIMode": "gdb",
-      "preLaunchTask": "Compile For Docker",
+      "preLaunchTask": "make",
       "stopAtEntry": false,
       
     }

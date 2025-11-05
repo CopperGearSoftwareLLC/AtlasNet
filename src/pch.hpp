@@ -14,8 +14,12 @@
 #include <imgui_impl_opengl3.h>
 #include <imgui_impl_glfw.h>
 #include <imgui.h>
+#include <imgui_stdlib.h>
 #include <implot.h>
+#include <implot3d.h>
 
+/*STB*/
+#include "stb_image.h"
 
 /* Valve GameNetworkingSockets */
 #define STEAMNETWORKINGSOCKETS_STATIC_LINK
@@ -49,9 +53,18 @@ using Json = nlohmann::json;
 using Ordered_Json = nlohmann::ordered_json;
 
 #include "glm/glm.hpp"
+#include "glm/gtc/matrix_transform.hpp"
+#define GLM_ENABLE_EXPERIMENTAL
+#include "glm/gtx/string_cast.hpp"
 using mat2 = glm::mat2;
 using mat3 = glm::mat3;
 using mat4 = glm::mat4;
+using uvec2 = glm::uvec2;
+using uvec3 = glm::uvec3;
+using uvec4 = glm::uvec4;
+using ivec2 = glm::ivec2;
+using ivec3 = glm::ivec3;
+using ivec4 = glm::ivec4;
 using vec2 = glm::vec2;
 using vec3 = glm::vec3;
 using vec4 = glm::vec4;
@@ -59,18 +72,33 @@ using quat = glm::quat;
 template <glm::length_t L, typename T>
 using vec = glm::vec<L, T>;
 
+inline vec2 ImGuiToGlm(ImVec2 e) {return vec2(e.x,e.y);}
+inline ImVec2 GlmToImGui(vec2 e) {return ImVec2(e.x,e.y);}
+
+
+inline vec4 ImGuiToGlm(ImVec4 e) {return vec4(e.x,e.y,e.z,e.w);}
+inline ImVec4 GlmToImGui(vec4 e) {return ImVec4(e.x,e.y,e.z,e.w);}
+
+
+
 /* Database */
 #include <sw/redis++/redis++.h>
-
+#include <netdb.h>  
+#include <ifaddrs.h>
+#include <arpa/inet.h>
+#include <netinet/in.h>
 #include <cassert>
 #define ASSERT(check,message) assert(check && message)
 #include <iostream>
+#include <regex>
 #include <cstdlib>
 #include <thread>
 #include <span>
 #include <vector>
 #include <functional>
 #include <chrono>
+#include <execution>
+#include <termios.h>
 #include <bitset>
 #include <unordered_map>
 #include <memory>

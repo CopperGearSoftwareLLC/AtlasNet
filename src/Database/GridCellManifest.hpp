@@ -47,6 +47,12 @@ public:
         
         return data;
     }
+    static std::unordered_map<std::string,std::string> FetchAll(IDatabase* db)
+    {
+        if (!db) return {};
+        ASSERT(db,"Invalid Database");
+        return db->HashGetAll(HASH_KEY);
+    }
 
     /**
      * @brief Parse grid shape data from database string

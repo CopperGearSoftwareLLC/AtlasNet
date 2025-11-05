@@ -4,7 +4,7 @@ local _PORT_PARTITION = 25565
 local _PORT_GAMESERVER = 25566
 local DevPackages = "git tini gdbserver build-essential binutils automake libtool m4 autoconf gdb curl zip less unzip ccache coreutils tar g++ cmake pkg-config uuid-dev libxmu-dev libxi-dev libgl-dev libxinerama-dev libxcursor-dev xorg-dev libglu1-mesa-dev"
 workspace "GuacNet"
-    architecture "x86_64"
+    --architecture "x86_64"
     configurations { "DebugDocker", "DebugLocal", "Release" }
     startproject "God"
     includedirs { "src" }
@@ -49,44 +49,51 @@ workspace "GuacNet"
         defines { "_DOCKER" }
         symbols "On"
         optimize "On"
-
-    project "AtlasNet"
+    project "AtlasNetLib"
         kind "StaticLib"
         language "C++"
         files { "src/**.cpp" }
         pchheader "src/pch.hpp"
         pchsource "src/pch.cpp"
+    project "AtlasNet"
+        dependson "AtlasNetLib"
+        links "AtlasNetLib"
+        kind "ConsoleApp"
+        language "C++"
+        files { "srcRun/AtlasNetRun.cpp" }
+        pchheader "src/pch.hpp"
+        pchsource "src/pch.cpp"
     project "God"
-        dependson "AtlasNet"
-        links "AtlasNet"
+        dependson "AtlasNetLib"
+        links "AtlasNetLib"
         kind "ConsoleApp"
         language "C++"
         files { "srcRun/GodRun.cpp" }
         defines "_GOD"
-    project "GodView"
-        dependson "AtlasNet"
-        links "AtlasNet"
+    project "Cartograph"
+        dependson "AtlasNetLib"
+        links "AtlasNetLib"
         kind "ConsoleApp"
         language "C++"
-        files { "srcRun/GodViewRun.cpp" }
-        defines "_GODVIEW"
+        files { "srcRun/CartographRun.cpp" }
+        defines "_CARTOGRAPH"
     project "Partition"
-        dependson "AtlasNet"
-        links {"AtlasNet",}
+        dependson "AtlasNetLib"
+        links {"AtlasNetLib",}
         kind "ConsoleApp"
         language "C++"
         files { "srcRun/PartitionRun.cpp" }
         defines "_PARTITION"
     project "Database"
-        dependson "AtlasNet"
-        links {"AtlasNet"}
+        dependson "AtlasNetLib"
+        links {"AtlasNetLib"}
         kind "ConsoleApp"
         language "C++"
         files { "srcRun/DatabaseRun.cpp" }
         defines "_PARTITION"
     project "UnitTests"
-        dependson "AtlasNet"
-        links "AtlasNet"
+        dependson "AtlasNetLib"
+        links "AtlasNetLib"
         kind "ConsoleApp"
         language "C++"
         files { "Tests/SampleGame/**.cpp" }
@@ -384,7 +391,7 @@ function RunDockerImage(_target,_build_config,_app_bundle)
         local app_bundle = _app_bundle or _OPTIONS["app-bundle"] or "INVALID"
         BuildDockerImageFromTarget(target,build_config,app_bundle)
         os.execute("docker rm -f " .. target .. " >/dev/null 2>&1; ")
-        local ok, _, code = os.execute("docker run --init --network AtlasNet --stop-timeout=999999 -v /var/run/docker.sock:/var/run/docker.sock "..
+        local ok, _, code = os.execute("docker run --init  --stop-timeout=999999 -v /var/run/docker.sock:/var/run/docker.sock "..
         "--cap-add=SYS_PTRACE --security-opt seccomp=unconfined --name "..target.." -d -p :".._PORT_GOD.." "..string.lower(target))--.." UnitTest=" ..(_OPTIONS["testid"] or "-1") )
         if not ok or code ~= 0 then
             error("(exit code: " .. tostring(code) .. ")", 2)
@@ -430,6 +437,7 @@ newaction {
     trigger = "AtlasNetStart",
     description = "build",
     execute = function()
+
       os.execute("docker volume create redis_data")
       os.execute("docker network create AtlasNet 2>/dev/null || true")
           MakeDockerImages()

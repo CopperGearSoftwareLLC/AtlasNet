@@ -113,7 +113,11 @@
       "syncstream": "cpp",
       "netfwd": "cpp",
       "csetjmp": "cpp",
-      "cuchar": "cpp"
+      "cuchar": "cpp",
+      "flat_map": "cpp",
+      "flat_set": "cpp",
+      "queue": "cpp",
+      "stack": "cpp"
     },
     "C_Cpp.default.defines": [
         "_PORT_GOD",

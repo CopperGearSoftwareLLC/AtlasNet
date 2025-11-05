@@ -1,11 +1,12 @@
-#include <GodView/GodView.hpp>
-#include <GodView/PartitionVisualization.hpp>
+#include <Cartograph/Cartograph.hpp>
 #include <Debug/Crash/CrashHandler.hpp>
 int main(int argc, char** argv)
 {
     CrashHandler::Get().Init(argv[0]);
 
-    std::cerr << "Hello from AtlasView\n";
+	Cartograph::Get().Run();
+	
+    /*s td::cerr << "Hello from AtlasView\n";
     
     // Initialize partition visualization
     PartitionVisualization partitionViz;
@@ -70,6 +71,6 @@ int main(int argc, char** argv)
 	    ImGui::RenderPlatformWindowsDefault();
 	    glfwMakeContextCurrent(backup_current_context);
 	}
-    }
+    } */
  
 }

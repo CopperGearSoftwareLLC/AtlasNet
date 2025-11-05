@@ -1,22 +1,16 @@
     void ClearAllDatabaseState();
-#pragma once
-#include "pch.hpp"
-#include "Singleton.hpp"
-#include "Debug/Log.hpp"
-#include "Interlink/Interlink.hpp"
-#include "Heuristic/Heuristic.hpp"
-#include "Database/RedisCacheDatabase.hpp"
+    #pragma once
+    #include "pch.hpp"
+    #include "Singleton.hpp"
+    #include "Debug/Log.hpp"
+    #include "Interlink/Interlink.hpp"
+    #include "Heuristic/Heuristic.hpp"
+    #include "Database/RedisCacheDatabase.hpp"
 #include "AtlasNet/AtlasEntity.hpp"
-class God : public Singleton<God>
-{
-public:
-    void ClearAllDatabaseState();
-    struct ActiveContainer
+    class God : public Singleton<God>
     {
-        Json LatestInformJson;
-        DockerContainerID ID;
-    };
-
+    public:
+    void ClearAllDatabaseState();
     // Structure to cache partition shape data
     struct PartitionShapeCache {
         std::vector<Shape> shapes;
@@ -24,26 +18,15 @@ public:
         bool isValid = false;
     };
 
-private:
-    CURL *curl;
-    std::shared_ptr<Log> logger = std::make_shared<Log>("God");
-    Heuristic heuristic;
+    private:
+        CURL *curl;
+        std::shared_ptr<Log> logger = std::make_shared<Log>("God");
+        Heuristic heuristic;
     PartitionShapeCache shapeCache;
-    struct IndexByID
-    {
-    };
-    boost::multi_index_container<
-        ActiveContainer,
-        boost::multi_index::indexed_by<
-            // Unique By ID
-            boost::multi_index::ordered_unique<
-                boost::multi_index::tag<IndexByID>,
-                boost::multi_index::member<ActiveContainer, DockerContainerID,
-                                           &ActiveContainer::ID>>
+        uint32 PartitionCount = 0;
+    std::atomic_bool ShouldShutdown = false;
 
-            >>
-        ActiveContainers;
-    bool ShouldShutdown = false;
+
 
 public:
     God();
@@ -116,32 +99,17 @@ public:
     /**
      * @brief Retrieves a set of all active partition IDs.
      */
-    const decltype(ActiveContainers) &GetContainers();
-
-    /**
-     * @brief Get the Partition object (returns null for now)
-     */
-    const ActiveContainer &GetContainer(const DockerContainerID &id);
-
+    std::vector<std::string>GetPartitionIDs();
     /**
      * @brief Notifies all partitions to fetch their shape data
      */
     void notifyPartitionsToFetchShapes();
 
+    void Cleanup();
     /**
-     * @brief Spawns a new partition by invoking an external script.
+     * @brief Sets the new number of partitions
      */
-    std::optional<ActiveContainer> spawnPartition();
-
-    /**
-     * @brief Removes a partition by its ID.
-     */
-    bool removePartition(const DockerContainerID &id, uint32 TimeOutSeconds = 10);
-
-    /**
-     * @brief Cleans up all active partitions.
-     */
-    bool cleanupContainers();
+    void SetPartitionCount(uint32 NewCount);
     /**
      * @brief Set of active partition IDs.
      */

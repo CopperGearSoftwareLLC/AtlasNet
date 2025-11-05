@@ -12,21 +12,21 @@
       },
     },
     {
-      "label": "Run God Docker",
+      "label": "premake",
       "type": "shell",
       "dependsOn": "Setup Docker Images. SampleGame",
       "command": "./premake5",
-      "args": [ "run-docker-image","--target=God","--build-config=DebugDocker","--testid=${input:TestNumber}"],
+      "args": [ "gmake"],
       "options": {
         "cwd": "${workspaceFolder}" // working directory
       },
     },
-     {
-      "label": "Run Partition + Unit Tests Docker",
+    {
+      "label": "make",
       "type": "shell",
-      "dependsOn": "Setup Docker Images. SampleGame",
-    "command": "./premake5",
-      "args": [ "run-docker-image","--target=Partition","--build-config=DebugDocker","--app-bundle=UnitTests","--testid=${input:TestNumber}"],
+      "dependsOn": "premake",
+      "command": "make",
+      "args": [ "-C","build","-j","$(nproc)"],
       "options": {
         "cwd": "${workspaceFolder}" // working directory
       },

@@ -21,7 +21,7 @@ public:
 	static InterLinkIdentifier MakeIDPartition(const std::string& _ID);
 	static InterLinkIdentifier MakeIDGameServer(const std::string& _ID);
 	static InterLinkIdentifier MakeIDGameClient(const std::string& _ID);
-	static InterLinkIdentifier MakeIDGodView();
+	static InterLinkIdentifier MakeIDCartograph();
 
 	std::string ToString() const;
 	std::array<std::byte,32> ToEncodedByteStream() const;

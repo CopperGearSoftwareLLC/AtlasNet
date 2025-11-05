@@ -1,6 +1,7 @@
 #include "pch.hpp"
 #include "Database/RedisCacheDatabase.hpp"
 #include "Database/ServerRegistry.hpp"
+#include "Database/ShapeManifest.hpp"
 int main()
 {
   IDatabase* database = new RedisCacheDatabase(true);
@@ -16,6 +17,7 @@ int main()
     database->HashSet("RedisCacheDatabase:Hash", "KeyFoo", "Database hash foo was here :D");
     database->HashSet("RedisCacheDatabase:Hash", "KeyBar", "Database hash bar was here :D");
     ServerRegistry::Get().ClearAll();
+    ShapeManifest::Clear(database);
 
   while (true)
   {

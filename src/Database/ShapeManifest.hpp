@@ -45,6 +45,16 @@ public:
         return data;
     }
 
+
+    /// @brief Fetch all shapes and the partitions they belong to
+    /// @param db 
+    /// @return 
+    static std::unordered_map<std::string,std::string> FetchAll(IDatabase* db)
+    {
+        if (!db) return {};
+        ASSERT(db,"Invalid Database");
+        return db->HashGetAll(HASH_KEY);
+    }
     /**
      * @brief Store metadata about the shape assignments
      */

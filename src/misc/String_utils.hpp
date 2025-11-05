@@ -27,3 +27,10 @@ static std::string NukeString(const std::string& input)
 
     return out.substr(start, end - start);
 }
+
+static std::string ToLower(const std::string& input) {
+    std::string result = input;
+    std::transform(result.begin(), result.end(), result.begin(),
+                   [](unsigned char c){ return std::tolower(c); });
+    return result;
+}

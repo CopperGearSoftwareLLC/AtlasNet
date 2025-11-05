@@ -10,11 +10,11 @@ enum class InterlinkType
 	eInvalid = 0,
 	ePartition = 1,	 // partition Server
 	eGod = 2,		 // God
-	eGodView = 3,	 // God Debug Tool
+	eCartograph = 3,	 // God Debug Tool
 	eGameClient = 4, // Game Client / Player
 	eGameServer = 5	 // Game Server
 };
-BOOST_DESCRIBE_ENUM(InterlinkType, eInvalid, ePartition, eGod, eGodView, eGameClient, eGameServer)
+BOOST_DESCRIBE_ENUM(InterlinkType, eInvalid, ePartition, eGod, eCartograph, eGameClient, eGameServer)
 
 enum class ConnectionState
 {

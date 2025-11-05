@@ -34,10 +34,10 @@ InterLinkIdentifier InterLinkIdentifier::MakeIDGameClient(const std::string &_ID
     return id;
 }
 
-InterLinkIdentifier InterLinkIdentifier::MakeIDGodView()
+InterLinkIdentifier InterLinkIdentifier::MakeIDCartograph()
 {
     InterLinkIdentifier id;
-    id.Type = InterlinkType::eGameClient;
+    id.Type = InterlinkType::eCartograph;
     id.ID.clear();
     return id;
 }

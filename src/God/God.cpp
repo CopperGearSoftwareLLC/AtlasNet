@@ -10,6 +10,8 @@
 #include "Database/ServerRegistry.hpp"
 #include "Interlink/InterlinkEnums.hpp"
 #include "Interlink/Connection.hpp"
+
+#include "AtlasNet/AtlasNetBootstrap.hpp"
 God::God()
 {
 }
@@ -56,21 +58,9 @@ void God::Init()
   };
   InterLinkProps.logger = logger;
   InterLinkProps.ThisID = InterLinkIdentifier::MakeIDGod();
-  logger->ErrorFormatted("[{}]", InterLinkProps.ThisID.ToString());
   Interlink::Get().Init(InterLinkProps);
-  
-  for (int32 i = 1; i <= 1; i++)
-  {
 
-    spawnPartition();
-  }
-
-  std::cerr << "Servers in the ServerRegistry:\n";
-  for (const auto &server : ServerRegistry::Get().GetServers())
-  {
-    std::cerr << server.second.identifier.ToString() << " " << server.second.address.ToString() << std::endl;
-  }
-
+  SetPartitionCount(10);
   // std::this_thread::sleep_for(std::chrono::seconds(4));
   // god.removePartition(4);
   using clock = std::chrono::steady_clock;
@@ -95,7 +85,7 @@ void God::Init()
     std::this_thread::sleep_for(std::chrono::milliseconds(10));
   }
   logger->Debug("Shutting down");
-  cleanupContainers();
+  Cleanup();
   Interlink::Get().Shutdown();
 }
 
@@ -545,61 +535,34 @@ void God::processExistingOutliers()
   }
 }
 
-const decltype(God::ActiveContainers) &God::GetContainers()
+std::vector<std::string> God::GetPartitionIDs()
 {
-  return ActiveContainers;
-}
+  std::string serviceResp = DockerIO::Get().request("GET", "/services/"+AtlasNetBootstrap::Get().PartitionServiceName);
+  Json serviceJson = Json::parse(serviceResp);
+  std::string serviceID = serviceJson["ID"];
 
-const God::ActiveContainer &God::GetContainer(const DockerContainerID &id)
-{
-
-  const ActiveContainer &v = *ActiveContainers.get<IndexByID>().find(id);
-  return v;
-}
-
-std::optional<God::ActiveContainer> God:: spawnPartition()
-{
-  Json createRequestBody =
+  std::string tasksResp = DockerIO::Get().request("GET", "/tasks?filters={\"service\":{\"" + serviceID + "\":true}}");
+  Json tasksJson = Json::parse(tasksResp);
+  std::vector<std::string> instanceNames;
+  for (auto &task : tasksJson)
+  {
+    if (task.contains("Status") && task["Status"].contains("ContainerStatus"))
+    {
+      auto &cstatus = task["Status"]["ContainerStatus"];
+      if (cstatus.contains("ContainerID"))
       {
-          {"Image", "partition"},
-          // {"Cmd", {"--testABCD"}},
-          {"ExposedPorts", {}},
-          {"HostConfig", {{"PublishAllPorts", true}, {"NetworkMode", "AtlasNet"}, // <-- attach to your custom network
-                          {"Binds", Json::array({"/var/run/docker.sock:/var/run/docker.sock"})},
-                          {"CapAdd", Json::array({"SYS_PTRACE"})},
-                          {"SecurityOpt", Json::array({"seccomp=unconfined"})}}},
-          {"NetworkingConfig", {{"EndpointsConfig", {
-                                                        {"AtlasNet", Json::object()} // tell Docker to connect to that network
-                                                    }}}}};
-
-  std::string createResp = DockerIO::Get().request("POST", "/containers/create", &createRequestBody);
-
-  auto createRespJ = nlohmann::json::parse(createResp);
-
-  ActiveContainer newPartition;
-  // logger->Debug(createRespJ.dump(4));
-  newPartition.ID = createRespJ["Id"].get<std::string>();
-  newPartition.LatestInformJson = nlohmann::json::parse(DockerIO::Get().InspectContainer(newPartition.ID));
-  std::string StartResponse = DockerIO::Get().request("POST", std::string("/containers/").append(newPartition.ID).append("/start"));
-  logger->DebugFormatted("Created container with ID {}", newPartition.ID); //, newPartition.LatestInformJson.dump(4));
-  ActiveContainers.insert(newPartition);
-
-  return newPartition;
-}
-
-bool God::removePartition(const DockerContainerID &id, uint32 TimeOutSeconds)
-{
-  logger->DebugFormatted("Stopping {}", id);
-  std::string RemoveResponse = DockerIO::Get().request("POST", "/containers/" + std::string(id) + "/stop?t=" + std::to_string(TimeOutSeconds));
-  logger->DebugFormatted("Deleting {}", id);
-  std::string DeleteResponse = DockerIO::Get().request("DELETE", "/containers/" + id);
-
-  // Clear partition entity manifest for removed partition
-  // Note: We can't get the exact partition ID from container ID, but we can clear all manifests
-  // This is a safety measure to prevent stale data
-  logger->Debug("CLEARED: Partition removed - stale entity data may remain in database");
-
-  return true;
+        std::string containerID = cstatus["ContainerID"];
+        // Optional: inspect the container to get its name
+        std::string contResp = DockerIO::Get().request("GET", "/containers/" + containerID + "/json");
+        Json contJson = Json::parse(contResp);
+        if (contJson.contains("Name"))
+          instanceNames.push_back(contJson["Name"].get<std::string>());
+      }
+    }
+  }
+  for (auto &name : instanceNames)
+    std::cout << "Instance: " << name << std::endl;
+  return instanceNames;
 }
 
 void God::notifyPartitionsToFetchShapes()
@@ -622,15 +585,37 @@ void God::notifyPartitionsToFetchShapes()
   }
 }
 
-bool God::cleanupContainers()
+void God::Cleanup()
 {
+}
 
-  for (const auto &Partition : ActiveContainers)
+void God::SetPartitionCount(uint32 NewCount)
+{
+  std::string inspectResp = DockerIO::Get().request("GET", "/services/"+AtlasNetBootstrap::Get().PartitionServiceName);
+  auto inspectJson = Json::parse(inspectResp);
+
+  try
   {
-    removePartition(Partition.ID);
+    int version = inspectJson["Version"]["Index"];
+    auto spec = inspectJson["Spec"];
+    spec["Mode"]["Replicated"]["Replicas"] = NewCount;
+    // 2. Send the update request with the new replica count
+    std::string updatePath = "/services/"+AtlasNetBootstrap::Get().PartitionServiceName+"/update?version=" + std::to_string(version);
+    std::string updateResp = DockerIO::Get().request("POST", updatePath, &spec);
+    if (!updateResp.empty())
+    {
+      logger->DebugFormatted("Service update responded with \n{}",Json::parse(updateResp).dump(4));
+    }
   }
-  ActiveContainers.clear();
-  return true;
+  catch (const std::exception &e)
+  {
+    std::cerr << e.what() << '\n';
+    logger->ErrorFormatted("Response from service inspect \n{}", inspectJson.dump(4));
+    throw "SHIT";
+  }
+
+  logger->DebugFormatted("Scaled {} to {} replicas",AtlasNetBootstrap::Get().PartitionServiceName, NewCount);
+  PartitionCount = NewCount;
 }
 
 const Shape* God::getCachedShape(const std::string& partitionId) const 

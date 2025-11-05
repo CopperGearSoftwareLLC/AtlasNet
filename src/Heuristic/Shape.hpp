@@ -1,6 +1,5 @@
 #pragma once
-#include <vector>
-#include <array>
+#include "pch.hpp"
 
 
 /**
@@ -27,5 +26,7 @@ struct Shape
      * form the complete geometric representation of a partition boundary.
      */
     std::vector<Triangle> triangles = {};
+
+    static Shape FromString(const std::string& str);
 };
 const static inline std::string m_PartitionShapeManifest = "PartitionShapeManifest";
