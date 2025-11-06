@@ -2,6 +2,7 @@
 
 AtlasNetSettings AtlasNet::ParseSettingsFile()
 {
+
     AtlasNetSettings settings;
     std::ifstream settingsFile(AtlasNetSettingsFile);
     if (!settingsFile.is_open())
@@ -12,8 +13,10 @@ AtlasNetSettings AtlasNet::ParseSettingsFile()
     Json parsedJson;
     settingsFile >> parsedJson;
     settingsFile.close();
-
-    if (parsedJson.contains("Workers"))
+    auto IsEntryValid = [](const Json& json,const std::string& str){
+        return json.contains(str) && !json[str].is_null();
+    };
+    if (IsEntryValid(parsedJson,"Workers"))
     {
         for (const auto &workerJ : parsedJson["Workers"])
         {
@@ -24,17 +27,17 @@ AtlasNetSettings AtlasNet::ParseSettingsFile()
         }
     }
 
-    settings.GameServerFiles = parsedJson.contains("GameServerFiles") ? parsedJson["GameServerFiles"] : "";
-    settings.GameServerBinary = parsedJson.contains("GameServerBinary") ? parsedJson["GameServerBinary"] : "";
-    settings.GameServerBinary = parsedJson["GameServerBinary"];
+
+    settings.GameServerFiles = IsEntryValid(parsedJson,"GameServerFiles") ? parsedJson["GameServerFiles"] : "";
+    settings.GameServerBinary = IsEntryValid(parsedJson,"GameServerBinary") ? parsedJson["GameServerBinary"] : "";
     settings.RuntimeArches;
     for (const auto &arch : parsedJson["RuntimeArches"])
     {
         settings.RuntimeArches.insert(arch);
     }
-    settings.BuildCacheDir = parsedJson.contains("BuildCacheDir") ? parsedJson["BuildCacheDir"] : "";
-    settings.NetworkInterface = parsedJson.contains("NetworkInterface") ? parsedJson["NetworkInterface"] : "";
-    if (parsedJson.contains("BuilderMemoryGb"))
+    settings.BuildCacheDir = IsEntryValid(parsedJson,"BuildCacheDir") ? parsedJson["BuildCacheDir"] : "";
+    settings.NetworkInterface = IsEntryValid(parsedJson,"NetworkInterface") ? parsedJson["NetworkInterface"] : "";
+    if (IsEntryValid(parsedJson,"BuilderMemoryGb"))
     {
         settings.BuilderMemoryGb = parsedJson["BuilderMemoryGb"].get<uint32>();
     }

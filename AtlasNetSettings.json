@@ -17,6 +17,6 @@
         "x86_64"
     ],
     "BuildCacheDir" : "docker_cache",
-    "NetworkInterface" : "eno1",
+    "NetworkInterface" : null,
     "BuilderMemoryGb": 15
 }

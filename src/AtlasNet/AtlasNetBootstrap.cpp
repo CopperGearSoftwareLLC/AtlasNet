@@ -114,7 +114,6 @@ std::string AtlasNetBootstrap::MacroParse(std::string input, std::unordered_map<
         for (; it != end; ++it)
             if (macros.find(it->str()) == macros.end())
             {
-                logger.ErrorFormatted("macro {} not parsed", it->str());
                 fullyParsed = false;
             }
         if (fullyParsed)
@@ -469,6 +468,12 @@ void AtlasNetBootstrap::RunDatabase()
     system("docker start Database");
 }
 
+#include <ifaddrs.h>
+#include <arpa/inet.h>
+#include <unistd.h>
+#include <iostream>
+#include <vector>
+
 void AtlasNetBootstrap::SetupSwarm()
 {
     auto isPortInUse = [](int port) -> bool {
@@ -493,7 +498,6 @@ void AtlasNetBootstrap::SetupSwarm()
             throw std::runtime_error("No available ports found for swarm init (2377–2400)");
     }
 
-    // Leave any existing swarm first
     system("docker swarm leave --force >/dev/null 2>&1");
 
     // Check if already a manager
@@ -509,42 +513,87 @@ void AtlasNetBootstrap::SetupSwarm()
 
     // Resolve configured network interface
     std::string preferredInterface = AtlasNet::Get().GetSettings().NetworkInterface;
+    if (RunningLocally) preferredInterface = "lo"; //if running locally then use the loop back interface 127.0.0.1
     std::string interfaceIP;
+
+    // Collect available interfaces
+    struct ifaddrs *ifaddr;
+    if (getifaddrs(&ifaddr) == -1)
+    {
+        perror("getifaddrs");
+        return;
+    }
+
+    struct InterfaceInfo {
+        std::string name;
+        std::string ip;
+    };
+    std::vector<InterfaceInfo> available;
+
+    for (auto *ifa = ifaddr; ifa != nullptr; ifa = ifa->ifa_next)
+    {
+        if (!ifa->ifa_addr || ifa->ifa_addr->sa_family != AF_INET)
+            continue;
+
+        char addr[INET_ADDRSTRLEN];
+        void *in_addr = &((struct sockaddr_in *)ifa->ifa_addr)->sin_addr;
+        inet_ntop(AF_INET, in_addr, addr, sizeof(addr));
+
+        available.push_back({ifa->ifa_name, addr});
+    }
+    freeifaddrs(ifaddr);
+
+    // Try preferred interface if declared
     if (!preferredInterface.empty())
     {
-        struct ifaddrs *ifaddr;
-        if (getifaddrs(&ifaddr) == -1)
+        auto it = std::find_if(available.begin(), available.end(),
+            [&](const InterfaceInfo &inf){ return inf.name == preferredInterface; });
+
+        if (it != available.end())
         {
-            perror("getifaddrs");
+            interfaceIP = it->ip;
+            logger.DebugFormatted("✅ Using configured interface '{}' with IP '{}'", preferredInterface, interfaceIP);
+        }
+        else
+        {
+            logger.WarningFormatted("⚠️ Configured interface '{}' not found or has no IPv4 address.", preferredInterface);
+        }
+    }
+
+    // Ask user if needed
+    if (interfaceIP.empty())
+    {
+        if (available.empty())
+        {
+            logger.Error("❌ No valid network interfaces with IPv4 addresses found.");
             return;
         }
 
-        for (auto *ifa = ifaddr; ifa != nullptr; ifa = ifa->ifa_next)
-        {
-            if (ifa->ifa_addr == nullptr || ifa->ifa_addr->sa_family != AF_INET)
-                continue;
-            if (preferredInterface == ifa->ifa_name)
-            {
-                char addr[INET_ADDRSTRLEN];
-                void *in_addr = &((struct sockaddr_in *)ifa->ifa_addr)->sin_addr;
-                inet_ntop(AF_INET, in_addr, addr, sizeof(addr));
-                interfaceIP = addr;
-                break;
-            }
-        }
-        freeifaddrs(ifaddr);
+        std::cout << "\nAvailable network interfaces:\n";
+        for (size_t i = 0; i < available.size(); ++i)
+            std::cout << "[" << i << "] " << available[i].name << " — " << available[i].ip << "\n";
 
-        if (interfaceIP.empty())
-            logger.WarningFormatted("⚠️ Configured interface '{}' not found or has no IPv4 address.", preferredInterface);
-        else
-            logger.DebugFormatted("✅ Using interface '{}' with IP '{}'", preferredInterface, interfaceIP);
+        std::cout << "\nSelect interface number: ";
+        int choice = -1;
+        std::cin >> choice;
+
+        if (choice < 0 || choice >= static_cast<int>(available.size()))
+        {
+            logger.Error("❌ Invalid selection.");
+            return;
+        }
+
+        interfaceIP = available[choice].ip;
+        preferredInterface = available[choice].name;
+
+        logger.DebugFormatted("✅ Selected interface '{}' with IP '{}'", preferredInterface, interfaceIP);
     }
 
     // Construct swarm init payload
-    Json swarmInit = interfaceIP.empty()
-        ? Json{{"ListenAddr", std::format("0.0.0.0:{}", swarmPort)}}
-        : Json{{"ListenAddr", std::format("0.0.0.0:{}", swarmPort)},
-               {"AdvertiseAddr", std::format("{}:{}", interfaceIP, swarmPort)}};
+    Json swarmInit = Json{
+        {"ListenAddr", std::format("0.0.0.0:{}", swarmPort)},
+        {"AdvertiseAddr", std::format("{}:{}", interfaceIP, swarmPort)}
+    };
 
     // Attempt swarm init
     std::string initResult = DockerIO::Get().request("POST", "/swarm/init", &swarmInit);
@@ -570,6 +619,7 @@ void AtlasNetBootstrap::SetupSwarm()
     ManagerPcAdvertiseAddr = infoJson["Swarm"]["NodeAddr"];
     logger.DebugFormatted("📡 Manager address set to {}", ManagerPcAdvertiseAddr);
 }
+
 
 void AtlasNetBootstrap::SetupNetwork()
 {
