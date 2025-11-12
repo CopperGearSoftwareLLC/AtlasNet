@@ -12,7 +12,9 @@ enum class InterlinkType
 	eGod = 2,		 // God
 	eCartograph = 3,	 // God Debug Tool
 	eGameClient = 4, // Game Client / Player
-	eGameServer = 5	 // Game Server
+	eGameServer = 5,	 // Game Server
+  eDemigod = 6,
+  eGameCoordinator = 7
 };
 BOOST_DESCRIBE_ENUM(InterlinkType, eInvalid, ePartition, eGod, eCartograph, eGameClient, eGameServer)
 

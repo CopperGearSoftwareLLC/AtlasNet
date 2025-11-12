@@ -2,6 +2,7 @@
 
 #include "Interlink.hpp"
 #include "Database/ServerRegistry.hpp"
+#include "Database/ProxyRegistry.hpp"
 #include "Docker/DockerIO.hpp"
 #include <atomic>
 #include <chrono>
@@ -298,8 +299,21 @@ void Interlink::Init(const InterlinkProperties &Properties)
   // Create poll group
   PollGroup = networkInterface->CreatePollGroup();
 
-  if (MyIdentity.Type != InterlinkType::eGameClient)
+  IPAddress ipAddress;
+  switch (MyIdentity.Type)
   {
+    case InterlinkType::eDemigod:
+        // Register Demigod in ProxyRegistry
+    ListenPort = Type2ListenPort.at(MyIdentity.Type);
+    ipAddress.Parse(DockerIO::Get().GetSelfContainerIP() + ":" + std::to_string(ListenPort));
+    ProxyRegistry::Get().RegisterSelf(MyIdentity, ipAddress);
+    OpenListenSocket(ListenPort);
+    logger->DebugFormatted("[Interlink]Registered in ProxyRegistry as {}:{}", MyIdentity.ToString(), ipAddress.ToString());
+
+    break;
+    case InterlinkType::eGameClient:
+    break;
+    default:
     // Register internal (container) address
     IPAddress ipAddress;
     ListenPort = Type2ListenPort.at(MyIdentity.Type);
@@ -308,11 +322,7 @@ void Interlink::Init(const InterlinkProperties &Properties)
     logger->DebugFormatted("[Interlink]Registered in ServerRegistry as {}:{}", MyIdentity.ToString(), ipAddress.ToString());
     // Open internal mesh listener
     OpenListenSocket(ListenPort);
-  }
-  else
-  {
-    // Type2ListenPort.at(MyIdentity.Type);
-    // OpenListenSocket(ListenPort);
+    break;
   }
 
   // Register public address (host ip:published port), if available

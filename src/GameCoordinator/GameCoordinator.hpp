@@ -3,9 +3,9 @@
 #include "Singleton.hpp"
 #include "Debug/Log.hpp"
 #include "Interlink/Interlink.hpp"
-#include "Externlink/Externlink.hpp"
 #include "Heuristic/Heuristic.hpp"
 #include "Database/RedisCacheDatabase.hpp"
+#include "Database/ProxyRegistry.hpp"
 
 class GameCoordinator : public Singleton<GameCoordinator>
 {
@@ -13,17 +13,20 @@ public:
     GameCoordinator();
     ~GameCoordinator();
 
-    bool Init();
+    void Init();
     void Run();
     void Shutdown();
 
 private:
-    std::shared_ptr<Log> logger = std::make_shared<Log>("GameCoordinator");
-    Externlink Link;
-    std::unordered_map<uint64_t, std::string> Clients;
-    std::atomic<bool> ShouldShutdown = false;
+    bool OnAcceptConnection(const Connection& c);
+    void OnConnected(const InterLinkIdentifier& id);
+    void OnMessageReceived(const Connection& from, std::span<const std::byte> data);
 
-    void OnClientConnected(const ExternlinkConnection& conn);
-    void OnClientDisconnected(const ExternlinkConnection& conn);
-    void OnClientMessage(const ExternlinkConnection& conn, std::string_view msg);
+    void HandleClientMessage(const Connection& from, const std::string& msg);
+    void AssignClientToDemigod(const Connection& from);
+
+private:
+    std::shared_ptr<Log> logger = std::make_shared<Log>("GameCoordinator");
+    bool ShouldShutdown = false;
+    std::unordered_map<std::string, InterLinkIdentifier> clientToDemigodMap;
 };
