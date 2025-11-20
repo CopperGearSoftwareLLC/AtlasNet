@@ -1,23 +1,28 @@
 {
   "name": "Ubuntu Dev Container",
-  "image": "ubuntu:24.04",
+  "image": "ubuntu:24.04", // Run commands after container is created 
+  "initializeCommand": "sh -c 'if [ ! -f \"$XAUTHORITY\" ] || [ ! -s \"$XAUTHORITY\" ]; then COOKIE=$(od -vAn -N16 -tx1 /dev/urandom | tr -d \" \\n\"); xauth add :0 . $COOKIE; fi'",
+  "postCreateCommand": "./.devcontainer/setup.sh", // Forward ports if needed 
 
-  // Run commands after container is created
-  "postCreateCommand": "apt-get update && apt-get install -y build-essential git cmake",
 
-  // Forward ports if needed
-  "forwardPorts": [8080, 3000, 5000],
-
-  // Bind your workspace into the container
+  "forwardPorts": [
+    8000,
+    9443,
+    5000
+  ], // Bind your workspace into the container 
   "mounts": [
-    "source=${localWorkspaceFolder},target=/workspace,type=bind"
+    "source=${localWorkspaceFolder},target=/workspace,type=bind",
+    "source=${localEnv:XAUTHORITY},target=/root/.Xauthority,type=bind",
+    //"source=/var/run/docker.sock,target=/var/run/docker.sock,type=bind"
   ],
-
-  "remoteUser": "root",
-
-  // Optional: VSCode features support
+  "runArgs": [
+   // "--group-add=docker",
+   // "--privileged",
+  ],
+  
   "features": {
-    "ghcr.io/devcontainers/features/docker-outside-of-docker:1": {}
+    //"ghcr.io/devcontainers/features/docker-outside-of-docker:1": {}
+    "ghcr.io/devcontainers/features/docker-in-docker:2": {}
   },
   "customizations": {
     "vscode": {
@@ -27,7 +32,9 @@
         "docker.docker",
         "PKief.material-icon-theme",
         "cschlosser.doxdocgen",
-        "mhutchie.git-graph"
+        "mhutchie.git-graph",
+        "cweijan.vscode-redis-client",
+        "yzhang.markdown-all-in-one"
       ]
     }
   }
