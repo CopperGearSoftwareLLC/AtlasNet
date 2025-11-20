@@ -129,8 +129,6 @@ workspace "GuacNet"
         language "C++"
         files { "srcRun/DemigodRun.cpp" }
 
-        links { "ftxui-component", "ftxui-dom", "ftxui-screen" }
-        filter {}
 
 -- Generic cleanup function
 function customClean(dirsToRemove, filesToRemove)
