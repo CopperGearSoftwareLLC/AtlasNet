@@ -229,21 +229,38 @@ void AtlasNetBootstrap::CreatePartitionImage()
     CreateLaunchJson("Partition/launch.json", {"Partition", "UnitTests"});
 
     std::string DockerFileContents = DockerImageBase + BuildBinariesInstructions;
+        DockerFileContents += MacroParse("RUN mv ./bin/${BUILD_CONFIG}/Partition/Partition ./Partition \n",{{"BUILD_CONFIG",BuildConfig}});
     std::string packages;
     for (const auto &p : RequiredPackages)
     {
         packages += p + " ";
     }
-    if (const std::string GameServerFiles = AtlasNet::Get().GetSettings().GameServerFiles; !GameServerFiles.empty())
+
+    #ifdef _NDEBUG
+    for (const auto srcDir : AtlasNet::Get().GetSettings().SourceDirectories)
     {
-        DockerFileContents += "COPY " + GameServerFiles + " " + WorkDir + "\n";
+        DockerFileContents += "COPY " + srcDir + " " + WorkDir +"/"+srcDir+ "\n";
     }
+
+    std::string BuildServerExe;
+    for (const auto buildCmd : AtlasNet::Get().GetSettings().GameServerBuildCmds)
+    {
+        BuildServerExe += "RUN " + buildCmd + "\n";
+    }
+    ProjToBuild+=BuildServerExe;
+    std::string ProjToBuild = "Partition";
+
+   #else
+    std::string ProjToBuild = "Partition UnitTestsServer";
+   #endif
+
     const std::string EntryPointCmd = MacroParse(R"(
-        RUN cat <<'EOF' > /entrypoint.sh
+        RUN cat <<'EOF' > ./entrypoint.sh
 #!/bin/bash
 set -euo pipefail
-
-${exe1} &
+chmod +x ./Partition
+chmod +x ./${exe2}
+./Partition &
 pid1=$!
 ${exe2} &
 pid2=$!
@@ -265,15 +282,14 @@ kill -TERM "$pid1" "$pid2" 2>/dev/null || true
 wait
 exit $exit_code
 EOF
-COPY ${exe2} ${WORKDIR}/${exe2}
-RUN chmod +x /entrypoint.sh
-ENTRYPOINT ["/usr/bin/tini", "--", "/entrypoint.sh"])",
-                                                 {{"exe1", "bin/" + BuildConfig + "/Partition/Partition"}, {"exe2", AtlasNet::Get().GetSettings().GameServerBinary}});
+RUN chmod +x ./entrypoint.sh
+ENTRYPOINT ["/usr/bin/tini", "--", "./entrypoint.sh"])",
+                                                 {{"exe1", "bin/" + BuildConfig + "/Partition/Partition"}, {"exe2", *AtlasNet::Get().GetSettings().GameServerRunCmds.begin()}});
     DockerFileContents += EntryPointCmd;
     DockerFileContents = MacroParse(DockerFileContents, {{"OS_VERSION", OS_Version},
                                                          {"BUILD_CONFIG", ToLower(BuildConfig)},
                                                          {"WORKDIR", WorkDir},
-                                                         {"PROJ_TO_BUILD", "Partition"},
+                                                         {"PROJ_TO_BUILD", ProjToBuild},
                                                          {"DEV_PACKAGES", packages},
                                                          {"EXECUTABLE", "Partition"}});
 

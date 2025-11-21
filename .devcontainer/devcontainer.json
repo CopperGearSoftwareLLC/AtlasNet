@@ -16,8 +16,15 @@
     //"source=/var/run/docker.sock,target=/var/run/docker.sock,type=bind"
   ],
   "runArgs": [
-   // "--group-add=docker",
-   // "--privileged",
+    // display for X apps (fallback)
+    "--env=DISPLAY=${localEnv:DISPLAY}",
+    "--volume=/tmp/.X11-unix:/tmp/.X11-unix:rw",
+    // wayland support
+    "--env=WAYLAND_DISPLAY=${localEnv:WAYLAND_DISPLAY}",
+    "--env=XDG_RUNTIME_DIR=/run/user/${localEnv:UID}",
+    "--volume=/run/user/${localEnv:UID}:/run/user/${localEnv:UID}",
+    // required on NixOS to avoid SELinux DAC failures
+    "--security-opt=label=disable"
   ],
   
   "features": {

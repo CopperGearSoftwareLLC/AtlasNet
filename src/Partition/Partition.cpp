@@ -56,9 +56,9 @@ void Partition::Init()
                   ConnectedProxies.insert(Connection);
                   logger->DebugFormatted("[Partition] ready to send messages to Proxy: {}", Connection.ToString().c_str());
                   logger->DebugFormatted("[Partition] Proxy count: {}", ConnectedProxies.size());
-                }
-              },
-						  .OnMessageArrival = [](const Connection &fromWhom, std::span<const std::byte> data) {Partition::Get().MessageArrived(fromWhom,data);}}});
+                } },
+						  .OnMessageArrival = [](const Connection &fromWhom, std::span<const std::byte> data)
+						  { Partition::Get().MessageArrived(fromWhom, data); }}});
 
 	// Clear any existing partition entity data to prevent stale data
 	std::string partitionKey = partitionIdentifier.ToString();
@@ -112,11 +112,11 @@ void Partition::MessageArrived(const Connection &fromWhom, std::span<const std::
 		{
 			managedEntities = entities;
 			logger->Debug("[Partition] Proxy");
-        for (const auto &proxy : ConnectedProxies)
-        {
-          logger->Debug("[Partition] forwarded to proxy");
-          Interlink::Get().SendMessageRaw(proxy, data);
-        }
+			for (const auto &proxy : ConnectedProxies)
+			{
+				logger->Debug("[Partition] forwarded to proxy");
+				Interlink::Get().SendMessageRaw(proxy, data);
+			}
 			return;
 		}
 		case AtlasNetMessageHeader::EntityIncoming:
@@ -142,10 +142,10 @@ void Partition::MessageArrived(const Connection &fromWhom, std::span<const std::
 			break;
 		}
 		// Forward to proxies
-    for (const auto &proxy : ConnectedProxies)
-    {
-      Interlink::Get().SendMessageRaw(proxy, data);
-    }
+		for (const auto &proxy : ConnectedProxies)
+		{
+			Interlink::Get().SendMessageRaw(proxy, data);
+		}
 		// Forward to GameServer
 		if (ConnectedGameServer != nullptr)
 		{
@@ -160,8 +160,8 @@ void Partition::MessageArrived(const Connection &fromWhom, std::span<const std::
 			Interlink::Get().SendMessageRaw(*ConnectedGameServer, std::span(buffer));
 		}
 
-        return;
-    }
+		return;
+	}
 
 	// ------------------------------------------------------------------------
 	// Handle header-based string messages (not entity packets)
@@ -256,20 +256,22 @@ void Partition::MessageArrived(const Connection &fromWhom, std::span<const std::
 
 			logger->DebugFormatted("REDISTRIBUTION COMPLETE: Successfully fetched entity {} from {}'s outliers", entityId, sourcePartition);
 			// Only notify proxies if entity is a player
-      if (it->IsPlayer)
-      {
-          std::string partitionStr = getCurrentPartitionId().ToString();
-          std::string authorityMsg =
-              "AuthorityChange:" + std::to_string(it->ID) + " " + partitionStr;
+			if (it->IsPlayer)
+			{
+				std::string partitionStr = getCurrentPartitionId().ToString();
+				std::string authorityMsg =
+					"AuthorityChange:" + std::to_string(it->ID) + " " + partitionStr;
 
-          for (const auto& proxy : ConnectedProxies)
-          {
-              Interlink::Get().SendMessageRaw(proxy, std::as_bytes(std::span(authorityMsg)));
-              logger->DebugFormatted("PROXY NOTIFY: Player {} moved to {}, sent to proxy {}",
-                                    it->ID, partitionStr, proxy.ToString());
-          }
-      }
-		} else {
+				for (const auto &proxy : ConnectedProxies)
+				{
+					Interlink::Get().SendMessageRaw(proxy, std::as_bytes(std::span(authorityMsg)));
+					logger->DebugFormatted("PROXY NOTIFY: Player {} moved to {}, sent to proxy {}",
+										   it->ID, partitionStr, proxy.ToString());
+				}
+			}
+		}
+		else
+		{
 			logger->ErrorFormatted("Could not find entity {} in {}'s outliers", entityId, sourcePartition);
 		}
 		break;
@@ -611,21 +613,7 @@ void Partition::pushManagedEntitiesSnapshot()
 	{
 		return;
 	}
-
-	if (managedEntities.empty())
-	{
-		lastEntitiesSnapshotPush = now;
-		return;
-	}
-
 	if (!database)
-	{
-		logger->Error("Database connection is null - cannot push entities snapshot");
-		return;
-	}
-
-	// Ensure database is alive
-	if (!database->Exists("connection_test"))
 	{
 		logger->Error("Database connection test failed during entities snapshot - reconnecting");
 		database = std::make_unique<RedisCacheDatabase>();
@@ -635,15 +623,34 @@ void Partition::pushManagedEntitiesSnapshot()
 			return;
 		}
 	}
-	std::string partitionKey = getCurrentPartitionId().ToString() + ":entities_snapshot";
-	if (EntityManifest::StoreEntitiesSnapshot(database.get(), partitionKey, managedEntities))
+
+	if (!database)
 	{
-		logger->DebugFormatted("SNAPSHOT: Pushed {} managed entities to read-only snapshot for {}", managedEntities.size(), partitionKey);
+		logger->Error("Database connection is null - cannot push entities snapshot");
+		return;
 	}
-	else
-	{
-		logger->ErrorFormatted("SNAPSHOT: Failed to push managed entities snapshot for {}", partitionKey);
-	}
+
+	// Ensure database is alive
+
+	std::string partitionKey = getCurrentPartitionId().ToString();
+	std::replace(partitionKey.begin(), partitionKey.end(), ' ', '_');
+		if ((managedEntities.empty() &&EntityManifest::RemoveEntitiesSnapshot(database.get(),partitionKey)) || (!managedEntities.empty() && EntityManifest::StoreEntitiesSnapshot(database.get(), partitionKey, managedEntities)))
+		{
+			if (!managedEntities.empty())
+			{
+			logger->DebugFormatted("SNAPSHOT: Pushed {} managed entities to read-only snapshot for {}", managedEntities.size(), partitionKey);
+
+			}
+			else
+			{
+			logger->DebugFormatted("SNAPSHOT: no entities to push, snapshot cleared");
+
+			}
+		}
+		else
+		{
+			logger->ErrorFormatted("SNAPSHOT: Failed to push managed entities snapshot for {}", partitionKey);
+		}
 	lastEntitiesSnapshotPush = now;
 }
 

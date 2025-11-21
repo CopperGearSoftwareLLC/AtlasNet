@@ -5,9 +5,10 @@
 #include "Interlink/Interlink.hpp"
 #include "AtlasNet/AtlasNetBootstrap.hpp"
 #include "Database/ShapeManifest.hpp"
+#include "Database/EntityManifest.hpp"
 void Cartograph::Startup()
 {
-	// glfwInitHint(GLFW_PLATFORM, GLFW_PLATFORM_X11);
+	glfwInitHint(GLFW_PLATFORM, GLFW_PLATFORM_X11);
 
 	glfwInit();
 	glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3);
@@ -116,7 +117,7 @@ void Cartograph::DrawConnectTo()
 		Color = vec4(0.1f, 1.0f, 0.1f, 1.0f);
 	if (connectionState == ConnectionState::eFailed)
 		Color = vec4(1.0f, 0.1f, 0.1f, 1.0f);
-	ImGui::TextColored(ImVec4(Color.r, Color.g, Color.b, Color.a), connectionLog.c_str());
+	ImGui::TextColored(ImVec4(Color.r, Color.g, Color.b, Color.a), "%s", connectionLog.c_str());
 	ImGui::End();
 }
 void Cartograph::DrawMap()
@@ -134,6 +135,12 @@ void Cartograph::DrawMap()
 			float PartitionAlpha = 1.0f;
 			vec4 finalColor = vec4(partition.UniquePartitionColor, PartitionAlpha) * (selected ? vec4(1.0f) : vec4(0.6f));
 			DrawToPlot(ImPlot::GetPlotDrawList(), partition.shape, mat4(1.0f), finalColor, 0.0f, 2.0f);
+			for (const auto &entity : partition.entities)
+			{
+				ImVec2 pixelOffset;
+				ImPlot::Annotation(entity.Position.x, entity.Position.z, GlmToImGui(finalColor), pixelOffset, false, "%ui", entity.ID);
+				logger->DebugFormatted("entity at {}", glm::to_string(entity.Position));
+			}
 			const auto bounds = partition.shape.getBounds();
 			const vec2 center = (bounds.first + bounds.second) / 2.0f;
 			partition.ScreenSpaceShapeCenter = ImGuiToGlm(ImPlot::PlotToPixels(GlmToImGui(center)));
@@ -203,11 +210,11 @@ void Cartograph::DrawPartitionGrid()
 						AnywindowHovered = true;
 						PartitionIndexSelected = ID;
 						ImGui::GetForegroundDrawList()->AddLine(ImGui::GetMousePos(), GlmToImGui(PartitionShapeMapCenter), ImGui::ColorConvertFloat4ToU32(GlmToImGui(Color)), 2.0f);
-						
+
 						if (ImGui::BeginTooltip())
 						{
-							ImGui::Text("ID: %s",part.Name.c_str());
-							ImGui::Text("Node ID: %s",part.NodeID.c_str());
+							ImGui::Text("ID: %s", part.Name.c_str());
+							ImGui::Text("Node ID: %s", part.NodeID.c_str());
 							ImGui::EndTooltip();
 						}
 					}
@@ -286,6 +293,7 @@ void Cartograph::Update()
 				} });
 
 	GetNodes();
+	GetEntities();
 }
 void Cartograph::Render()
 {
@@ -379,6 +387,39 @@ void Cartograph::GetNodes()
 		w.addr = node["Status"]["Addr"];
 		w.Color = HSVtoRGB(GetUniqueColor(i++));
 		workers.insert(std::make_pair(w.id, w));
+	}
+}
+
+void Cartograph::GetEntities()
+{
+	std::unordered_map<std::string, std::vector<AtlasEntity>> entities;
+	logger->DebugFormatted("Getting Entities");
+
+	EntityManifest::GetAllEntitiesSnapshot(database.get(), entities);
+	logger->DebugFormatted("{} partitions with entities", entities.size());
+	for (const auto &partition : entities)
+	{
+		std::string partitionName = partition.first;
+		partitionName[partitionName.find_first_of('_')] = ' ';
+		bool found = false;
+		for (auto &activepart : partitions)
+		{
+			if (partitionName == activepart.Name)
+			{
+				found = true;
+				for (const auto &entity : partition.second)
+				{
+					activepart.entities.push_back(entity);
+				}
+				break;
+			}
+		}
+		if (!found) logger->ErrorFormatted("Didnt find {}. options where:\n",partitionName);
+		
+		for (const auto &activepart : partitions)
+		{
+			logger->ErrorFormatted("{}",activepart.Name);
+		}
 	}
 }
 

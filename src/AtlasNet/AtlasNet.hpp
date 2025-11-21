@@ -20,8 +20,9 @@ struct Worker
 struct AtlasNetSettings
 {
     std::vector<Worker> workers;
-    std::string GameServerBinary;
-    std::string GameServerFiles;
+
+    std::unordered_set<std::string> SourceDirectories;
+    std::vector<std::string> GameServerBuildCmds,GameServerRunCmds;
     std::unordered_set<std::string> RuntimeArches;
     std::string BuildCacheDir;
     std::string NetworkInterface;

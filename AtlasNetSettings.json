@@ -1,7 +1,10 @@
 {
     "TickRatePerSecond": 20,
     "HeuristicMode": "Automatic",
-    "GameServerBinary": "bin/DebugDocker/UnitTestsServer/UnitTestsServer",
+
+    "SourceDirectory" :["Tests","src","srcRun","premake5.lua","vcpkg.json"],
+    "GameServerBuildCmds" :["./Tests/SampleGame/build.sh","make -C build UnitTestsServer -j $(nproc)"],
+    "GameServerRunCmds":["./bin/DebugDocker/UnitTestsServer/UnitTestsServer"],
     "GameCoordinatorBinary": "UnitGameCoordinator",
     "GameCoordinatorPort" : 44474,
     "Workers--": [
