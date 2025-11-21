@@ -24,6 +24,9 @@ private:
     private:
     void StartClientProxyHandshake(const InterLinkIdentifier& clientID);    
     std::unordered_map<std::string, InterLinkIdentifier> pendingClientAssignments;
+    void AssignClientToDemigod(const InterLinkIdentifier& clientID);
+
+private:
     std::shared_ptr<Log> logger = std::make_shared<Log>("GameCoordinator");
     bool ShouldShutdown = false;
 };
