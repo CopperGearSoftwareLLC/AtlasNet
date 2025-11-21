@@ -68,19 +68,72 @@ void GameCoordinator::OnConnected(const InterLinkIdentifier& id)
 
     if (id.Type == InterlinkType::eGameClient)
     {
-        AssignClientToDemigod(id);
+        StartClientProxyHandshake(id);
     }
 }
 
 void GameCoordinator::OnMessageReceived(const Connection& from, std::span<const std::byte> data)
 {
     std::string msg(reinterpret_cast<const char*>(data.data()), data.size());
-    logger->DebugFormatted("[Coordinator] Message from {}: {}", from.target.ToString(), msg);
+    logger->DebugFormatted("[Coordinator] Message from {}: {}",
+                           from.target.ToString(), msg);
+
+    // Only care about GameClient confirmations for now
+    if (from.target.Type == InterlinkType::eGameClient)
+    {
+        const std::string clientKey = from.target.ToString();
+
+        // Simple protocol: client confirms with "ProxyConnected"
+        if (msg.rfind("ProxyConnected", 0) == 0)
+        {
+            auto it = pendingClientAssignments.find(clientKey);
+            if (it == pendingClientAssignments.end())
+            {
+                logger->WarningFormatted(
+                    "[Coordinator] Client {} sent ProxyConnected but no pending assignment exists",
+                    clientKey);
+                return;
+            }
+
+            const InterLinkIdentifier& proxyID = it->second;
+
+            // Register the client→proxy mapping in ProxyRegistry
+            ProxyRegistry::Get().AssignClientToProxy(clientKey, proxyID);
+
+            logger->DebugFormatted(
+                "[Coordinator] Client {} confirmed connection to proxy {}. Registered in ProxyRegistry.",
+                clientKey, proxyID.ToString());
+
+            // Notify the Demigod about the new client (same as before)
+            std::string connectMsg = "NewClient:" + clientKey;
+            Interlink::Get().SendMessageRaw(proxyID, std::as_bytes(std::span(connectMsg)));
+
+            logger->DebugFormatted(
+                "[Coordinator] Notified proxy {} about new client {}",
+                proxyID.ToString(), clientKey);
+
+            // Remove from pending
+            pendingClientAssignments.erase(it);
+
+            // STUB: cutting GameCoordinator↔client connection
+            // TODO: Once we have a proper disconnect/cleanup protocol,
+            //       we should close this connection instead of leaving it open.
+            logger->DebugFormatted(
+                "[Coordinator] (STUB) Would now close connection to client {} after proxy handoff",
+                clientKey);
+
+            return;
+        }
+    }
+
+    // For now, we don't handle other message types specially
+    // (log-only behavior above is kept)
 }
 
-void GameCoordinator::AssignClientToDemigod(const InterLinkIdentifier& clientID)
+
+void GameCoordinator::StartClientProxyHandshake(const InterLinkIdentifier& clientID)
 {
-    // Ask ProxyRegistry for the least-loaded proxy
+    // Ask ProxyRegistry for the least-loaded Demigod
     auto proxyOpt = ProxyRegistry::Get().GetLeastLoadedProxy();
     if (!proxyOpt.has_value())
     {
@@ -90,13 +143,29 @@ void GameCoordinator::AssignClientToDemigod(const InterLinkIdentifier& clientID)
 
     const InterLinkIdentifier& proxyID = proxyOpt.value();
 
-    // Record client -> proxy relationship globally and locally
-    ProxyRegistry::Get().AssignClientToProxy(clientID.ToString(), proxyID);
+    // Try to get the public (host) address of the chosen proxy
+    auto publicAddrOpt = ProxyRegistry::Get().GetPublicAddress(proxyID);
+    if (!publicAddrOpt.has_value())
+    {
+        logger->ErrorFormatted("[Coordinator] No public address found for proxy {}",
+                               proxyID.ToString());
+        return;
+    }
 
-    logger->DebugFormatted("[Coordinator] Assigned client {} to proxy {}",
-                           clientID.ToString(), proxyID.ToString());
+    const IPAddress& publicAddr = publicAddrOpt.value();
+    const std::string clientKey = clientID.ToString();
 
-    // Notify the Demigod about the new client
-    std::string connectMsg = "NewClient:" + clientID.ToString();
-    Interlink::Get().SendMessageRaw(proxyID, std::as_bytes(std::span(connectMsg)));
+    // Remember which proxy we told this client to use
+    pendingClientAssignments[clientKey] = proxyID;
+
+    // Send redirect info to client. Client implementation is unknown,
+    // so this is a simple text protocol for now:
+    //   "ProxyRedirect:<ip:port>"
+    std::string redirectMsg = "ProxyRedirect:" + publicAddr.ToString();
+
+    logger->DebugFormatted(
+        "[Coordinator] Instructing client {} to connect to proxy {} at {}",
+        clientKey, proxyID.ToString(), publicAddr.ToString());
+
+    Interlink::Get().SendMessageRaw(clientID, std::as_bytes(std::span(redirectMsg)));
 }
