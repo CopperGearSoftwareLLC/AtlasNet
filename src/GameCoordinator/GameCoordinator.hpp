@@ -21,9 +21,9 @@ private:
     bool OnAcceptConnection(const Connection& c);
     void OnConnected(const InterLinkIdentifier& id);
     void OnMessageReceived(const Connection& from, std::span<const std::byte> data);
-    void AssignClientToDemigod(const InterLinkIdentifier& clientID);
-
-private:
+    private:
+    void StartClientProxyHandshake(const InterLinkIdentifier& clientID);    
+    std::unordered_map<std::string, InterLinkIdentifier> pendingClientAssignments;
     std::shared_ptr<Log> logger = std::make_shared<Log>("GameCoordinator");
     bool ShouldShutdown = false;
 };
