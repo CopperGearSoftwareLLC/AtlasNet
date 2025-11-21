@@ -1,6 +1,6 @@
 #include "GameCoordinator.hpp"
 #include "Docker/DockerIO.hpp"
-#include "Database/ServerRegistry.hpp"
+#include "Database/ProxyRegistry.hpp"
 #include "Interlink/InterlinkIdentifier.hpp"
 
 GameCoordinator::GameCoordinator() {}
@@ -76,34 +76,6 @@ void GameCoordinator::OnMessageReceived(const Connection& from, std::span<const 
 {
     std::string msg(reinterpret_cast<const char*>(data.data()), data.size());
     logger->DebugFormatted("[Coordinator] Message from {}: {}", from.target.ToString(), msg);
-
-    if (from.target.Type == InterlinkType::eGameClient)
-        HandleClientMessage(from, msg);
-}
-
-void GameCoordinator::HandleClientMessage(const Connection& from,
-                                          const std::string& msg)
-{
-    auto it = clientToDemigodMap.find(from.target.ToString());
-    if (it == clientToDemigodMap.end())
-    {
-        logger->WarningFormatted("[Coordinator] No Demigod assigned for client {}, assigning now...",
-                                 from.target.ToString());
-        AssignClientToDemigod(from.target);
-        it = clientToDemigodMap.find(from.target.ToString());
-        if (it == clientToDemigodMap.end())
-        {
-            logger->ErrorFormatted("[Coordinator] Failed to assign Demigod for client {}",
-                                   from.target.ToString());
-            return;
-        }
-    }
-
-    const auto& demigod = it->second;
-    Interlink::Get().SendMessageRaw(demigod,
-                                    std::as_bytes(std::span(msg)));
-    logger->DebugFormatted("[Coordinator] Forwarded client message '{}' to Demigod {}",
-                           msg, demigod.ToString());
 }
 
 void GameCoordinator::AssignClientToDemigod(const InterLinkIdentifier& clientID)
@@ -118,9 +90,8 @@ void GameCoordinator::AssignClientToDemigod(const InterLinkIdentifier& clientID)
 
     const InterLinkIdentifier& proxyID = proxyOpt.value();
 
-    // Record client → proxy relationship globally and locally
+    // Record client -> proxy relationship globally and locally
     ProxyRegistry::Get().AssignClientToProxy(clientID.ToString(), proxyID);
-    clientToDemigodMap[clientID.ToString()] = proxyID;
 
     logger->DebugFormatted("[Coordinator] Assigned client {} to proxy {}",
                            clientID.ToString(), proxyID.ToString());
