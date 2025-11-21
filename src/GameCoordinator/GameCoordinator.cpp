@@ -66,10 +66,21 @@ void GameCoordinator::OnConnected(const InterLinkIdentifier& id)
 {
     logger->DebugFormatted("[Coordinator] Connection established with {}", id.ToString());
 
-    if (id.Type == InterlinkType::eGameClient)
+    switch (id.Type)
     {
-        StartClientProxyHandshake(id);
+        case InterlinkType::eDemigod:
+        {
+            //Interlink::Get().CloseConnectionTo(id, 0, "GameCoordinator does not maintain persistent connections to Demigods.");
+            break;
+        }
+        case InterlinkType::eGameClient:
+        {
+            StartClientProxyHandshake(id);
+            break;
+        }
     }
+
+
 }
 
 void GameCoordinator::OnMessageReceived(const Connection& from, std::span<const std::byte> data)

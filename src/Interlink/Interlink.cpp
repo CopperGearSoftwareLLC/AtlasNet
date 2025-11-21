@@ -603,6 +603,29 @@ bool Interlink::EstablishConnectionTo(const InterLinkIdentifier &id)
   return false;
 }
 
+void Interlink::CloseConnectionTo(const InterLinkIdentifier& id, int reason, const char* debug)
+{
+    auto& byTarget = Connections.get<IndexByTarget>();
+
+    auto it = byTarget.find(id);
+    if (it == byTarget.end())
+    {
+        logger->WarningFormatted("CloseConnectionTo: No active connection found for {}", id.ToString());
+        return;
+    }
+
+    HSteamNetConnection conn = it->SteamConnection;
+
+    logger->DebugFormatted("Closing connection to {} (SteamConn={})", id.ToString(), (uint64)conn);
+
+    // Close on the networking side
+    networkInterface->CloseConnection(conn, reason, debug, false);
+
+    // Remove from table
+    byTarget.erase(it);
+}
+
+
 void Interlink::DebugPrint()
 {
   for (const auto &connection : Connections)

@@ -85,10 +85,13 @@ class Interlink : public Singleton<Interlink>
 
 public:
 	bool EstablishConnectionAtIP(const InterLinkIdentifier &who, const IPAddress &ip);
-
-private:
+  void CloseConnectionTo(const InterLinkIdentifier& id, int reason = 0, const char* debug = nullptr);
+  bool EstablishConnectionTo(const InterLinkIdentifier &who);
+  
+  
+  private:
+  
 	void GenerateNewConnections();
-
 	void OnDebugOutput(ESteamNetworkingSocketsDebugOutputType eType, const char *pszMsg);
 
 	template <typename... Args>
@@ -105,7 +108,6 @@ private:
 	void OpenListenSocket(PortType port);
 	void ReceiveMessages();
 
-	bool EstablishConnectionTo(const InterLinkIdentifier &who);
 	void DebugPrint();
 
 public:
