@@ -210,11 +210,11 @@ void Cartograph::DrawPartitionGrid()
 						AnywindowHovered = true;
 						PartitionIndexSelected = ID;
 						ImGui::GetForegroundDrawList()->AddLine(ImGui::GetMousePos(), GlmToImGui(PartitionShapeMapCenter), ImGui::ColorConvertFloat4ToU32(GlmToImGui(Color)), 2.0f);
-						
+
 						if (ImGui::BeginTooltip())
 						{
-							ImGui::Text("ID: %s",part.Name.c_str());
-							ImGui::Text("Node ID: %s",part.NodeID.c_str());
+							ImGui::Text("ID: %s", part.Name.c_str());
+							ImGui::Text("Node ID: %s", part.NodeID.c_str());
 							ImGui::EndTooltip();
 						}
 					}
