@@ -128,5 +128,7 @@
     ],
     "transparent-win.transparency": 0.9,
     "workbench.colorTheme": "Default Dark Modern",
+    "nixEnvSelector.nixFile": "${workspaceFolder}/flake.nix",
+    "C_Cpp.default.compilerPath": "/usr/bin/gcc",
    
 }

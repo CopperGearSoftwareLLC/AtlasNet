@@ -56,10 +56,10 @@ void AtlasNetBootstrap::Run()
     RunningLocally = AtlasNet::Get().GetSettings().workers.empty();
     SetupSwarm();
     SetupNetwork();
+    GenerateTSLCertificate();
 
     if (!RunningLocally)
     {
-        GenerateTSLCertificate();
         SetupRegistry();
         GetWorkersSSHCredentials();
         SendTLSCertificateToWorkers();
@@ -77,7 +77,7 @@ void AtlasNetBootstrap::Run()
     RunGod();
     RunGameCoordinator();
     SetupDemigodService();
-    //RunDemigod();
+    // RunDemigod();
 }
 
 std::string AtlasNetBootstrap::MacroParse(std::string input, std::unordered_map<std::string, std::string> macros)
@@ -229,21 +229,38 @@ void AtlasNetBootstrap::CreatePartitionImage()
     CreateLaunchJson("Partition/launch.json", {"Partition", "UnitTests"});
 
     std::string DockerFileContents = DockerImageBase + BuildBinariesInstructions;
+    DockerFileContents += MacroParse("RUN mv ./bin/${BUILD_CONFIG}/Partition/Partition ./Partition \n", {{"BUILD_CONFIG", BuildConfig}});
     std::string packages;
     for (const auto &p : RequiredPackages)
     {
         packages += p + " ";
     }
-    if (const std::string GameServerFiles = AtlasNet::Get().GetSettings().GameServerFiles; !GameServerFiles.empty())
+
+#ifdef _NDEBUG
+    for (const auto srcDir : AtlasNet::Get().GetSettings().SourceDirectories)
     {
-        DockerFileContents += "COPY " + GameServerFiles + " " + WorkDir + "\n";
+        DockerFileContents += "COPY " + srcDir + " " + WorkDir + "/" + srcDir + "\n";
     }
+
+    std::string BuildServerExe;
+    for (const auto buildCmd : AtlasNet::Get().GetSettings().GameServerBuildCmds)
+    {
+        BuildServerExe += "RUN " + buildCmd + "\n";
+    }
+    ProjToBuild += BuildServerExe;
+    std::string ProjToBuild = "Partition";
+
+#else
+    std::string ProjToBuild = "Partition UnitTestsServer";
+#endif
+
     const std::string EntryPointCmd = MacroParse(R"(
-        RUN cat <<'EOF' > /entrypoint.sh
+        RUN cat <<'EOF' > ./entrypoint.sh
 #!/bin/bash
 set -euo pipefail
-
-${exe1} &
+chmod +x ./Partition
+chmod +x ./${exe2}
+./Partition &
 pid1=$!
 ${exe2} &
 pid2=$!
@@ -265,15 +282,14 @@ kill -TERM "$pid1" "$pid2" 2>/dev/null || true
 wait
 exit $exit_code
 EOF
-COPY ${exe2} ${WORKDIR}/${exe2}
-RUN chmod +x /entrypoint.sh
-ENTRYPOINT ["/usr/bin/tini", "--", "/entrypoint.sh"])",
-                                                 {{"exe1", "bin/" + BuildConfig + "/Partition/Partition"}, {"exe2", AtlasNet::Get().GetSettings().GameServerBinary}});
+RUN chmod +x ./entrypoint.sh
+ENTRYPOINT ["/usr/bin/tini", "--", "./entrypoint.sh"])",
+                                                 {{"exe1", "bin/" + BuildConfig + "/Partition/Partition"}, {"exe2", *AtlasNet::Get().GetSettings().GameServerRunCmds.begin()}});
     DockerFileContents += EntryPointCmd;
     DockerFileContents = MacroParse(DockerFileContents, {{"OS_VERSION", OS_Version},
                                                          {"BUILD_CONFIG", ToLower(BuildConfig)},
                                                          {"WORKDIR", WorkDir},
-                                                         {"PROJ_TO_BUILD", "Partition"},
+                                                         {"PROJ_TO_BUILD", ProjToBuild},
                                                          {"DEV_PACKAGES", packages},
                                                          {"EXECUTABLE", "Partition"}});
 
@@ -304,24 +320,22 @@ void AtlasNetBootstrap::CreateDatabaseImage()
 
 void AtlasNetBootstrap::CreateGameCoordinatorImage()
 {
-    CreateLaunchJson("GameCoordinator/launch.json", { "GameCoordinator" });
+    CreateLaunchJson("GameCoordinator/launch.json", {"GameCoordinator"});
 
     std::string dockerfile =
         DockerImageBase + BuildBinariesInstructions + EntryPointString;
 
     std::string packages;
-    for (const auto& pkg : RequiredPackages)
+    for (const auto &pkg : RequiredPackages)
         packages += pkg + " ";
 
-    dockerfile = MacroParse(dockerfile, {
-        { "OS_VERSION", OS_Version },
-        { "ENTRYPOINT_CMD", "\"bin/" + BuildConfig + "/GameCoordinator/GameCoordinator\"" },
-        { "BUILD_CONFIG", ToLower(BuildConfig) },
-        { "WORKDIR", WorkDir },
-        { "DEV_PACKAGES", packages },
-        { "PROJ_TO_BUILD", "GameCoordinator" },
-        { "EXECUTABLE", "GameCoordinator" }
-    });
+    dockerfile = MacroParse(dockerfile, {{"OS_VERSION", OS_Version},
+                                         {"ENTRYPOINT_CMD", "\"bin/" + BuildConfig + "/GameCoordinator/GameCoordinator\""},
+                                         {"BUILD_CONFIG", ToLower(BuildConfig)},
+                                         {"WORKDIR", WorkDir},
+                                         {"DEV_PACKAGES", packages},
+                                         {"PROJ_TO_BUILD", "GameCoordinator"},
+                                         {"EXECUTABLE", "GameCoordinator"}});
 
     OutputDockerFile("GameCoordinator/Dockerfile", dockerfile);
     BuildDockerImage("GameCoordinator/Dockerfile",
@@ -331,31 +345,28 @@ void AtlasNetBootstrap::CreateGameCoordinatorImage()
 
 void AtlasNetBootstrap::CreateDemigodImage()
 {
-    CreateLaunchJson("Demigod/launch.json", { "Demigod" });
+    CreateLaunchJson("Demigod/launch.json", {"Demigod"});
 
     std::string dockerfile =
         DockerImageBase + BuildBinariesInstructions + EntryPointString;
 
     std::string packages;
-    for (const auto& pkg : RequiredPackages)
+    for (const auto &pkg : RequiredPackages)
         packages += pkg + " ";
 
-    dockerfile = MacroParse(dockerfile, {
-        { "OS_VERSION", OS_Version },
-        { "ENTRYPOINT_CMD", "\"bin/" + BuildConfig + "/Demigod/Demigod\"" },
-        { "BUILD_CONFIG", ToLower(BuildConfig) },
-        { "WORKDIR", WorkDir },
-        { "DEV_PACKAGES", packages },
-        { "PROJ_TO_BUILD", "Demigod" },
-        { "EXECUTABLE", "Demigod" }
-    });
+    dockerfile = MacroParse(dockerfile, {{"OS_VERSION", OS_Version},
+                                         {"ENTRYPOINT_CMD", "\"bin/" + BuildConfig + "/Demigod/Demigod\""},
+                                         {"BUILD_CONFIG", ToLower(BuildConfig)},
+                                         {"WORKDIR", WorkDir},
+                                         {"DEV_PACKAGES", packages},
+                                         {"PROJ_TO_BUILD", "Demigod"},
+                                         {"EXECUTABLE", "Demigod"}});
 
     OutputDockerFile("Demigod/Dockerfile", dockerfile);
     BuildDockerImage("Demigod/Dockerfile",
                      DemigodImageName,
                      AtlasNet::Get().GetSettings().RuntimeArches);
 }
-
 
 bool AtlasNetBootstrap::BuildDockerImage(const std::string &DockerFile, const std::string &ImageName, const std::unordered_set<std::string> &arches)
 {
@@ -501,17 +512,40 @@ void AtlasNetBootstrap::QueueDockerImage(const std::string &DockerFile, const st
 
     logger.DebugFormatted("📝 Added '{}' targets to bake.json", ImageName);
 }
-
 void AtlasNetBootstrap::RunGod()
 {
-    std::string removeCommand = "docker rm -f God > /dev/null 2>&1";
-    system(removeCommand.c_str());
+    // Remove old container OR service safely
+    system("docker rm -f God > /dev/null 2>&1");
+    system("docker service rm God > /dev/null 2>&1");
 
     logger.Debug("Running God");
-    std::string ImageName = RunningLocally ? GodImageName : (ManagerPcAdvertiseAddr + ":5000/") + GodImageName;
 
-    std::string Command = "docker run --init  --stop-timeout=999999 --network " + NetworkName + " -v /var/run/docker.sock:/var/run/docker.sock --cap-add=SYS_PTRACE --security-opt seccomp=unconfined --name God -d -p :" + std::to_string(_PORT_GOD) + " " + ImageName;
-    system(Command.c_str());
+    std::string imageName = RunningLocally
+                                ? GodImageName
+                                : (ManagerPcAdvertiseAddr + std::string(":5000/") + GodImageName);
+
+    // Create the Swarm service
+    std::string command =
+        "docker service create "
+        "--name God "
+        "--replicas 1 "
+        "--restart-condition on-failure "
+        "--restart-max-attempts 0 "
+        "--restart-delay 2s "
+        "--network " +
+        NetworkName + " "
+                      "--mount type=bind,src=/var/run/docker.sock,dst=/var/run/docker.sock "
+                      "--cap-add SYS_PTRACE "
+                      // publish TCP
+                      "--publish published=" +
+        std::to_string(_PORT_GOD) +
+        ",target=" + std::to_string(_PORT_GOD) + ",protocol=tcp "
+                                                 // publish UDP
+                                                 "--publish published=" +
+        std::to_string(_PORT_GOD) +
+        ",target=" + std::to_string(_PORT_GOD) + ",protocol=udp " + imageName;
+
+    system(command.c_str());
 }
 
 void AtlasNetBootstrap::RunDatabase()
@@ -534,8 +568,7 @@ void AtlasNetBootstrap::RunGameCoordinator()
     system("docker rm -f GameCoordinator");
 
     std::string image =
-        RunningLocally ? GameCoordinatorImageName :
-        ManagerPcAdvertiseAddr + ":5000/" + GameCoordinatorImageName;
+        RunningLocally ? GameCoordinatorImageName : ManagerPcAdvertiseAddr + ":5000/" + GameCoordinatorImageName;
 
     std::string cmd =
         "docker run --init --network " + NetworkName +
@@ -550,8 +583,7 @@ void AtlasNetBootstrap::RunDemigod()
     system("docker rm -f Demigod");
 
     std::string image =
-        RunningLocally ? DemigodImageName :
-        ManagerPcAdvertiseAddr + ":5000/" + DemigodImageName;
+        RunningLocally ? DemigodImageName : ManagerPcAdvertiseAddr + ":5000/" + DemigodImageName;
 
     std::string cmd =
         "docker run --init --network " + NetworkName +
@@ -561,7 +593,6 @@ void AtlasNetBootstrap::RunDemigod()
     system(cmd.c_str());
 }
 
-
 #include <ifaddrs.h>
 #include <arpa/inet.h>
 #include <unistd.h>
@@ -570,14 +601,16 @@ void AtlasNetBootstrap::RunDemigod()
 
 void AtlasNetBootstrap::SetupSwarm()
 {
-    auto isPortInUse = [](int port) -> bool {
+    auto isPortInUse = [](int port) -> bool
+    {
         int sock = socket(AF_INET, SOCK_STREAM, 0);
-        if (sock < 0) return true;
+        if (sock < 0)
+            return true;
         sockaddr_in addr{};
         addr.sin_family = AF_INET;
         addr.sin_addr.s_addr = inet_addr("0.0.0.0");
         addr.sin_port = htons(port);
-        bool inUse = bind(sock, (sockaddr*)&addr, sizeof(addr)) < 0;
+        bool inUse = bind(sock, (sockaddr *)&addr, sizeof(addr)) < 0;
         close(sock);
         return inUse;
     };
@@ -607,7 +640,8 @@ void AtlasNetBootstrap::SetupSwarm()
 
     // Resolve configured network interface
     std::string preferredInterface = AtlasNet::Get().GetSettings().NetworkInterface;
-    if (RunningLocally) preferredInterface = "lo"; //if running locally then use the loop back interface 127.0.0.1
+    if (RunningLocally)
+        preferredInterface = "lo"; // if running locally then use the loop back interface 127.0.0.1
     std::string interfaceIP;
 
     // Collect available interfaces
@@ -618,7 +652,8 @@ void AtlasNetBootstrap::SetupSwarm()
         return;
     }
 
-    struct InterfaceInfo {
+    struct InterfaceInfo
+    {
         std::string name;
         std::string ip;
     };
@@ -641,7 +676,8 @@ void AtlasNetBootstrap::SetupSwarm()
     if (!preferredInterface.empty())
     {
         auto it = std::find_if(available.begin(), available.end(),
-            [&](const InterfaceInfo &inf){ return inf.name == preferredInterface; });
+                               [&](const InterfaceInfo &inf)
+                               { return inf.name == preferredInterface; });
 
         if (it != available.end())
         {
@@ -686,15 +722,17 @@ void AtlasNetBootstrap::SetupSwarm()
     // Construct swarm init payload
     Json swarmInit = Json{
         {"ListenAddr", std::format("0.0.0.0:{}", swarmPort)},
-        {"AdvertiseAddr", std::format("{}:{}", interfaceIP, swarmPort)}
-    };
+        {"AdvertiseAddr", std::format("{}:{}", interfaceIP, swarmPort)}};
 
     // Attempt swarm init
     std::string initResult = DockerIO::Get().request("POST", "/swarm/init", &swarmInit);
     Json parsed;
-    try {
+    try
+    {
         parsed = Json::parse(initResult);
-    } catch (...) {
+    }
+    catch (...)
+    {
         logger.ErrorFormatted("Invalid swarm init response: {}", initResult);
         return;
     }
@@ -713,7 +751,6 @@ void AtlasNetBootstrap::SetupSwarm()
     ManagerPcAdvertiseAddr = infoJson["Swarm"]["NodeAddr"];
     logger.DebugFormatted("📡 Manager address set to {}", ManagerPcAdvertiseAddr);
 }
-
 
 void AtlasNetBootstrap::SetupNetwork()
 {
@@ -968,9 +1005,7 @@ void AtlasNetBootstrap::SetupDemigodService()
     system(RemoveCmd.c_str());
 
     // Determine correct image reference
-    std::string imageTag = RunningLocally ?
-        DemigodImageName :
-        std::format("{}/{}:latest", registry, DemigodImageName);
+    std::string imageTag = RunningLocally ? DemigodImageName : std::format("{}/{}:latest", registry, DemigodImageName);
 
     logger.DebugFormatted("Creating demigod service from image '{}'", imageTag);
 
@@ -979,13 +1014,16 @@ void AtlasNetBootstrap::SetupDemigodService()
     //        Docker Swarm will pick the host port
     std::string ServiceCmd =
         "docker service create "
-        "--name " + DemigodServiceName + " "
-        "--network " + NetworkName + " "
-        "--mount type=bind,source=/var/run/docker.sock,target=/var/run/docker.sock "
-        "--replicas 2 "
-        "--publish published=0,target=" + std::to_string(_PORT_DEMIGOD) + ",mode=ingress "
-        "--detach=true "
-        + imageTag;
+        "--name " +
+        DemigodServiceName + " "
+                             "--network " +
+        NetworkName + " "
+                      "--mount type=bind,source=/var/run/docker.sock,target=/var/run/docker.sock "
+                      "--replicas 2 "
+                      "--publish published=0,target=" +
+        std::to_string(_PORT_DEMIGOD) + ",mode=ingress "
+                                        "--detach=true " +
+        imageTag;
 
     int result = system(ServiceCmd.c_str());
     if (result != 0)
@@ -998,7 +1036,6 @@ void AtlasNetBootstrap::SetupDemigodService()
                               DemigodServiceName);
     }
 }
-
 
 void AtlasNetBootstrap::GenerateTSLCertificate()
 {

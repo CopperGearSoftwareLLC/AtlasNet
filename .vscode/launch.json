@@ -8,7 +8,7 @@
       "program": "${workspaceFolder}/bin/DebugDocker/AtlasNet/AtlasNet",
       "cwd": "${workspaceFolder}",
       "MIMode": "gdb",
-      "miDebuggerPath": "/usr/bin/gdb",
+      "preLaunchTask": "make",
       "stopAtEntry": false,
       
     },
@@ -33,7 +33,12 @@
       "cwd": "${workspaceFolder}",
       "MIMode": "gdb",
       "preLaunchTask": "make",
-      "stopAtEntry": false,
+      "stopAtEntry": true,
+      "logging": {
+    "engineLogging": true,
+    "trace": true,
+    "traceResponse": true
+}
       
     }
   ],

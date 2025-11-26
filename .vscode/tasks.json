@@ -5,7 +5,7 @@
       "label": "AtlasNet Start",
       "type": "shell",
       "dependsOn": "Setup Docker Images. SampleGame",
-      "command": "./premake5",
+      "command": "premake5",
       "args": [ "AtlasNetStart","--testid=${input:TestNumber}"],
       "options": {
         "cwd": "${workspaceFolder}" // working directory
@@ -14,8 +14,7 @@
     {
       "label": "premake",
       "type": "shell",
-      "dependsOn": "Setup Docker Images. SampleGame",
-      "command": "./premake5",
+      "command": "premake5",
       "args": [ "gmake"],
       "options": {
         "cwd": "${workspaceFolder}" // working directory

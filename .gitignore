@@ -16,3 +16,4 @@ vcpkg_installed
 docker_cache
 keys
 /src/TestUnityAPI/Server/build
+flake.lock

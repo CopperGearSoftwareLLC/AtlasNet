@@ -6,7 +6,7 @@
 #include "Database/RedisCacheDatabase.hpp"
 #include "Heuristic/Shape.hpp"
 #include "Database/GridCellManifest.hpp"
-
+#include "AtlasNet/AtlasEntity.hpp"
 class Cartograph : public Singleton<Cartograph>
 {
     GLFWwindow *_glfwwindow;
@@ -20,9 +20,25 @@ class Cartograph : public Singleton<Cartograph>
         std::string NodeID;
         vec2 ScreenSpaceShapeCenter;
         vec3 UniquePartitionColor;
+        std::vector<AtlasEntity> entities;
     };
     
     std::vector<ActivePartition> partitions;
+    struct IndexByName;
+    struct IndexByNode;
+    boost::multi_index_container<
+		ActivePartition,
+		boost::multi_index::indexed_by<
+			// non-unique by name
+			boost::multi_index::ordered_unique<
+				boost::multi_index::tag<IndexByName>,
+				boost::multi_index::member<ActivePartition, std::string, &ActivePartition::Name>>,
+			// non-unique by node
+			boost::multi_index::ordered_unique<
+				boost::multi_index::tag<IndexByNode>,
+				boost::multi_index::member<ActivePartition, std::string, &ActivePartition::NodeID>>>>
+		_partitions;
+
     std::optional<uint32> PartitionIndexSelected;
 
     struct NodeWorker
@@ -71,6 +87,7 @@ class Cartograph : public Singleton<Cartograph>
         std::vector<std::pair<uint32, uint32>> Out2InPorts;
     };
     void GetNodes();
+    void GetEntities();
     void ForEachContainer(std::function<void(const Container &, const Json &)> func);
     static vec3 HSVtoRGB(vec3 vec);
 

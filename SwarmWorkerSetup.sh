@@ -9,8 +9,6 @@ DOCKER_IP="0.0.0.0"        # listen on all interfaces
 SERVICE_FILE="/lib/systemd/system/docker.service"
 OVERRIDE_DIR="/etc/systemd/system/docker.service.d"
 OVERRIDE_FILE="$OVERRIDE_DIR/override.conf"
-DAEMON_JSON="/etc/docker/daemon.json"
-INSECURE_REGISTRY="registry:5000"   # change if needed
 
 # ==============================
 # Prerequisites
@@ -37,22 +35,7 @@ cat <<EOF | sudo tee "$OVERRIDE_FILE" >/dev/null
 ExecStart=
 ExecStart=/usr/bin/dockerd -H unix:///var/run/docker.sock -H tcp://$DOCKER_IP:$DOCKER_PORT
 EOF
-# ==============================
-# Configure insecure registry
-# ==============================
-echo "Adding insecure registry support for '$INSECURE_REGISTRY' (overwriting daemon.json)..."
 
-DAEMON_JSON="/etc/docker/daemon.json"
-
-sudo mkdir -p "$(dirname "$DAEMON_JSON")"
-
-cat <<EOF | sudo tee "$DAEMON_JSON" >/dev/null
-{
-  "insecure-registries": ["$INSECURE_REGISTRY"]
-}
-EOF
-
-sudo chmod 644 "$DAEMON_JSON"
 # ==============================
 # Apply and verify
 # ==============================
@@ -74,6 +57,12 @@ hostname -I | awk '{print "   tcp://" $1 ":2375"}'
 echo
 echo "Test remotely from another machine with:"
 echo "   curl http://<this_machine_ip>:2375/version"
+
+# ==============================
+# Enable user to use docker
+# ==============================
+sudo usermod -aG docker $USER
+newgrp docker
 
 # ==============================
 # Enable root SSH login
