@@ -349,10 +349,7 @@ void Interlink::Init(const InterlinkProperties &Properties)
     ProxyRegistry::Get().RegisterSelf(MyIdentity, ipAddress);
     ServerRegistry::Get().RegisterSelf(MyIdentity, ipAddress);
     ServerRegistry::Get().RegisterPublicAddress(MyIdentity, ipAddress);
-    if (MyIdentity.Type == InterlinkType::eDemigod)
-    {
-      ProxyRegistry::Get().RegisterPublicAddress(MyIdentity, ipAddress);
-    }
+    ProxyRegistry::Get().RegisterPublicAddress(MyIdentity, ipAddress);
     OpenListenSocket(ListenPort);
     logger->DebugFormatted("[Interlink]Registered in ProxyRegistry as {}:{}", MyIdentity.ToString(), ipAddress.ToString());
 

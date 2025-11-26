@@ -1056,7 +1056,7 @@ void AtlasNetBootstrap::SetupDemigodService()
         << "--name Demigod "
         << "--network " << NetworkName << " "
         << "--mount type=bind,source=/var/run/docker.sock,target=/var/run/docker.sock "
-        << "--replicas 2 "   // change here if scaling
+        << "--replicas 1 "   // change here if scaling
         // publish TCP on random port
         << "--publish published=0,target=" << _PORT_DEMIGOD << ",protocol=tcp,mode=ingress "
         // publish UDP on random port
