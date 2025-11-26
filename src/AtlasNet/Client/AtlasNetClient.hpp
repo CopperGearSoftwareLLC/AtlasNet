@@ -26,7 +26,9 @@ public:
     int GetRemoteEntities(AtlasEntity *buffer, int maxCount);
     void Shutdown();
 private:
-    std::shared_ptr<Log> logger = std::make_shared<Log>("AtlasNetClient");;
+void OnMessageReceived(const Connection& from, std::span<const std::byte> data);
+private:
+    std::shared_ptr<Log> logger = std::make_shared<Log>("AtlasNetClient");
     std::unordered_map<AtlasEntityID, AtlasEntity> RemoteEntities;
     std::mutex Mutex;
     InterLinkIdentifier serverID;

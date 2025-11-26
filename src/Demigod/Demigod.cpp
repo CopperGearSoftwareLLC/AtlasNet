@@ -86,7 +86,8 @@ bool Demigod::OnAcceptConnection(const Connection& c)
 {
     // Accept all incoming connections
     logger->DebugFormatted("[Demigod] Accepting connection from {}", c.address.ToString());
-    ProxyRegistry::Get().IncrementClient(SelfID);
+    if (c.target.Type == InterlinkType::eGameClient)
+      ProxyRegistry::Get().IncrementClient(SelfID);
     return true;
 }
 

@@ -586,17 +586,46 @@ void AtlasNetBootstrap::RunGameCoordinator()
 
 void AtlasNetBootstrap::RunDemigod()
 {
-    system("docker rm -f Demigod");
+    logger.Debug("Removing old Demigod container (if exists)...");
+    {
+        std::string rmCmd = "docker rm -f Demigod  > /dev/null 2>&1";
+        system(rmCmd.c_str());
+    }
 
-    std::string image =
-        RunningLocally ? DemigodImageName : ManagerPcAdvertiseAddr + ":5000/" + DemigodImageName;
+    std::this_thread::sleep_for(std::chrono::milliseconds(200));
 
-    std::string cmd =
-        "docker run --init --network " + NetworkName +
-        " -v /var/run/docker.sock:/var/run/docker.sock --name Demigod -d " +
-        image;
+    const std::string registry = ManagerPcAdvertiseAddr + ":5000";
 
-    system(cmd.c_str());
+    std::string imageTag = RunningLocally
+        ? DemigodImageName
+        : registry + "/" + DemigodImageName + ":latest";
+
+    logger.DebugFormatted("Running Demigod container from image '{}'", imageTag);
+
+    // docker run version of random-port publish:
+    // -p :PORT publishes random host port
+    std::stringstream cmd;
+    cmd
+        << "docker run "
+        << "--init "
+        << "--name Demigod "
+        << "--network " << NetworkName << " "
+        << "-v /var/run/docker.sock:/var/run/docker.sock "
+        // random port publish: host picks random port for both TCP & UDP
+        << "-p :" << _PORT_DEMIGOD << "/tcp "
+        << "-p :" << _PORT_DEMIGOD << "/udp "
+        << "-d "
+        << imageTag;
+
+    int result = system(cmd.str().c_str());
+    if (result != 0)
+    {
+        logger.ErrorFormatted("[Bootstrap] Failed to run Demigod container. Exit code: {}", result);
+    }
+    else
+    {
+        logger.Debug("[Bootstrap] Demigod container running successfully.");
+    }
 }
 
 #include <ifaddrs.h>
@@ -1002,44 +1031,47 @@ void AtlasNetBootstrap::SetupPartitionService()
 
 void AtlasNetBootstrap::SetupDemigodService()
 {
+    logger.Debug("Removing old Demigod service (if exists)...");
+    {
+        std::string rmCmd = "docker service rm Demigod  > /dev/null 2>&1";
+        system(rmCmd.c_str());
+    }
+
+    std::this_thread::sleep_for(std::chrono::milliseconds(300));
+
     const std::string registry = ManagerPcAdvertiseAddr + ":5000";
 
-    logger.Debug("Cleaning up existing demigod services");
+    // Select correct image from registry or local
+    std::string imageTag = RunningLocally
+        ? DemigodImageName
+        : registry + "/" + DemigodImageName + ":latest";
 
-    std::string RemoveCmd =
-        std::string("docker service rm ") + DemigodServiceName + " > /dev/null 2>&1";
-    system(RemoveCmd.c_str());
+    logger.DebugFormatted("Creating Demigod service using image '{}'", imageTag);
 
-    // Determine correct image reference
-    std::string imageTag = RunningLocally ? DemigodImageName : std::format("{}/{}:latest", registry, DemigodImageName);
+    // IMPORTANT: publish random host ports for BOTH TCP and UDP
+    // This is required for Valve GNS.
+    std::stringstream cmd;
+    cmd
+        << "docker service create "
+        << "--name Demigod "
+        << "--network " << NetworkName << " "
+        << "--mount type=bind,source=/var/run/docker.sock,target=/var/run/docker.sock "
+        << "--replicas 2 "   // change here if scaling
+        // publish TCP on random port
+        << "--publish published=0,target=" << _PORT_DEMIGOD << ",protocol=tcp,mode=ingress "
+        // publish UDP on random port
+        << "--publish published=0,target=" << _PORT_DEMIGOD << ",protocol=udp,mode=ingress "
+        << "--detach=true "
+        << imageTag;
 
-    logger.DebugFormatted("Creating demigod service from image '{}'", imageTag);
-
-    // Publish a random port, same logic as God uses
-    //      -p :<port> publishes on a RANDOM ephemeral host port
-    //        Docker Swarm will pick the host port
-    std::string ServiceCmd =
-        "docker service create "
-        "--name " +
-        DemigodServiceName + " "
-                             "--network " +
-        NetworkName + " "
-                      "--mount type=bind,source=/var/run/docker.sock,target=/var/run/docker.sock "
-                      "--replicas 2 "
-                      "--publish published=0,target=" +
-        std::to_string(_PORT_DEMIGOD) + ",mode=ingress "
-                                        "--detach=true " +
-        imageTag;
-
-    int result = system(ServiceCmd.c_str());
+    int result = system(cmd.str().c_str());
     if (result != 0)
     {
-        logger.ErrorFormatted("Failed to create demigod service. Error code {}", result);
+        logger.ErrorFormatted("Failed to create Demigod service. Exit code: {}", result);
     }
     else
     {
-        logger.DebugFormatted("Docker Swarm started demigod service '{}' (0 replicas).",
-                              DemigodServiceName);
+        logger.Debug("[Bootstrap] Demigod service created successfully.");
     }
 }
 

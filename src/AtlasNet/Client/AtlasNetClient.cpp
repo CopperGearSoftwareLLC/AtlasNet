@@ -7,12 +7,12 @@ void AtlasNetClient::Initialize(AtlasNetClient::InitializeProperties& props)
   logger->Debug("[AtlasNetClient] Initialize");
   InterLinkIdentifier myID(InterlinkType::eGameClient, UUIDGen::encode_base20(UUIDGen::Gen()));
   //InterLinkIdentifier God =  InterLinkIdentifier::MakeIDGod();
-  InterLinkIdentifier God = InterLinkIdentifier::MakeIDGameCoordinator();
-  serverID = God;
+  InterLinkIdentifier GC = InterLinkIdentifier::MakeIDGameCoordinator();
+  serverID = GC;
   logger->Debug("[AtlasNetClient] Made my & GodID");
-  IPAddress GodIP;
+  IPAddress GCIP;
   //GodIP.SetIPv4(127,0,0,1,_PORT_GOD);
-  GodIP.SetIPv4(127,0,0,1,_PORT_GAMECOORDINATOR);
+  GCIP.SetIPv4(127,0,0,1,_PORT_GAMECOORDINATOR);
   logger->Debug("[AtlasNetClient] Set God IPv4");
   
   Interlink::Get().Init(
@@ -22,9 +22,13 @@ void AtlasNetClient::Initialize(AtlasNetClient::InitializeProperties& props)
     .callbacks = {.acceptConnectionCallback = [](const Connection &c)
             { return true; },
             .OnConnectedCallback = [](const InterLinkIdentifier &Connection) {},
-            .OnMessageArrival = [](const Connection &fromWhom, std::span<const std::byte> data) {}}});
+            .OnMessageArrival = [this](const Connection &fromWhom, std::span<const std::byte> data) 
+            {
+              OnMessageReceived(fromWhom, data); 
+            }
+          }});
   
-    Interlink::Get().EstablishConnectionAtIP(God, GodIP);
+    Interlink::Get().EstablishConnectionAtIP(GC, GCIP);
     logger->Debug("[AtlasNetClient] establishing connection to God");
 }
 
@@ -47,6 +51,50 @@ int AtlasNetClient::GetRemoteEntities(AtlasEntity *buffer, int maxCount)
         buffer[i++] = e;
     }
     return count;
+}
+
+void AtlasNetClient::OnMessageReceived(const Connection& from, std::span<const std::byte> data)
+{
+    std::string msg(reinterpret_cast<const char*>(data.data()), data.size());
+    logger->DebugFormatted("[AtlasNetClient] Message from {}: {}",
+                           from.target.ToString(), msg);
+
+    // Only care about GameClient confirmations for now
+    if (from.target.Type == InterlinkType::eGameCoordinator)
+    {
+        // The message is expected to be only "IP:Port"
+        std::string address = msg;
+
+        // Find the colon separating IP and port
+        size_t colonPos = address.find(':');
+        if (colonPos == std::string::npos)
+        {
+            logger->Error("[AtlasNetClient] Invalid proxy address (missing ':' separator).");
+            return;
+        }
+
+        // Extract IP and port substrings
+        std::string ipStr = address.substr(0, colonPos);
+        std::string portStr = address.substr(colonPos + 1);
+
+        // Convert port to integer
+        PortType port = static_cast<PortType>(std::stoi(portStr));
+
+        // Fill IPAddress
+        IPAddress ProxyIP;
+        ProxyIP.SetIPv4(127,0,0,1, port); // Default init
+
+        // Build the identifier for this proxy
+        InterLinkIdentifier ProxyID;
+        ProxyID.Type = InterlinkType::eDemigod;
+        ProxyID.ID   = "DemigodProxy";  // GC will update this if needed
+
+        logger->DebugFormatted("[AtlasNetClient] Connecting to proxy {} at {}:{}",
+                               ProxyID.ToString(), ipStr, port);
+
+        // Establish connection
+        Interlink::Get().EstablishConnectionAtIP(ProxyID, ProxyIP);
+    }
 }
 
 void AtlasNetClient::Shutdown()
