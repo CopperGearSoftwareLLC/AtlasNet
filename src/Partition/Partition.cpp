@@ -58,7 +58,25 @@ void Partition::Init()
                   logger->DebugFormatted("[Partition] Proxy count: {}", ConnectedProxies.size());
                 }
               },
-						  .OnMessageArrival = [](const Connection &fromWhom, std::span<const std::byte> data) {Partition::Get().MessageArrived(fromWhom,data);}}});
+						  .OnMessageArrival = [](const Connection &fromWhom, std::span<const std::byte> data) {Partition::Get().MessageArrived(fromWhom,data);},
+              .OnDisconnectedCallback = [this](const InterLinkIdentifier &Connection)
+              {
+                logger->Debug("[Partition] disconnected callback");
+                if (Connection.Type == InterlinkType::eGameServer)
+                {
+                  ConnectedGameServer = nullptr;
+                  logger->DebugFormatted("[Partition] GameServer disconnected: {}", Connection.ToString().c_str());
+                }
+                else if (Connection.Type == InterlinkType::eDemigod)
+                {
+                  ConnectedProxies.erase(Connection);
+                  logger->DebugFormatted("[Partition] Proxy disconnected: {}", Connection.ToString().c_str());
+                  logger->DebugFormatted("[Partition] Proxy count: {}", ConnectedProxies.size());
+                }
+              }
+            }
+          }
+        );
 
 	// Clear any existing partition entity data to prevent stale data
 	std::string partitionKey = partitionIdentifier.ToString();

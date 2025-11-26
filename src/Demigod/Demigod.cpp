@@ -86,6 +86,7 @@ bool Demigod::OnAcceptConnection(const Connection& c)
 {
     // Accept all incoming connections
     logger->DebugFormatted("[Demigod] Accepting connection from {}", c.address.ToString());
+    ProxyRegistry::Get().IncrementClient(SelfID);
     return true;
 }
 
@@ -176,6 +177,7 @@ void Demigod::HandleControlMessage(const Connection& /*from*/,
     clientToPartitionMap[clientID] = maybePartition.value();
     logger->DebugFormatted("[Demigod] Updated authority: {} → {}",
                            clientID, partitionS);
+
 }
 
 void Demigod::ForwardClientToPartition(const Connection& from,

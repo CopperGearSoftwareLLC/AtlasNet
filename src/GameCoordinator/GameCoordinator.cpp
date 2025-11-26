@@ -31,6 +31,19 @@ void GameCoordinator::Init()
                 .OnMessageArrival = [this](const Connection& from, std::span<const std::byte> data)
                 {
                     OnMessageReceived(from, data);
+                },
+                .OnDisconnectedCallback = [this](const InterLinkIdentifier& id)
+                {
+                    if (id.Type == InterlinkType::eGameClient)
+                    {
+                      logger->DebugFormatted("[Coordinator] Client {} disconnected.", id.ToString());
+
+                      // Clean up pending handshake, if present
+                      pendingClientAssignments.erase(id.ToString());
+
+                      // Clean up ProxyRegistry mappings
+                      ProxyRegistry::Get().DecrementClient(id);
+                    }
                 }
             }
         });

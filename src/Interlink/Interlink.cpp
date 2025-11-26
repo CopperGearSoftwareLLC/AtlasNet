@@ -172,7 +172,24 @@ void Interlink::CallbackOnConnecting(SteamCBInfo info)
 
 void Interlink::CallbackOnClosedByPear(SteamCBInfo info)
 {
-  networkInterface->CloseConnection(info->m_hConn, 0, nullptr, false);
+    auto& bySteam = Connections.get<IndexByHSteamNetConnection>();
+    auto it = bySteam.find(info->m_hConn);
+
+    if (it == bySteam.end())
+    {
+        logger->Warning("ClosedByPeer received for unknown connection.");
+        return;
+    }
+
+    InterLinkIdentifier closedID = it->target;
+
+    logger->DebugFormatted("Connection closed by peer: {}", closedID.ToString());
+
+    // Remove from internal table BEFORE notifying callbacks.
+    bySteam.erase(it);
+
+    // Notify game systems (GameCoordinator, Demigod, etc.)
+    DispatchDisconnected(closedID);
 }
 
 void Interlink::CallbackOnConnected(SteamCBInfo info)
@@ -220,6 +237,15 @@ void Interlink::CallbackOnConnected(SteamCBInfo info)
     ASSERT(false, "Connected? to non existent connection?, HSteamNetConnection was not found");
   }
 }
+
+void Interlink::DispatchDisconnected(const InterLinkIdentifier& id)
+{
+    if (callbacks.OnDisconnectedCallback)
+    {
+        callbacks.OnDisconnectedCallback(id);
+    }
+}
+
 
 void Interlink::OpenListenSocket(PortType port)
 {
@@ -623,6 +649,8 @@ void Interlink::CloseConnectionTo(const InterLinkIdentifier& id, int reason, con
 
     // Remove from table
     byTarget.erase(it);
+
+    DispatchDisconnected(id);
 }
 
 

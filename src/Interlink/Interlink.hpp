@@ -12,6 +12,8 @@ struct InterlinkCallbacks
 	std::function<bool(const Connection &)> acceptConnectionCallback;
 	std::function<void(const InterLinkIdentifier &)> OnConnectedCallback;
 	std::function<void(const Connection &, std::span<const std::byte>)> OnMessageArrival;
+  std::function<void(const InterLinkIdentifier&)> OnDisconnectedCallback;
+
 };
 struct InterlinkProperties
 {
@@ -91,6 +93,7 @@ public:
   
   private:
   
+  void DispatchDisconnected(const InterLinkIdentifier& id);
 	void GenerateNewConnections();
 	void OnDebugOutput(ESteamNetworkingSocketsDebugOutputType eType, const char *pszMsg);
 
