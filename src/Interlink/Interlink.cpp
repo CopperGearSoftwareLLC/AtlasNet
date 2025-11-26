@@ -113,10 +113,9 @@ void Interlink::CallbackOnConnecting(SteamCBInfo info)
     IndiciesBySteamConnection.modify(
         ExistingConnection, [](Connection &c)
         { c.SetNewState(ConnectionState::eConnecting); });
-    logger->DebugFormatted("Existing connection to ({}) started by me transitioning to CONNECTING state",ExistingConnection->target.ToString());
+    logger->DebugFormatted("Existing connection to ({}) started by me transitioning to CONNECTING state", ExistingConnection->target.ToString());
     return;
   }
-
 
   /* ADD CHECK TO CHECK IF THE GIVEN NETWORKING IDENTITY ALREADY EXISTS IN THE CONNECTIONS MAP.
   IMPLYING THAT THE SAME TARGET TRIED TO CONNECT MULTIPLE TIMES IN A ROW. CAUSES A CRASH*/
@@ -177,6 +176,7 @@ void Interlink::CallbackOnClosedByPear(SteamCBInfo info)
 
 void Interlink::CallbackOnConnected(SteamCBInfo info)
 {
+  logger->Debug("OnConnected");
   auto &indiciesBySteamConn = Connections.get<IndexByHSteamNetConnection>();
   if (auto v = indiciesBySteamConn.find(info->m_hConn); v != indiciesBySteamConn.end())
   {
@@ -424,22 +424,22 @@ void Interlink::Init(const InterlinkProperties &Properties)
 
     for (auto &server : serverMap)
     {
-      if (server.first.Type == InterlinkType::ePartition || 
-        server.first.Type == InterlinkType::eGod || 
-        server.first.Type == InterlinkType::eGameCoordinator)
-        {
-          EstablishConnectionTo(server.first);
-        }
+      if (server.first.Type == InterlinkType::ePartition ||
+          server.first.Type == InterlinkType::eGod ||
+          server.first.Type == InterlinkType::eGameCoordinator)
+      {
+        EstablishConnectionTo(server.first);
+      }
     }
   }
   break;
 
   case InterlinkType::eGameCoordinator:
   {
-    //std::unordered_map<InterLinkIdentifier, ProxyRegistry::ProxyRegistryEntry> proxyMap =
-    //    ProxyRegistry::Get().GetProxies();
-//
-    //for (auto &proxy : proxyMap)
+    // std::unordered_map<InterLinkIdentifier, ProxyRegistry::ProxyRegistryEntry> proxyMap =
+    //     ProxyRegistry::Get().GetProxies();
+    //
+    // for (auto &proxy : proxyMap)
     //{
     //  EstablishConnectionTo(proxy.first);
     //}

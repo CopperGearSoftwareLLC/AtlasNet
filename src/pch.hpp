@@ -47,6 +47,7 @@
 #include <boost/describe/enum_to_string.hpp>
 #include <boost/describe/enum_from_string.hpp>
 #include <boost/stacktrace.hpp>
+#include <boost/uuid.hpp>
 
 #include "nlohmann/json.hpp"
 using Json = nlohmann::json;

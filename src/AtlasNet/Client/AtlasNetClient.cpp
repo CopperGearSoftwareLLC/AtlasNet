@@ -1,16 +1,16 @@
 #include "AtlasNetClient.hpp"
 #include "../../Database/ServerRegistry.hpp"
 #include "../../Docker/DockerIO.hpp"
-
+#include "misc/UUID.hpp"
 void AtlasNetClient::Initialize(AtlasNetClient::InitializeProperties& props)
 {
   logger->Debug("[AtlasNetClient] Initialize");
-  InterLinkIdentifier myID(InterlinkType::eGameClient, props.ClientName);
+  InterLinkIdentifier myID(InterlinkType::eGameClient, UUIDGen::encode_base20(UUIDGen::Gen()));
   InterLinkIdentifier God =  InterLinkIdentifier::MakeIDGod();
   serverID = God;
   logger->Debug("[AtlasNetClient] Made my & GodID");
   IPAddress GodIP;
-  GodIP.SetIPv4(127,0,0,1,32770);
+  GodIP.SetIPv4(127,0,0,1,_PORT_GOD);
   logger->Debug("[AtlasNetClient] Set God IPv4");
   
   Interlink::Get().Init(

@@ -15,7 +15,6 @@ public:
     struct InitializeProperties
     {
         std::string ExePath;
-        std::string ClientName;
         std::string ServerName;
     };
 

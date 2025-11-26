@@ -72,7 +72,13 @@
     stdenv.cc.cc
     stdenv.cc.libc
   ];
-
+shellHook = ''
+  export SHELL=${pkgs.bashInteractive}/bin/bash
+   export LIBGL_PATH=${pkgs.libGL}/lib
+  export LD_LIBRARY_PATH=${pkgs.mesa.drivers}/lib:${pkgs.libGL}/lib:$LD_LIBRARY_PATH
+  export LDFLAGS="-L${pkgs.libGL}/lib -L${pkgs.mesa.drivers}/lib $LDFLAGS"
+  export CFLAGS="-I${pkgs.libGL}/include -I${pkgs.mesa}/include $CFLAGS"
+'';
   profile = ''
     export CC=gcc
     export CXX=g++
