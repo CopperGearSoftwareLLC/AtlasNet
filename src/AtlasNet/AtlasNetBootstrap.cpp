@@ -236,10 +236,10 @@ void AtlasNetBootstrap::CreatePartitionImage()
         packages += p + " ";
     }
 
-    #ifdef _NDEBUG
+#ifdef _NDEBUG
     for (const auto srcDir : AtlasNet::Get().GetSettings().SourceDirectories)
     {
-        DockerFileContents += "COPY " + srcDir + " " + WorkDir +"/"+srcDir+ "\n";
+        DockerFileContents += "COPY " + srcDir + " " + WorkDir + "/" + srcDir + "\n";
     }
 
     std::string BuildServerExe;
@@ -247,12 +247,12 @@ void AtlasNetBootstrap::CreatePartitionImage()
     {
         BuildServerExe += "RUN " + buildCmd + "\n";
     }
-    ProjToBuild+=BuildServerExe;
+    ProjToBuild += BuildServerExe;
     std::string ProjToBuild = "Partition";
 
-   #else
+#else
     std::string ProjToBuild = "Partition UnitTestsServer";
-   #endif
+#endif
 
     const std::string EntryPointCmd = MacroParse(R"(
         RUN cat <<'EOF' > ./entrypoint.sh
