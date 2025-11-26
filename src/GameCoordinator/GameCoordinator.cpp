@@ -140,11 +140,11 @@ void GameCoordinator::OnMessageReceived(const Connection& from, std::span<const 
             pendingClientAssignments.erase(it);
 
             // cutting GameCoordinator↔proxy connection
+            // there should never be a connection between proxy and coordinator anyways
             //Interlink::Get().CloseConnectionTo(proxyID, 0, "Handoff to proxy complete.");
 
             // cutting GameCoordinator↔client connection
-            //Interlink::Get().CloseConnectionTo(from.target, 0, "Handoff to proxy complete.");
-
+            Interlink::Get().CloseConnectionTo(from.target, 0, "Handoff to proxy complete.");
 
             return;
         }
@@ -183,13 +183,13 @@ void GameCoordinator::StartClientProxyHandshake(const InterLinkIdentifier& clien
     pendingClientAssignments[clientKey] = proxyID;
 
     // Send redirect info to client. Client implementation is unknown,
-    // so this is a simple text protocol for now:
-    //   "ProxyRedirect:<ip:port>"
-    std::string redirectMsg = "ProxyRedirect:" + publicAddr.ToString();
+    std::string redirectMsg = publicAddr.ToString();
 
     logger->DebugFormatted(
         "[Coordinator] Instructing client {} to connect to proxy {} at {}",
         clientKey, proxyID.ToString(), publicAddr.ToString());
+
+    //redirectMsg = publicAddr.GetIPv4().second;
 
     Interlink::Get().SendMessageRaw(clientID, std::as_bytes(std::span(redirectMsg)));
 }

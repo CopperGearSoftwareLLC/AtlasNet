@@ -348,6 +348,11 @@ void Interlink::Init(const InterlinkProperties &Properties)
     ipAddress.Parse(DockerIO::Get().GetSelfContainerIP() + ":" + std::to_string(ListenPort));
     ProxyRegistry::Get().RegisterSelf(MyIdentity, ipAddress);
     ServerRegistry::Get().RegisterSelf(MyIdentity, ipAddress);
+    ServerRegistry::Get().RegisterPublicAddress(MyIdentity, ipAddress);
+    if (MyIdentity.Type == InterlinkType::eDemigod)
+    {
+      ProxyRegistry::Get().RegisterPublicAddress(MyIdentity, ipAddress);
+    }
     OpenListenSocket(ListenPort);
     logger->DebugFormatted("[Interlink]Registered in ProxyRegistry as {}:{}", MyIdentity.ToString(), ipAddress.ToString());
 
@@ -386,6 +391,12 @@ void Interlink::Init(const InterlinkProperties &Properties)
       pubAddr.Parse(hostIP + ":" + std::to_string(*mappedHostPort));
 
       ServerRegistry::Get().RegisterPublicAddress(MyIdentity, pubAddr);
+
+      if (MyIdentity.Type == InterlinkType::eDemigod)
+      {
+        ProxyRegistry::Get().RegisterPublicAddress(MyIdentity, pubAddr);
+      }
+
       logger->DebugFormatted("[Interlink] Registered public address: {}", pubAddr.ToString());
     }
     /*
