@@ -9,11 +9,11 @@ void AtlasNetClient::Initialize(AtlasNetClient::InitializeProperties& props)
   //InterLinkIdentifier God =  InterLinkIdentifier::MakeIDGod();
   InterLinkIdentifier GC = InterLinkIdentifier::MakeIDGameCoordinator();
   serverID = GC;
-  logger->Debug("[AtlasNetClient] Made my & GodID");
+  logger->Debug("[AtlasNetClient] Made my & GCID");
   IPAddress GCIP;
   //GodIP.SetIPv4(127,0,0,1,_PORT_GOD);
   GCIP.SetIPv4(127,0,0,1,_PORT_GAMECOORDINATOR);
-  logger->Debug("[AtlasNetClient] Set God IPv4");
+  logger->Debug("[AtlasNetClient] Set GC IPv4");
   
   Interlink::Get().Init(
   InterlinkProperties{
@@ -83,6 +83,7 @@ void AtlasNetClient::OnMessageReceived(const Connection& from, std::span<const s
         // Fill IPAddress
         IPAddress ProxyIP;
         ProxyIP.SetIPv4(127,0,0,1, port); // Default init
+        //ProxyIP.SetIPv4(127,0,0,1, _PORT_DEMIGOD); // Default init
 
         // Build the identifier for this proxy
         InterLinkIdentifier ProxyID;
