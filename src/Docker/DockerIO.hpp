@@ -44,4 +44,16 @@ public:
     std::optional<uint32> GetSelfExposedPortForInternalBind(uint32 InternalPort) const;
     std::string GetSelfPublicIP(uint32_t& outPort) const;
 std::optional<uint32_t> GetSelfPublicPortFor(uint32_t internalPort) const;
+
+    // grab published port for service
+    std::optional<uint32_t> GetServicePublishedPort(const std::string& serviceName,
+    uint32_t internalPort,
+    const std::string& protocol = "udp") const;
+    // grab published IP for service
+    std::optional<std::string> GetServiceNodePublicIP(const std::string& serviceName) const;
+    
+private:
+    // URL-escaped JSON filters for Swarm API
+    std::string EncodeFilters(const nlohmann::json& filters) const;
+
 };

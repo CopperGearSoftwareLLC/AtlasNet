@@ -110,9 +110,9 @@ void AtlasNetClient::OnMessageReceived(const Connection& from, std::span<const s
 
         // Fill IPAddress
         IPAddress ProxyIP;
-        //ProxyIP.Parse(address);
+        ProxyIP.Parse(address);
         //ProxyIP.SetIPv4(127,0,0,1, port);
-        ProxyIP.SetIPv4(127,0,0,1,30000);
+        //ProxyIP.SetIPv4(127,0,0,1,30000);
 
         // Build the identifier for this proxy
         proxyID.Type = InterlinkType::eDemigod;
