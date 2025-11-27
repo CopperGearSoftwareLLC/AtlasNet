@@ -5,36 +5,40 @@
 void AtlasNetClient::Initialize(AtlasNetClient::InitializeProperties& props)
 {
   logger->Debug("[AtlasNetClient] Initialize");
-  InterLinkIdentifier myID(InterlinkType::eGameClient, UUIDGen::encode_base20(UUIDGen::Gen()));
+  InterLinkIdentifier ID(InterlinkType::eGameClient, UUIDGen::encode_base20(UUIDGen::Gen()));
+  myID = ID;
   //InterLinkIdentifier God =  InterLinkIdentifier::MakeIDGod();
-  InterLinkIdentifier GC = InterLinkIdentifier::MakeIDGameCoordinator();
-  serverID = GC;
+  GameCoordinatorID = InterLinkIdentifier::MakeIDGameCoordinator();
   logger->Debug("[AtlasNetClient] Made my & GCID");
-  IPAddress GCIP;
+  //IPAddress GodIP;
   //GodIP.SetIPv4(127,0,0,1,_PORT_GOD);
-  GCIP.SetIPv4(127,0,0,1,_PORT_GAMECOORDINATOR);
+  IPAddress GameCoordinatorIP;
+  GameCoordinatorIP.SetIPv4(127,0,0,1,_PORT_GAMECOORDINATOR);
   logger->Debug("[AtlasNetClient] Set GC IPv4");
-  
+
   Interlink::Get().Init(
   InterlinkProperties{
     .ThisID = myID,
     .logger = logger,
-    .callbacks = {.acceptConnectionCallback = [](const Connection &c)
-            { return true; },
-            .OnConnectedCallback = [](const InterLinkIdentifier &Connection) {},
+    .callbacks = {.acceptConnectionCallback = [](const Connection &c) { return true; },
+            .OnConnectedCallback = [this](const InterLinkIdentifier &Connection) 
+            {
+              OnConnected(Connection);
+            },
             .OnMessageArrival = [this](const Connection &fromWhom, std::span<const std::byte> data) 
             {
               OnMessageReceived(fromWhom, data); 
             }
           }});
   
-    Interlink::Get().EstablishConnectionAtIP(GC, GCIP);
-    logger->Debug("[AtlasNetClient] establishing connection to God");
+    Interlink::Get().EstablishConnectionAtIP(GameCoordinatorID, GameCoordinatorIP);
+    logger->Debug("[AtlasNetClient] establishing connection to Game Coordinator");
 }
 
 void AtlasNetClient::SendEntityUpdate(const AtlasEntity &entity)
 {
-    Interlink::Get().SendMessageRaw(serverID, std::as_bytes(std::span(&entity, 1)));
+    if (!proxyID.ID.empty())
+        Interlink::Get().SendMessageRaw(proxyID, std::as_bytes(std::span(&entity, 1)));
 }
 void AtlasNetClient::Tick()
 {
@@ -51,6 +55,27 @@ int AtlasNetClient::GetRemoteEntities(AtlasEntity *buffer, int maxCount)
         buffer[i++] = e;
     }
     return count;
+}
+
+void AtlasNetClient::OnConnected(const InterLinkIdentifier &identifier)
+{
+    // Accept all incoming connections
+    logger->DebugFormatted("[AtlasNetClient] connected to {}", identifier.ToString());
+    if (identifier.Type == InterlinkType::eDemigod)
+    {
+        // likely changing proxies, not game coordinator rerouting us
+        if (IsConnectedToProxy == true)
+            return;
+        
+        // stop the connection
+        IsConnectedToProxy = true;
+        Interlink::Get().SendMessageRaw(GameCoordinatorID, std::as_bytes(std::span("ProxyConnected")));
+        logger->Debug("[AtlasNetClient] Messaged Game Coordinator of proxy connection success.");
+    }
+    if (identifier.Type == InterlinkType::eGameCoordinator)
+    {
+        logger->DebugFormatted("[AtlasNetClient] connected GameCoordinator ID {}", GameCoordinatorID.ToString());
+    }
 }
 
 void AtlasNetClient::OnMessageReceived(const Connection& from, std::span<const std::byte> data)
@@ -90,15 +115,14 @@ void AtlasNetClient::OnMessageReceived(const Connection& from, std::span<const s
         ProxyIP.SetIPv4(127,0,0,1,30000);
 
         // Build the identifier for this proxy
-        InterLinkIdentifier ProxyID;
-        ProxyID.Type = InterlinkType::eDemigod;
-        ProxyID.ID   = "DemigodProxy";  // update this if needed
+        proxyID.Type = InterlinkType::eDemigod;
+        proxyID.ID   = "DemigodProxy";  // update this if needed
 
         logger->DebugFormatted("[AtlasNetClient] Connecting to proxy {} at {}:{}",
-                               ProxyID.ToString(), ipStr, port);
+                               proxyID.ToString(), ipStr, port);
 
         // Establish connection
-        Interlink::Get().EstablishConnectionAtIP(ProxyID, ProxyIP);
+        Interlink::Get().EstablishConnectionAtIP(proxyID, ProxyIP);
     }
 }
 
