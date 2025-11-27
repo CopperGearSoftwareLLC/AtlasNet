@@ -26,10 +26,14 @@ public:
     int GetRemoteEntities(AtlasEntity *buffer, int maxCount);
     void Shutdown();
 private:
-void OnMessageReceived(const Connection& from, std::span<const std::byte> data);
+    void OnConnected(const InterLinkIdentifier &identifier);
+    void OnMessageReceived(const Connection& from, std::span<const std::byte> data);
 private:
     std::shared_ptr<Log> logger = std::make_shared<Log>("AtlasNetClient");
     std::unordered_map<AtlasEntityID, AtlasEntity> RemoteEntities;
     std::mutex Mutex;
-    InterLinkIdentifier serverID;
+    InterLinkIdentifier myID;
+    InterLinkIdentifier proxyID;
+    InterLinkIdentifier GameCoordinatorID;
+    bool IsConnectedToProxy = false;
 };

@@ -32,17 +32,19 @@ void GameCoordinator::Init()
                 {
                     OnMessageReceived(from, data);
                 },
-                .OnDisconnectedCallback = [this](const InterLinkIdentifier& id)
+                .OnDisconnectedCallback = [this, coordinatorIdentifier](const InterLinkIdentifier& id)
                 {
                     if (id.Type == InterlinkType::eGameClient)
                     {
                       logger->DebugFormatted("[Coordinator] Client {} disconnected.", id.ToString());
 
-                      // Clean up pending handshake, if present
-                      pendingClientAssignments.erase(id.ToString());
-
                       // Clean up ProxyRegistry mappings
-                      ProxyRegistry::Get().DecrementClient(id);
+                      //ProxyRegistry::Get().DecrementClient(id);
+                      //ProxyRegistry::Get().DecrementClient(coordinatorIdentifier);
+
+                      // Clean up pending handshake, if present
+                      // currently crashes as id is invalid or corrupted
+                      //pendingClientAssignments.erase(id.ToString());
                     }
                 }
             }
@@ -107,8 +109,9 @@ void GameCoordinator::OnMessageReceived(const Connection& from, std::span<const 
     {
         const std::string clientKey = from.target.ToString();
 
-        // Simple protocol: client confirms with "ProxyConnected"
-        if (msg.rfind("ProxyConnected", 0) == 0)
+        // replace with message header
+        //if (msg.rfind("ProxyConnected", 0) == 0)
+        if (true)
         {
             auto it = pendingClientAssignments.find(clientKey);
             if (it == pendingClientAssignments.end())
@@ -127,13 +130,6 @@ void GameCoordinator::OnMessageReceived(const Connection& from, std::span<const 
             logger->DebugFormatted(
                 "[Coordinator] Client {} confirmed connection to proxy {}. Registered in ProxyRegistry.",
                 clientKey, proxyID.ToString());
-
-            logger->DebugFormatted(
-                "[Coordinator] Notified proxy {} about new client {}",
-                proxyID.ToString(), clientKey);
-
-            // Remove from pending
-            pendingClientAssignments.erase(it);
 
             // cutting GameCoordinator↔proxy connection
             // there should never be a connection between proxy and coordinator anyways
