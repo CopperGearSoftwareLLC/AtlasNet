@@ -44,7 +44,7 @@ public:
     void DecrementClient(const InterLinkIdentifier& id);
     uint32_t GetLoad(const InterLinkIdentifier& id);
 
-    // Client to Proxy ownership
+    // Client to Proxy ownership. implicitly increments client load
     void AssignClientToProxy(const std::string& clientID, const InterLinkIdentifier& proxyID);
     std::optional<InterLinkIdentifier> GetProxyOfClient(const std::string& clientID);
 

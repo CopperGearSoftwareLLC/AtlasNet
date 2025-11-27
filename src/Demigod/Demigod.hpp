@@ -36,6 +36,7 @@ private:
 
     bool OnAcceptConnection(const Connection& c);
     void OnConnected(const InterLinkIdentifier& id);
+    void OnDisconnected(const InterLinkIdentifier& id);
     void OnMessageReceived(const Connection& from, std::span<const std::byte> data);
 
     // --- Routing helpers ----------------------------------------------------
@@ -54,8 +55,9 @@ private:
     // Known partitions this proxy is connected to
     std::unordered_set<InterLinkIdentifier> partitions;
 
+    std::unordered_set<InterLinkIdentifier> clients;
     // String-ified client IDs connected to this proxy
-    std::unordered_set<std::string> connectedClients;
+    std::unordered_set<std::string> clientStringIDs;
 
     // Routing: client identifier string -> authoritative partition ID
     std::unordered_map<std::string, InterLinkIdentifier> clientToPartitionMap;

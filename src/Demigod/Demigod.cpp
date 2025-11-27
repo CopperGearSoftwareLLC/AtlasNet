@@ -34,15 +34,13 @@ void Demigod::Init()
                 .OnMessageArrival = [this](const Connection& from, std::span<const std::byte> data)
                 {
                     OnMessageReceived(from, data);
+                },
+                .OnDisconnectedCallback = [this](const InterLinkIdentifier& id)
+                {
+                    OnDisconnected(id);
                 }
             }
         });
-
-    // 3. Register in ProxyRegistry with internal IP + port
-    //uint16_t listenPort = Type2ListenPort.at(InterlinkType::eDemigod);
-    //IPAddress ip;
-    //ip.Parse(DockerIO::Get().GetSelfContainerIP() + ":" + std::to_string(listenPort));
-    //ProxyRegistry::Get().RegisterSelf(demigodIdentifier, ip);
 
     SelfID = demigodIdentifier;
 
@@ -104,15 +102,34 @@ void Demigod::OnConnected(const InterLinkIdentifier& id)
     else if (id.Type == InterlinkType::eGameClient)
     {
         const std::string clientKey = id.ToString();
-        connectedClients.insert(clientKey);
+        clientStringIDs.insert(clientKey);
+        clients.insert(id);
 
         // Note: load increment is already done in ProxyRegistry::AssignClientToProxy
-        // called by GameCoordinator. If you want per-connection tracking here, you can:
-        // ProxyRegistry::Get().IncrementClient(SelfID);
+        //ProxyRegistry::Get().incrementClient(SelfID);
 
         logger->DebugFormatted("[Demigod] Client {} connected", clientKey);
     }
 }
+
+void Demigod::OnDisconnected(const InterLinkIdentifier& id)
+{
+    if (id.Type == InterlinkType::eGameClient)
+    {
+        logger->DebugFormatted("[Demigod] Client {} disconnected.", id.ToString());
+
+        const std::string clientKey = id.ToString();
+        clientStringIDs.erase(clientKey);
+        clients.erase(id);
+
+        // Clean up routing map
+        clientToPartitionMap.erase(clientKey);
+
+        // Update ProxyRegistry
+        ProxyRegistry::Get().DecrementClient(SelfID);
+    }
+}
+
 
 void Demigod::OnMessageReceived(const Connection& from,
                                 std::span<const std::byte> data)
@@ -189,7 +206,6 @@ void Demigod::ForwardClientToPartition(const Connection& from,
     auto it = clientToPartitionMap.find(clientKey);
     if (it == clientToPartitionMap.end())
     {
-        // No known partition; fallback to a simple heuristic (first partition).
         if (partitions.empty())
         {
             logger->ErrorFormatted("[Demigod] No partitions available to route client {}",
@@ -220,6 +236,8 @@ void Demigod::ForwardPartitionToClient(const Connection& from,
 {
     const InterLinkIdentifier& partitionID = from.target;
 
+    // no mapping yet, heuristic not implemented
+    /*
     for (auto& [clientKey, mappedPartition] : clientToPartitionMap)
     {
         if (mappedPartition == partitionID)
@@ -237,5 +255,13 @@ void Demigod::ForwardPartitionToClient(const Connection& from,
             logger->DebugFormatted("[Demigod] Forwarded {} bytes from partition {} to client {}",
                                    data.size(), partitionID.ToString(), clientKey);
         }
+    }
+*/    
+    for (const auto& clientID : clients)
+    {
+        Interlink::Get().SendMessageRaw(clientID, data,
+                                        InterlinkMessageSendFlag::eReliableNow);
+        logger->DebugFormatted("[Demigod] Forwarded {} bytes from partition {} to client {}",
+                                data.size(), partitionID.ToString(), clientID.ToString());
     }
 }
