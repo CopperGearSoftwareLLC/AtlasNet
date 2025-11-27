@@ -48,6 +48,11 @@ void Interlink::OnSteamNetConnectionStatusChanged(SteamNetConnectionStatusChange
     break;
   case k_ESteamNetworkingConnectionState_ProblemDetectedLocally:
     logger->Debug("k_ESteamNetworkingConnectionState_ProblemDetectedLocally");
+    logger->ErrorFormatted(
+        "[GNS] ProblemDetectedLocally. desc='{}' reason={} debug='{}'",
+        pInfo->m_info.m_szConnectionDescription,
+        (int)pInfo->m_info.m_eEndReason,
+        pInfo->m_info.m_szEndDebug ? pInfo->m_info.m_szEndDebug : "(null)");
     break;
   case k_ESteamNetworkingConnectionState_FinWait:
     logger->Debug("k_ESteamNetworkingConnectionState_FinWait");
@@ -339,6 +344,7 @@ void Interlink::Init(const InterlinkProperties &Properties)
   // Create poll group
   PollGroup = networkInterface->CreatePollGroup();
 
+  // registering to database + opening listen sockets
   IPAddress ipAddress;
   switch (MyIdentity.Type)
   {
@@ -372,6 +378,7 @@ void Interlink::Init(const InterlinkProperties &Properties)
   logger->Debug("Registered local");
 
   // Register public address (host ip:published port), if available
+  // seems to never trigger in service containers?
   if (DockerIO::Get().GetSelfExposedPorts().empty() == false)
   {
     // The port we are actually listening on inside the container

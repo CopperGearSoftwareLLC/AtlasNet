@@ -77,18 +77,22 @@ void AtlasNetClient::OnMessageReceived(const Connection& from, std::span<const s
         std::string ipStr = address.substr(0, colonPos);
         std::string portStr = address.substr(colonPos + 1);
 
+        logger->DebugFormatted("[AtlasNetClient] Proxy Address {}:{}",
+                           ipStr, portStr);
+
         // Convert port to integer
         PortType port = static_cast<PortType>(std::stoi(portStr));
 
         // Fill IPAddress
         IPAddress ProxyIP;
-        ProxyIP.SetIPv4(127,0,0,1, port); // Default init
-        //ProxyIP.SetIPv4(127,0,0,1, _PORT_DEMIGOD); // Default init
+        //ProxyIP.Parse(address);
+        //ProxyIP.SetIPv4(127,0,0,1, port);
+        ProxyIP.SetIPv4(127,0,0,1,30000);
 
         // Build the identifier for this proxy
         InterLinkIdentifier ProxyID;
         ProxyID.Type = InterlinkType::eDemigod;
-        ProxyID.ID   = "DemigodProxy";  // GC will update this if needed
+        ProxyID.ID   = "DemigodProxy";  // update this if needed
 
         logger->DebugFormatted("[AtlasNetClient] Connecting to proxy {} at {}:{}",
                                ProxyID.ToString(), ipStr, port);

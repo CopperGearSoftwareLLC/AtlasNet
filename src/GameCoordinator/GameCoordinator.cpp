@@ -128,10 +128,6 @@ void GameCoordinator::OnMessageReceived(const Connection& from, std::span<const 
                 "[Coordinator] Client {} confirmed connection to proxy {}. Registered in ProxyRegistry.",
                 clientKey, proxyID.ToString());
 
-            // Notify the Demigod about the new client (same as before)
-            std::string connectMsg = "NewClient:" + clientKey;
-            Interlink::Get().SendMessageRaw(proxyID, std::as_bytes(std::span(connectMsg)));
-
             logger->DebugFormatted(
                 "[Coordinator] Notified proxy {} about new client {}",
                 proxyID.ToString(), clientKey);
