@@ -344,6 +344,12 @@ void Interlink::Init(const InterlinkProperties &Properties)
   // Create poll group
   PollGroup = networkInterface->CreatePollGroup();
 
+  // grab public address
+  ListenPort = Type2ListenPort.at(MyIdentity.Type);
+  std::optional<std::string> pubIP;
+  std::optional<uint32_t> pubPort;
+  IPAddress pub;
+
   // registering to database + opening listen sockets
   IPAddress ipAddress;
   switch (MyIdentity.Type)
@@ -354,8 +360,16 @@ void Interlink::Init(const InterlinkProperties &Properties)
     ipAddress.Parse(DockerIO::Get().GetSelfContainerIP() + ":" + std::to_string(ListenPort));
     ProxyRegistry::Get().RegisterSelf(MyIdentity, ipAddress);
     ServerRegistry::Get().RegisterSelf(MyIdentity, ipAddress);
-    ServerRegistry::Get().RegisterPublicAddress(MyIdentity, ipAddress);
-    ProxyRegistry::Get().RegisterPublicAddress(MyIdentity, ipAddress);
+
+    // Register public address
+    pubIP = DockerIO::Get().GetServiceNodePublicIP("Demigod");
+    pubPort = DockerIO::Get().GetServicePublishedPort("Demigod", ListenPort);
+    pub.Parse(*pubIP + ":" + std::to_string(*pubPort));
+    ProxyRegistry::Get().RegisterPublicAddress(MyIdentity, pub);
+    ServerRegistry::Get().RegisterPublicAddress(MyIdentity, pub);
+
+    logger->DebugFormatted("[Demigod] Public Swarm address = {}", pub.ToString());
+
     OpenListenSocket(ListenPort);
     logger->DebugFormatted("[Interlink]Registered in ProxyRegistry as {}:{}", MyIdentity.ToString(), ipAddress.ToString());
 

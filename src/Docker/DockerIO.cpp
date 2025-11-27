@@ -214,3 +214,132 @@ std::optional<uint32_t> DockerIO::GetSelfPublicPortFor(uint32_t internalPort) co
 {
     return GetSelfExposedPortForInternalBind(internalPort);
 }
+
+std::string DockerIO::EncodeFilters(const nlohmann::json& filters) const
+{
+    std::string raw = filters.dump();
+
+    char* enc = curl_easy_escape(nullptr, raw.c_str(), raw.length());
+    if (!enc)
+        throw std::runtime_error("curl_easy_escape failed");
+
+    std::string encoded(enc);
+    curl_free(enc);
+
+    return encoded;
+}
+
+
+std::optional<uint32_t> DockerIO::GetServicePublishedPort(
+    const std::string& serviceName,
+    uint32_t internalPort,
+    const std::string& protocol) const
+{
+    try
+    {
+        // --- Query Docker service ---
+        nlohmann::json service = nlohmann::json::parse(
+            request("GET", "/services/" + serviceName));
+
+        // Normalize protocol (udp/tcp)
+        std::string desired = protocol;
+        std::transform(desired.begin(), desired.end(), desired.begin(), ::tolower);
+
+        // Helper function to search inside an array of port dicts
+        auto findPort = [&](const nlohmann::json& arr, const std::string& pathName)
+            -> std::optional<uint32_t>
+        {
+            if (!arr.is_array())
+                return std::nullopt;
+
+            for (const auto& p : arr)
+            {
+                if (!p.contains("Protocol") || !p.contains("TargetPort") || !p.contains("PublishedPort"))
+                    continue;
+
+                std::string proto = p["Protocol"].get<std::string>();
+                std::transform(proto.begin(), proto.end(), proto.begin(), ::tolower);
+
+                uint32_t target = p["TargetPort"].get<uint32_t>();
+                uint32_t published = p["PublishedPort"].get<uint32_t>();
+
+                if (proto == desired && target == internalPort)
+                {
+                    std::cerr << "[Swarm] Match in " << pathName
+                              << " → PublishedPort=" << published << "\n";
+                    return published;
+                }
+            }
+
+            return std::nullopt;
+        };
+
+        // --- 1. Try runtime ports (Endpoint.Ports) ---
+        if (service.contains("Endpoint") &&
+            service["Endpoint"].contains("Ports"))
+        {
+            auto result = findPort(service["Endpoint"]["Ports"], "Endpoint.Ports");
+            if (result) return result;
+        }
+
+        // --- 2. Try Spec.EndpointSpec.Ports ---
+        if (service.contains("Spec") &&
+            service["Spec"].contains("EndpointSpec") &&
+            service["Spec"]["EndpointSpec"].contains("Ports"))
+        {
+            auto result = findPort(service["Spec"]["EndpointSpec"]["Ports"], "Spec.EndpointSpec.Ports");
+            if (result) return result;
+        }
+
+        // --- If still nothing, print entire JSON for debugging ---
+        std::cerr << "\n[Swarm] Port lookup FAILED for service '" 
+                  << serviceName << "' (internalPort=" << internalPort
+                  << ", protocol=" << desired << ")\n";
+
+        std::cerr << "[Swarm] FULL SERVICE JSON:\n"
+                  << service.dump(4) << "\n";
+
+                  std::cerr << "[Swarm] nullopt public PORT " << "\n";
+        return std::nullopt;
+    }
+    catch (const std::exception& e)
+    {
+        std::cerr << "[Swarm] Exception: " << e.what() << "\n";
+        return std::nullopt;
+    }
+}
+
+
+
+std::optional<std::string> DockerIO::GetServiceNodePublicIP(
+    const std::string& serviceName) const
+{
+    try
+    {
+        nlohmann::json filters = {
+            { "service", { serviceName } }
+        };
+
+        std::string encoded = EncodeFilters(filters);
+
+        nlohmann::json tasks = nlohmann::json::parse(
+            request("GET", "/tasks?filters=" + encoded));
+
+        if (!tasks.is_array() || tasks.empty())
+            return std::nullopt;
+
+        std::string nodeID = tasks[0]["NodeID"];
+
+        nlohmann::json node = nlohmann::json::parse(
+            request("GET", "/nodes/" + nodeID));
+
+        if (node.contains("Status") &&
+            node["Status"].contains("Addr"))
+        {
+            return node["Status"]["Addr"].get<std::string>();
+        }
+    }
+    catch (...) {}
+    std::cerr << "[Swarm] nullopt public IP " << "\n";
+    return std::nullopt;
+}
