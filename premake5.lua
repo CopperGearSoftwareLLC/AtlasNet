@@ -56,6 +56,7 @@ workspace "GuacNet"
     project "AtlasNetLib"
         kind "StaticLib"
         language "C++"
+        pic "On"
         files { "src/**.cpp" }
         pchheader "src/pch.hpp"
         pchsource "src/pch.cpp"
@@ -116,6 +117,7 @@ workspace "GuacNet"
         kind "SharedLib"
         dependson "AtlasNetLib"
         links "AtlasNetLib"
+        files { "src/TestUnityAPI/Client/AtlasClientBridge.cpp" }
     project "GameCoordinator"
         dependson "AtlasNetLib"
         links "AtlasNetLib"
@@ -128,7 +130,6 @@ workspace "GuacNet"
         kind "ConsoleApp"
         language "C++"
         files { "srcRun/DemigodRun.cpp" }
-
 
 -- Generic cleanup function
 function customClean(dirsToRemove, filesToRemove)
