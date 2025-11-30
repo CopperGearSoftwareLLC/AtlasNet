@@ -26,6 +26,11 @@ extern "C" void atlas_client_send_entity(AtlasEntity entity)
     if (g_client) g_client->SendEntityUpdate(entity);
 }
 
+extern "C" void atlas_client_update()
+{
+    if (g_client) g_client->Tick();
+}
+
 extern "C" int atlas_client_get_entities(AtlasEntity *buffer, int maxCount)
 {
   return 0;
