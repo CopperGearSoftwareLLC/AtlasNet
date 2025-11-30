@@ -1056,6 +1056,8 @@ void AtlasNetBootstrap::SetupDemigodService()
 
     logger.DebugFormatted("Creating Demigod service using image '{}'", imageTag);
 
+    static int publicPort = _PORT_DEMIGOD;
+
     // IMPORTANT: publish random host ports for BOTH TCP and UDP
     // This is required for Valve GNS.
     std::stringstream cmd;
@@ -1066,9 +1068,15 @@ void AtlasNetBootstrap::SetupDemigodService()
         << "--mount type=bind,source=/var/run/docker.sock,target=/var/run/docker.sock "
         << "--replicas 1 "   // change here if scaling
         // publish TCP on random port
-        << "--publish published=0,target=" << _PORT_DEMIGOD << ",protocol=tcp,mode=ingress "
+        //<< "--publish published=0,target=" << _PORT_DEMIGOD << ",protocol=tcp,mode=ingress "
         // publish UDP on random port
-        << "--publish published=0,target=" << _PORT_DEMIGOD << ",protocol=udp,mode=ingress "
+        //<< "--publish published=0,target=" << _PORT_DEMIGOD << ",protocol=udp,mode=ingress "
+        // publishing in host mode + random port
+        //<< "--publish published=0,target=" << _PORT_DEMIGOD << ",protocol=tcp,mode=host "
+        //<< "--publish published=0,target=" << _PORT_DEMIGOD << ",protocol=udp,mode=host "
+        // publishing in ingress mode + assigned port
+        << "--publish published=" << publicPort << ",target=" << _PORT_DEMIGOD << ",protocol=tcp,mode=ingress "
+        << "--publish published=" << publicPort++ << ",target=" << _PORT_DEMIGOD << ",protocol=udp,mode=ingress "
         << "--detach=true "
         << imageTag;
 
