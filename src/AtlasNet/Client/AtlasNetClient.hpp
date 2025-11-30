@@ -8,6 +8,7 @@
 #include "../../Interlink/Interlink.hpp"
 #include "../../Debug/Crash/CrashHandler.hpp"
 #include "../../Docker/DockerIO.hpp"
+#include "../AtlasNet.hpp"
 
 class AtlasNetClient: public AtlasNetInterface, public Singleton<AtlasNetClient>
 {
@@ -28,6 +29,7 @@ public:
 private:
     void OnConnected(const InterLinkIdentifier &identifier);
     void OnMessageReceived(const Connection& from, std::span<const std::byte> data);
+    void HandleEntityMessage(const std::span<const std::byte>& data);
 private:
     std::shared_ptr<Log> logger = std::make_shared<Log>("AtlasNetClient");
     std::unordered_map<AtlasEntityID, AtlasEntity> RemoteEntities;

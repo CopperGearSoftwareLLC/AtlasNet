@@ -46,15 +46,18 @@ void AtlasNetClient::Tick()
 }
 int AtlasNetClient::GetRemoteEntities(AtlasEntity *buffer, int maxCount)
 {
-    std::lock_guard lock(Mutex);
-    int count = std::min<int>(maxCount, RemoteEntities.size());
-    int i = 0;
-    for (auto &[id, e] : RemoteEntities)
     {
-        if (i >= count) break;
-        buffer[i++] = e;
+        std::lock_guard lock(Mutex);
+        int count = std::min<int>(maxCount, RemoteEntities.size());
+        int i = 0;
+        for (auto &[id, e] : RemoteEntities)
+        {
+            if (i >= count) break;
+            buffer[i++] = e;
+        }
+  
+        return count;
     }
-    return count;
 }
 
 void AtlasNetClient::OnConnected(const InterLinkIdentifier &identifier)
@@ -122,6 +125,72 @@ void AtlasNetClient::OnMessageReceived(const Connection& from, std::span<const s
         // Establish connection
         Interlink::Get().EstablishConnectionAtIP(proxyID, ProxyIP);
     }
+    else if (from.target.Type == InterlinkType::eDemigod)
+    {
+        HandleEntityMessage(data);
+    }
+}
+
+void AtlasNetClient::HandleEntityMessage(const std::span<const std::byte>& data)
+{
+    if (data.size() < 1)
+    {
+        logger->Error("[AtlasNetClient] Received empty message ABORT");
+        return;
+    }
+
+    const AtlasNetMessageHeader header = static_cast<AtlasNetMessageHeader>(data[0]);
+    const std::byte *payload = data.data() + 1;
+    const size_t payloadSize = data.size() - 1;
+
+    if (payloadSize % sizeof(AtlasEntity) != 0)
+    {
+        logger->ErrorFormatted("[AtlasNetClient] Invalid payload size {}, ABORT", payloadSize);
+        return;
+    }
+
+    const size_t entityCount = payloadSize / sizeof(AtlasEntity);
+    std::vector<AtlasEntity> entities(entityCount);
+    std::memcpy(entities.data(), payload, payloadSize);
+    {
+        std::lock_guard<std::mutex> lock(Mutex);
+        
+        switch (header)
+        {
+            case AtlasNetMessageHeader::EntityUpdate:
+            {
+                for (const auto &entity : entities)
+                    RemoteEntities[entity.ID] = entity;
+    
+                logger->DebugFormatted("[AtlasNetClient] EntityUpdate: {} entities", entities.size());
+                break;
+            }
+            case AtlasNetMessageHeader::EntityIncoming:
+            {
+                for (const auto &entity : entities)
+                {
+                    RemoteEntities[entity.ID] = entity;
+                }
+                logger->DebugFormatted("[AtlasNetClient] Cached EntityIncoming: {} entities", entities.size());
+                break;
+            }
+            case AtlasNetMessageHeader::EntityOutgoing:
+            {
+                for (const auto &entity : entities)
+                {
+                    RemoteEntities.erase(entity.ID);
+                }
+                logger->DebugFormatted("[AtlasNetClient] Cached EntityOutgoing: {} entities", entities.size());
+                break;
+            }
+    
+            default:
+                logger->ErrorFormatted("[AtlasNetClient] Unknown AtlasNetMessageHeader {}",
+                                       static_cast<int>(header));
+                return;
+        }
+    }
+
 }
 
 void AtlasNetClient::Shutdown()

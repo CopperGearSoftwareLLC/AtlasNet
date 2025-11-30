@@ -33,7 +33,6 @@ extern "C" void atlas_client_update()
 
 extern "C" int atlas_client_get_entities(AtlasEntity *buffer, int maxCount)
 {
-  return 0;
     if (!g_client) return 0;
     return g_client->GetRemoteEntities(buffer, maxCount);
 }
