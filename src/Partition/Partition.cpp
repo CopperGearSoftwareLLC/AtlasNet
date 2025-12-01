@@ -84,7 +84,7 @@ void Partition::Init()
 
 	// Send initial test message to God
 	std::string testMessage = "Hello This is a test message from " + partitionIdentifier.ToString();
-	Interlink::Get().SendMessageRaw(InterLinkIdentifier::MakeIDGod(), std::as_bytes(std::span(testMessage)));
+	Interlink::Get().SendMessageRaw(InterLinkIdentifier::MakeIDGod(), std::as_bytes(std::span(testMessage)), InterlinkMessageSendFlag::eReliableNow);
 	while (!ShouldShutdown)
 	{
 		// Continuously check for outliers and notify God if found
@@ -97,7 +97,7 @@ void Partition::Init()
 		pushManagedEntitiesSnapshot();
 
 		Interlink::Get().Tick();
-		std::this_thread::sleep_for(std::chrono::seconds(5));
+		std::this_thread::sleep_for(std::chrono::milliseconds(200));
 	}
 
 	logger->Debug("Shutting Down");
@@ -133,7 +133,7 @@ void Partition::MessageArrived(const Connection &fromWhom, std::span<const std::
 			for (const auto &proxy : ConnectedProxies)
 			{
 				logger->Debug("[Partition] forwarded to proxy");
-				Interlink::Get().SendMessageRaw(proxy, data);
+				Interlink::Get().SendMessageRaw(proxy, data, InterlinkMessageSendFlag::eUnreliableNow);
 			}
 			return;
 		}
@@ -162,7 +162,7 @@ void Partition::MessageArrived(const Connection &fromWhom, std::span<const std::
 		// Forward to proxies
 		for (const auto &proxy : ConnectedProxies)
 		{
-			Interlink::Get().SendMessageRaw(proxy, data);
+			Interlink::Get().SendMessageRaw(proxy, data, InterlinkMessageSendFlag::eUnreliableNow);
 		}
 		// Forward to GameServer
 		if (ConnectedGameServer != nullptr)
@@ -175,7 +175,7 @@ void Partition::MessageArrived(const Connection &fromWhom, std::span<const std::
 				const std::byte *ptr = reinterpret_cast<const std::byte *>(&entity);
 				buffer.insert(buffer.end(), ptr, ptr + sizeof(AtlasEntity));
 			}
-			Interlink::Get().SendMessageRaw(*ConnectedGameServer, std::span(buffer));
+			Interlink::Get().SendMessageRaw(*ConnectedGameServer, std::span(buffer), InterlinkMessageSendFlag::eUnreliableNow);
 		}
 
 		return;
@@ -282,7 +282,7 @@ void Partition::MessageArrived(const Connection &fromWhom, std::span<const std::
 
 				for (const auto &proxy : ConnectedProxies)
 				{
-					Interlink::Get().SendMessageRaw(proxy, std::as_bytes(std::span(authorityMsg)));
+					Interlink::Get().SendMessageRaw(proxy, std::as_bytes(std::span(authorityMsg)), InterlinkMessageSendFlag::eReliableNow);
 					logger->DebugFormatted("PROXY NOTIFY: Player {} moved to {}, sent to proxy {}",
 										   it->ID, partitionStr, proxy.ToString());
 				}
@@ -366,7 +366,7 @@ void Partition::MessageArrived(const Connection &fromWhom, std::span<const std::
 											std::to_string(entity.Position.y) + ":" +
 											std::to_string(entity.Position.z);
 
-				Interlink::Get().SendMessageRaw(InterLinkIdentifier::MakeIDGod(), std::as_bytes(std::span(entityInfoMsg)));
+				Interlink::Get().SendMessageRaw(InterLinkIdentifier::MakeIDGod(), std::as_bytes(std::span(entityInfoMsg)), InterlinkMessageSendFlag::eReliableNow);
 				logger->DebugFormatted("REDISTRIBUTION: Sent entity info back to God: {}", entityInfoMsg);
 			}
 			else
@@ -378,7 +378,7 @@ void Partition::MessageArrived(const Connection &fromWhom, std::span<const std::
 											InterLinkIdentifier(InterlinkType::ePartition, DockerIO::Get().GetSelfContainerName()).ToString() + ":" +
 											std::to_string(entityId) + ":0.0:0.0:0.0"; // Dummy position since entity not found
 
-				Interlink::Get().SendMessageRaw(InterLinkIdentifier::MakeIDGod(), std::as_bytes(std::span(entityInfoMsg)));
+				Interlink::Get().SendMessageRaw(InterLinkIdentifier::MakeIDGod(), std::as_bytes(std::span(entityInfoMsg)), InterlinkMessageSendFlag::eReliableNow);
 				logger->DebugFormatted("ACKNOWLEDGED: Sent dummy response to God for missing entity {}", entityId);
 			}
 		}
@@ -540,7 +540,7 @@ void Partition::checkForOutliersAndNotifyGod()
 
 			// Notify God about outliers
 			std::string notifyMsg = "OutliersDetected:" + partitionKey + ":" + std::to_string(outliers.size());
-			Interlink::Get().SendMessageRaw(InterLinkIdentifier::MakeIDGod(), std::as_bytes(std::span(notifyMsg)));
+			Interlink::Get().SendMessageRaw(InterLinkIdentifier::MakeIDGod(), std::as_bytes(std::span(notifyMsg)), InterlinkMessageSendFlag::eReliableNow);
 			logger->DebugFormatted("GOD NOTIFICATION: Sent outlier message to God: {}", notifyMsg);
 
 			// Update notification timer since we just notified God
@@ -606,7 +606,7 @@ void Partition::notifyGodAboutOutliers()
 
 		// Notify God about outliers
 		std::string notifyMsg = "OutliersDetected:" + partitionKey + ":" + std::to_string(outliers.size());
-		Interlink::Get().SendMessageRaw(InterLinkIdentifier::MakeIDGod(), std::as_bytes(std::span(notifyMsg)));
+		Interlink::Get().SendMessageRaw(InterLinkIdentifier::MakeIDGod(), std::as_bytes(std::span(notifyMsg)), InterlinkMessageSendFlag::eReliableNow);
 		logger->DebugFormatted("PERIODIC NOTIFICATION: Sent outlier message to God: {}", notifyMsg);
 
 		// Update notification timer
@@ -618,7 +618,7 @@ void Partition::notifyGodAboutOutliers()
 			logger->DebugFormatted("AGGRESSIVE NOTIFICATION: Sending additional outlier notification to ensure God gets the message");
 			// Send a second notification after a short delay
 			std::this_thread::sleep_for(std::chrono::milliseconds(100));
-			Interlink::Get().SendMessageRaw(InterLinkIdentifier::MakeIDGod(), std::as_bytes(std::span(notifyMsg)));
+			Interlink::Get().SendMessageRaw(InterLinkIdentifier::MakeIDGod(), std::as_bytes(std::span(notifyMsg)), InterlinkMessageSendFlag::eReliableNow);
 		}
 	}
 }
