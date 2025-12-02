@@ -107,6 +107,7 @@ public:
 	using SteamCBInfo = SteamNetConnectionStatusChangedCallback_t *;
 	void CallbackOnConnecting(SteamCBInfo info);
 	void CallbackOnClosedByPear(SteamCBInfo info);
+  void CallbackOnProblemDetectedLocally(SteamCBInfo info);
 	void CallbackOnConnected(SteamCBInfo info);
 	void OpenListenSocket(PortType port);
 	void ReceiveMessages();

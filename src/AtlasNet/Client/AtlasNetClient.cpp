@@ -37,8 +37,16 @@ void AtlasNetClient::Initialize(AtlasNetClient::InitializeProperties& props)
 
 void AtlasNetClient::SendEntityUpdate(const AtlasEntity &entity)
 {
+    std::vector<std::byte> buffer;
+    buffer.reserve(1 + sizeof(AtlasEntity));
+
+    buffer.push_back(static_cast<std::byte>(AtlasNetMessageHeader::EntityUpdate));
+
+    const std::byte *ptr = reinterpret_cast<const std::byte *>(&entity);
+    buffer.insert(buffer.end(), ptr, ptr + sizeof(AtlasEntity));
+
     if (!proxyID.ID.empty())
-        Interlink::Get().SendMessageRaw(proxyID, std::as_bytes(std::span(&entity, 1)));
+        Interlink::Get().SendMessageRaw(proxyID, std::as_bytes(std::span(buffer)), InterlinkMessageSendFlag::eUnreliableNow);
 }
 void AtlasNetClient::Tick()
 {

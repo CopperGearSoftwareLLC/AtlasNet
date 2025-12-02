@@ -43,6 +43,8 @@ private:
 
     void ForwardClientToPartition(const Connection& from, std::span<const std::byte> data);
     void ForwardPartitionToClient(const Connection& from, std::span<const std::byte> data);
+    // for testing purposes, do not use in production
+    void ForwardClientToClient(const Connection& from, std::span<const std::byte> data);
 
     // Handle text-based control messages like "AuthorityChange:..."
     void HandleControlMessage(const Connection& from, const std::string& msg);

@@ -23,6 +23,17 @@ extern "C" int atlas_client_initialize(const char *exe_path, const char *client_
 
 extern "C" void atlas_client_send_entity(AtlasEntity entity)
 {
+    AtlasEntity copy;
+    copy.ID = entity.ID;
+    copy.Position = entity.Position;
+    copy.Rotation = entity.Rotation;
+    copy.Scale = entity.Scale;
+    copy.IsSpawned = entity.IsSpawned;
+    copy.IsPlayer = entity.IsPlayer;
+
+    std::cerr << "[AtlasClientBridge] Sending entity ID " << copy.ID << " Position("
+              << copy.Position.x << ", " << copy.Position.y << ", " << copy.Position.z << ")\n";
+
     if (g_client) g_client->SendEntityUpdate(entity);
 }
 

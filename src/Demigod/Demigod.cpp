@@ -151,11 +151,12 @@ void Demigod::OnMessageReceived(const Connection& from,
     // Route data either from clients to partitions or from partitions → clients.
     if (from.target.Type == InterlinkType::eGameClient)
     {
-        ForwardClientToPartition(from, data);
+        //ForwardClientToPartition(from, data);
+        ForwardClientToClient(from, data); // for testing purposes
     }
     else if (from.target.Type == InterlinkType::ePartition)
     {
-        ForwardPartitionToClient(from, data);
+        //ForwardPartitionToClient(from, data);
     }
     else
     {
@@ -260,8 +261,27 @@ void Demigod::ForwardPartitionToClient(const Connection& from,
     for (const auto& clientID : clients)
     {
         Interlink::Get().SendMessageRaw(clientID, data,
-                                        InterlinkMessageSendFlag::eReliableNow);
+                                        InterlinkMessageSendFlag::eUnreliableNow);
         logger->DebugFormatted("[Demigod] Forwarded {} bytes from partition {} to client {}",
                                 data.size(), partitionID.ToString(), clientID.ToString());
+    }
+}
+
+void Demigod::ForwardClientToClient(const Connection& from,
+                                       std::span<const std::byte> data)
+{
+    const InterLinkIdentifier& senderID = from.target;
+
+    for (const auto& clientID : clients)
+    {
+        if (clientID == senderID)
+            continue; // don't echo back to sender
+
+        Interlink::Get().SendMessageRaw(clientID, data,
+                                        InterlinkMessageSendFlag::eUnreliableNow);
+        logger->DebugFormatted("[Demigod] Forwarded {} bytes from client {} to client {}",
+                                data.size(), senderID.ToString(), clientID.ToString());
+
+        
     }
 }

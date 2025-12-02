@@ -80,7 +80,8 @@ void SampleGameServer::Run()
     Scene scene;
     // create an entity with radius that will cross partition boundaries
     // Using normalized coordinates [0,1], so radius of 0.3 centered at 0.5 will cross boundaries
-    scene.entities.emplace_back(0.3f, 0.5f); // radius = 0.3 (in normalized space), speed = 0.5 radians/sec
+    Entity& entity = scene.entities.emplace_back(0.3f, 0.5f); // radius = 0.3 (in normalized space), speed = 0.5 radians/sec
+    entity.radius = 3;
 
     // Time / loop variables
     using clock = std::chrono::high_resolution_clock;
@@ -102,6 +103,7 @@ void SampleGameServer::Run()
         {
             const auto& circleEntity = scene.entities[0];
             AtlasEntity entity;
+            entity.IsPlayer = false;
             entity.ID = 0;
             entity.IsSpawned = true;
             // Map circle position to AtlasEntity Position
@@ -126,7 +128,8 @@ void SampleGameServer::Run()
         // Sleep a bit to avoid burning CPU (simulate frame time)
         //std::this_thread::sleep_for(std::chrono::milliseconds(16));
         // ~60 updates per second
-        std::this_thread::sleep_for(std::chrono::milliseconds(1000));
+        std::this_thread::sleep_for(std::chrono::milliseconds(32));
+        // ~30 updates per second
     }
 
 }
