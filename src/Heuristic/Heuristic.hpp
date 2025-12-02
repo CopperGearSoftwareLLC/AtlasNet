@@ -27,4 +27,5 @@ public:
 private:
     std::vector<Shape> computeBigSquareShape();
     std::vector<Shape> computeGridShape();
+    std::vector<Shape> computeQuadtreeShape();
 };
