@@ -53,4 +53,5 @@ private:
     HeuristicType currentType;
     std::vector<Shape> computeBigSquareShape();
     std::vector<Shape> computeGridShape();
+    std::vector<Shape> computeQuadtreeShape();
 };

@@ -6,6 +6,10 @@
 #include <chrono>
 #include <memory>
 #include <unordered_map>
+#include "Debug/Log.hpp"
+#include <chrono>
+#include <memory>
+#include <unordered_map>
 
 /**
  * @brief Database manifest for entity outliers
@@ -206,46 +210,17 @@ public:
             return false;
         // Build compact string id:x,z;id:x,z
         std::string data;
-
-        return db->HashRemove(ENTITIES_SNAPSHOT_HASH, partitionId);
-    }
-    static bool GetAllEntitiesSnapshot(IDatabase *db,
-                                       std::unordered_map<std::string, std::vector<AtlasEntity>> &entities)
-    {
-        if (!db)
-            return false;
-
-        entities.clear();
-        const auto allData = db->HashGetAll(ENTITIES_SNAPSHOT_HASH);
-
-        for (const auto &[partitionId, jsonString] : allData)
-        {
-            try
-            {
-                nlohmann::json j = nlohmann::json::parse(jsonString);
-
-                if (!j.is_array())
-                    continue;
-
-                std::vector<AtlasEntity> list;
-                list.reserve(j.size());
-
-                for (const auto &elem : j)
-                {
-                    AtlasEntity e = AtlasEntity::FromJson(elem);
-                    list.push_back(std::move(e));
-                }
-
-                entities[partitionId] = std::move(list);
-            }
-            catch (...)
-            {
-                // malformed JSON: skip this entry
-                continue;
-            }
+        data.reserve(entities.size() * 24);
+        for (size_t i = 0; i < entities.size(); ++i) {
+            const auto& e = entities[i];
+            if (i > 0) data.push_back(';');
+            data += std::to_string(e.ID);
+            data.push_back(':');
+            data += std::to_string(e.Position.x);
+            data.push_back(',');
+            data += std::to_string(e.Position.z);
         }
-
-        return true;
+        return db->HashSet(ENTITIES_SNAPSHOT_HASH, partitionId, data);
     }
 
     /**
