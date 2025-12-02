@@ -2,6 +2,10 @@
 #include "pch.hpp"
 #include "IDatabase.hpp"
 #include "AtlasNet/AtlasEntity.hpp"
+#include "Debug/Log.hpp"
+#include <chrono>
+#include <memory>
+#include <unordered_map>
 
 /**
  * @brief Database manifest for entity outliers
@@ -164,4 +168,51 @@ public:
         }
         return db->HashSet(ENTITIES_SNAPSHOT_HASH, partitionId, data);
     }
+
+    /**
+     * @brief Push a snapshot of managed entities for a partition
+     * 
+     * @param db Database connection
+     * @param partitionId Partition identifier (e.g., "ePartition awesome_greider")
+     * @param managedEntities Vector of entities to snapshot
+     * @param lastPushTime Reference to last push time (will be updated)
+     * @param logger Optional logger for debug messages
+     * @param snapshotIntervalSeconds How often to push snapshots (default: 10 seconds)
+     * @return true if snapshot was pushed, false if skipped or failed
+     */
+    static bool PushManagedEntitiesSnapshot(
+        IDatabase* db,
+        const std::string& partitionId,
+        const std::vector<AtlasEntity>& managedEntities,
+        std::chrono::steady_clock::time_point& lastPushTime,
+        std::shared_ptr<Log> logger = nullptr,
+        int snapshotIntervalSeconds = 10
+    );
+
+    /**
+     * @brief Fetch all entities from all partitions
+     * 
+     * Retrieves entities from:
+     * - PartitionEntityManifest (managed entities per partition)
+     * - EntityManifest outliers (outliers per partition)
+     * - Entity snapshots (if includeSnapshots is true)
+     * 
+     * @param db Database connection
+     * @param includeOutliers Whether to include outlier entities (default: true)
+     * @param includeSnapshots Whether to include snapshot entities (default: true)
+     * @return Vector of all entities across all partitions
+     */
+    static std::vector<AtlasEntity> FetchAllEntitiesFromAllPartitions(
+        IDatabase* db,
+        bool includeOutliers = true,
+        bool includeSnapshots = true
+    );
+
+    /**
+     * @brief Remove duplicate entities by ID, keeping the last occurrence of each
+     * 
+     * @param entities Vector of entities that may contain duplicates
+     * @return Vector of unique entities (one per ID)
+     */
+    static std::vector<AtlasEntity> DeduplicateEntities(const std::vector<AtlasEntity>& entities);
 };

@@ -35,6 +35,12 @@ std::vector<InterLinkIdentifier> God::getPartitionServerIds() const
 
 std::optional<std::string> God::findPartitionForPoint(const vec2& point) const
 {
+  // First try fast spatial index lookup
+  if (auto fastResult = shapeCache.fastLookup(point)) {
+    return fastResult;
+  }
+  
+  // Fallback to slow iteration if spatial index not available
   for (const auto& [partitionId, shapeIdx] : shapeCache.partitionToShapeIndex) {
     const Shape& shape = shapeCache.shapes[shapeIdx];
     if (shape.contains(point)) return partitionId;
@@ -401,6 +407,10 @@ bool God::computeAndStorePartitions()
         shapeCache.partitionToShapeIndex[partitionIds[i].ToString()] = i;
     }
     shapeCache.isValid = true;
+    
+    // Build spatial index for fast partition lookups
+    shapeCache.buildSpatialIndex();
+    logger->DebugFormatted("Built spatial index with {} entries for fast partition lookups", shapeCache.spatialIndex.size());
 
     logger->Debug("Successfully computed and stored all partition shapes in database and memory cache");
     return true;

@@ -605,46 +605,13 @@ void Partition::notifyGodAboutOutliers()
 
 void Partition::pushManagedEntitiesSnapshot()
 {
-	// Push every 10 seconds if we have entities
-	auto now = std::chrono::steady_clock::now();
-	if (std::chrono::duration_cast<std::chrono::seconds>(now - lastEntitiesSnapshotPush).count() < 10)
-	{
-		return;
-	}
-
-	if (managedEntities.empty())
-	{
-		lastEntitiesSnapshotPush = now;
-		return;
-	}
-
-	if (!database)
-	{
-		logger->Error("Database connection is null - cannot push entities snapshot");
-		return;
-	}
-
-	// Ensure database is alive
-	if (!database->Exists("connection_test"))
-	{
-		logger->Error("Database connection test failed during entities snapshot - reconnecting");
-		database = std::make_unique<RedisCacheDatabase>();
-		if (!database->Connect())
-		{
-			logger->Error("Failed to reconnect to database during entities snapshot");
-			return;
-		}
-	}
-	std::string partitionKey = getCurrentPartitionId().ToString() + ":entities_snapshot";
-	if (EntityManifest::StoreEntitiesSnapshot(database.get(), partitionKey, managedEntities))
-	{
-		logger->DebugFormatted("SNAPSHOT: Pushed {} managed entities to read-only snapshot for {}", managedEntities.size(), partitionKey);
-	}
-	else
-	{
-		logger->ErrorFormatted("SNAPSHOT: Failed to push managed entities snapshot for {}", partitionKey);
-	}
-	lastEntitiesSnapshotPush = now;
+	EntityManifest::PushManagedEntitiesSnapshot(
+		database.get(),
+		getCurrentPartitionId().ToString(),
+		managedEntities,
+		lastEntitiesSnapshotPush,
+		logger
+	);
 }
 
 // ============================================================================
