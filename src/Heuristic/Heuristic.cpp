@@ -6,10 +6,14 @@
 #include "Database/IDatabase.hpp"
 
 /**
- * @brief Computes partition shapes using the current heuristic type
+ * @brief Computes partition shapes using heuristic algorithms.
  * 
- * @param entities Optional vector of entities for density-based algorithms (e.g., quadtree)
- * @return std::vector<Shape> A collection of shapes representing partition boundaries
+ * @note This is currently a placeholder implementation that returns a single triangular shape.
+ *       This method should be replaced with actual heuristic logic that analyzes system state
+ *       and computes optimal partition boundaries.
+ * 
+ * @return std::vector<Shape> A collection of shapes representing partition boundaries.
+ *         Currently returns a single triangle as a demonstration.
  */
 std::vector<Shape> Heuristic::computePartition()
 {
