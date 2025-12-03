@@ -1,30 +1,25 @@
-    void ClearAllDatabaseState();
-    #pragma once
-    #include "pch.hpp"
-    #include "Singleton.hpp"
-    #include "Debug/Log.hpp"
-    #include "Interlink/Interlink.hpp"
-    #include "Heuristic/Heuristic.hpp"
-    #include "Database/RedisCacheDatabase.hpp"
+#pragma once
+#include "pch.hpp"
+#include "Singleton.hpp"
+#include "Debug/Log.hpp"
+#include "Interlink/Interlink.hpp"
+#include "Heuristic/Heuristic.hpp"
+#include "Database/RedisCacheDatabase.hpp"
 #include "AtlasNet/AtlasEntity.hpp"
 #include "AtlasNet/AtlasNet.hpp"
+#include "Utils/GeometryUtils.hpp"
+#include "PartitionShapeCache.hpp"
+
 class God : public Singleton<God>
 {
-
     public:
     void ClearAllDatabaseState();
-
-    // Structure to cache partition shape data
-    struct PartitionShapeCache {
-        std::vector<Shape> shapes;
-        std::map<std::string, size_t> partitionToShapeIndex;
-        bool isValid = false;
-    };
 
     private:
         CURL *curl;
         std::shared_ptr<Log> logger = std::make_shared<Log>("God");
         Heuristic heuristic;
+        HeuristicType currentHeuristicType = QuadTree;  // Current heuristic type to use
     PartitionShapeCache shapeCache;
         uint32 PartitionCount = 0;
     std::atomic_bool ShouldShutdown = false;
@@ -72,6 +67,18 @@ public:
      * @return True if the cache contains valid shape data.
      */
     bool isShapeCacheValid() const { return shapeCache.isValid; }
+    
+    /**
+     * @brief Sets the heuristic type to use for partition computation
+     * @param type The heuristic type (QuadTree, Grid, etc.)
+     */
+    void setHeuristicType(HeuristicType type);
+    
+    /**
+     * @brief Gets the current heuristic type
+     * @return The current heuristic type
+     */
+    HeuristicType getHeuristicType() const { return currentHeuristicType; }
 
 
     

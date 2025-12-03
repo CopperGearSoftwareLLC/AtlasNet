@@ -625,51 +625,13 @@ void Partition::notifyGodAboutOutliers()
 
 void Partition::pushManagedEntitiesSnapshot()
 {
-	// Push every 10 seconds if we have entities
-	auto now = std::chrono::steady_clock::now();
-	if (std::chrono::duration_cast<std::chrono::seconds>(now - lastEntitiesSnapshotPush).count() < 10)
-	{
-		return;
-	}
-	if (!database)
-	{
-		logger->Error("Database connection test failed during entities snapshot - reconnecting");
-		database = std::make_unique<RedisCacheDatabase>();
-		if (!database->Connect())
-		{
-			logger->Error("Failed to reconnect to database during entities snapshot");
-			return;
-		}
-	}
-
-	if (!database)
-	{
-		logger->Error("Database connection is null - cannot push entities snapshot");
-		return;
-	}
-
-	// Ensure database is alive
-
-	std::string partitionKey = getCurrentPartitionId().ToString();
-	std::replace(partitionKey.begin(), partitionKey.end(), ' ', '_');
-		if ((managedEntities.empty() &&EntityManifest::RemoveEntitiesSnapshot(database.get(),partitionKey)) || (!managedEntities.empty() && EntityManifest::StoreEntitiesSnapshot(database.get(), partitionKey, managedEntities)))
-		{
-			if (!managedEntities.empty())
-			{
-			logger->DebugFormatted("SNAPSHOT: Pushed {} managed entities to read-only snapshot for {}", managedEntities.size(), partitionKey);
-
-			}
-			else
-			{
-			logger->DebugFormatted("SNAPSHOT: no entities to push, snapshot cleared");
-
-			}
-		}
-		else
-		{
-			logger->ErrorFormatted("SNAPSHOT: Failed to push managed entities snapshot for {}", partitionKey);
-		}
-	lastEntitiesSnapshotPush = now;
+	EntityManifest::PushManagedEntitiesSnapshot(
+		database.get(),
+		getCurrentPartitionId().ToString(),
+		managedEntities,
+		lastEntitiesSnapshotPush,
+		logger
+	);
 }
 
 // ============================================================================
