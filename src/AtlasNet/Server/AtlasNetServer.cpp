@@ -77,7 +77,7 @@ void AtlasNetServer::Update(std::span<AtlasEntity> entities,
         }
 
         InterLinkIdentifier partitionID(InterlinkType::ePartition, DockerIO::Get().GetSelfContainerName());
-        Interlink::Get().SendMessageRaw(partitionID, std::span(buffer), InterlinkMessageSendFlag::eUnreliableNow);
+        Interlink::Get().SendMessageRaw(partitionID, std::span(buffer), InterlinkMessageSendFlag::eReliableNow);
 
         logger->DebugFormatted("[Server] Sent EntityUpdate ({} entities) to partition", entities.size());
     }

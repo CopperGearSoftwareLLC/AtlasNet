@@ -148,7 +148,7 @@ void Demigod::OnMessageReceived(const Connection& from,
         return;
     }
 
-    // Route data either from clients to partitions or from partitions → clients.
+    // Route data either from clients to partitions or from partitions -> clients.
     if (from.target.Type == InterlinkType::eGameClient)
     {
         //ForwardClientToPartition(from, data);
@@ -156,7 +156,7 @@ void Demigod::OnMessageReceived(const Connection& from,
     }
     else if (from.target.Type == InterlinkType::ePartition)
     {
-        //ForwardPartitionToClient(from, data);
+        ForwardPartitionToClient(from, data);
     }
     else
     {
@@ -261,7 +261,7 @@ void Demigod::ForwardPartitionToClient(const Connection& from,
     for (const auto& clientID : clients)
     {
         Interlink::Get().SendMessageRaw(clientID, data,
-                                        InterlinkMessageSendFlag::eUnreliableNow);
+                                        InterlinkMessageSendFlag::eReliableNow);
         logger->DebugFormatted("[Demigod] Forwarded {} bytes from partition {} to client {}",
                                 data.size(), partitionID.ToString(), clientID.ToString());
     }
