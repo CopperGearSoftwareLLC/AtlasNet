@@ -1,5 +1,6 @@
 {
   "scriptPaths": [
-    "Scripts"
+    "Scripts",
+    "../"
   ]
 }
