@@ -33,14 +33,18 @@ public:
             return false;
         }
         
-        if (entities.empty()) {
-            std::cerr << "[PartitionEntityManifest] WARNING: No entities to store for partition " << partitionId << std::endl;
-            return true;
-        }
-
         // Create partition-specific hash key
         std::string partitionKey = PARTITION_ENTITIES_PREFIX + partitionId;
         
+        if (entities.empty()) {
+            // Clear the hash if no entities to store
+            bool cleared = db->HashRemoveAll(partitionKey);
+            if (!cleared) {
+                std::cerr << "[PartitionEntityManifest] WARNING: Failed to clear partition " << partitionId << std::endl;
+            }
+            return cleared;
+        }
+
         // Convert entities to string format using AtlasEntity::ToString()
         std::string entitiesStr;
         for (const auto& entity : entities) {

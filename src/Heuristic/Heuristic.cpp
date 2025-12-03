@@ -1,26 +1,28 @@
 #include "Heuristic.hpp"
 #include "GridCell.hpp"
+#include "QuadtreeHeuristic.hpp"
+#include "Database/EntityManifest.hpp"
+#include "Database/IDatabase.hpp"
 
 /**
- * @brief Computes partition shapes using heuristic algorithms.
+ * @brief Computes partition shapes using the current heuristic type
  * 
- * @note This is currently a placeholder implementation that returns a single triangular shape.
- *       This method should be replaced with actual heuristic logic that analyzes system state
- *       and computes optimal partition boundaries.
- * 
- * @return std::vector<Shape> A collection of shapes representing partition boundaries.
- *         Currently returns a single triangle as a demonstration.
+ * @param entities Optional vector of entities for density-based algorithms (e.g., quadtree)
+ * @return std::vector<Shape> A collection of shapes representing partition boundaries
  */
-std::vector<Shape> Heuristic::computePartition()
+std::vector<Shape> Heuristic::computePartition(const std::vector<AtlasEntity>& entities)
 {
-    HeuristicType theType = Grid;
-    switch (theType)
+    switch (currentType)
     {
     case BigSquare:
         return computeBigSquareShape();
     case QuadTree:
-        // Implement QuadTree heuristic logic here
-        break;
+        // Use density-based quadtree if entities are available
+        if (!entities.empty()) {
+            return QuadtreeHeuristic::computeQuadtreeShapeDensity(entities, 4, 4);
+        } else {
+            return QuadtreeHeuristic::computeQuadtreeShape();
+        }
     case KDTree:
         // Implement KDTree heuristic logic here
         break;
@@ -31,6 +33,20 @@ std::vector<Shape> Heuristic::computePartition()
         break;  
     }
     return {};
+}
+
+/**
+ * @brief Finds which partition index a point belongs to using the current heuristic
+ */
+std::optional<size_t> Heuristic::findPartitionForPoint(const vec2& point, const std::vector<Shape>& shapes) const
+{
+    // Search through all shapes to find which one contains the point
+    for (size_t i = 0; i < shapes.size(); ++i) {
+        if (shapes[i].contains(point)) {
+            return i;
+        }
+    }
+    return std::nullopt;
 }
 //(0,1)(1,1)
 //(0,0)(1,0)

@@ -35,6 +35,12 @@ std::vector<InterLinkIdentifier> God::getPartitionServerIds() const
 
 std::optional<std::string> God::findPartitionForPoint(const vec2& point) const
 {
+  // First try fast spatial index lookup
+  if (auto fastResult = shapeCache.fastLookup(point)) {
+    return fastResult;
+  }
+  
+  // Fallback to slow iteration if spatial index not available
   for (const auto& [partitionId, shapeIdx] : shapeCache.partitionToShapeIndex) {
     const Shape& shape = shapeCache.shapes[shapeIdx];
     if (shape.contains(point)) return partitionId;
@@ -314,12 +320,30 @@ const Shape* God::getCachedShape(const std::string& partitionId) const
     return nullptr;
 }
 
+void God::setHeuristicType(HeuristicType type)
+{
+    currentHeuristicType = type;
+    heuristic.setHeuristicType(type);
+    logger->DebugFormatted("Heuristic type set to {}", static_cast<int>(type));
+}
+
 bool God::computeAndStorePartitions()
 {
   try
   {
-    // Compute partition shapes using heuristic algorithms
-    std::vector<Shape> partitionShapes = heuristic.computePartition();
+    // Ensure heuristic is using the correct type
+    heuristic.setHeuristicType(currentHeuristicType);
+    
+    // Try to fetch entities for density-based algorithms
+    std::vector<AtlasEntity> entities;
+    if (cache) {
+      entities = EntityManifest::FetchAllEntitiesFromAllPartitions(cache.get(), true, true);
+      entities = EntityManifest::DeduplicateEntities(entities);
+      logger->DebugFormatted("Fetched {} entities for heuristic computation", entities.size());
+    }
+    
+    // Compute partition shapes using the current heuristic type
+    std::vector<Shape> partitionShapes = heuristic.computePartition(entities);
 
     // Update shape cache
     shapeCache.shapes = partitionShapes;
@@ -401,6 +425,10 @@ bool God::computeAndStorePartitions()
         shapeCache.partitionToShapeIndex[partitionIds[i].ToString()] = i;
     }
     shapeCache.isValid = true;
+    
+    // Build spatial index for fast partition lookups
+    shapeCache.buildSpatialIndex();
+    logger->DebugFormatted("Built spatial index with {} entries for fast partition lookups", shapeCache.spatialIndex.size());
 
     logger->Debug("Successfully computed and stored all partition shapes in database and memory cache");
     return true;
