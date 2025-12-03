@@ -320,12 +320,30 @@ const Shape* God::getCachedShape(const std::string& partitionId) const
     return nullptr;
 }
 
+void God::setHeuristicType(HeuristicType type)
+{
+    currentHeuristicType = type;
+    heuristic.setHeuristicType(type);
+    logger->DebugFormatted("Heuristic type set to {}", static_cast<int>(type));
+}
+
 bool God::computeAndStorePartitions()
 {
   try
   {
-    // Compute partition shapes using heuristic algorithms
-    std::vector<Shape> partitionShapes = heuristic.computePartition();
+    // Ensure heuristic is using the correct type
+    heuristic.setHeuristicType(currentHeuristicType);
+    
+    // Try to fetch entities for density-based algorithms
+    std::vector<AtlasEntity> entities;
+    if (cache) {
+      entities = EntityManifest::FetchAllEntitiesFromAllPartitions(cache.get(), true, true);
+      entities = EntityManifest::DeduplicateEntities(entities);
+      logger->DebugFormatted("Fetched {} entities for heuristic computation", entities.size());
+    }
+    
+    // Compute partition shapes using the current heuristic type
+    std::vector<Shape> partitionShapes = heuristic.computePartition(entities);
 
     // Update shape cache
     shapeCache.shapes = partitionShapes;
