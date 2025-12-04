@@ -1,36 +1,36 @@
 {
   "name": "Ubuntu Dev Container",
-  "image": "ubuntu:24.04", // Run commands after container is created 
-  "initializeCommand": "sh -c 'if [ ! -f \"$XAUTHORITY\" ] || [ ! -s \"$XAUTHORITY\" ]; then COOKIE=$(od -vAn -N16 -tx1 /dev/urandom | tr -d \" \\n\"); xauth add :0 . $COOKIE; fi'",
-  "postCreateCommand": "./.devcontainer/setup.sh", // Forward ports if needed 
+  "image": "ubuntu:24.04",
 
+  // Create a portable xauth file in .devcontainer/.xauth by copying the *real* cookie for $DISPLAY
+  "initializeCommand": "sh -c 'set -eu; mkdir -p .devcontainer; XAUTH_IN=\"${XAUTHORITY:-$HOME/.Xauthority}\"; XAUTH_OUT=\"$(pwd)/.devcontainer/.xauth\"; if [ ! -s \"$XAUTH_IN\" ]; then echo \"Host XAUTHORITY not found at $XAUTH_IN\" >&2; exit 1; fi; : > \"$XAUTH_OUT\"; xauth -f \"$XAUTH_IN\" nlist \"${DISPLAY}\" | sed -e \"s/^..../ffff/\" | xauth -f \"$XAUTH_OUT\" nmerge -; chmod 600 \"$XAUTH_OUT\"'",
 
-  "forwardPorts": [
-    8000,
-    9443,
-    5000
-  ], // Bind your workspace into the container 
+  "postCreateCommand": "./.devcontainer/setup.sh",
+
+  "forwardPorts": [8000, 9443, 5000],
+
   "mounts": [
     "source=${localWorkspaceFolder},target=/workspace,type=bind",
-    "source=${localEnv:XAUTHORITY},target=/root/.Xauthority,type=bind",
-    //"source=/var/run/docker.sock,target=/var/run/docker.sock,type=bind"
+
+    // mount the generated xauth file into the container
+    "source=${localWorkspaceFolder}/.devcontainer/.xauth,target=/tmp/.Xauthority,type=bind,readonly",
   ],
+
   "runArgs": [
-    // display for X apps (fallback)
     "--env=DISPLAY=${localEnv:DISPLAY}",
-    "--volume=/tmp/.X11-unix:/tmp/.X11-unix:rw",
-    // wayland support
-    "--env=WAYLAND_DISPLAY=${localEnv:WAYLAND_DISPLAY}",
-    "--env=XDG_RUNTIME_DIR=/run/user/${localEnv:UID}",
-    "--volume=/run/user/${localEnv:UID}:/run/user/${localEnv:UID}",
-    // required on NixOS to avoid SELinux DAC failures
+    "--env=XAUTHORITY=/tmp/.Xauthority",
+
+    // helps some apps that hate MIT-SHM in containers
+    "--ipc=host",
+      "--volume=/tmp/.X11-unix:/tmp/.X11-unix:rw",
+    // your NixOS label workaround (fine to keep)
     "--security-opt=label=disable"
   ],
-  
+
   "features": {
-    //"ghcr.io/devcontainers/features/docker-outside-of-docker:1": {}
     "ghcr.io/devcontainers/features/docker-in-docker:2": {}
   },
+
   "customizations": {
     "vscode": {
       "extensions": [

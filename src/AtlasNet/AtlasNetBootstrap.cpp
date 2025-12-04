@@ -218,6 +218,7 @@ void AtlasNetBootstrap::CreateGodImage()
                                                          {"BUILD_CONFIG", ToLower(BuildConfig)},
                                                          {"WORKDIR", WorkDir},
                                                          {"DEV_PACKAGES", packages},
+                                                         {"EXTRA_BUILD_CMDS",""},
                                                          {"PROJ_TO_BUILD", "God"},
                                                          {"EXECUTABLE", "God"}});
     OutputDockerFile("God/Dockerfile", DockerFileContents);
@@ -237,21 +238,23 @@ void AtlasNetBootstrap::CreatePartitionImage()
     }
 
 #ifdef _NDEBUG
+    std::string UserBuildCmds;
     for (const auto srcDir : AtlasNet::Get().GetSettings().SourceDirectories)
     {
-        DockerFileContents += "COPY " + srcDir + " " + WorkDir + "/" + srcDir + "\n";
+        UserBuildCmds += "COPY " + srcDir + " " + WorkDir + "/" + srcDir + "\n";
     }
 
     std::string BuildServerExe;
     for (const auto buildCmd : AtlasNet::Get().GetSettings().GameServerBuildCmds)
     {
-        BuildServerExe += "RUN " + buildCmd + "\n";
+        UserBuildCmds += "RUN " + buildCmd + "\n";
     }
-    ProjToBuild += BuildServerExe;
-    std::string ProjToBuild = "Partition";
+    std::string ProjToBuild = "Partition ";
+    // ProjToBuild += BuildServerExe;
 
 #else
-    std::string ProjToBuild = "Partition UnitTestsServer";
+    std::string UserBuildCmds = "";
+    std::string ProjToBuild = "Partition SandboxServer";
 #endif
 
     const std::string EntryPointCmd = MacroParse(R"(
@@ -291,6 +294,7 @@ ENTRYPOINT ["/usr/bin/tini", "--", "./entrypoint.sh"])",
                                                          {"WORKDIR", WorkDir},
                                                          {"PROJ_TO_BUILD", ProjToBuild},
                                                          {"DEV_PACKAGES", packages},
+                                                         {"EXTRA_BUILD_CMDS", UserBuildCmds},
                                                          {"EXECUTABLE", "Partition"}});
 
     OutputDockerFile("Partition/Dockerfile", DockerFileContents);
@@ -312,6 +316,7 @@ void AtlasNetBootstrap::CreateDatabaseImage()
                                                          {"BUILD_CONFIG", ToLower(BuildConfig)},
                                                          {"WORKDIR", WorkDir},
                                                          {"PROJ_TO_BUILD", "Database"},
+                                                         {"EXTRA_BUILD_CMDS", ""},
                                                          {"DEV_PACKAGES", packages},
                                                          {"EXECUTABLE", "Database"}});
     OutputDockerFile("Database/Dockerfile", DockerFileContents);
@@ -334,6 +339,7 @@ void AtlasNetBootstrap::CreateGameCoordinatorImage()
                                          {"BUILD_CONFIG", ToLower(BuildConfig)},
                                          {"WORKDIR", WorkDir},
                                          {"DEV_PACKAGES", packages},
+                                         {"EXTRA_BUILD_CMDS", ""},
                                          {"PROJ_TO_BUILD", "GameCoordinator"},
                                          {"EXECUTABLE", "GameCoordinator"}});
 
@@ -358,6 +364,7 @@ void AtlasNetBootstrap::CreateDemigodImage()
                                          {"ENTRYPOINT_CMD", "\"bin/" + BuildConfig + "/Demigod/Demigod\""},
                                          {"BUILD_CONFIG", ToLower(BuildConfig)},
                                          {"WORKDIR", WorkDir},
+                                         {"EXTRA_BUILD_CMDS", ""},
                                          {"DEV_PACKAGES", packages},
                                          {"PROJ_TO_BUILD", "Demigod"},
                                          {"EXECUTABLE", "Demigod"}});
@@ -574,12 +581,15 @@ void AtlasNetBootstrap::RunGameCoordinator()
     std::string cmd =
         "docker service create "
         "--name GameCoordinator "
-        "--network " + NetworkName + " "
-        "--mount type=bind,source=/var/run/docker.sock,target=/var/run/docker.sock "
-        "--publish published=" + std::to_string(_PORT_GAMECOORDINATOR) + ",target=" + std::to_string(_PORT_GAMECOORDINATOR) + ",protocol=tcp "
-        "--publish published=" + std::to_string(_PORT_GAMECOORDINATOR) + ",target=" + std::to_string(_PORT_GAMECOORDINATOR) + ",protocol=udp "
-        "--detach=true "
-        + image;
+        "--network " +
+        NetworkName + " "
+                      "--mount type=bind,source=/var/run/docker.sock,target=/var/run/docker.sock "
+                      "--publish published=" +
+        std::to_string(_PORT_GAMECOORDINATOR) + ",target=" + std::to_string(_PORT_GAMECOORDINATOR) + ",protocol=tcp "
+                                                                                                     "--publish published=" +
+        std::to_string(_PORT_GAMECOORDINATOR) + ",target=" + std::to_string(_PORT_GAMECOORDINATOR) + ",protocol=udp "
+                                                                                                     "--detach=true " +
+        image;
 
     system(cmd.c_str());
 }
@@ -597,8 +607,8 @@ void AtlasNetBootstrap::RunDemigod()
     const std::string registry = ManagerPcAdvertiseAddr + ":5000";
 
     std::string imageTag = RunningLocally
-        ? DemigodImageName
-        : registry + "/" + DemigodImageName + ":latest";
+                               ? DemigodImageName
+                               : registry + "/" + DemigodImageName + ":latest";
 
     logger.DebugFormatted("Running Demigod container from image '{}'", imageTag);
 
@@ -1043,8 +1053,8 @@ void AtlasNetBootstrap::SetupDemigodService()
 
     // Select correct image from registry or local
     std::string imageTag = RunningLocally
-        ? DemigodImageName
-        : registry + "/" + DemigodImageName + ":latest";
+                               ? DemigodImageName
+                               : registry + "/" + DemigodImageName + ":latest";
 
     logger.DebugFormatted("Creating Demigod service using image '{}'", imageTag);
 
@@ -1058,7 +1068,7 @@ void AtlasNetBootstrap::SetupDemigodService()
         << "--name Demigod "
         << "--network " << NetworkName << " "
         << "--mount type=bind,source=/var/run/docker.sock,target=/var/run/docker.sock "
-        << "--replicas 1 "   // change here if scaling
+        << "--replicas 1 " // change here if scaling
         // publish TCP on random port
         //<< "--publish published=0,target=" << _PORT_DEMIGOD << ",protocol=tcp,mode=ingress "
         // publish UDP on random port

@@ -4,10 +4,11 @@
 
 class CrashHandler : public Singleton<CrashHandler>
 {
+    std::filesystem::path get_executable_path();
 public:
-    void Init(const std::string &binaryName)
+    void Init()
     {
-        programName = binaryName;
+        programName = get_executable_path();
         auto HandleLambda = [](int sig)
         { CrashHandler::Get().HandleSignal(sig); };
         std::signal(SIGSEGV, HandleLambda);

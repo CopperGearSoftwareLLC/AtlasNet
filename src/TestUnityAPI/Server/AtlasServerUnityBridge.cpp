@@ -32,8 +32,6 @@ extern "C" int atlas_initialize(const AtlasInitializeProperties* props)
         g_server = std::make_unique<AtlasNetServer>();
 
         AtlasNetServer::InitializeProperties initProps;
-        if (props && props->exe_path)
-            initProps.ExePath = props->exe_path;
 
         g_server->Initialize(initProps);
         return 0;

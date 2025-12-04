@@ -182,13 +182,15 @@ void Interlink::CallbackOnClosedByPear(SteamCBInfo info)
 
     if (it == bySteam.end())
     {
-        logger->Warning("ClosedByPeer received for unknown connection.");
+        logger->Error("ClosedByPeer received for unknown connection. This should never happen");
         return;
     }
 
     InterLinkIdentifier closedID = it->target;
 
     logger->DebugFormatted("Connection closed by peer: {}", closedID.ToString());
+
+    networkInterface->CloseConnection(info->m_hConn,0,"Connection closed by peer. aka you",true);
 
     // Remove from internal table BEFORE notifying callbacks.
     bySteam.erase(it);
@@ -398,7 +400,7 @@ void Interlink::Init(const InterlinkProperties &Properties)
 
     break;
   case InterlinkType::eGameClient:
-
+    b_InDockerNetwork=false;
     break;
   default:
     // Register internal (container) address
@@ -416,7 +418,7 @@ void Interlink::Init(const InterlinkProperties &Properties)
 
   // Register public address (host ip:published port), if available
   // seems to never trigger in service containers?
-  if (DockerIO::Get().GetSelfExposedPorts().empty() == false)
+  if (b_InDockerNetwork&& DockerIO::Get().GetSelfExposedPorts().empty() == false)
   {
     // The port we are actually listening on inside the container
     ListenPort = Type2ListenPort.at(MyIdentity.Type);
@@ -463,8 +465,16 @@ void Interlink::Init(const InterlinkProperties &Properties)
   }
   else
   {
-    logger->DebugFormatted("[Interlink] No host port published for internal {} ({}). Skipping public registration.",
+    if (!b_InDockerNetwork)
+    {
+
+    }
+    else
+    {
+      logger->DebugFormatted("[Interlink] No host port published for internal {} ({}). Skipping public registration.",
                            ListenPort, MyIdentity.ToString());
+    }
+    
   }
 
   logger->Debug("Registered public");

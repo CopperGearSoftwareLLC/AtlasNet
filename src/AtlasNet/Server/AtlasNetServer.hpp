@@ -32,7 +32,7 @@ class AtlasNetServer : public AtlasNetInterface, public Singleton<AtlasNetServer
      */
     struct InitializeProperties {
 	std::function<KDServerRequestType(KDServerRequest)> RequestHandleFunction;
-    std::string ExePath;
+    //std::string ExePath;
     std::function<void(SignalType signal)>OnShutdownRequest;
     };
     /**
