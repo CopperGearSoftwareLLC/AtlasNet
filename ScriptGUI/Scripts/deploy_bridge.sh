@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# @desc: build and paste plugin to unity.
+# @desc: AtlasNetStart and paste plugin to unity.
 # @category: atlasnet
 # ==========================================
 
