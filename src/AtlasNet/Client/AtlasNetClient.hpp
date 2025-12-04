@@ -9,14 +9,13 @@
 #include "../../Debug/Crash/CrashHandler.hpp"
 #include "../../Docker/DockerIO.hpp"
 #include "../AtlasNet.hpp"
-
+#include "Interlink/Connection.hpp"
 class AtlasNetClient: public AtlasNetInterface, public Singleton<AtlasNetClient>
 {
 public:
     struct InitializeProperties
     {
-        std::string ExePath;
-        std::string ServerName;
+        IPAddress GameCoordinatorAddress;
     };
 
 public:

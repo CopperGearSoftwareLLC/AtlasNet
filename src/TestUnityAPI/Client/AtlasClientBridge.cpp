@@ -8,8 +8,6 @@ extern "C" int atlas_client_initialize(const char *exe_path, const char *client_
 {
     g_client = std::make_unique<AtlasNetClient>();
     AtlasNetClient::InitializeProperties props{
-        .ExePath = exe_path,
-        .ServerName = server_name
     };
 
     try {

@@ -75,7 +75,7 @@ class Interlink : public Singleton<Interlink>
 
 	InterlinkCallbacks callbacks;
 	PortType ListenPort;
-
+	bool b_InDockerNetwork = true;
 	const static inline std::unordered_map<InterlinkType, uint32> Type2ListenPort = {
 		{InterlinkType::eGod, _PORT_GOD},
 		{InterlinkType::ePartition, _PORT_PARTITION},

@@ -20,7 +20,7 @@ void Cartograph::Startup()
 	glewInit();
 	ImGui::CreateContext();
 	ImPlot::CreateContext();
-	ImPlot3D::CreateContext();
+
 	ImGuiIO &io = ImGui::GetIO();
 	(void)io;
 	ImFontConfig fontconfig;
@@ -28,7 +28,6 @@ void Cartograph::Startup()
 	io.Fonts->AddFontDefault(&fontconfig);
 	io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard; // Enable Keyboard Controls
 	io.ConfigFlags |= ImGuiConfigFlags_NavEnableGamepad;  // Enable Gamepad Controls
-	io.ConfigFlags |= ImGuiConfigFlags_ViewportsEnable;
 	io.ConfigFlags |= ImGuiConfigFlags_DockingEnable;
 	ImGui_ImplGlfw_InitForOpenGL(_glfwwindow, true);
 	ImGui_ImplOpenGL3_Init("#version 330");
@@ -120,9 +119,63 @@ void Cartograph::DrawConnectTo()
 	ImGui::TextColored(ImVec4(Color.r, Color.g, Color.b, Color.a), "%s", connectionLog.c_str());
 	ImGui::End();
 }
+void Cartograph::UpdateMapMatricies()
+{
+	const auto availSpace = ImGui::GetContentRegionAvail();
+	const float aspect = (float)availSpace.y / availSpace.x;
+	const auto viewportPos = ImGui::GetWindowPos();
+	const auto viewportSize = ImGui::GetWindowSize();
+	mat4 Screen(1.0f);
+	Screen[0][0] = viewportSize.x * 0.5f;  // scale X
+	Screen[1][1] = -viewportSize.y * 0.5f; // scale Y and flip
+	Screen[2][2] = 1.0f;
+	Screen[3][0] = viewportPos.x + viewportSize.x * 0.5f; // translate X
+	Screen[3][1] = viewportPos.y + viewportSize.y * 0.5f; // translate Y
+	Screen[3][3] = 1.0f;
+
+	logger->DebugFormatted("{}", glm::to_string(Screen));
+	mat4 Proj = glm::perspective<float>(Fov, 1.0f, 0.1, 100.0f);
+	logger->DebugFormatted("{}", glm::to_string(Proj));
+
+	glm::vec3 forward = glm::normalize(CameraDir);
+	glm::vec3 up = glm::vec3(0.0f, 1.0f, 0.0f);
+
+	// Fix forward parallel to up
+	if (glm::abs(glm::dot(forward, up)) > 0.999f)
+		up = glm::vec3(0.0f, 0.0f, 1.0f);
+
+	glm::mat4 view = glm::lookAt(CameraPosition, CameraPosition + forward, up);
+
+	logger->DebugFormatted("{}", glm::to_string(view));
+
+	WorldToScreenMatrix = Screen * Proj * view;
+}
 void Cartograph::DrawMap()
 {
+
 	ImGui::Begin("Map", nullptr);
+	UpdateMapMatricies();
+
+	if (ImGui::IsWindowHovered())
+	{
+		CameraPosition.y += ImGui::GetIO().MouseWheel * 0.1f;
+	}
+	vec3 quadPoints[4];
+
+	for (int i = 0; i < 4; i++)
+	{
+		float scale = 100;
+		quadPoints[i].x = (i / 2) ? 1 : -1;
+		quadPoints[i].y = (i % 2) ? 1 : -1;
+		quadPoints[i].z = 0;
+		quadPoints[i] *= scale;
+		quadPoints[i] = WorldToScreenMatrix * vec4(quadPoints[i], 1.0f);
+		logger->DebugFormatted("{}", glm::to_string(quadPoints[i]));
+	}
+	ImGui::GetWindowDrawList()->AddCircle(ImGui::GetWindowViewport()->Pos, 200, ImGui::ColorConvertFloat4ToU32(ImVec4(1, 1, 1, 1)));
+	ImGui::GetWindowDrawList()->AddQuadFilled(GlmToImGui(quadPoints[0]), GlmToImGui(quadPoints[1]), GlmToImGui(quadPoints[2]), GlmToImGui(quadPoints[3]), ImGui::ColorConvertFloat4ToU32(ImVec4(1, 1, 1, 1)));
+	// ImGui::GetWindowDrawList()->add
+	/*
 	static bool ShowNames = true;
 	ImGui::Checkbox("Names", &ShowNames);
 	if (ImPlot::BeginPlot("Map View", ImVec2(-1, -1), ImPlotFlags_CanvasOnly | ImPlotFlags_Equal))
@@ -150,12 +203,12 @@ void Cartograph::DrawMap()
 		ImPlot::PopPlotClipRect();
 		ImPlot::EndPlot();
 	}
-
+*/
 	ImGui::End();
 }
 void Cartograph::DrawPartitionGrid()
 {
-
+	/*
 	static int32 ItemCountX = 2;
 	static float ItemSpacing = 5.0f;
 	ImGui::Begin("Partitions");
@@ -246,7 +299,7 @@ void Cartograph::DrawPartitionGrid()
 	ImGui::EndChild();
 	// ImGui::SetCursorPos(GlmToImGui(OriginalCursorPos));
 
-	ImGui::End();
+	ImGui::End();*/
 }
 void Cartograph::DrawLog()
 {
@@ -276,7 +329,7 @@ void Cartograph::Update()
 	{
 		ActivePartition partition;
 		// partition.shape = Shape::FromString(shape.second);
-		partition.shape = GridCellManifest::ParseGridShape(shape.second);
+		// partition.shape = GridCellManifest::ParseGridShape(shape.second);
 		partition.Name = shape.first;
 		partition.UniquePartitionColor = GetUniqueColor(i++);
 		partitions.push_back(partition);
@@ -414,11 +467,12 @@ void Cartograph::GetEntities()
 				break;
 			}
 		}
-		if (!found) logger->ErrorFormatted("Didnt find {}. options where:\n",partitionName);
-		
+		if (!found)
+			logger->ErrorFormatted("Didnt find {}. options where:\n", partitionName);
+
 		for (const auto &activepart : partitions)
 		{
-			logger->ErrorFormatted("{}",activepart.Name);
+			logger->ErrorFormatted("{}", activepart.Name);
 		}
 	}
 }
@@ -584,7 +638,7 @@ void Cartograph::Run()
 		{
 			ImGui::ShowDemoWindow();
 			ImPlot::ShowDemoWindow();
-			ImPlot3D::ShowDemoWindow();
+
 		}
 
 		ImGui::EndFrame();

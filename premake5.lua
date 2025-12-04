@@ -26,7 +26,7 @@ workspace "GuacNet"
 
     filter {}     -- clear filter so it doesn’t leak into other settings
     
-    links { "boost_stacktrace_addr2line","boost_container", "curl", "GameNetworkingSockets", "GLEW", "glfw3", "glm", "imgui","implot","implot3d","GL","curl","ssl","crypto","z","dl","redis++","hiredis" }
+    links { "boost_stacktrace_addr2line","boost_container", "curl", "GameNetworkingSockets", "GLEW", "glfw3", "glm", "imgui","implot","GL","curl","ssl","crypto","z","dl","redis++","hiredis" }
     defines {"BOOST_STACKTRACE_LINK","BOOST_STACKTRACE_USE_ADDR2LINE"}
 
 
@@ -130,6 +130,24 @@ workspace "GuacNet"
         kind "ConsoleApp"
         language "C++"
         files { "srcRun/DemigodRun.cpp" }
+
+        
+    project "SandboxServer"
+        dependson "AtlasNetLib"
+        links "AtlasNetLib"
+        kind "ConsoleApp"
+        language "C++"
+        files { "Tests/Sandbox/*.cpp","Tests/Sandbox/Server/**.cpp" }
+        includedirs { "Tests" }
+        defines {"ENTRY_POINT=sandbox_server_entry"}
+    project "SandboxClient"
+        dependson "AtlasNetLib"
+        links "AtlasNetLib"
+        kind "ConsoleApp"
+        language "C++"
+        files { "Tests/Sandbox/*.cpp","Tests/Sandbox/Client/**.cpp" }
+        defines {"ENTRY_POINT=sandbox_client_entry"}
+        includedirs { "Tests" }
 
 -- Generic cleanup function
 function customClean(dirsToRemove, filesToRemove)

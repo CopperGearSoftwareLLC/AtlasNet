@@ -16,7 +16,6 @@
 #include <imgui.h>
 #include <imgui_stdlib.h>
 #include <implot.h>
-#include <implot3d.h>
 
 /*STB*/
 #include "stb_image.h"

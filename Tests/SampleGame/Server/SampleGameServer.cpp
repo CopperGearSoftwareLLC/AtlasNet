@@ -72,10 +72,10 @@ void SampleGameServer::Run()
 {
     std::cerr << "SampleGame Starting" << std::endl;
     AtlasNetServer::InitializeProperties InitProperties;
-    AtlasNetServer::Get().Initialize(InitProperties);
-    InitProperties.ExePath = exePath;
+    //InitProperties.ExePath = exePath;
     InitProperties.OnShutdownRequest = [&](SignalType signal)
     { ShouldShutdown = true; };
+    AtlasNetServer::Get().Initialize(InitProperties);
 
     Scene scene;
     // create an entity with radius that will cross partition boundaries

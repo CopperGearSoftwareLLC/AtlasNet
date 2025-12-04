@@ -17,6 +17,12 @@ IPAddress IPAddress::MakeLocalHost(PortType port)
 	address.SetLocalHost(port);
 	return address;
 }
+IPAddress IPAddress::FromString(const std::string_view str)
+{
+	IPAddress addr;
+	addr.SteamAddress.ParseString(str.data());
+    return addr;
+}
 void IPAddress::SetLocalHost(PortType port)
 {
 	SetIPv4(127, 0, 0, 1, port);

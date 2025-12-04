@@ -1,6 +1,7 @@
 {
   "name": "landmark",
   "version-string": "0.1.0",
+  "builtin-baseline":"d5ec528843d29e3a52d745a64b469f810b2cedbf",
   "dependencies": [
     "glfw3",
     "glew",
@@ -14,7 +15,6 @@
       ]
     },
     "implot",
-    "implot3d",
     "nlohmann-json",
     "stb",
     "boost-type-traits",
@@ -26,6 +26,7 @@
     "gamenetworkingsockets",
     "curl",
     "redis-plus-plus",
-    "hiredis"
+    "hiredis",
+    "ftxui"
   ]
 }

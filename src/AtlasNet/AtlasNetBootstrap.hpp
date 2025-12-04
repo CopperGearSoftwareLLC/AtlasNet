@@ -67,13 +67,13 @@ RUN  ./premake-core/bin/release/premake5 gmake
  RUN \
    --mount=type=cache,target=${WORKDIR}/obj \
      make -C ./build config=${BUILD_CONFIG} ${PROJ_TO_BUILD} -j $(nproc)
-
     FROM ${OS_VERSION}
     WORKDIR ${WORKDIR}
     RUN apt update && apt install redis-server tini -y
     COPY --from=builder ${WORKDIR}/bin ./bin
     COPY --from=builder ${WORKDIR}/vcpkg_installed/x64-linux/lib/*.so /usr/local/lib/
     ENV LD_LIBRARY_PATH=/usr/local/lib
+    ${EXTRA_BUILD_CMDS}
     
 
     )";
