@@ -12,7 +12,9 @@ struct AtlasEntity
     vec3 Scale;
     bool IsSpawned;
     bool IsPlayer = true;
-
+    
+    Json metadata;
+    
     Json ToJson() const;
     static AtlasEntity FromJson(const Json& json);
     //add a to string and from string 

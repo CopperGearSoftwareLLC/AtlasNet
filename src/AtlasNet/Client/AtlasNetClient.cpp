@@ -10,11 +10,7 @@ void AtlasNetClient::Initialize(AtlasNetClient::InitializeProperties& props)
   //InterLinkIdentifier God =  InterLinkIdentifier::MakeIDGod();
   GameCoordinatorID = InterLinkIdentifier::MakeIDGameCoordinator();
   logger->Debug("[AtlasNetClient] Made my & GCID");
-  //IPAddress GodIP;
-  //GodIP.SetIPv4(127,0,0,1,_PORT_GOD);
-  IPAddress GameCoordinatorIP;
-  GameCoordinatorIP.SetIPv4(127,0,0,1,_PORT_GAMECOORDINATOR);
-  logger->Debug("[AtlasNetClient] Set GC IPv4");
+
 
   Interlink::Get().Init(
   InterlinkProperties{
@@ -31,8 +27,8 @@ void AtlasNetClient::Initialize(AtlasNetClient::InitializeProperties& props)
             }
           }});
   
-    Interlink::Get().EstablishConnectionAtIP(GameCoordinatorID, GameCoordinatorIP);
-    logger->Debug("[AtlasNetClient] establishing connection to Game Coordinator");
+    Interlink::Get().EstablishConnectionAtIP(GameCoordinatorID, props.GameCoordinatorAddress);
+    logger->DebugFormatted("[AtlasNetClient] establishing connection to Game Coordinator at {}",props.GameCoordinatorAddress.ToString());
 }
 
 void AtlasNetClient::SendEntityUpdate(const AtlasEntity &entity)

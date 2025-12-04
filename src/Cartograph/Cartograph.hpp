@@ -15,10 +15,8 @@ class Cartograph : public Singleton<Cartograph>
 
     struct ActivePartition
     {
-        GridShape shape;
         std::string Name;
         std::string NodeID;
-        vec2 ScreenSpaceShapeCenter;
         vec3 UniquePartitionColor;
         std::vector<AtlasEntity> entities;
     };
@@ -64,10 +62,16 @@ class Cartograph : public Singleton<Cartograph>
     std::string IP2Manager = "localhost";
     void DrawConnectTo();
 
+    vec3 CameraPosition = {0,5,0};
+    vec3 CameraDir = {0,-1,0};
+    float Fov = 60;
+    mat4 WorldToScreenMatrix;
+    void UpdateMapMatricies();
     void DrawMap();
     void DrawPartitionGrid();
     void DrawLog();
     void DrawOptions();
+    mat4 GetWorldToScreenMatrix();
 
     void Update();
 

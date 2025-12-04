@@ -2,7 +2,7 @@
 #include <Debug/Crash/CrashHandler.hpp>
 int main(int argc, char** argv)
 {
-    CrashHandler::Get().Init(argv[0]);
+    CrashHandler::Get().Init();
 
 	Cartograph::Get().Run();
 	

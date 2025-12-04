@@ -11,7 +11,7 @@
 int main(int argc, char **argv)
 {
 
-    CrashHandler::Get().Init(argv[0]);
+    CrashHandler::Get().Init();
     DockerEvents::Get().Init(DockerEventsInit{.OnShutdownRequest = [](SignalType signal)
                                               { Partition::Get().Shutdown(); }});
     Partition::Get().Init();
