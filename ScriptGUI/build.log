@@ -3,8 +3,8 @@
 Built from '6000.0/respin/6000.0.60f1-f02d6f9f9009' branch; Version is '6000.0.60f1 (61dfb374e36f) revision 6414259'; Using compiler version '193933523'; Build Type 'Release'
 OS: 'Windows 11  (10.0.26200) 64bit Professional' Language: 'en' Physical Memory: 32507 MB
 BatchMode: 1, IsHumanControllingUs: 0, StartBugReporterOnCrash: 0, Is64bit: 1
-Date: 2025-12-05T01:38:11Z
-[Licensing::Module] Successfully launched the LicensingClient (PId: 22096)
+Date: 2025-12-05T05:11:54Z
+[Licensing::Module] Successfully launched the LicensingClient (PId: 52160)
 
 COMMAND LINE ARGUMENTS:
 Unity.exe
@@ -54,33 +54,35 @@ D:/KDNet/KDnetUnity/Linux
     "memorysetup-temp-allocator-size-gi-baking-worker=262144"
     "memorysetup-temp-allocator-size-gi-baking-worker=262144"
     "memorysetup-temp-allocator-size-gfx=262144"
-Player connection [25232]  Target information:
+Player connection [49688]  Target information:
 
-Player connection [25232]  * "[IP] 172.21.192.1 [Port] 55504 [Flags] 2 [Guid] 3016777751 [EditorId] 3016777751 [Version] 1048832 [Id] WindowsEditor(7,LenovoDS) [Debug] 1 [PackageName] WindowsEditor [ProjectName] Editor" 
+Player connection [49688]  * "[IP] 172.21.192.1 [Port] 55504 [Flags] 2 [Guid] 4049031663 [EditorId] 4049031663 [Version] 1048832 [Id] WindowsEditor(7,LenovoDS) [Debug] 1 [PackageName] WindowsEditor [ProjectName] Editor" 
 
-Player connection [25232]  * "[IP] 172.27.240.1 [Port] 55504 [Flags] 2 [Guid] 3016777751 [EditorId] 3016777751 [Version] 1048832 [Id] WindowsEditor(7,LenovoDS) [Debug] 1 [PackageName] WindowsEditor [ProjectName] Editor" 
+Player connection [49688]  * "[IP] 172.27.240.1 [Port] 55504 [Flags] 2 [Guid] 4049031663 [EditorId] 4049031663 [Version] 1048832 [Id] WindowsEditor(7,LenovoDS) [Debug] 1 [PackageName] WindowsEditor [ProjectName] Editor" 
 
-Player connection [25232]  * "[IP] 169.254.83.107 [Port] 55504 [Flags] 2 [Guid] 3016777751 [EditorId] 3016777751 [Version] 1048832 [Id] WindowsEditor(7,LenovoDS) [Debug] 1 [PackageName] WindowsEditor [ProjectName] Editor" 
+Player connection [49688]  * "[IP] 169.254.83.107 [Port] 55504 [Flags] 2 [Guid] 4049031663 [EditorId] 4049031663 [Version] 1048832 [Id] WindowsEditor(7,LenovoDS) [Debug] 1 [PackageName] WindowsEditor [ProjectName] Editor" 
 
-Player connection [25232]  * "[IP] 192.168.75.14 [Port] 55504 [Flags] 2 [Guid] 3016777751 [EditorId] 3016777751 [Version] 1048832 [Id] WindowsEditor(7,LenovoDS) [Debug] 1 [PackageName] WindowsEditor [ProjectName] Editor" 
+Player connection [49688]  * "[IP] 192.168.75.14 [Port] 55504 [Flags] 2 [Guid] 4049031663 [EditorId] 4049031663 [Version] 1048832 [Id] WindowsEditor(7,LenovoDS) [Debug] 1 [PackageName] WindowsEditor [ProjectName] Editor" 
 
-Player connection [25232] Host joined multi-casting on [225.0.0.222:54997]...
-Player connection [25232] Host joined alternative multi-casting on [225.0.0.222:34997]...
+Player connection [49688] Host joined multi-casting on [225.0.0.222:54997]...
+Player connection [49688] Host joined alternative multi-casting on [225.0.0.222:34997]...
 Input System module state changed to: Initialized.
 [Physics::Module] Initialized fallback backend.
 [Physics::Module] Id: 0xdecafbad
-[Licensing::IpcConnector] Successfully connected to: "LicenseClient-2002d" at "2025-12-05T01:38:12.3799895Z"
-[Licensing::Client] Code 10 while verifying Licensing Client signature (process Id: 22096, path: "C:/Program Files/Unity/Hub/Editor/6000.0.60f1/Editor/Data/Resources/Licensing/Client/Unity.Licensing.Client.exe")
+[Licensing::IpcConnector] Successfully connected to: "LicenseClient-2002d" at "2025-12-05T05:11:54.6411127Z"
+[Package Manager] Connected to IPC stream "Upm-37416" after 0.5 seconds.
+Library Redirect Path: Library/
+[Licensing::Client] Code 10 while verifying Licensing Client signature (process Id: 52160, path: "C:/Program Files/Unity/Hub/Editor/6000.0.60f1/Editor/Data/Resources/Licensing/Client/Unity.Licensing.Client.exe")
 [Licensing::Module] LicensingClient has failed validation; ignoring
 [Licensing::Client] Handshaking with LicensingClient:
   Version:                 1.17.2+ff71f16
-  Session Id:              e07203aa5c9f4fde93bda776ac19767e
-  Correlation Id:          3ad5339f1b72f980a1b61c08ead5534a
-  External correlation Id: 5467241295898897643
+  Session Id:              9c2e5f72e6524f65baef1dbf2e94dad9
+  Correlation Id:          4dbd7a6c59cc227858b96f7737322a59
+  External correlation Id: 8701895159842956513
   Machine Id:              ijD7u2rafHHpADmuGV6LW8xylEc=
-[Licensing::Module] Successfully connected to LicensingClient on channel: "LicenseClient-2002d" (connect: 0.85s, validation: 0.10s, handshake: 0.05s)
-[Licensing::IpcConnector] Successfully connected to: "LicenseClient-2002d-notifications" at "2025-12-05T01:38:12.5272559Z"
-[Licensing::Module] Connected to LicensingClient (PId: 22096, launch time: 0.01, total connection time: 1.00s)
+[Licensing::Module] Successfully connected to LicensingClient on channel: "LicenseClient-2002d" (connect: 0.57s, validation: 0.26s, handshake: 0.06s)
+[Licensing::IpcConnector] Successfully connected to: "LicenseClient-2002d-notifications" at "2025-12-05T05:11:54.9678035Z"
+[Licensing::Module] Connected to LicensingClient (PId: 52160, launch time: 0.00, total connection time: 0.89s)
 [Licensing::Module] Error: Access token is unavailable; failed to update
 [Licensing::Client] Successfully resolved entitlement details
 [Licensing::Module] License group:
@@ -88,18 +90,16 @@ Input System module state changed to: Initialized.
   Product: Unity Personal
   Type: Assigned
   Expiration: Unlimited
-[Licensing::Client] Successfully updated license, isAsync: True, time: 0.01
+[Licensing::Client] Successfully updated license, isAsync: True, time: 0.02
 [Licensing::Client] Successfully resolved entitlement details
-[Licensing::Module] Licensing Background thread has ended after 1.04s
-[Package Manager] Connected to IPC stream "Upm-15956" after 0.8 seconds.
-Library Redirect Path: Library/
+[Licensing::Module] Licensing Background thread has ended after 0.96s
 [Physics::Module] Selected backend.
 [Physics::Module] Name: PhysX
 [Physics::Module] Id: 0xf2b8ea05
 [Physics::Module] SDK Version: 4.1.2
 [Physics::Module] Integration Version: 1.0.0
 [Physics::Module] Threading Mode: Multi-Threaded
-Artifact Garbage Collection - Removed 2 unused hashed content filesRefreshing native plugins compatible for Editor in 49.12 ms, found 0 plugins.
+Artifact Garbage Collection - Removed 2 unused hashed content filesRefreshing native plugins compatible for Editor in 0.97 ms, found 0 plugins.
 Preloading 0 native plugins for Editor in 0.00 ms.
 Initialize engine version: 6000.0.60f1 (61dfb374e36f)
 [Subsystems] Discovering subsystems at path C:/Program Files/Unity/Hub/Editor/6000.0.60f1/Editor/Data/Resources/UnitySubsystems
@@ -115,7 +115,7 @@ Initialize mono
 Mono path[0] = 'C:/Program Files/Unity/Hub/Editor/6000.0.60f1/Editor/Data/Managed'
 Mono path[1] = 'C:/Program Files/Unity/Hub/Editor/6000.0.60f1/Editor/Data/MonoBleedingEdge/lib/mono/unityjit-win32'
 Mono config path = 'C:/Program Files/Unity/Hub/Editor/6000.0.60f1/Editor/Data/MonoBleedingEdge/etc'
-Using monoOptions --debugger-agent=transport=dt_socket,embedding=1,server=y,suspend=n,address=127.0.0.1:56956
+Using monoOptions --debugger-agent=transport=dt_socket,embedding=1,server=y,suspend=n,address=127.0.0.1:56416
 Using cacheserver namespaces - metadata:defaultmetadata, artifacts:defaultartifacts
 Using cacheserver namespaces - metadata:defaultmetadata, artifacts:defaultartifacts
 ImportWorker Server TCP listen port: 0
@@ -124,42 +124,42 @@ Begin MonoManager ReloadAssembly
 Registering precompiled unity dll's ...
 Register platform support module: C:/Program Files/Unity/Hub/Editor/6000.0.60f1/Editor/Data/PlaybackEngines/WindowsStandaloneSupport/UnityEditor.WindowsStandalone.Extensions.dll
 Register platform support module: C:/Program Files/Unity/Hub/Editor/6000.0.60f1/Editor/Data/PlaybackEngines/LinuxStandaloneSupport/UnityEditor.LinuxStandalone.Extensions.dll
-Registered in 0.209937 seconds.
-- Loaded All Assemblies, in 12.694 seconds
+Registered in 0.003503 seconds.
+- Loaded All Assemblies, in  0.400 seconds
 Native extension for LinuxStandalone target not found
 Package Manager log level set to [2]
 [Licensing::Client] Successfully resolved entitlement details
 Native extension for WindowsStandalone target not found
 Mono: successfully reloaded assembly
-- Finished resetting the current domain, in  1.570 seconds
-Domain Reload Profiling: 14262ms
-	BeginReloadAssembly (10565ms)
+- Finished resetting the current domain, in  1.225 seconds
+Domain Reload Profiling: 1623ms
+	BeginReloadAssembly (139ms)
 		ExecutionOrderSort (0ms)
 		DisableScriptedObjects (0ms)
 		BackupInstance (0ms)
 		ReleaseScriptingObjects (0ms)
-		CreateAndSetChildDomain (6ms)
-	RebuildCommonClasses (629ms)
+		CreateAndSetChildDomain (1ms)
+	RebuildCommonClasses (38ms)
 	RebuildNativeTypeToScriptingClass (11ms)
-	initialDomainReloadingComplete (265ms)
-	LoadAllAssembliesAndSetupDomain (1220ms)
-		LoadAssemblies (10569ms)
+	initialDomainReloadingComplete (53ms)
+	LoadAllAssembliesAndSetupDomain (157ms)
+		LoadAssemblies (136ms)
 		RebuildTransferFunctionScriptingTraits (0ms)
-		AnalyzeDomain (1198ms)
-			TypeCache.Refresh (1196ms)
-				TypeCache.ScanAssembly (849ms)
+		AnalyzeDomain (153ms)
+			TypeCache.Refresh (152ms)
+				TypeCache.ScanAssembly (137ms)
 			BuildScriptInfoCaches (0ms)
 			ResolveRequiredComponents (1ms)
-	FinalizeReload (1571ms)
+	FinalizeReload (1226ms)
 		ReleaseScriptCaches (0ms)
 		RebuildScriptCaches (0ms)
-		SetupLoadedEditorAssemblies (1537ms)
+		SetupLoadedEditorAssemblies (1188ms)
 			LogAssemblyErrors (0ms)
-			InitializePlatformSupportModulesInManaged (1236ms)
-			SetLoadedEditorAssemblies (5ms)
-			BeforeProcessingInitializeOnLoad (59ms)
-			ProcessInitializeOnLoadAttributes (165ms)
-			ProcessInitializeOnLoadMethodAttributes (72ms)
+			InitializePlatformSupportModulesInManaged (897ms)
+			SetLoadedEditorAssemblies (8ms)
+			BeforeProcessingInitializeOnLoad (66ms)
+			ProcessInitializeOnLoadAttributes (159ms)
+			ProcessInitializeOnLoadMethodAttributes (58ms)
 			AfterProcessingInitializeOnLoad (0ms)
 			EditorAssembliesLoaded (0ms)
 		ExecutionOrderSort2 (0ms)
@@ -231,101 +231,98 @@ Application.AssetDatabase Initial Refresh Start
     com.unity.render-pipelines.universal-config@17.0.3 (location: D:\KDNet\KDnetUnity\Linux\Library\PackageCache\com.unity.render-pipelines.universal-config@dd206bf35d04)
     com.unity.rendering.light-transport@1.0.1 (location: D:\KDNet\KDnetUnity\Linux\Library\PackageCache\com.unity.rendering.light-transport@9bd588f963c0)
 [Subsystems] No new subsystems found in resolved package list.
-[Package Manager] Done registering packages in 0.02 seconds
+[Package Manager] Done registering packages in 0.03 seconds
 Starting: C:\Program Files\Unity\Hub\Editor\6000.0.60f1\Editor\Data\bee_backend.exe --ipc --defer-dag-verification --dagfile="Library/Bee/2400b0aEDbg.dag" --continue-on-failure --profile="Library/Bee/backend1.traceevents" ScriptAssemblies
 WorkingDir: D:/KDNet/KDnetUnity/Linux
 DisplayProgressbar: Compiling Scripts
-ExitCode: 0 Duration: 1s25ms
+ExitCode: 0 Duration: 0s919ms
 [463/842    0s] WriteResponseFile Library/Bee/artifacts/rsp/4747638433968585886.rsp
 [661/842    0s] ILPP-Configuration Library/ilpp-configuration.nevergeneratedoutput
-*** Tundra build success (0.99 seconds), 2 items updated, 842 evaluated
-AssetDatabase: script compilation time: 2.189287s
+*** Tundra build success (0.87 seconds), 2 items updated, 842 evaluated
+AssetDatabase: script compilation time: 1.610165s
 Begin MonoManager ReloadAssembly
-- Loaded All Assemblies, in 11.846 seconds
-Refreshing native plugins compatible for Editor in 36.92 ms, found 3 plugins.
+- Loaded All Assemblies, in  0.975 seconds
+Refreshing native plugins compatible for Editor in 1.71 ms, found 3 plugins.
 Native extension for LinuxStandalone target not found
 Native extension for WindowsStandalone target not found
-Refreshing native plugins compatible for Editor in 1.47 ms, found 3 plugins.
+Refreshing native plugins compatible for Editor in 2.33 ms, found 3 plugins.
 Mono: successfully reloaded assembly
-- Finished resetting the current domain, in  7.089 seconds
-Domain Reload Profiling: 18933ms
-	BeginReloadAssembly (274ms)
+- Finished resetting the current domain, in  5.158 seconds
+Domain Reload Profiling: 6130ms
+	BeginReloadAssembly (295ms)
 		ExecutionOrderSort (0ms)
-		DisableScriptedObjects (14ms)
+		DisableScriptedObjects (13ms)
 		BackupInstance (0ms)
 		ReleaseScriptingObjects (0ms)
-		CreateAndSetChildDomain (133ms)
-	RebuildCommonClasses (36ms)
-	RebuildNativeTypeToScriptingClass (13ms)
+		CreateAndSetChildDomain (142ms)
+	RebuildCommonClasses (35ms)
+	RebuildNativeTypeToScriptingClass (12ms)
 	initialDomainReloadingComplete (31ms)
-	LoadAllAssembliesAndSetupDomain (11489ms)
-		LoadAssemblies (10980ms)
+	LoadAllAssembliesAndSetupDomain (599ms)
+		LoadAssemblies (457ms)
 		RebuildTransferFunctionScriptingTraits (0ms)
-		AnalyzeDomain (603ms)
-			TypeCache.Refresh (540ms)
-				TypeCache.ScanAssembly (529ms)
-			BuildScriptInfoCaches (47ms)
-			ResolveRequiredComponents (11ms)
-	FinalizeReload (7090ms)
+		AnalyzeDomain (250ms)
+			TypeCache.Refresh (187ms)
+				TypeCache.ScanAssembly (175ms)
+			BuildScriptInfoCaches (49ms)
+			ResolveRequiredComponents (10ms)
+	FinalizeReload (5159ms)
 		ReleaseScriptCaches (0ms)
 		RebuildScriptCaches (0ms)
-		SetupLoadedEditorAssemblies (5918ms)
+		SetupLoadedEditorAssemblies (4909ms)
 			LogAssemblyErrors (0ms)
-			InitializePlatformSupportModulesInManaged (35ms)
+			InitializePlatformSupportModulesInManaged (34ms)
 			SetLoadedEditorAssemblies (5ms)
-			BeforeProcessingInitializeOnLoad (212ms)
-			ProcessInitializeOnLoadAttributes (5596ms)
-			ProcessInitializeOnLoadMethodAttributes (63ms)
-			AfterProcessingInitializeOnLoad (6ms)
+			BeforeProcessingInitializeOnLoad (216ms)
+			ProcessInitializeOnLoadAttributes (4583ms)
+			ProcessInitializeOnLoadMethodAttributes (64ms)
+			AfterProcessingInitializeOnLoad (5ms)
 			EditorAssembliesLoaded (0ms)
 		ExecutionOrderSort2 (0ms)
-		AwakeInstancesAfterBackupRestoration (10ms)
-Refreshing native plugins compatible for Editor in 1.64 ms, found 3 plugins.
-Preloading 0 native plugins for Editor in 0.00 ms.
-Asset Pipeline Refresh (id=fa5f2deb0060f1049b894b1d35db0d8b): Total: 25.323 seconds - Initiated by InitialRefreshV2(ForceSynchronousImport)
+		AwakeInstancesAfterBackupRestoration (9ms)
+Asset Pipeline Refresh (id=ce06979e73bb9b3448d399cdf77c37d4): Total: 8.656 seconds - Initiated by InitialRefreshV2(ForceSynchronousImport)
 	Summary:
 		Imports: total=0 (actual=0, local cache=0, cache server=0)
-		Asset DB Process Time: managed=0 ms, native=10815 ms
-		Asset DB Callback time: managed=310 ms, native=58 ms
-		Scripting: domain reloads=1, domain reload time=11847 ms, compile time=2191 ms, other=101 ms
+		Asset DB Process Time: managed=0 ms, native=5754 ms
+		Asset DB Callback time: managed=175 ms, native=30 ms
+		Scripting: domain reloads=1, domain reload time=975 ms, compile time=1611 ms, other=109 ms
 		Project Asset Count: scripts=1239, non-scripts=2135
-		Asset File Changes: new=0, changed=1, moved=0, deleted=0
+		Asset File Changes: new=0, changed=0, moved=0, deleted=0
 		Scan Filter Count: 0
 	InvokeCustomDependenciesCallbacks: 0.001ms
-	InvokePackagesCallback: 49.245ms
-	ApplyChangesToAssetFolders: 0.868ms
-	Scan: 311.726ms
-	OnSourceAssetsModified: 0.826ms
-	CategorizeAssetsWithTransientArtifact: 2288.653ms
-	ProcessAssetsWithTransientArtifactChanges: 71.051ms
-	CategorizeAssets: 51.357ms
-	ImportOutOfDateAssets: 7135.565ms (4942.400ms without children)
-		CompileScripts: 2190.567ms
-		ReloadNativeAssets: 0.029ms
-		UnloadImportedAssets: 1.305ms
-		EnsureUptoDateAssetsAreRegisteredWithGuidPM: 0.527ms
-		InitializingProgressBar: 0.000ms
+	InvokePackagesCallback: 32.119ms
+	ApplyChangesToAssetFolders: 1.298ms
+	Scan: 174.384ms
+	OnSourceAssetsModified: 0.002ms
+	CategorizeAssetsWithTransientArtifact: 62.928ms
+	ProcessAssetsWithTransientArtifactChanges: 80.090ms
+	CategorizeAssets: 55.810ms
+	ImportOutOfDateAssets: 5171.609ms (3556.976ms without children)
+		CompileScripts: 1611.329ms
+		ReloadNativeAssets: 0.051ms
+		UnloadImportedAssets: 1.624ms
+		EnsureUptoDateAssetsAreRegisteredWithGuidPM: 0.846ms
+		InitializingProgressBar: 0.001ms
 		PostProcessAllAssetNotificationsAddChangedAssets: 0.001ms
-		OnDemandSchedulerStart: 0.737ms
-	PostProcessAllAssets: 314.633ms
-	Hotreload: 5.375ms
-	GatherAllCurrentPrimaryArtifactRevisions: 0.003ms
-	UnloadStreamsBegin: 2.384ms
-	PersistCurrentRevisions: 0.124ms
-	UnloadStreamsEnd: 0.001ms
-	GenerateScriptTypeHashes: 3.346ms
-	Untracked: 15091.152ms
+		OnDemandSchedulerStart: 0.782ms
+	PostProcessAllAssets: 175.041ms
+	GatherAllCurrentPrimaryArtifactRevisions: 0.002ms
+	UnloadStreamsBegin: 2.480ms
+	PersistCurrentRevisions: 0.133ms
+	UnloadStreamsEnd: 0.002ms
+	GenerateScriptTypeHashes: 3.266ms
+	Untracked: 2899.637ms
 
 Application.AssetDatabase Initial Refresh End
-Scanning for USB devices : 5.114ms
+Scanning for USB devices : 6.222ms
 Initializing Unity extensions:
 [MODES] ModeService[none].Initialize
 [MODES] ModeService[none].LoadModes
 [MODES] Loading mode Default (0) for mode-current-id-KDnetServer
 Unloading 16 Unused Serialized files (Serialized files now loaded: 0)
-Unloading 6117 unused Assets / (2.9 MB). Loaded Objects now: 6841.
-Memory consumption went from 193.9 MB to 191.0 MB.
-Total: 9.909900 ms (FindLiveObjects: 0.446100 ms CreateObjectMapping: 0.330600 ms MarkObjects: 7.401100 ms  DeleteObjects: 1.730600 ms)
+Unloading 6117 unused Assets / (2.7 MB). Loaded Objects now: 6841.
+Memory consumption went from 191.1 MB to 188.4 MB.
+Total: 10.329500 ms (FindLiveObjects: 0.718900 ms CreateObjectMapping: 0.351000 ms MarkObjects: 7.325500 ms  DeleteObjects: 1.932500 ms)
 
 Starting Linux Build...
 1 URP assets included in build
@@ -350,99 +347,98 @@ BuildScript:BuildLinux () (at Assets/Editor/BuildScript.cs:27)
 
 (Filename: ./Library/PackageCache/com.unity.render-pipelines.universal@ba24149c0920/Editor/BuildProcessors/URPPreprocessBuild.cs Line: 52)
 
-Start importing ProjectSettings/GraphicsSettings.asset using Guid(00000000000000006100000000000000) (LibraryAssetImporter) -> (artifact id: '7971743a43fa757e955096692620268d') in 0.0089185 seconds
-Start importing Assets/Settings/UniversalRenderPipelineGlobalSettings.asset using Guid(18dc0cd2c080841dea60987a38ce93fa) (NativeFormatImporter) -> (artifact id: '76a2f92fafa3726fa207a290f52e1d83') in 0.0070045 seconds
-Start importing Assets/Settings/PC_RPAsset.asset using Guid(4b83569d67af61e458304325a23e5dfd) (NativeFormatImporter) -> (artifact id: '74225053455e2af7fd7ea07ac6abbc81') in 0.0029655 seconds
-Refreshing native plugins compatible for Editor in 1.46 ms, found 3 plugins.
+Start importing ProjectSettings/GraphicsSettings.asset using Guid(00000000000000006100000000000000) (LibraryAssetImporter) -> (artifact id: '7971743a43fa757e955096692620268d') in 0.0120749 seconds
+Start importing Assets/Settings/UniversalRenderPipelineGlobalSettings.asset using Guid(18dc0cd2c080841dea60987a38ce93fa) (NativeFormatImporter) -> (artifact id: '76a2f92fafa3726fa207a290f52e1d83') in 0.0080273 seconds
+Start importing Assets/Settings/PC_RPAsset.asset using Guid(4b83569d67af61e458304325a23e5dfd) (NativeFormatImporter) -> (artifact id: '74225053455e2af7fd7ea07ac6abbc81') in 0.0019093 seconds
+Refreshing native plugins compatible for Editor in 1.57 ms, found 3 plugins.
 Preloading 0 native plugins for Editor in 0.00 ms.
-Asset Pipeline Refresh (id=76e0334e180ef1d4997e1234c0c1fd38): Total: 0.076 seconds - Initiated by StopAssetImportingV2(NoUpdateAssetOptions)
-Launched and connected shader compiler UnityShaderCompiler.exe after 0.06 seconds
+Asset Pipeline Refresh (id=3d682ff17c2179f4b856044fbb0fb463): Total: 0.261 seconds - Initiated by StopAssetImportingV2(NoUpdateAssetOptions)
+Launched and connected shader compiler UnityShaderCompiler.exe after 0.02 seconds
 Starting: C:\Program Files\Unity\Hub\Editor\6000.0.60f1\Editor\Data\bee_backend.exe --ipc --defer-dag-verification --dagfile="Library/Bee/2400b0aEDbgSkipCompile.dag" --continue-on-failure --profile="Library/Bee/backend1.traceevents" ScriptAssembliesAndTypeDB
 WorkingDir: D:/KDNet/KDnetUnity/Linux
-ExitCode: 0 Duration: 0s145ms
-*** Tundra build success (0.11 seconds), 0 items updated, 3 evaluated
-Start importing Assets/Resources/PerformanceTestRunSettings.json using Guid(c9f1210c40136814d9a14ea2be51b789) (TextScriptImporter) -> (artifact id: '29561b67c488262b2915a1e0a63644ec') in 0.0184158 seconds
-Start importing Assets/Resources/PerformanceTestRunInfo.json using Guid(e96907ab49c96d044978f0ac2cf01fda) (TextScriptImporter) -> (artifact id: '901d188e66369cede5b54c5bb35322eb') in 0.0135229 seconds
-Refreshing native plugins compatible for Editor in 2.26 ms, found 3 plugins.
+ExitCode: 0 Duration: 0s132ms
+*** Tundra build success (0.10 seconds), 0 items updated, 3 evaluated
+Start importing Assets/Resources/PerformanceTestRunSettings.json using Guid(6079d0115379f8d47ba0dfab4d87a64f) (TextScriptImporter) -> (artifact id: '85db64d02d8f114ab68f5fa36f0b15af') in 0.0167344 seconds
+Start importing Assets/Resources/PerformanceTestRunInfo.json using Guid(7ef644062bfb0f8418d746eb108e6947) (TextScriptImporter) -> (artifact id: 'ab23687cc21cda5fd3e3ae71b0390cea') in 0.0149874 seconds
+Refreshing native plugins compatible for Editor in 1.57 ms, found 3 plugins.
 Preloading 0 native plugins for Editor in 0.00 ms.
-Asset Pipeline Refresh (id=d5fda2c8748475a4d966dfd16bd43d61): Total: 0.070 seconds - Initiated by RefreshV2(NoUpdateAssetOptions)
+Asset Pipeline Refresh (id=c07f7086fb773304b89989daee4ef033): Total: 0.069 seconds - Initiated by RefreshV2(NoUpdateAssetOptions)
 [ScriptCompilation] Requested script compilation because: Recompiling scripts for player build.
 BuildPlayer: start building target 24
 Starting: C:\Program Files\Unity\Hub\Editor\6000.0.60f1\Editor\Data\bee_backend.exe --ipc --defer-dag-verification --dagfile="Library/Bee/2400b0aP.dag" --continue-on-failure --profile="Library/Bee/backend1.traceevents" ScriptAssembliesAndTypeDB
 WorkingDir: D:/KDNet/KDnetUnity/Linux
-ExitCode: 0 Duration: 1s256ms
+ExitCode: 0 Duration: 1s17ms
 [377/557    0s] WriteResponseFile Library/Bee/artifacts/rsp/4747638433968585886.rsp
 [476/557    0s] ILPP-Configuration Library/ilpp-configuration.nevergeneratedoutput
 [503/557    0s] CopyFiles Library/Bee/PlayerScriptAssemblies/Unity.Rendering.LightTransport.Runtime.pdb
-[504/557    0s] CopyFiles Library/Bee/PlayerScriptAssemblies/Unity.RenderPipelines.Core.Runtime.Shared.dll
-[505/557    0s] CopyFiles Library/Bee/PlayerScriptAssemblies/Unity.RenderPipelines.ShaderGraph.ShaderGraphLibrary.dll
-[506/557    0s] CopyFiles Library/Bee/PlayerScriptAssemblies/UnityEngine.UI.dll
-[507/557    0s] CopyFiles Library/Bee/PlayerScriptAssemblies/Unity.TextMeshPro.dll
-[508/557    0s] CopyFiles Library/Bee/PlayerScriptAssemblies/Unity.RenderPipelines.Universal.Config.Runtime.dll
-[509/557    0s] CopyFiles Library/Bee/PlayerScriptAssemblies/Unity.RenderPipelines.ShaderGraph.ShaderGraphLibrary.pdb
-[510/557    0s] CopyFiles Library/Bee/PlayerScriptAssemblies/Unity.Collections.dll
-[511/557    0s] CopyFiles Library/Bee/PlayerScriptAssemblies/Unity.RenderPipelines.Universal.Config.Runtime.pdb
-[512/557    0s] CopyFiles Library/Bee/PlayerScriptAssemblies/Unity.Burst.dll
-[513/557    0s] CopyFiles Library/Bee/PlayerScriptAssemblies/Unity.RenderPipelines.GPUDriven.Runtime.dll
-[514/557    0s] CopyFiles Library/Bee/PlayerScriptAssemblies/Unity.Collections.pdb
-[515/557    0s] CopyFiles Library/Bee/PlayerScriptAssemblies/Unity.RenderPipelines.Universal.Shaders.dll
-[516/557    0s] CopyFiles Library/Bee/PlayerScriptAssemblies/Unity.Mathematics.dll
-[517/557    0s] CopyFiles Library/Bee/PlayerScriptAssemblies/UnityEngine.UI.pdb
-[518/557    0s] CopyFiles Library/Bee/PlayerScriptAssemblies/Unity.RenderPipeline.Universal.ShaderLibrary.dll
-[519/557    0s] CopyFiles Library/Bee/PlayerScriptAssemblies/Assembly-CSharp-firstpass.dll
-[520/557    0s] CopyFiles Library/Bee/PlayerScriptAssemblies/Unity.Rendering.LightTransport.Runtime.dll
-[521/557    0s] CopyFiles Library/Bee/PlayerScriptAssemblies/Unity.InputSystem.ForUI.dll
-[522/557    0s] CopyFiles Library/Bee/PlayerScriptAssemblies/Unity.RenderPipelines.Core.ShaderLibrary.dll
-[523/557    0s] CopyFiles Library/Bee/PlayerScriptAssemblies/Unity.InputSystem.dll
-[524/557    0s] CopyFiles Library/Bee/PlayerScriptAssemblies/Assembly-CSharp.dll
-[525/557    0s] CopyFiles Library/Bee/PlayerScriptAssemblies/Unity.AI.Navigation.dll
-[526/557    0s] CopyFiles Library/Bee/PlayerScriptAssemblies/Unity.Multiplayer.Center.Common.pdb
-[527/557    0s] CopyFiles Library/Bee/PlayerScriptAssemblies/Unity.VisualScripting.State.dll
-[528/557    0s] CopyFiles Library/Bee/PlayerScriptAssemblies/Unity.Timeline.dll
-[529/557    0s] CopyFiles Library/Bee/PlayerScriptAssemblies/Assembly-CSharp.pdb
+[504/557    0s] CopyFiles Library/Bee/PlayerScriptAssemblies/Unity.AI.Navigation.pdb
+[505/557    0s] CopyFiles Library/Bee/PlayerScriptAssemblies/Unity.Rendering.LightTransport.Runtime.dll
+[506/557    0s] CopyFiles Library/Bee/PlayerScriptAssemblies/Unity.VisualScripting.Flow.dll
+[507/557    0s] CopyFiles Library/Bee/PlayerScriptAssemblies/Unity.Burst.pdb
+[508/557    0s] CopyFiles Library/Bee/PlayerScriptAssemblies/Unity.RenderPipelines.Core.Runtime.Shared.dll
+[509/557    0s] CopyFiles Library/Bee/PlayerScriptAssemblies/Unity.VisualScripting.Flow.pdb
+[510/557    0s] CopyFiles Library/Bee/PlayerScriptAssemblies/Unity.RenderPipelines.Core.Runtime.Shared.pdb
+[511/557    0s] CopyFiles Library/Bee/PlayerScriptAssemblies/Unity.TextMeshPro.dll
+[512/557    0s] CopyFiles Library/Bee/PlayerScriptAssemblies/Unity.TextMeshPro.pdb
+[513/557    0s] CopyFiles Library/Bee/PlayerScriptAssemblies/Unity.Burst.dll
+[514/557    0s] CopyFiles Library/Bee/PlayerScriptAssemblies/Unity.RenderPipelines.ShaderGraph.ShaderGraphLibrary.dll
+[515/557    0s] CopyFiles Library/Bee/PlayerScriptAssemblies/Unity.Multiplayer.Center.Common.dll
+[516/557    0s] CopyFiles Library/Bee/PlayerScriptAssemblies/Unity.Collections.dll
+[517/557    0s] CopyFiles Library/Bee/PlayerScriptAssemblies/Unity.RenderPipelines.Universal.Config.Runtime.dll
+[518/557    0s] CopyFiles Library/Bee/PlayerScriptAssemblies/Unity.VisualScripting.State.dll
+[519/557    0s] CopyFiles Library/Bee/PlayerScriptAssemblies/Unity.AI.Navigation.dll
+[520/557    0s] CopyFiles Library/Bee/PlayerScriptAssemblies/Unity.RenderPipelines.Universal.2D.Runtime.dll
+[521/557    0s] CopyFiles Library/Bee/PlayerScriptAssemblies/Unity.RenderPipelines.GPUDriven.Runtime.dll
+[522/557    0s] CopyFiles Library/Bee/PlayerScriptAssemblies/Unity.Timeline.dll
+[523/557    0s] CopyFiles Library/Bee/PlayerScriptAssemblies/Unity.RenderPipelines.Universal.Runtime.dll
+[524/557    0s] CopyFiles Library/Bee/PlayerScriptAssemblies/Unity.RenderPipelines.Core.Runtime.dll
+[525/557    0s] CopyFiles Library/Bee/PlayerScriptAssemblies/Assembly-CSharp.dll
+[526/557    0s] CopyFiles Library/Bee/PlayerScriptAssemblies/UnityEngine.UI.dll
+[527/557    0s] CopyFiles Library/Bee/PlayerScriptAssemblies/Unity.RenderPipelines.Universal.Shaders.dll
+[528/557    0s] CopyFiles Library/Bee/PlayerScriptAssemblies/Unity.InputSystem.ForUI.dll
+[529/557    0s] CopyFiles Library/Bee/PlayerScriptAssemblies/Unity.RenderPipelines.Core.ShaderLibrary.dll
 [530/557    0s] CopyFiles Library/Bee/PlayerScriptAssemblies/Unity.VisualScripting.Core.dll
-[531/557    0s] CopyFiles Library/Bee/PlayerScriptAssemblies/Unity.RenderPipelines.Core.ShaderLibrary.pdb
-[532/557    0s] CopyFiles Library/Bee/PlayerScriptAssemblies/Unity.Multiplayer.Center.Common.dll
-[533/557    0s] CopyFiles Library/Bee/PlayerScriptAssemblies/Unity.Timeline.pdb
-[534/557    0s] CopyFiles Library/Bee/PlayerScriptAssemblies/Unity.RenderPipelines.Universal.2D.Runtime.dll
-[535/557    0s] CopyFiles Library/Bee/PlayerScriptAssemblies/Unity.VisualScripting.Flow.dll
-[536/557    0s] CopyFiles Library/Bee/PlayerScriptAssemblies/Unity.InputSystem.pdb
-[537/557    0s] CopyFiles Library/Bee/PlayerScriptAssemblies/Unity.RenderPipelines.Core.Runtime.dll
-[538/557    0s] CopyFiles Library/Bee/PlayerScriptAssemblies/Unity.VisualScripting.Core.pdb
-[539/557    0s] CopyFiles Library/Bee/PlayerScriptAssemblies/Unity.VisualScripting.State.pdb
-[540/557    0s] CopyFiles Library/Bee/PlayerScriptAssemblies/Assembly-CSharp-firstpass.pdb
-[541/557    0s] CopyFiles Library/Bee/PlayerScriptAssemblies/Unity.RenderPipelines.Universal.Runtime.dll
-[542/557    0s] CopyFiles Library/Bee/PlayerScriptAssemblies/Unity.Mathematics.pdb
-[543/557    0s] CopyFiles Library/Bee/PlayerScriptAssemblies/Unity.AI.Navigation.pdb
-[544/557    0s] CopyFiles Library/Bee/PlayerScriptAssemblies/Unity.RenderPipelines.Universal.Runtime.pdb
-[545/557    0s] CopyFiles Library/Bee/PlayerScriptAssemblies/Unity.RenderPipelines.Core.Runtime.pdb
-[546/557    0s] CopyFiles Library/Bee/PlayerScriptAssemblies/Unity.InputSystem.ForUI.pdb
-[547/557    0s] CopyFiles Library/Bee/PlayerScriptAssemblies/Unity.VisualScripting.Flow.pdb
-[548/557    0s] CopyFiles Library/Bee/PlayerScriptAssemblies/Unity.RenderPipelines.GPUDriven.Runtime.pdb
-[549/557    0s] CopyFiles Library/Bee/PlayerScriptAssemblies/Unity.Burst.pdb
-[550/557    0s] CopyFiles Library/Bee/PlayerScriptAssemblies/Unity.RenderPipelines.Core.Runtime.Shared.pdb
-[551/557    0s] CopyFiles Library/Bee/PlayerScriptAssemblies/Unity.RenderPipelines.Universal.Shaders.pdb
-[552/557    0s] CopyFiles Library/Bee/PlayerScriptAssemblies/Unity.RenderPipeline.Universal.ShaderLibrary.pdb
-[553/557    0s] CopyFiles Library/Bee/PlayerScriptAssemblies/Unity.TextMeshPro.pdb
-[554/557    0s] CopyFiles Library/Bee/PlayerScriptAssemblies/Unity.RenderPipelines.Universal.2D.Runtime.pdb
-*** Tundra build success (1.23 seconds), 54 items updated, 557 evaluated
+[531/557    0s] CopyFiles Library/Bee/PlayerScriptAssemblies/Unity.RenderPipeline.Universal.ShaderLibrary.dll
+[532/557    0s] CopyFiles Library/Bee/PlayerScriptAssemblies/Assembly-CSharp.pdb
+[533/557    0s] CopyFiles Library/Bee/PlayerScriptAssemblies/UnityEngine.UI.pdb
+[534/557    0s] CopyFiles Library/Bee/PlayerScriptAssemblies/Unity.RenderPipelines.Universal.Shaders.pdb
+[535/557    0s] CopyFiles Library/Bee/PlayerScriptAssemblies/Unity.RenderPipelines.Core.ShaderLibrary.pdb
+[536/557    0s] CopyFiles Library/Bee/PlayerScriptAssemblies/Assembly-CSharp-firstpass.dll
+[537/557    0s] CopyFiles Library/Bee/PlayerScriptAssemblies/Unity.VisualScripting.State.pdb
+[538/557    0s] CopyFiles Library/Bee/PlayerScriptAssemblies/Unity.RenderPipelines.Universal.2D.Runtime.pdb
+[539/557    0s] CopyFiles Library/Bee/PlayerScriptAssemblies/Unity.RenderPipelines.Universal.Runtime.pdb
+[540/557    0s] CopyFiles Library/Bee/PlayerScriptAssemblies/Unity.RenderPipelines.GPUDriven.Runtime.pdb
+[541/557    0s] CopyFiles Library/Bee/PlayerScriptAssemblies/Unity.InputSystem.ForUI.pdb
+[542/557    0s] CopyFiles Library/Bee/PlayerScriptAssemblies/Unity.RenderPipelines.ShaderGraph.ShaderGraphLibrary.pdb
+[543/557    0s] CopyFiles Library/Bee/PlayerScriptAssemblies/Unity.RenderPipeline.Universal.ShaderLibrary.pdb
+[544/557    0s] CopyFiles Library/Bee/PlayerScriptAssemblies/Unity.Mathematics.pdb
+[545/557    0s] CopyFiles Library/Bee/PlayerScriptAssemblies/Unity.Timeline.pdb
+[546/557    0s] CopyFiles Library/Bee/PlayerScriptAssemblies/Assembly-CSharp-firstpass.pdb
+[547/557    0s] CopyFiles Library/Bee/PlayerScriptAssemblies/Unity.Multiplayer.Center.Common.pdb
+[548/557    0s] CopyFiles Library/Bee/PlayerScriptAssemblies/Unity.RenderPipelines.Universal.Config.Runtime.pdb
+[549/557    0s] CopyFiles Library/Bee/PlayerScriptAssemblies/Unity.Collections.pdb
+[550/557    0s] CopyFiles Library/Bee/PlayerScriptAssemblies/Unity.InputSystem.pdb
+[551/557    0s] CopyFiles Library/Bee/PlayerScriptAssemblies/Unity.VisualScripting.Core.pdb
+[552/557    0s] CopyFiles Library/Bee/PlayerScriptAssemblies/Unity.RenderPipelines.Core.Runtime.pdb
+[553/557    0s] CopyFiles Library/Bee/PlayerScriptAssemblies/Unity.Mathematics.dll
+[554/557    0s] CopyFiles Library/Bee/PlayerScriptAssemblies/Unity.InputSystem.dll
+*** Tundra build success (0.99 seconds), 54 items updated, 557 evaluated
 Total cache size 268411196
-Total cache size after purge 268411196, took 00:00:01.8019680
-Rebuilding Data files because Assets/Resources/PerformanceTestRunInfo.json is dirty (hash)
+Total cache size after purge 268411196, took 00:00:01.4196639
+Rebuilding Data files because Assets/Resources/PerformanceTestRunSettings.json is dirty (hash)
 Opening scene 'Assets/Scenes/SampleScene.unity'
 Unloading 3 Unused Serialized files (Serialized files now loaded: 0)
 Loaded scene 'Assets/Scenes/SampleScene.unity'
-	Deserialize:            23.407 ms
-	Integration:            192.704 ms
-	Integration of assets:  1.430 ms
-	Thread Wait Time:       8.880 ms
-	Total Operation Time:   226.421 ms
+	Deserialize:            14.562 ms
+	Integration:            220.358 ms
+	Integration of assets:  2.051 ms
+	Thread Wait Time:       17.769 ms
+	Total Operation Time:   254.740 ms
 Unloading 52 unused Assets / (0.6 MB). Loaded Objects now: 6922.
-Memory consumption went from 175.8 MB to 175.2 MB.
-Total: 7.917800 ms (FindLiveObjects: 0.709300 ms CreateObjectMapping: 0.127900 ms MarkObjects: 6.809100 ms  DeleteObjects: 0.270600 ms)
+Memory consumption went from 191.0 MB to 190.4 MB.
+Total: 10.039300 ms (FindLiveObjects: 0.311900 ms CreateObjectMapping: 0.121600 ms MarkObjects: 9.170100 ms  DeleteObjects: 0.434600 ms)
 
-Created GICache directory at C:/Users/2002d/AppData/LocalLow/Unity/Caches/GiCache. Took: 0.028s, timestamps: [47.655 - 47.683]
-Total cache size 268411196
+Created GICache directory at C:/Users/2002d/AppData/LocalLow/Unity/Caches/GiCache. Took: 0.023s, timestamps: [15.732 - 15.755]
 Script attached to 'ServerTest' in scene 'Assets/Scenes/SampleScene.unity' is missing or no valid script is attached.
 UnityEngine.Debug:ExtractStackTraceNoAlloc (byte*,int,string)
 UnityEngine.StackTraceUtility:ExtractStackTrace ()
@@ -454,6 +450,7 @@ BuildScript:BuildLinux () (at Assets/Editor/BuildScript.cs:27)
 
 [Assets/Editor/BuildScript.cs line 27]
 
+Total cache size 268411196
 
 
 Mono dependencies included in the build
@@ -774,27 +771,27 @@ Dependency assembly - System.ComponentModel.dll
 
 Unloading 42 Unused Serialized files (Serialized files now loaded: 0)
 Unloading 2048 unused Assets / (1.1 MB). Loaded Objects now: 6884.
-Memory consumption went from 181.6 MB to 180.5 MB.
-Total: 9.732200 ms (FindLiveObjects: 0.297800 ms CreateObjectMapping: 0.130600 ms MarkObjects: 7.954300 ms  DeleteObjects: 1.348100 ms)
+Memory consumption went from 196.8 MB to 195.7 MB.
+Total: 10.037600 ms (FindLiveObjects: 0.330400 ms CreateObjectMapping: 0.130100 ms MarkObjects: 7.533800 ms  DeleteObjects: 2.042000 ms)
 
 Unloading 0 Unused Serialized files (Serialized files now loaded: 0)
 Unloading 0 unused Assets / (0 B). Loaded Objects now: 6884.
-Memory consumption went from 180.4 MB to 180.4 MB.
-Total: 7.187100 ms (FindLiveObjects: 0.253700 ms CreateObjectMapping: 0.142300 ms MarkObjects: 6.775200 ms  DeleteObjects: 0.014900 ms)
+Memory consumption went from 195.6 MB to 195.6 MB.
+Total: 7.643000 ms (FindLiveObjects: 0.267100 ms CreateObjectMapping: 0.128500 ms MarkObjects: 7.227600 ms  DeleteObjects: 0.018300 ms)
 
 Unloading 1 Unused Serialized files (Serialized files now loaded: 0)
 Unloading 166 unused Assets / (139.2 MB). Loaded Objects now: 6884.
-Memory consumption went from 316.7 MB to 177.5 MB.
-Total: 23.640600 ms (FindLiveObjects: 0.394500 ms CreateObjectMapping: 0.107200 ms MarkObjects: 9.182300 ms  DeleteObjects: 13.955300 ms)
+Memory consumption went from 331.9 MB to 192.7 MB.
+Total: 22.366200 ms (FindLiveObjects: 0.287900 ms CreateObjectMapping: 0.132700 ms MarkObjects: 8.068800 ms  DeleteObjects: 13.875400 ms)
 
 Compiling shader "Hidden/Universal Render Pipeline/Sampling" pass "BoxDownsample" (vp)
     Full variant space:         2
     After settings filtering:   2
     After built-in stripping:   2
     After scriptable stripping: 2
-    Processed in 1.01 seconds
+    Processed in 0.99 seconds
     starting compilation...
-    finished in 0.01 seconds. Local cache hits 2 (0.01s CPU time), remote cache hits 0 (0.00s CPU time), compiled 0 variants (0.00s CPU time), skipped 0 variants
+    finished in 0.00 seconds. Local cache hits 2 (0.00s CPU time), remote cache hits 0 (0.00s CPU time), compiled 0 variants (0.00s CPU time), skipped 0 variants
     Prepared data for serialisation in 0.00s
 Serialized binary data for shader Hidden/Universal Render Pipeline/Sampling in 0.00s
     glcore (total internal programs: 1, unique: 1)
@@ -806,7 +803,7 @@ Compiling shader "Hidden/Universal Render Pipeline/ScreenSpaceAmbientOcclusion" 
     After scriptable stripping: 4
     Processed in 0.00 seconds
     starting compilation...
-    finished in 0.01 seconds. Local cache hits 4 (0.04s CPU time), remote cache hits 0 (0.00s CPU time), compiled 0 variants (0.00s CPU time), skipped 0 variants
+    finished in 0.00 seconds. Local cache hits 4 (0.00s CPU time), remote cache hits 0 (0.00s CPU time), compiled 0 variants (0.00s CPU time), skipped 0 variants
     Prepared data for serialisation in 0.00s
 Compiling shader "Hidden/Universal Render Pipeline/ScreenSpaceAmbientOcclusion" pass "SSAO_Bilateral_HorizontalBlur" (vp)
     Full variant space:         2
@@ -824,7 +821,7 @@ Compiling shader "Hidden/Universal Render Pipeline/ScreenSpaceAmbientOcclusion" 
     After scriptable stripping: 2
     Processed in 0.00 seconds
     starting compilation...
-    finished in 0.01 seconds. Local cache hits 2 (0.02s CPU time), remote cache hits 0 (0.00s CPU time), compiled 0 variants (0.00s CPU time), skipped 0 variants
+    finished in 0.00 seconds. Local cache hits 2 (0.00s CPU time), remote cache hits 0 (0.00s CPU time), compiled 0 variants (0.00s CPU time), skipped 0 variants
     Prepared data for serialisation in 0.00s
 Compiling shader "Hidden/Universal Render Pipeline/ScreenSpaceAmbientOcclusion" pass "SSAO_Bilateral_FinalBlur" (vp)
     Full variant space:         2
@@ -833,7 +830,7 @@ Compiling shader "Hidden/Universal Render Pipeline/ScreenSpaceAmbientOcclusion" 
     After scriptable stripping: 2
     Processed in 0.00 seconds
     starting compilation...
-    finished in 0.01 seconds. Local cache hits 2 (0.01s CPU time), remote cache hits 0 (0.00s CPU time), compiled 0 variants (0.00s CPU time), skipped 0 variants
+    finished in 0.00 seconds. Local cache hits 2 (0.00s CPU time), remote cache hits 0 (0.00s CPU time), compiled 0 variants (0.00s CPU time), skipped 0 variants
     Prepared data for serialisation in 0.00s
 Compiling shader "Hidden/Universal Render Pipeline/ScreenSpaceAmbientOcclusion" pass "SSAO_Bilateral_FinalBlur_AfterOpaque" (vp)
     Full variant space:         2
@@ -851,7 +848,7 @@ Compiling shader "Hidden/Universal Render Pipeline/ScreenSpaceAmbientOcclusion" 
     After scriptable stripping: 2
     Processed in 0.00 seconds
     starting compilation...
-    finished in 0.01 seconds. Local cache hits 2 (0.01s CPU time), remote cache hits 0 (0.00s CPU time), compiled 0 variants (0.00s CPU time), skipped 0 variants
+    finished in 0.00 seconds. Local cache hits 2 (0.00s CPU time), remote cache hits 0 (0.00s CPU time), compiled 0 variants (0.00s CPU time), skipped 0 variants
     Prepared data for serialisation in 0.00s
 Compiling shader "Hidden/Universal Render Pipeline/ScreenSpaceAmbientOcclusion" pass "SSAO_Gaussian_VerticalBlur" (vp)
     Full variant space:         2
@@ -860,7 +857,7 @@ Compiling shader "Hidden/Universal Render Pipeline/ScreenSpaceAmbientOcclusion" 
     After scriptable stripping: 2
     Processed in 0.00 seconds
     starting compilation...
-    finished in 0.01 seconds. Local cache hits 2 (0.01s CPU time), remote cache hits 0 (0.00s CPU time), compiled 0 variants (0.00s CPU time), skipped 0 variants
+    finished in 0.00 seconds. Local cache hits 2 (0.00s CPU time), remote cache hits 0 (0.00s CPU time), compiled 0 variants (0.00s CPU time), skipped 0 variants
     Prepared data for serialisation in 0.00s
 Compiling shader "Hidden/Universal Render Pipeline/ScreenSpaceAmbientOcclusion" pass "SSAO_Gaussian_VerticalBlur_AfterOpaque" (vp)
     Full variant space:         2
@@ -869,7 +866,7 @@ Compiling shader "Hidden/Universal Render Pipeline/ScreenSpaceAmbientOcclusion" 
     After scriptable stripping: 2
     Processed in 0.00 seconds
     starting compilation...
-    finished in 0.01 seconds. Local cache hits 2 (0.02s CPU time), remote cache hits 0 (0.00s CPU time), compiled 0 variants (0.00s CPU time), skipped 0 variants
+    finished in 0.00 seconds. Local cache hits 2 (0.00s CPU time), remote cache hits 0 (0.00s CPU time), compiled 0 variants (0.00s CPU time), skipped 0 variants
     Prepared data for serialisation in 0.00s
 Compiling shader "Hidden/Universal Render Pipeline/ScreenSpaceAmbientOcclusion" pass "SSAO_Kawase" (vp)
     Full variant space:         2
@@ -878,7 +875,7 @@ Compiling shader "Hidden/Universal Render Pipeline/ScreenSpaceAmbientOcclusion" 
     After scriptable stripping: 2
     Processed in 0.00 seconds
     starting compilation...
-    finished in 0.01 seconds. Local cache hits 2 (0.02s CPU time), remote cache hits 0 (0.00s CPU time), compiled 0 variants (0.00s CPU time), skipped 0 variants
+    finished in 0.00 seconds. Local cache hits 2 (0.00s CPU time), remote cache hits 0 (0.00s CPU time), compiled 0 variants (0.00s CPU time), skipped 0 variants
     Prepared data for serialisation in 0.00s
 Compiling shader "Hidden/Universal Render Pipeline/ScreenSpaceAmbientOcclusion" pass "SSAO_Kawase_AfterOpaque" (vp)
     Full variant space:         2
@@ -887,7 +884,7 @@ Compiling shader "Hidden/Universal Render Pipeline/ScreenSpaceAmbientOcclusion" 
     After scriptable stripping: 2
     Processed in 0.00 seconds
     starting compilation...
-    finished in 0.01 seconds. Local cache hits 2 (0.02s CPU time), remote cache hits 0 (0.00s CPU time), compiled 0 variants (0.00s CPU time), skipped 0 variants
+    finished in 0.00 seconds. Local cache hits 2 (0.00s CPU time), remote cache hits 0 (0.00s CPU time), compiled 0 variants (0.00s CPU time), skipped 0 variants
     Prepared data for serialisation in 0.00s
 Serialized binary data for shader Hidden/Universal Render Pipeline/ScreenSpaceAmbientOcclusion in 0.00s
     glcore (total internal programs: 11, unique: 11)
@@ -899,7 +896,7 @@ Compiling shader "Hidden/Universal Render Pipeline/Stop NaN" pass "Stop NaN" (vp
     After scriptable stripping: 2
     Processed in 0.00 seconds
     starting compilation...
-    finished in 0.01 seconds. Local cache hits 2 (0.02s CPU time), remote cache hits 0 (0.00s CPU time), compiled 0 variants (0.00s CPU time), skipped 0 variants
+    finished in 0.00 seconds. Local cache hits 2 (0.00s CPU time), remote cache hits 0 (0.00s CPU time), compiled 0 variants (0.00s CPU time), skipped 0 variants
     Prepared data for serialisation in 0.00s
 Serialized binary data for shader Hidden/Universal Render Pipeline/Stop NaN in 0.00s
     glcore (total internal programs: 1, unique: 1)
@@ -911,7 +908,7 @@ Compiling shader "Hidden/CoreSRP/CoreCopy" pass "Copy" (vp)
     After scriptable stripping: 4
     Processed in 0.00 seconds
     starting compilation...
-    finished in 0.01 seconds. Local cache hits 4 (0.03s CPU time), remote cache hits 0 (0.00s CPU time), compiled 0 variants (0.00s CPU time), skipped 0 variants
+    finished in 0.00 seconds. Local cache hits 4 (0.00s CPU time), remote cache hits 0 (0.00s CPU time), compiled 0 variants (0.00s CPU time), skipped 0 variants
     Prepared data for serialisation in 0.00s
 Compiling shader "Hidden/CoreSRP/CoreCopy" pass "CopyMS" (vp)
     Full variant space:         4
@@ -920,7 +917,7 @@ Compiling shader "Hidden/CoreSRP/CoreCopy" pass "CopyMS" (vp)
     After scriptable stripping: 4
     Processed in 0.00 seconds
     starting compilation...
-    finished in 0.01 seconds. Local cache hits 4 (0.03s CPU time), remote cache hits 0 (0.00s CPU time), compiled 0 variants (0.00s CPU time), skipped 0 variants
+    finished in 0.00 seconds. Local cache hits 4 (0.00s CPU time), remote cache hits 0 (0.00s CPU time), compiled 0 variants (0.00s CPU time), skipped 0 variants
     Prepared data for serialisation in 0.00s
 Serialized binary data for shader Hidden/CoreSRP/CoreCopy in 0.00s
     glcore (total internal programs: 4, unique: 4)
@@ -941,7 +938,7 @@ Compiling shader "Hidden/Universal Render Pipeline/CameraMotionBlur" pass "Camer
     After scriptable stripping: 2
     Processed in 0.00 seconds
     starting compilation...
-    finished in 0.01 seconds. Local cache hits 2 (0.01s CPU time), remote cache hits 0 (0.00s CPU time), compiled 0 variants (0.00s CPU time), skipped 0 variants
+    finished in 0.00 seconds. Local cache hits 2 (0.00s CPU time), remote cache hits 0 (0.00s CPU time), compiled 0 variants (0.00s CPU time), skipped 0 variants
     Prepared data for serialisation in 0.00s
 Compiling shader "Hidden/Universal Render Pipeline/CameraMotionBlur" pass "Camera Motion Blur - High Quality" (vp)
     Full variant space:         4
@@ -950,7 +947,7 @@ Compiling shader "Hidden/Universal Render Pipeline/CameraMotionBlur" pass "Camer
     After scriptable stripping: 2
     Processed in 0.00 seconds
     starting compilation...
-    finished in 0.01 seconds. Local cache hits 2 (0.01s CPU time), remote cache hits 0 (0.00s CPU time), compiled 0 variants (0.00s CPU time), skipped 0 variants
+    finished in 0.00 seconds. Local cache hits 2 (0.00s CPU time), remote cache hits 0 (0.00s CPU time), compiled 0 variants (0.00s CPU time), skipped 0 variants
     Prepared data for serialisation in 0.00s
 Compiling shader "Hidden/Universal Render Pipeline/CameraMotionBlur" pass "Camera And Object Motion Blur - Low Quality" (vp)
     Full variant space:         4
@@ -959,7 +956,7 @@ Compiling shader "Hidden/Universal Render Pipeline/CameraMotionBlur" pass "Camer
     After scriptable stripping: 2
     Processed in 0.00 seconds
     starting compilation...
-    finished in 0.01 seconds. Local cache hits 2 (0.01s CPU time), remote cache hits 0 (0.00s CPU time), compiled 0 variants (0.00s CPU time), skipped 0 variants
+    finished in 0.00 seconds. Local cache hits 2 (0.00s CPU time), remote cache hits 0 (0.00s CPU time), compiled 0 variants (0.00s CPU time), skipped 0 variants
     Prepared data for serialisation in 0.00s
 Compiling shader "Hidden/Universal Render Pipeline/CameraMotionBlur" pass "Camera And Object Motion Blur - Medium Quality" (vp)
     Full variant space:         4
@@ -968,7 +965,7 @@ Compiling shader "Hidden/Universal Render Pipeline/CameraMotionBlur" pass "Camer
     After scriptable stripping: 2
     Processed in 0.00 seconds
     starting compilation...
-    finished in 0.01 seconds. Local cache hits 2 (0.01s CPU time), remote cache hits 0 (0.00s CPU time), compiled 0 variants (0.00s CPU time), skipped 0 variants
+    finished in 0.00 seconds. Local cache hits 2 (0.00s CPU time), remote cache hits 0 (0.00s CPU time), compiled 0 variants (0.00s CPU time), skipped 0 variants
     Prepared data for serialisation in 0.00s
 Compiling shader "Hidden/Universal Render Pipeline/CameraMotionBlur" pass "Camera And Object Motion Blur - High Quality" (vp)
     Full variant space:         4
@@ -977,7 +974,7 @@ Compiling shader "Hidden/Universal Render Pipeline/CameraMotionBlur" pass "Camer
     After scriptable stripping: 2
     Processed in 0.00 seconds
     starting compilation...
-    finished in 0.01 seconds. Local cache hits 2 (0.01s CPU time), remote cache hits 0 (0.00s CPU time), compiled 0 variants (0.00s CPU time), skipped 0 variants
+    finished in 0.00 seconds. Local cache hits 2 (0.00s CPU time), remote cache hits 0 (0.00s CPU time), compiled 0 variants (0.00s CPU time), skipped 0 variants
     Prepared data for serialisation in 0.00s
 Serialized binary data for shader Hidden/Universal Render Pipeline/CameraMotionBlur in 0.00s
     glcore (total internal programs: 6, unique: 6)
@@ -989,7 +986,7 @@ Compiling shader "Hidden/TerrainEngine/Details/UniversalPipeline/BillboardWaving
     After scriptable stripping: 8
     Processed in 0.00 seconds
     starting compilation...
-    finished in 0.01 seconds. Local cache hits 8 (0.08s CPU time), remote cache hits 0 (0.00s CPU time), compiled 0 variants (0.00s CPU time), skipped 0 variants
+    finished in 0.00 seconds. Local cache hits 8 (0.01s CPU time), remote cache hits 0 (0.00s CPU time), compiled 0 variants (0.00s CPU time), skipped 0 variants
     Prepared data for serialisation in 0.00s
 Compiling shader "Hidden/TerrainEngine/Details/UniversalPipeline/BillboardWavingDoublePass" pass "GBuffer" (vp)
     Full variant space:         640
@@ -1005,7 +1002,7 @@ Compiling shader "Hidden/TerrainEngine/Details/UniversalPipeline/BillboardWaving
     After scriptable stripping: 2
     Processed in 0.00 seconds
     starting compilation...
-    finished in 0.01 seconds. Local cache hits 2 (0.01s CPU time), remote cache hits 0 (0.00s CPU time), compiled 0 variants (0.00s CPU time), skipped 0 variants
+    finished in 0.00 seconds. Local cache hits 2 (0.00s CPU time), remote cache hits 0 (0.00s CPU time), compiled 0 variants (0.00s CPU time), skipped 0 variants
     Prepared data for serialisation in 0.00s
 Compiling shader "Hidden/TerrainEngine/Details/UniversalPipeline/BillboardWavingDoublePass" pass "DepthNormals" (vp)
     Full variant space:         4
@@ -1014,7 +1011,7 @@ Compiling shader "Hidden/TerrainEngine/Details/UniversalPipeline/BillboardWaving
     After scriptable stripping: 2
     Processed in 0.00 seconds
     starting compilation...
-    finished in 0.01 seconds. Local cache hits 2 (0.01s CPU time), remote cache hits 0 (0.00s CPU time), compiled 0 variants (0.00s CPU time), skipped 0 variants
+    finished in 0.00 seconds. Local cache hits 2 (0.00s CPU time), remote cache hits 0 (0.00s CPU time), compiled 0 variants (0.00s CPU time), skipped 0 variants
     Prepared data for serialisation in 0.00s
 Serialized binary data for shader Hidden/TerrainEngine/Details/UniversalPipeline/BillboardWavingDoublePass in 0.00s
     glcore (total internal programs: 6, unique: 6)
@@ -1026,7 +1023,7 @@ Compiling shader "Hidden/Universal Render Pipeline/BokehDepthOfField" pass "Boke
     After scriptable stripping: 2
     Processed in 0.00 seconds
     starting compilation...
-    finished in 0.01 seconds. Local cache hits 2 (0.02s CPU time), remote cache hits 0 (0.00s CPU time), compiled 0 variants (0.00s CPU time), skipped 0 variants
+    finished in 0.00 seconds. Local cache hits 2 (0.00s CPU time), remote cache hits 0 (0.00s CPU time), compiled 0 variants (0.00s CPU time), skipped 0 variants
     Prepared data for serialisation in 0.00s
 Compiling shader "Hidden/Universal Render Pipeline/BokehDepthOfField" pass "Bokeh Depth Of Field Prefilter" (vp)
     Full variant space:         4
@@ -1035,7 +1032,7 @@ Compiling shader "Hidden/Universal Render Pipeline/BokehDepthOfField" pass "Boke
     After scriptable stripping: 2
     Processed in 0.00 seconds
     starting compilation...
-    finished in 0.01 seconds. Local cache hits 2 (0.01s CPU time), remote cache hits 0 (0.00s CPU time), compiled 0 variants (0.00s CPU time), skipped 0 variants
+    finished in 0.00 seconds. Local cache hits 2 (0.00s CPU time), remote cache hits 0 (0.00s CPU time), compiled 0 variants (0.00s CPU time), skipped 0 variants
     Prepared data for serialisation in 0.00s
 Compiling shader "Hidden/Universal Render Pipeline/BokehDepthOfField" pass "Bokeh Depth Of Field Blur" (vp)
     Full variant space:         4
@@ -1044,52 +1041,7 @@ Compiling shader "Hidden/Universal Render Pipeline/BokehDepthOfField" pass "Boke
     After scriptable stripping: 2
     Processed in 0.00 seconds
     starting compilation...
-    finished in 0.02 seconds. Local cache hits 2 (0.02s CPU time), remote cache hits 0 (0.00s CPU time), compiled 0 variants (0.00s CPU time), skipped 0 variants
-    Prepared data for serialisation in 0.00s
-Compiling shader "Hidden/Universal Render Pipeline/BokehDepthOfField" pass "Bokeh Depth Of Field Post Blur" (vp)
-    Full variant space:         4
-    After settings filtering:   2
-    After built-in stripping:   2
-    After scriptable stripping: 2
-    Processed in 0.00 seconds
-    starting compilation...
-    finished in 0.01 seconds. Local cache hits 2 (0.01s CPU time), remote cache hits 0 (0.00s CPU time), compiled 0 variants (0.00s CPU time), skipped 0 variants
-    Prepared data for serialisation in 0.00s
-Compiling shader "Hidden/Universal Render Pipeline/BokehDepthOfField" pass "Bokeh Depth Of Field Composite" (vp)
-    Full variant space:         8
-    After settings filtering:   2
-    After built-in stripping:   2
-    After scriptable stripping: 2
-    Processed in 0.00 seconds
-    starting compilation...
-    finished in 0.01 seconds. Local cache hits 2 (0.02s CPU time), remote cache hits 0 (0.00s CPU time), compiled 0 variants (0.00s CPU time), skipped 0 variants
-    Prepared data for serialisation in 0.00s
-Compiling shader "Hidden/Universal Render Pipeline/BokehDepthOfField" pass "Bokeh Depth Of Field CoC" (vp)
-    Full variant space:         4
-    After settings filtering:   2
-    After built-in stripping:   2
-    After scriptable stripping: 2
-    Processed in 0.00 seconds
-    starting compilation...
-    finished in 0.01 seconds. Local cache hits 2 (0.01s CPU time), remote cache hits 0 (0.00s CPU time), compiled 0 variants (0.00s CPU time), skipped 0 variants
-    Prepared data for serialisation in 0.00s
-Compiling shader "Hidden/Universal Render Pipeline/BokehDepthOfField" pass "Bokeh Depth Of Field Prefilter" (vp)
-    Full variant space:         4
-    After settings filtering:   2
-    After built-in stripping:   2
-    After scriptable stripping: 2
-    Processed in 0.00 seconds
-    starting compilation...
-    finished in 0.01 seconds. Local cache hits 2 (0.02s CPU time), remote cache hits 0 (0.00s CPU time), compiled 0 variants (0.00s CPU time), skipped 0 variants
-    Prepared data for serialisation in 0.00s
-Compiling shader "Hidden/Universal Render Pipeline/BokehDepthOfField" pass "Bokeh Depth Of Field Blur" (vp)
-    Full variant space:         4
-    After settings filtering:   2
-    After built-in stripping:   2
-    After scriptable stripping: 2
-    Processed in 0.00 seconds
-    starting compilation...
-    finished in 0.01 seconds. Local cache hits 2 (0.02s CPU time), remote cache hits 0 (0.00s CPU time), compiled 0 variants (0.00s CPU time), skipped 0 variants
+    finished in 0.00 seconds. Local cache hits 2 (0.00s CPU time), remote cache hits 0 (0.00s CPU time), compiled 0 variants (0.00s CPU time), skipped 0 variants
     Prepared data for serialisation in 0.00s
 Compiling shader "Hidden/Universal Render Pipeline/BokehDepthOfField" pass "Bokeh Depth Of Field Post Blur" (vp)
     Full variant space:         4
@@ -1107,7 +1059,52 @@ Compiling shader "Hidden/Universal Render Pipeline/BokehDepthOfField" pass "Boke
     After scriptable stripping: 2
     Processed in 0.00 seconds
     starting compilation...
-    finished in 0.01 seconds. Local cache hits 2 (0.01s CPU time), remote cache hits 0 (0.00s CPU time), compiled 0 variants (0.00s CPU time), skipped 0 variants
+    finished in 0.00 seconds. Local cache hits 2 (0.00s CPU time), remote cache hits 0 (0.00s CPU time), compiled 0 variants (0.00s CPU time), skipped 0 variants
+    Prepared data for serialisation in 0.00s
+Compiling shader "Hidden/Universal Render Pipeline/BokehDepthOfField" pass "Bokeh Depth Of Field CoC" (vp)
+    Full variant space:         4
+    After settings filtering:   2
+    After built-in stripping:   2
+    After scriptable stripping: 2
+    Processed in 0.00 seconds
+    starting compilation...
+    finished in 0.00 seconds. Local cache hits 2 (0.00s CPU time), remote cache hits 0 (0.00s CPU time), compiled 0 variants (0.00s CPU time), skipped 0 variants
+    Prepared data for serialisation in 0.00s
+Compiling shader "Hidden/Universal Render Pipeline/BokehDepthOfField" pass "Bokeh Depth Of Field Prefilter" (vp)
+    Full variant space:         4
+    After settings filtering:   2
+    After built-in stripping:   2
+    After scriptable stripping: 2
+    Processed in 0.00 seconds
+    starting compilation...
+    finished in 0.00 seconds. Local cache hits 2 (0.00s CPU time), remote cache hits 0 (0.00s CPU time), compiled 0 variants (0.00s CPU time), skipped 0 variants
+    Prepared data for serialisation in 0.00s
+Compiling shader "Hidden/Universal Render Pipeline/BokehDepthOfField" pass "Bokeh Depth Of Field Blur" (vp)
+    Full variant space:         4
+    After settings filtering:   2
+    After built-in stripping:   2
+    After scriptable stripping: 2
+    Processed in 0.00 seconds
+    starting compilation...
+    finished in 0.00 seconds. Local cache hits 2 (0.00s CPU time), remote cache hits 0 (0.00s CPU time), compiled 0 variants (0.00s CPU time), skipped 0 variants
+    Prepared data for serialisation in 0.00s
+Compiling shader "Hidden/Universal Render Pipeline/BokehDepthOfField" pass "Bokeh Depth Of Field Post Blur" (vp)
+    Full variant space:         4
+    After settings filtering:   2
+    After built-in stripping:   2
+    After scriptable stripping: 2
+    Processed in 0.00 seconds
+    starting compilation...
+    finished in 0.00 seconds. Local cache hits 2 (0.00s CPU time), remote cache hits 0 (0.00s CPU time), compiled 0 variants (0.00s CPU time), skipped 0 variants
+    Prepared data for serialisation in 0.00s
+Compiling shader "Hidden/Universal Render Pipeline/BokehDepthOfField" pass "Bokeh Depth Of Field Composite" (vp)
+    Full variant space:         8
+    After settings filtering:   2
+    After built-in stripping:   2
+    After scriptable stripping: 2
+    Processed in 0.00 seconds
+    starting compilation...
+    finished in 0.00 seconds. Local cache hits 2 (0.00s CPU time), remote cache hits 0 (0.00s CPU time), compiled 0 variants (0.00s CPU time), skipped 0 variants
     Prepared data for serialisation in 0.00s
 Serialized binary data for shader Hidden/Universal Render Pipeline/BokehDepthOfField in 0.00s
     glcore (total internal programs: 10, unique: 10)
@@ -1119,7 +1116,7 @@ Compiling shader "Hidden/Core/FallbackError" pass "" (vp)
     After scriptable stripping: 2
     Processed in 0.00 seconds
     starting compilation...
-    finished in 0.01 seconds. Local cache hits 2 (0.02s CPU time), remote cache hits 0 (0.00s CPU time), compiled 0 variants (0.00s CPU time), skipped 0 variants
+    finished in 0.00 seconds. Local cache hits 2 (0.00s CPU time), remote cache hits 0 (0.00s CPU time), compiled 0 variants (0.00s CPU time), skipped 0 variants
     Prepared data for serialisation in 0.00s
 Serialized binary data for shader Hidden/Core/FallbackError in 0.00s
     glcore (total internal programs: 1, unique: 1)
@@ -1141,7 +1138,7 @@ Compiling shader "Hidden/Universal Render Pipeline/Edge Adaptive Spatial Upsampl
     After scriptable stripping: 2
     Processed in 0.00 seconds
     starting compilation...
-    finished in 0.01 seconds. Local cache hits 2 (0.02s CPU time), remote cache hits 0 (0.00s CPU time), compiled 0 variants (0.00s CPU time), skipped 0 variants
+    finished in 0.00 seconds. Local cache hits 2 (0.00s CPU time), remote cache hits 0 (0.00s CPU time), compiled 0 variants (0.00s CPU time), skipped 0 variants
     Prepared data for serialisation in 0.00s
 Serialized binary data for shader Hidden/Universal Render Pipeline/Edge Adaptive Spatial Upsampling in 0.00s
     glcore (total internal programs: 1, unique: 1)
@@ -1162,7 +1159,7 @@ Compiling shader "Hidden/Universal/HDRDebugView" pass "" (vp)
     After scriptable stripping: 2
     Processed in 0.00 seconds
     starting compilation...
-    finished in 0.01 seconds. Local cache hits 2 (0.02s CPU time), remote cache hits 0 (0.00s CPU time), compiled 0 variants (0.00s CPU time), skipped 0 variants
+    finished in 0.00 seconds. Local cache hits 2 (0.00s CPU time), remote cache hits 0 (0.00s CPU time), compiled 0 variants (0.00s CPU time), skipped 0 variants
     Prepared data for serialisation in 0.00s
 Serialized binary data for shader Hidden/Universal/HDRDebugView in 0.00s
     glcore (total internal programs: 2, unique: 2)
@@ -1174,7 +1171,7 @@ Compiling shader "Hidden/Universal Render Pipeline/GaussianDepthOfField" pass "G
     After scriptable stripping: 2
     Processed in 0.00 seconds
     starting compilation...
-    finished in 0.01 seconds. Local cache hits 2 (0.01s CPU time), remote cache hits 0 (0.00s CPU time), compiled 0 variants (0.00s CPU time), skipped 0 variants
+    finished in 0.00 seconds. Local cache hits 2 (0.00s CPU time), remote cache hits 0 (0.00s CPU time), compiled 0 variants (0.00s CPU time), skipped 0 variants
     Prepared data for serialisation in 0.00s
 Compiling shader "Hidden/Universal Render Pipeline/GaussianDepthOfField" pass "Gaussian Depth Of Field Prefilter" (vp)
     Full variant space:         8
@@ -1183,7 +1180,7 @@ Compiling shader "Hidden/Universal Render Pipeline/GaussianDepthOfField" pass "G
     After scriptable stripping: 4
     Processed in 0.00 seconds
     starting compilation...
-    finished in 0.01 seconds. Local cache hits 4 (0.03s CPU time), remote cache hits 0 (0.00s CPU time), compiled 0 variants (0.00s CPU time), skipped 0 variants
+    finished in 0.00 seconds. Local cache hits 4 (0.00s CPU time), remote cache hits 0 (0.00s CPU time), compiled 0 variants (0.00s CPU time), skipped 0 variants
     Prepared data for serialisation in 0.00s
 Compiling shader "Hidden/Universal Render Pipeline/GaussianDepthOfField" pass "Gaussian Depth Of Field Blur Horizontal" (vp)
     Full variant space:         4
@@ -1192,7 +1189,7 @@ Compiling shader "Hidden/Universal Render Pipeline/GaussianDepthOfField" pass "G
     After scriptable stripping: 2
     Processed in 0.00 seconds
     starting compilation...
-    finished in 0.01 seconds. Local cache hits 2 (0.01s CPU time), remote cache hits 0 (0.00s CPU time), compiled 0 variants (0.00s CPU time), skipped 0 variants
+    finished in 0.00 seconds. Local cache hits 2 (0.00s CPU time), remote cache hits 0 (0.00s CPU time), compiled 0 variants (0.00s CPU time), skipped 0 variants
     Prepared data for serialisation in 0.00s
 Compiling shader "Hidden/Universal Render Pipeline/GaussianDepthOfField" pass "Gaussian Depth Of Field Blur Vertical" (vp)
     Full variant space:         4
@@ -1201,7 +1198,7 @@ Compiling shader "Hidden/Universal Render Pipeline/GaussianDepthOfField" pass "G
     After scriptable stripping: 2
     Processed in 0.00 seconds
     starting compilation...
-    finished in 0.01 seconds. Local cache hits 2 (0.01s CPU time), remote cache hits 0 (0.00s CPU time), compiled 0 variants (0.00s CPU time), skipped 0 variants
+    finished in 0.00 seconds. Local cache hits 2 (0.00s CPU time), remote cache hits 0 (0.00s CPU time), compiled 0 variants (0.00s CPU time), skipped 0 variants
     Prepared data for serialisation in 0.00s
 Compiling shader "Hidden/Universal Render Pipeline/GaussianDepthOfField" pass "Gaussian Depth Of Field Composite" (vp)
     Full variant space:         8
@@ -1210,7 +1207,7 @@ Compiling shader "Hidden/Universal Render Pipeline/GaussianDepthOfField" pass "G
     After scriptable stripping: 4
     Processed in 0.00 seconds
     starting compilation...
-    finished in 0.01 seconds. Local cache hits 4 (0.03s CPU time), remote cache hits 0 (0.00s CPU time), compiled 0 variants (0.00s CPU time), skipped 0 variants
+    finished in 0.00 seconds. Local cache hits 4 (0.01s CPU time), remote cache hits 0 (0.00s CPU time), compiled 0 variants (0.00s CPU time), skipped 0 variants
     Prepared data for serialisation in 0.00s
 Serialized binary data for shader Hidden/Universal Render Pipeline/GaussianDepthOfField in 0.00s
     glcore (total internal programs: 7, unique: 7)
@@ -1222,7 +1219,7 @@ Compiling shader "Hidden/Universal Render Pipeline/Bloom" pass "Bloom Prefilter"
     After scriptable stripping: 4
     Processed in 0.00 seconds
     starting compilation...
-    finished in 0.00 seconds. Local cache hits 4 (0.01s CPU time), remote cache hits 0 (0.00s CPU time), compiled 0 variants (0.00s CPU time), skipped 0 variants
+    finished in 0.00 seconds. Local cache hits 4 (0.00s CPU time), remote cache hits 0 (0.00s CPU time), compiled 0 variants (0.00s CPU time), skipped 0 variants
     Prepared data for serialisation in 0.00s
 Compiling shader "Hidden/Universal Render Pipeline/Bloom" pass "Bloom Blur Horizontal" (vp)
     Full variant space:         2
@@ -1231,7 +1228,7 @@ Compiling shader "Hidden/Universal Render Pipeline/Bloom" pass "Bloom Blur Horiz
     After scriptable stripping: 2
     Processed in 0.00 seconds
     starting compilation...
-    finished in 0.01 seconds. Local cache hits 2 (0.01s CPU time), remote cache hits 0 (0.00s CPU time), compiled 0 variants (0.00s CPU time), skipped 0 variants
+    finished in 0.00 seconds. Local cache hits 2 (0.00s CPU time), remote cache hits 0 (0.00s CPU time), compiled 0 variants (0.00s CPU time), skipped 0 variants
     Prepared data for serialisation in 0.00s
 Compiling shader "Hidden/Universal Render Pipeline/Bloom" pass "Bloom Blur Vertical" (vp)
     Full variant space:         2
@@ -1240,7 +1237,7 @@ Compiling shader "Hidden/Universal Render Pipeline/Bloom" pass "Bloom Blur Verti
     After scriptable stripping: 2
     Processed in 0.00 seconds
     starting compilation...
-    finished in 0.01 seconds. Local cache hits 2 (0.02s CPU time), remote cache hits 0 (0.00s CPU time), compiled 0 variants (0.00s CPU time), skipped 0 variants
+    finished in 0.00 seconds. Local cache hits 2 (0.00s CPU time), remote cache hits 0 (0.00s CPU time), compiled 0 variants (0.00s CPU time), skipped 0 variants
     Prepared data for serialisation in 0.00s
 Compiling shader "Hidden/Universal Render Pipeline/Bloom" pass "Bloom Upsample" (vp)
     Full variant space:         4
@@ -1249,7 +1246,7 @@ Compiling shader "Hidden/Universal Render Pipeline/Bloom" pass "Bloom Upsample" 
     After scriptable stripping: 4
     Processed in 0.00 seconds
     starting compilation...
-    finished in 0.01 seconds. Local cache hits 4 (0.02s CPU time), remote cache hits 0 (0.00s CPU time), compiled 0 variants (0.00s CPU time), skipped 0 variants
+    finished in 0.00 seconds. Local cache hits 4 (0.00s CPU time), remote cache hits 0 (0.00s CPU time), compiled 0 variants (0.00s CPU time), skipped 0 variants
     Prepared data for serialisation in 0.00s
 Serialized binary data for shader Hidden/Universal Render Pipeline/Bloom in 0.00s
     glcore (total internal programs: 6, unique: 6)
@@ -1261,7 +1258,7 @@ Compiling shader "Hidden/Universal Render Pipeline/SubpixelMorphologicalAntialia
     After scriptable stripping: 6
     Processed in 0.00 seconds
     starting compilation...
-    finished in 0.01 seconds. Local cache hits 6 (0.04s CPU time), remote cache hits 0 (0.00s CPU time), compiled 0 variants (0.00s CPU time), skipped 0 variants
+    finished in 0.00 seconds. Local cache hits 6 (0.00s CPU time), remote cache hits 0 (0.00s CPU time), compiled 0 variants (0.00s CPU time), skipped 0 variants
     Prepared data for serialisation in 0.00s
 Compiling shader "Hidden/Universal Render Pipeline/SubpixelMorphologicalAntialiasing" pass "" (vp)
     Full variant space:         6
@@ -1270,7 +1267,7 @@ Compiling shader "Hidden/Universal Render Pipeline/SubpixelMorphologicalAntialia
     After scriptable stripping: 6
     Processed in 0.00 seconds
     starting compilation...
-    finished in 0.01 seconds. Local cache hits 6 (0.05s CPU time), remote cache hits 0 (0.00s CPU time), compiled 0 variants (0.00s CPU time), skipped 0 variants
+    finished in 0.00 seconds. Local cache hits 6 (0.01s CPU time), remote cache hits 0 (0.00s CPU time), compiled 0 variants (0.00s CPU time), skipped 0 variants
     Prepared data for serialisation in 0.00s
 Compiling shader "Hidden/Universal Render Pipeline/SubpixelMorphologicalAntialiasing" pass "" (vp)
     Full variant space:         6
@@ -1279,7 +1276,7 @@ Compiling shader "Hidden/Universal Render Pipeline/SubpixelMorphologicalAntialia
     After scriptable stripping: 6
     Processed in 0.00 seconds
     starting compilation...
-    finished in 0.01 seconds. Local cache hits 6 (0.04s CPU time), remote cache hits 0 (0.00s CPU time), compiled 0 variants (0.00s CPU time), skipped 0 variants
+    finished in 0.00 seconds. Local cache hits 6 (0.00s CPU time), remote cache hits 0 (0.00s CPU time), compiled 0 variants (0.00s CPU time), skipped 0 variants
     Prepared data for serialisation in 0.00s
 Serialized binary data for shader Hidden/Universal Render Pipeline/SubpixelMorphologicalAntialiasing in 0.00s
     glcore (total internal programs: 9, unique: 9)
@@ -1291,7 +1288,7 @@ Compiling shader "Hidden/Universal Render Pipeline/LutBuilderLdr" pass "LutBuild
     After scriptable stripping: 2
     Processed in 0.00 seconds
     starting compilation...
-    finished in 0.01 seconds. Local cache hits 2 (0.02s CPU time), remote cache hits 0 (0.00s CPU time), compiled 0 variants (0.00s CPU time), skipped 0 variants
+    finished in 0.00 seconds. Local cache hits 2 (0.00s CPU time), remote cache hits 0 (0.00s CPU time), compiled 0 variants (0.00s CPU time), skipped 0 variants
     Prepared data for serialisation in 0.00s
 Serialized binary data for shader Hidden/Universal Render Pipeline/LutBuilderLdr in 0.00s
     glcore (total internal programs: 1, unique: 1)
@@ -1303,7 +1300,7 @@ Compiling shader "Hidden/Universal Render Pipeline/LensFlareDataDriven" pass "Le
     After scriptable stripping: 16
     Processed in 0.00 seconds
     starting compilation...
-    finished in 0.01 seconds. Local cache hits 16 (0.21s CPU time), remote cache hits 0 (0.00s CPU time), compiled 0 variants (0.00s CPU time), skipped 0 variants
+    finished in 0.00 seconds. Local cache hits 16 (0.04s CPU time), remote cache hits 0 (0.00s CPU time), compiled 0 variants (0.00s CPU time), skipped 0 variants
     Prepared data for serialisation in 0.00s
 Compiling shader "Hidden/Universal Render Pipeline/LensFlareDataDriven" pass "LensFlareScreen" (vp)
     Full variant space:         16
@@ -1312,7 +1309,7 @@ Compiling shader "Hidden/Universal Render Pipeline/LensFlareDataDriven" pass "Le
     After scriptable stripping: 16
     Processed in 0.00 seconds
     starting compilation...
-    finished in 0.01 seconds. Local cache hits 16 (0.18s CPU time), remote cache hits 0 (0.00s CPU time), compiled 0 variants (0.00s CPU time), skipped 0 variants
+    finished in 0.00 seconds. Local cache hits 16 (0.03s CPU time), remote cache hits 0 (0.00s CPU time), compiled 0 variants (0.00s CPU time), skipped 0 variants
     Prepared data for serialisation in 0.00s
 Compiling shader "Hidden/Universal Render Pipeline/LensFlareDataDriven" pass "LensFlarePremultiply" (vp)
     Full variant space:         16
@@ -1321,7 +1318,7 @@ Compiling shader "Hidden/Universal Render Pipeline/LensFlareDataDriven" pass "Le
     After scriptable stripping: 16
     Processed in 0.00 seconds
     starting compilation...
-    finished in 0.01 seconds. Local cache hits 16 (0.18s CPU time), remote cache hits 0 (0.00s CPU time), compiled 0 variants (0.00s CPU time), skipped 0 variants
+    finished in 0.00 seconds. Local cache hits 16 (0.02s CPU time), remote cache hits 0 (0.00s CPU time), compiled 0 variants (0.00s CPU time), skipped 0 variants
     Prepared data for serialisation in 0.00s
 Compiling shader "Hidden/Universal Render Pipeline/LensFlareDataDriven" pass "LensFlareLerp" (vp)
     Full variant space:         16
@@ -1330,7 +1327,7 @@ Compiling shader "Hidden/Universal Render Pipeline/LensFlareDataDriven" pass "Le
     After scriptable stripping: 16
     Processed in 0.00 seconds
     starting compilation...
-    finished in 0.01 seconds. Local cache hits 16 (0.18s CPU time), remote cache hits 0 (0.00s CPU time), compiled 0 variants (0.00s CPU time), skipped 0 variants
+    finished in 0.00 seconds. Local cache hits 16 (0.03s CPU time), remote cache hits 0 (0.00s CPU time), compiled 0 variants (0.00s CPU time), skipped 0 variants
     Prepared data for serialisation in 0.00s
 Compiling shader "Hidden/Universal Render Pipeline/LensFlareDataDriven" pass "LensFlareOcclusion" (vp)
     Full variant space:         2
@@ -1339,7 +1336,7 @@ Compiling shader "Hidden/Universal Render Pipeline/LensFlareDataDriven" pass "Le
     After scriptable stripping: 2
     Processed in 0.00 seconds
     starting compilation...
-    finished in 0.01 seconds. Local cache hits 2 (0.02s CPU time), remote cache hits 0 (0.00s CPU time), compiled 0 variants (0.00s CPU time), skipped 0 variants
+    finished in 0.00 seconds. Local cache hits 2 (0.00s CPU time), remote cache hits 0 (0.00s CPU time), compiled 0 variants (0.00s CPU time), skipped 0 variants
     Prepared data for serialisation in 0.00s
 Serialized binary data for shader Hidden/Universal Render Pipeline/LensFlareDataDriven in 0.00s
     glcore (total internal programs: 33, unique: 17)
@@ -1351,7 +1348,7 @@ Compiling shader "Hidden/Universal Render Pipeline/LensFlareScreenSpace" pass "L
     After scriptable stripping: 2
     Processed in 0.00 seconds
     starting compilation...
-    finished in 0.12 seconds. Local cache hits 2 (0.13s CPU time), remote cache hits 0 (0.00s CPU time), compiled 0 variants (0.00s CPU time), skipped 0 variants
+    finished in 0.00 seconds. Local cache hits 2 (0.00s CPU time), remote cache hits 0 (0.00s CPU time), compiled 0 variants (0.00s CPU time), skipped 0 variants
     Prepared data for serialisation in 0.00s
 Compiling shader "Hidden/Universal Render Pipeline/LensFlareScreenSpace" pass "LensFlareScreenSpace Downsample" (vp)
     Full variant space:         2
@@ -1360,7 +1357,7 @@ Compiling shader "Hidden/Universal Render Pipeline/LensFlareScreenSpace" pass "L
     After scriptable stripping: 2
     Processed in 0.00 seconds
     starting compilation...
-    finished in 0.01 seconds. Local cache hits 2 (0.02s CPU time), remote cache hits 0 (0.00s CPU time), compiled 0 variants (0.00s CPU time), skipped 0 variants
+    finished in 0.00 seconds. Local cache hits 2 (0.00s CPU time), remote cache hits 0 (0.00s CPU time), compiled 0 variants (0.00s CPU time), skipped 0 variants
     Prepared data for serialisation in 0.00s
 Compiling shader "Hidden/Universal Render Pipeline/LensFlareScreenSpace" pass "LensFlareScreenSpace Upsample" (vp)
     Full variant space:         2
@@ -1369,7 +1366,7 @@ Compiling shader "Hidden/Universal Render Pipeline/LensFlareScreenSpace" pass "L
     After scriptable stripping: 2
     Processed in 0.00 seconds
     starting compilation...
-    finished in 0.01 seconds. Local cache hits 2 (0.01s CPU time), remote cache hits 0 (0.00s CPU time), compiled 0 variants (0.00s CPU time), skipped 0 variants
+    finished in 0.00 seconds. Local cache hits 2 (0.00s CPU time), remote cache hits 0 (0.00s CPU time), compiled 0 variants (0.00s CPU time), skipped 0 variants
     Prepared data for serialisation in 0.00s
 Compiling shader "Hidden/Universal Render Pipeline/LensFlareScreenSpace" pass "LensFlareScreenSpace Composition" (vp)
     Full variant space:         2
@@ -1378,7 +1375,7 @@ Compiling shader "Hidden/Universal Render Pipeline/LensFlareScreenSpace" pass "L
     After scriptable stripping: 2
     Processed in 0.00 seconds
     starting compilation...
-    finished in 0.01 seconds. Local cache hits 2 (0.01s CPU time), remote cache hits 0 (0.00s CPU time), compiled 0 variants (0.00s CPU time), skipped 0 variants
+    finished in 0.00 seconds. Local cache hits 2 (0.00s CPU time), remote cache hits 0 (0.00s CPU time), compiled 0 variants (0.00s CPU time), skipped 0 variants
     Prepared data for serialisation in 0.00s
 Compiling shader "Hidden/Universal Render Pipeline/LensFlareScreenSpace" pass "LensFlareScreenSpace Write to BloomTexture" (vp)
     Full variant space:         2
@@ -1387,7 +1384,7 @@ Compiling shader "Hidden/Universal Render Pipeline/LensFlareScreenSpace" pass "L
     After scriptable stripping: 2
     Processed in 0.00 seconds
     starting compilation...
-    finished in 0.01 seconds. Local cache hits 2 (0.02s CPU time), remote cache hits 0 (0.00s CPU time), compiled 0 variants (0.00s CPU time), skipped 0 variants
+    finished in 0.00 seconds. Local cache hits 2 (0.00s CPU time), remote cache hits 0 (0.00s CPU time), compiled 0 variants (0.00s CPU time), skipped 0 variants
     Prepared data for serialisation in 0.00s
 Serialized binary data for shader Hidden/Universal Render Pipeline/LensFlareScreenSpace in 0.00s
     glcore (total internal programs: 5, unique: 5)
@@ -1399,7 +1396,7 @@ Compiling shader "Hidden/Universal/CoreBlit" pass "Nearest" (vp)
     After scriptable stripping: 2
     Processed in 0.00 seconds
     starting compilation...
-    finished in 0.01 seconds. Local cache hits 2 (0.01s CPU time), remote cache hits 0 (0.00s CPU time), compiled 0 variants (0.00s CPU time), skipped 0 variants
+    finished in 0.00 seconds. Local cache hits 2 (0.00s CPU time), remote cache hits 0 (0.00s CPU time), compiled 0 variants (0.00s CPU time), skipped 0 variants
     Prepared data for serialisation in 0.00s
 Compiling shader "Hidden/Universal/CoreBlit" pass "Bilinear" (vp)
     Full variant space:         2
@@ -1417,7 +1414,7 @@ Compiling shader "Hidden/Universal/CoreBlit" pass "NearestQuad" (vp)
     After scriptable stripping: 2
     Processed in 0.00 seconds
     starting compilation...
-    finished in 0.01 seconds. Local cache hits 2 (0.02s CPU time), remote cache hits 0 (0.00s CPU time), compiled 0 variants (0.00s CPU time), skipped 0 variants
+    finished in 0.00 seconds. Local cache hits 2 (0.00s CPU time), remote cache hits 0 (0.00s CPU time), compiled 0 variants (0.00s CPU time), skipped 0 variants
     Prepared data for serialisation in 0.00s
 Compiling shader "Hidden/Universal/CoreBlit" pass "BilinearQuad" (vp)
     Full variant space:         2
@@ -1435,7 +1432,7 @@ Compiling shader "Hidden/Universal/CoreBlit" pass "NearestQuadPadding" (vp)
     After scriptable stripping: 2
     Processed in 0.00 seconds
     starting compilation...
-    finished in 0.01 seconds. Local cache hits 2 (0.02s CPU time), remote cache hits 0 (0.00s CPU time), compiled 0 variants (0.00s CPU time), skipped 0 variants
+    finished in 0.00 seconds. Local cache hits 2 (0.00s CPU time), remote cache hits 0 (0.00s CPU time), compiled 0 variants (0.00s CPU time), skipped 0 variants
     Prepared data for serialisation in 0.00s
 Compiling shader "Hidden/Universal/CoreBlit" pass "BilinearQuadPadding" (vp)
     Full variant space:         2
@@ -1444,7 +1441,7 @@ Compiling shader "Hidden/Universal/CoreBlit" pass "BilinearQuadPadding" (vp)
     After scriptable stripping: 2
     Processed in 0.00 seconds
     starting compilation...
-    finished in 0.01 seconds. Local cache hits 2 (0.01s CPU time), remote cache hits 0 (0.00s CPU time), compiled 0 variants (0.00s CPU time), skipped 0 variants
+    finished in 0.00 seconds. Local cache hits 2 (0.00s CPU time), remote cache hits 0 (0.00s CPU time), compiled 0 variants (0.00s CPU time), skipped 0 variants
     Prepared data for serialisation in 0.00s
 Compiling shader "Hidden/Universal/CoreBlit" pass "NearestQuadPaddingRepeat" (vp)
     Full variant space:         2
@@ -1471,7 +1468,7 @@ Compiling shader "Hidden/Universal/CoreBlit" pass "BilinearQuadPaddingOctahedral
     After scriptable stripping: 2
     Processed in 0.00 seconds
     starting compilation...
-    finished in 0.01 seconds. Local cache hits 2 (0.01s CPU time), remote cache hits 0 (0.00s CPU time), compiled 0 variants (0.00s CPU time), skipped 0 variants
+    finished in 0.00 seconds. Local cache hits 2 (0.00s CPU time), remote cache hits 0 (0.00s CPU time), compiled 0 variants (0.00s CPU time), skipped 0 variants
     Prepared data for serialisation in 0.00s
 Compiling shader "Hidden/Universal/CoreBlit" pass "NearestQuadPaddingAlphaBlend" (vp)
     Full variant space:         2
@@ -1525,7 +1522,7 @@ Compiling shader "Hidden/Universal/CoreBlit" pass "CubeToOctahedral" (vp)
     After scriptable stripping: 2
     Processed in 0.00 seconds
     starting compilation...
-    finished in 0.01 seconds. Local cache hits 2 (0.02s CPU time), remote cache hits 0 (0.00s CPU time), compiled 0 variants (0.00s CPU time), skipped 0 variants
+    finished in 0.00 seconds. Local cache hits 2 (0.00s CPU time), remote cache hits 0 (0.00s CPU time), compiled 0 variants (0.00s CPU time), skipped 0 variants
     Prepared data for serialisation in 0.00s
 Compiling shader "Hidden/Universal/CoreBlit" pass "CubeToOctahedralLuminance" (vp)
     Full variant space:         2
@@ -1534,7 +1531,7 @@ Compiling shader "Hidden/Universal/CoreBlit" pass "CubeToOctahedralLuminance" (v
     After scriptable stripping: 2
     Processed in 0.00 seconds
     starting compilation...
-    finished in 0.01 seconds. Local cache hits 2 (0.02s CPU time), remote cache hits 0 (0.00s CPU time), compiled 0 variants (0.00s CPU time), skipped 0 variants
+    finished in 0.00 seconds. Local cache hits 2 (0.00s CPU time), remote cache hits 0 (0.00s CPU time), compiled 0 variants (0.00s CPU time), skipped 0 variants
     Prepared data for serialisation in 0.00s
 Compiling shader "Hidden/Universal/CoreBlit" pass "CubeToOctahedralAlpha" (vp)
     Full variant space:         2
@@ -1552,7 +1549,7 @@ Compiling shader "Hidden/Universal/CoreBlit" pass "CubeToOctahedralRed" (vp)
     After scriptable stripping: 2
     Processed in 0.00 seconds
     starting compilation...
-    finished in 0.01 seconds. Local cache hits 2 (0.01s CPU time), remote cache hits 0 (0.00s CPU time), compiled 0 variants (0.00s CPU time), skipped 0 variants
+    finished in 0.00 seconds. Local cache hits 2 (0.00s CPU time), remote cache hits 0 (0.00s CPU time), compiled 0 variants (0.00s CPU time), skipped 0 variants
     Prepared data for serialisation in 0.00s
 Compiling shader "Hidden/Universal/CoreBlit" pass "BilinearQuadLuminance" (vp)
     Full variant space:         2
@@ -1561,7 +1558,7 @@ Compiling shader "Hidden/Universal/CoreBlit" pass "BilinearQuadLuminance" (vp)
     After scriptable stripping: 2
     Processed in 0.00 seconds
     starting compilation...
-    finished in 0.01 seconds. Local cache hits 2 (0.02s CPU time), remote cache hits 0 (0.00s CPU time), compiled 0 variants (0.00s CPU time), skipped 0 variants
+    finished in 0.00 seconds. Local cache hits 2 (0.00s CPU time), remote cache hits 0 (0.00s CPU time), compiled 0 variants (0.00s CPU time), skipped 0 variants
     Prepared data for serialisation in 0.00s
 Compiling shader "Hidden/Universal/CoreBlit" pass "BilinearQuadAlpha" (vp)
     Full variant space:         2
@@ -1570,7 +1567,7 @@ Compiling shader "Hidden/Universal/CoreBlit" pass "BilinearQuadAlpha" (vp)
     After scriptable stripping: 2
     Processed in 0.00 seconds
     starting compilation...
-    finished in 0.01 seconds. Local cache hits 2 (0.02s CPU time), remote cache hits 0 (0.00s CPU time), compiled 0 variants (0.00s CPU time), skipped 0 variants
+    finished in 0.00 seconds. Local cache hits 2 (0.00s CPU time), remote cache hits 0 (0.00s CPU time), compiled 0 variants (0.00s CPU time), skipped 0 variants
     Prepared data for serialisation in 0.00s
 Compiling shader "Hidden/Universal/CoreBlit" pass "BilinearQuadRed" (vp)
     Full variant space:         2
@@ -1579,7 +1576,7 @@ Compiling shader "Hidden/Universal/CoreBlit" pass "BilinearQuadRed" (vp)
     After scriptable stripping: 2
     Processed in 0.00 seconds
     starting compilation...
-    finished in 0.01 seconds. Local cache hits 2 (0.01s CPU time), remote cache hits 0 (0.00s CPU time), compiled 0 variants (0.00s CPU time), skipped 0 variants
+    finished in 0.00 seconds. Local cache hits 2 (0.00s CPU time), remote cache hits 0 (0.00s CPU time), compiled 0 variants (0.00s CPU time), skipped 0 variants
     Prepared data for serialisation in 0.00s
 Compiling shader "Hidden/Universal/CoreBlit" pass "NearestCubeToOctahedralPadding" (vp)
     Full variant space:         4
@@ -1588,7 +1585,7 @@ Compiling shader "Hidden/Universal/CoreBlit" pass "NearestCubeToOctahedralPaddin
     After scriptable stripping: 4
     Processed in 0.00 seconds
     starting compilation...
-    finished in 0.01 seconds. Local cache hits 4 (0.03s CPU time), remote cache hits 0 (0.00s CPU time), compiled 0 variants (0.00s CPU time), skipped 0 variants
+    finished in 0.00 seconds. Local cache hits 4 (0.00s CPU time), remote cache hits 0 (0.00s CPU time), compiled 0 variants (0.00s CPU time), skipped 0 variants
     Prepared data for serialisation in 0.00s
 Compiling shader "Hidden/Universal/CoreBlit" pass "BilinearCubeToOctahedralPadding" (vp)
     Full variant space:         4
@@ -1597,7 +1594,7 @@ Compiling shader "Hidden/Universal/CoreBlit" pass "BilinearCubeToOctahedralPaddi
     After scriptable stripping: 4
     Processed in 0.00 seconds
     starting compilation...
-    finished in 0.01 seconds. Local cache hits 4 (0.02s CPU time), remote cache hits 0 (0.00s CPU time), compiled 0 variants (0.00s CPU time), skipped 0 variants
+    finished in 0.00 seconds. Local cache hits 4 (0.00s CPU time), remote cache hits 0 (0.00s CPU time), compiled 0 variants (0.00s CPU time), skipped 0 variants
     Prepared data for serialisation in 0.00s
 Compiling shader "Hidden/Universal/CoreBlit" pass "BilinearDebugDraw" (vp)
     Full variant space:         8
@@ -1606,7 +1603,7 @@ Compiling shader "Hidden/Universal/CoreBlit" pass "BilinearDebugDraw" (vp)
     After scriptable stripping: 4
     Processed in 0.00 seconds
     starting compilation...
-    finished in 0.00 seconds. Local cache hits 4 (0.01s CPU time), remote cache hits 0 (0.00s CPU time), compiled 0 variants (0.00s CPU time), skipped 0 variants
+    finished in 0.00 seconds. Local cache hits 4 (0.00s CPU time), remote cache hits 0 (0.00s CPU time), compiled 0 variants (0.00s CPU time), skipped 0 variants
     Prepared data for serialisation in 0.00s
 Compiling shader "Hidden/Universal/CoreBlit" pass "NearestDebugDraw" (vp)
     Full variant space:         8
@@ -1615,7 +1612,7 @@ Compiling shader "Hidden/Universal/CoreBlit" pass "NearestDebugDraw" (vp)
     After scriptable stripping: 4
     Processed in 0.00 seconds
     starting compilation...
-    finished in 0.00 seconds. Local cache hits 4 (0.01s CPU time), remote cache hits 0 (0.00s CPU time), compiled 0 variants (0.00s CPU time), skipped 0 variants
+    finished in 0.00 seconds. Local cache hits 4 (0.00s CPU time), remote cache hits 0 (0.00s CPU time), compiled 0 variants (0.00s CPU time), skipped 0 variants
     Prepared data for serialisation in 0.00s
 Serialized binary data for shader Hidden/Universal/CoreBlit in 0.00s
     glcore (total internal programs: 29, unique: 14)
@@ -1627,7 +1624,7 @@ Compiling shader "Hidden/Universal Render Pipeline/TemporalAA" pass "TemporalAA 
     After scriptable stripping: 2
     Processed in 0.00 seconds
     starting compilation...
-    finished in 0.01 seconds. Local cache hits 2 (0.01s CPU time), remote cache hits 0 (0.00s CPU time), compiled 0 variants (0.00s CPU time), skipped 0 variants
+    finished in 0.00 seconds. Local cache hits 2 (0.00s CPU time), remote cache hits 0 (0.00s CPU time), compiled 0 variants (0.00s CPU time), skipped 0 variants
     Prepared data for serialisation in 0.00s
 Compiling shader "Hidden/Universal Render Pipeline/TemporalAA" pass "TemporalAA - Accumulate - Quality Low" (vp)
     Full variant space:         4
@@ -1645,7 +1642,7 @@ Compiling shader "Hidden/Universal Render Pipeline/TemporalAA" pass "TemporalAA 
     After scriptable stripping: 2
     Processed in 0.00 seconds
     starting compilation...
-    finished in 0.01 seconds. Local cache hits 2 (0.02s CPU time), remote cache hits 0 (0.00s CPU time), compiled 0 variants (0.00s CPU time), skipped 0 variants
+    finished in 0.00 seconds. Local cache hits 2 (0.00s CPU time), remote cache hits 0 (0.00s CPU time), compiled 0 variants (0.00s CPU time), skipped 0 variants
     Prepared data for serialisation in 0.00s
 Compiling shader "Hidden/Universal Render Pipeline/TemporalAA" pass "TemporalAA - Accumulate - Quality High" (vp)
     Full variant space:         4
@@ -1654,7 +1651,7 @@ Compiling shader "Hidden/Universal Render Pipeline/TemporalAA" pass "TemporalAA 
     After scriptable stripping: 2
     Processed in 0.00 seconds
     starting compilation...
-    finished in 0.02 seconds. Local cache hits 2 (0.03s CPU time), remote cache hits 0 (0.00s CPU time), compiled 0 variants (0.00s CPU time), skipped 0 variants
+    finished in 0.00 seconds. Local cache hits 2 (0.00s CPU time), remote cache hits 0 (0.00s CPU time), compiled 0 variants (0.00s CPU time), skipped 0 variants
     Prepared data for serialisation in 0.00s
 Compiling shader "Hidden/Universal Render Pipeline/TemporalAA" pass "TemporalAA - Accumulate - Quality Very High" (vp)
     Full variant space:         8
@@ -1663,7 +1660,7 @@ Compiling shader "Hidden/Universal Render Pipeline/TemporalAA" pass "TemporalAA 
     After scriptable stripping: 4
     Processed in 0.00 seconds
     starting compilation...
-    finished in 0.01 seconds. Local cache hits 4 (0.04s CPU time), remote cache hits 0 (0.00s CPU time), compiled 0 variants (0.00s CPU time), skipped 0 variants
+    finished in 0.00 seconds. Local cache hits 4 (0.00s CPU time), remote cache hits 0 (0.00s CPU time), compiled 0 variants (0.00s CPU time), skipped 0 variants
     Prepared data for serialisation in 0.00s
 Compiling shader "Hidden/Universal Render Pipeline/TemporalAA" pass "TemporalAA - Copy History" (vp)
     Full variant space:         4
@@ -1672,7 +1669,7 @@ Compiling shader "Hidden/Universal Render Pipeline/TemporalAA" pass "TemporalAA 
     After scriptable stripping: 2
     Processed in 0.00 seconds
     starting compilation...
-    finished in 0.01 seconds. Local cache hits 2 (0.01s CPU time), remote cache hits 0 (0.00s CPU time), compiled 0 variants (0.00s CPU time), skipped 0 variants
+    finished in 0.00 seconds. Local cache hits 2 (0.00s CPU time), remote cache hits 0 (0.00s CPU time), compiled 0 variants (0.00s CPU time), skipped 0 variants
     Prepared data for serialisation in 0.00s
 Serialized binary data for shader Hidden/Universal Render Pipeline/TemporalAA in 0.00s
     glcore (total internal programs: 7, unique: 7)
@@ -1684,7 +1681,7 @@ Compiling shader "Hidden/Universal Render Pipeline/PaniniProjection" pass "Panin
     After scriptable stripping: 4
     Processed in 0.00 seconds
     starting compilation...
-    finished in 0.01 seconds. Local cache hits 4 (0.03s CPU time), remote cache hits 0 (0.00s CPU time), compiled 0 variants (0.00s CPU time), skipped 0 variants
+    finished in 0.00 seconds. Local cache hits 4 (0.00s CPU time), remote cache hits 0 (0.00s CPU time), compiled 0 variants (0.00s CPU time), skipped 0 variants
     Prepared data for serialisation in 0.00s
 Serialized binary data for shader Hidden/Universal Render Pipeline/PaniniProjection in 0.00s
     glcore (total internal programs: 2, unique: 2)
@@ -1713,7 +1710,7 @@ Compiling shader "Hidden/Universal Render Pipeline/FinalPost" pass "FinalPost" (
     After scriptable stripping: 96
     Processed in 0.00 seconds
     starting compilation...
-    finished in 0.05 seconds. Local cache hits 96 (1.33s CPU time), remote cache hits 0 (0.00s CPU time), compiled 0 variants (0.00s CPU time), skipped 0 variants
+    finished in 0.01 seconds. Local cache hits 96 (0.34s CPU time), remote cache hits 0 (0.00s CPU time), compiled 0 variants (0.00s CPU time), skipped 0 variants
     Prepared data for serialisation in 0.00s
 Compiling shader "Hidden/Universal Render Pipeline/FinalPost" pass "FinalPost" (vp)
     Full variant space:         5120
@@ -1722,7 +1719,7 @@ Compiling shader "Hidden/Universal Render Pipeline/FinalPost" pass "FinalPost" (
     After scriptable stripping: 96
     Processed in 0.00 seconds
     starting compilation...
-    finished in 0.04 seconds. Local cache hits 96 (0.99s CPU time), remote cache hits 0 (0.00s CPU time), compiled 0 variants (0.00s CPU time), skipped 0 variants
+    finished in 0.01 seconds. Local cache hits 96 (0.28s CPU time), remote cache hits 0 (0.00s CPU time), compiled 0 variants (0.00s CPU time), skipped 0 variants
     Prepared data for serialisation in 0.00s
 Serialized binary data for shader Hidden/Universal Render Pipeline/FinalPost in 0.00s
     glcore (total internal programs: 96, unique: 96)
@@ -1746,7 +1743,7 @@ Compiling shader "Hidden/Universal Render Pipeline/Debug/DebugReplacement" pass 
     After scriptable stripping: 2
     Processed in 0.00 seconds
     starting compilation...
-    finished in 0.01 seconds. Local cache hits 2 (0.01s CPU time), remote cache hits 0 (0.00s CPU time), compiled 0 variants (0.00s CPU time), skipped 0 variants
+    finished in 0.00 seconds. Local cache hits 2 (0.00s CPU time), remote cache hits 0 (0.00s CPU time), compiled 0 variants (0.00s CPU time), skipped 0 variants
     Prepared data for serialisation in 0.00s
 Serialized binary data for shader Hidden/Universal Render Pipeline/Debug/DebugReplacement in 0.00s
     glcore (total internal programs: 1, unique: 1)
@@ -1767,7 +1764,7 @@ Compiling shader "Hidden/Universal/CoreBlitColorAndDepth" pass "ColorAndDepth" (
     After scriptable stripping: 2
     Processed in 0.00 seconds
     starting compilation...
-    finished in 0.01 seconds. Local cache hits 2 (0.01s CPU time), remote cache hits 0 (0.00s CPU time), compiled 0 variants (0.00s CPU time), skipped 0 variants
+    finished in 0.00 seconds. Local cache hits 2 (0.00s CPU time), remote cache hits 0 (0.00s CPU time), compiled 0 variants (0.00s CPU time), skipped 0 variants
     Prepared data for serialisation in 0.00s
 Serialized binary data for shader Hidden/Universal/CoreBlitColorAndDepth in 0.00s
     glcore (total internal programs: 2, unique: 2)
@@ -1789,7 +1786,7 @@ Compiling shader "Hidden/Universal Render Pipeline/CopyDepth" pass "CopyDepth" (
     After scriptable stripping: 16
     Processed in 0.00 seconds
     starting compilation...
-    finished in 0.01 seconds. Local cache hits 16 (0.15s CPU time), remote cache hits 0 (0.00s CPU time), compiled 0 variants (0.00s CPU time), skipped 0 variants
+    finished in 0.00 seconds. Local cache hits 16 (0.02s CPU time), remote cache hits 0 (0.00s CPU time), compiled 0 variants (0.00s CPU time), skipped 0 variants
     Prepared data for serialisation in 0.00s
 Serialized binary data for shader Hidden/Universal Render Pipeline/CopyDepth in 0.00s
     glcore (total internal programs: 8, unique: 8)
@@ -1801,7 +1798,7 @@ Compiling shader "Hidden/TerrainEngine/Details/UniversalPipeline/WavingDoublePas
     After scriptable stripping: 16
     Processed in 0.00 seconds
     starting compilation...
-    finished in 0.01 seconds. Local cache hits 16 (0.17s CPU time), remote cache hits 0 (0.00s CPU time), compiled 0 variants (0.00s CPU time), skipped 0 variants
+    finished in 0.00 seconds. Local cache hits 16 (0.03s CPU time), remote cache hits 0 (0.00s CPU time), compiled 0 variants (0.00s CPU time), skipped 0 variants
     Prepared data for serialisation in 0.00s
 Compiling shader "Hidden/TerrainEngine/Details/UniversalPipeline/WavingDoublePass" pass "GBuffer" (vp)
     Full variant space:         92160
@@ -1826,7 +1823,7 @@ Compiling shader "Hidden/TerrainEngine/Details/UniversalPipeline/WavingDoublePas
     After scriptable stripping: 2
     Processed in 0.00 seconds
     starting compilation...
-    finished in 0.01 seconds. Local cache hits 2 (0.02s CPU time), remote cache hits 0 (0.00s CPU time), compiled 0 variants (0.00s CPU time), skipped 0 variants
+    finished in 0.00 seconds. Local cache hits 2 (0.00s CPU time), remote cache hits 0 (0.00s CPU time), compiled 0 variants (0.00s CPU time), skipped 0 variants
     Prepared data for serialisation in 0.00s
 Serialized binary data for shader Hidden/TerrainEngine/Details/UniversalPipeline/WavingDoublePass in 0.00s
     glcore (total internal programs: 10, unique: 10)
@@ -1838,7 +1835,7 @@ Compiling shader "Hidden/Universal Render Pipeline/FallbackError" pass "" (vp)
     After scriptable stripping: 2
     Processed in 0.00 seconds
     starting compilation...
-    finished in 0.01 seconds. Local cache hits 2 (0.02s CPU time), remote cache hits 0 (0.00s CPU time), compiled 0 variants (0.00s CPU time), skipped 0 variants
+    finished in 0.00 seconds. Local cache hits 2 (0.00s CPU time), remote cache hits 0 (0.00s CPU time), compiled 0 variants (0.00s CPU time), skipped 0 variants
     Prepared data for serialisation in 0.00s
 Serialized binary data for shader Hidden/Universal Render Pipeline/FallbackError in 0.00s
     glcore (total internal programs: 1, unique: 1)
@@ -1850,7 +1847,7 @@ Compiling shader "Hidden/Universal Render Pipeline/UberPost" pass "UberPost" (vp
     After scriptable stripping: 864
     Processed in 0.02 seconds
     starting compilation...
-    finished in 0.32 seconds. Local cache hits 864 (10.09s CPU time), remote cache hits 0 (0.00s CPU time), compiled 0 variants (0.00s CPU time), skipped 0 variants
+    finished in 0.09 seconds. Local cache hits 864 (2.97s CPU time), remote cache hits 0 (0.00s CPU time), compiled 0 variants (0.00s CPU time), skipped 0 variants
     Prepared data for serialisation in 0.02s
 Serialized binary data for shader Hidden/Universal Render Pipeline/UberPost in 0.00s
     glcore (total internal programs: 432, unique: 432)
@@ -1865,7 +1862,7 @@ Compiling shader "Hidden/Universal Render Pipeline/Scaling Setup" pass "ScalingS
     After scriptable stripping: 8
     Processed in 0.00 seconds
     starting compilation...
-    finished in 0.01 seconds. Local cache hits 8 (0.07s CPU time), remote cache hits 0 (0.00s CPU time), compiled 0 variants (0.00s CPU time), skipped 0 variants
+    finished in 0.00 seconds. Local cache hits 8 (0.01s CPU time), remote cache hits 0 (0.00s CPU time), compiled 0 variants (0.00s CPU time), skipped 0 variants
     Prepared data for serialisation in 0.00s
 Serialized binary data for shader Hidden/Universal Render Pipeline/Scaling Setup in 0.00s
     glcore (total internal programs: 4, unique: 4)
@@ -1936,7 +1933,7 @@ Compiling shader "Hidden/Universal Render Pipeline/LutBuilderHdr" pass "LutBuild
     After scriptable stripping: 6
     Processed in 0.00 seconds
     starting compilation...
-    finished in 0.01 seconds. Local cache hits 6 (0.06s CPU time), remote cache hits 0 (0.00s CPU time), compiled 0 variants (0.00s CPU time), skipped 0 variants
+    finished in 0.00 seconds. Local cache hits 6 (0.00s CPU time), remote cache hits 0 (0.00s CPU time), compiled 0 variants (0.00s CPU time), skipped 0 variants
     Prepared data for serialisation in 0.00s
 Serialized binary data for shader Hidden/Universal Render Pipeline/LutBuilderHdr in 0.00s
     glcore (total internal programs: 3, unique: 3)
@@ -1958,7 +1955,7 @@ Compiling shader "Hidden/TerrainEngine/Details/UniversalPipeline/Vertexlit" pass
     After scriptable stripping: 16
     Processed in 0.00 seconds
     starting compilation...
-    finished in 0.01 seconds. Local cache hits 16 (0.16s CPU time), remote cache hits 0 (0.00s CPU time), compiled 0 variants (0.00s CPU time), skipped 0 variants
+    finished in 0.00 seconds. Local cache hits 16 (0.03s CPU time), remote cache hits 0 (0.00s CPU time), compiled 0 variants (0.00s CPU time), skipped 0 variants
     Prepared data for serialisation in 0.00s
 Compiling shader "Hidden/TerrainEngine/Details/UniversalPipeline/Vertexlit" pass "TerrainDetailVertex - GBuffer" (vp)
     Full variant space:         7680
@@ -1967,7 +1964,7 @@ Compiling shader "Hidden/TerrainEngine/Details/UniversalPipeline/Vertexlit" pass
     After scriptable stripping: 16
     Processed in 0.00 seconds
     starting compilation...
-    finished in 0.01 seconds. Local cache hits 16 (0.15s CPU time), remote cache hits 0 (0.00s CPU time), compiled 0 variants (0.00s CPU time), skipped 0 variants
+    finished in 0.00 seconds. Local cache hits 16 (0.03s CPU time), remote cache hits 0 (0.00s CPU time), compiled 0 variants (0.00s CPU time), skipped 0 variants
     Prepared data for serialisation in 0.00s
 Compiling shader "Hidden/TerrainEngine/Details/UniversalPipeline/Vertexlit" pass "DepthOnly" (vp)
     Full variant space:         4
@@ -1976,7 +1973,7 @@ Compiling shader "Hidden/TerrainEngine/Details/UniversalPipeline/Vertexlit" pass
     After scriptable stripping: 2
     Processed in 0.00 seconds
     starting compilation...
-    finished in 0.01 seconds. Local cache hits 2 (0.02s CPU time), remote cache hits 0 (0.00s CPU time), compiled 0 variants (0.00s CPU time), skipped 0 variants
+    finished in 0.00 seconds. Local cache hits 2 (0.00s CPU time), remote cache hits 0 (0.00s CPU time), compiled 0 variants (0.00s CPU time), skipped 0 variants
     Prepared data for serialisation in 0.00s
 Compiling shader "Hidden/TerrainEngine/Details/UniversalPipeline/Vertexlit" pass "DepthNormals" (vp)
     Full variant space:         4
@@ -1985,7 +1982,7 @@ Compiling shader "Hidden/TerrainEngine/Details/UniversalPipeline/Vertexlit" pass
     After scriptable stripping: 2
     Processed in 0.00 seconds
     starting compilation...
-    finished in 0.01 seconds. Local cache hits 2 (0.02s CPU time), remote cache hits 0 (0.00s CPU time), compiled 0 variants (0.00s CPU time), skipped 0 variants
+    finished in 0.00 seconds. Local cache hits 2 (0.00s CPU time), remote cache hits 0 (0.00s CPU time), compiled 0 variants (0.00s CPU time), skipped 0 variants
     Prepared data for serialisation in 0.00s
 Serialized binary data for shader Hidden/TerrainEngine/Details/UniversalPipeline/Vertexlit in 0.00s
     glcore (total internal programs: 18, unique: 18)
@@ -2004,7 +2001,7 @@ Compiling compute shader "ProbeVolumeSamplingDebugPositionNormal"
     starting stripping...
     finished in 0.00 seconds. 2 of 2 variants left
     2 variants, starting compilation...
-    finished in 0.01 seconds. Local cache hits 2, remote cache hits 0, compiled 0 variants
+    finished in 0.00 seconds. Local cache hits 2, remote cache hits 0, compiled 0 variants
 Compiling shader "Skybox/Procedural" pass "" (vp)
     Full variant space:         6
     After settings filtering:   6
@@ -2012,7 +2009,7 @@ Compiling shader "Skybox/Procedural" pass "" (vp)
     After scriptable stripping: 6
     Processed in 0.00 seconds
     starting compilation...
-    finished in 0.01 seconds. Local cache hits 6 (0.04s CPU time), remote cache hits 0 (0.00s CPU time), compiled 0 variants (0.00s CPU time), skipped 0 variants
+    finished in 0.00 seconds. Local cache hits 6 (0.01s CPU time), remote cache hits 0 (0.00s CPU time), compiled 0 variants (0.00s CPU time), skipped 0 variants
     Prepared data for serialisation in 0.00s
 Serialized binary data for shader Skybox/Procedural in 0.00s
     glcore (total internal programs: 3, unique: 3)
@@ -2024,7 +2021,7 @@ Compiling shader "Universal Render Pipeline/Lit" pass "ForwardLit" (vp)
     After scriptable stripping: 64
     Processed in 0.01 seconds
     starting compilation...
-    finished in 0.04 seconds. Local cache hits 64 (0.96s CPU time), remote cache hits 0 (0.00s CPU time), compiled 0 variants (0.00s CPU time), skipped 0 variants
+    finished in 0.01 seconds. Local cache hits 64 (0.23s CPU time), remote cache hits 0 (0.00s CPU time), compiled 0 variants (0.00s CPU time), skipped 0 variants
     Prepared data for serialisation in 0.00s
 Compiling shader "Universal Render Pipeline/Lit" pass "ShadowCaster" (vp)
     Full variant space:         32
@@ -2033,7 +2030,7 @@ Compiling shader "Universal Render Pipeline/Lit" pass "ShadowCaster" (vp)
     After scriptable stripping: 8
     Processed in 0.00 seconds
     starting compilation...
-    finished in 0.01 seconds. Local cache hits 8 (0.08s CPU time), remote cache hits 0 (0.00s CPU time), compiled 0 variants (0.00s CPU time), skipped 0 variants
+    finished in 0.00 seconds. Local cache hits 8 (0.01s CPU time), remote cache hits 0 (0.00s CPU time), compiled 0 variants (0.00s CPU time), skipped 0 variants
     Prepared data for serialisation in 0.00s
 Compiling shader "Universal Render Pipeline/Lit" pass "GBuffer" (vp)
     Full variant space:         11796480
@@ -2049,7 +2046,7 @@ Compiling shader "Universal Render Pipeline/Lit" pass "DepthOnly" (vp)
     After scriptable stripping: 4
     Processed in 0.00 seconds
     starting compilation...
-    finished in 0.01 seconds. Local cache hits 4 (0.02s CPU time), remote cache hits 0 (0.00s CPU time), compiled 0 variants (0.00s CPU time), skipped 0 variants
+    finished in 0.00 seconds. Local cache hits 4 (0.00s CPU time), remote cache hits 0 (0.00s CPU time), compiled 0 variants (0.00s CPU time), skipped 0 variants
     Prepared data for serialisation in 0.00s
 Compiling shader "Universal Render Pipeline/Lit" pass "DepthNormals" (vp)
     Full variant space:         32
@@ -2058,7 +2055,7 @@ Compiling shader "Universal Render Pipeline/Lit" pass "DepthNormals" (vp)
     After scriptable stripping: 4
     Processed in 0.00 seconds
     starting compilation...
-    finished in 0.01 seconds. Local cache hits 4 (0.02s CPU time), remote cache hits 0 (0.00s CPU time), compiled 0 variants (0.00s CPU time), skipped 0 variants
+    finished in 0.00 seconds. Local cache hits 4 (0.00s CPU time), remote cache hits 0 (0.00s CPU time), compiled 0 variants (0.00s CPU time), skipped 0 variants
     Prepared data for serialisation in 0.00s
 Compiling shader "Universal Render Pipeline/Lit" pass "Universal2D" (vp)
     Full variant space:         8
@@ -2074,7 +2071,7 @@ Compiling shader "Universal Render Pipeline/Lit" pass "MotionVectors" (vp)
     After scriptable stripping: 4
     Processed in 0.00 seconds
     starting compilation...
-    finished in 0.01 seconds. Local cache hits 4 (0.03s CPU time), remote cache hits 0 (0.00s CPU time), compiled 0 variants (0.00s CPU time), skipped 0 variants
+    finished in 0.00 seconds. Local cache hits 4 (0.00s CPU time), remote cache hits 0 (0.00s CPU time), compiled 0 variants (0.00s CPU time), skipped 0 variants
     Prepared data for serialisation in 0.00s
 Compiling shader "Universal Render Pipeline/Lit" pass "XRMotionVectors" (vp)
     Full variant space:         16
@@ -2088,7 +2085,7 @@ Serialized binary data for shader Universal Render Pipeline/Lit in 0.00s
     vulkan (total internal programs: 42, unique: 42)
 Compressed shader 'Universal Render Pipeline/Lit' on glcore from 2.22MB to 0.29MB
 Compressed shader 'Universal Render Pipeline/Lit' on vulkan from 1.25MB to 0.40MB
-Compressed shader 'Universal Render Pipeline/Lit' in 0.06s
+Compressed shader 'Universal Render Pipeline/Lit' in 0.07s
 Compiling shader "Legacy Shaders/VertexLit" pass "" (vp)
     Full variant space:         24
     After settings filtering:   24
@@ -2096,7 +2093,7 @@ Compiling shader "Legacy Shaders/VertexLit" pass "" (vp)
     After scriptable stripping: 6
     Processed in 0.00 seconds
     starting compilation...
-    finished in 0.01 seconds. Local cache hits 6 (0.04s CPU time), remote cache hits 0 (0.00s CPU time), compiled 0 variants (0.00s CPU time), skipped 0 variants
+    finished in 0.00 seconds. Local cache hits 6 (0.01s CPU time), remote cache hits 0 (0.00s CPU time), compiled 0 variants (0.00s CPU time), skipped 0 variants
     Prepared data for serialisation in 0.00s
 Compiling shader "Legacy Shaders/VertexLit" pass "" (vp)
     Full variant space:         8
@@ -2105,7 +2102,7 @@ Compiling shader "Legacy Shaders/VertexLit" pass "" (vp)
     After scriptable stripping: 2
     Processed in 0.00 seconds
     starting compilation...
-    finished in 0.01 seconds. Local cache hits 2 (0.02s CPU time), remote cache hits 0 (0.00s CPU time), compiled 0 variants (0.00s CPU time), skipped 0 variants
+    finished in 0.00 seconds. Local cache hits 2 (0.00s CPU time), remote cache hits 0 (0.00s CPU time), compiled 0 variants (0.00s CPU time), skipped 0 variants
     Prepared data for serialisation in 0.00s
 Compiling shader "Legacy Shaders/VertexLit" pass "ShadowCaster" (vp)
     Full variant space:         8
@@ -2114,7 +2111,7 @@ Compiling shader "Legacy Shaders/VertexLit" pass "ShadowCaster" (vp)
     After scriptable stripping: 4
     Processed in 0.00 seconds
     starting compilation...
-    finished in 0.01 seconds. Local cache hits 4 (0.03s CPU time), remote cache hits 0 (0.00s CPU time), compiled 0 variants (0.00s CPU time), skipped 0 variants
+    finished in 0.00 seconds. Local cache hits 4 (0.00s CPU time), remote cache hits 0 (0.00s CPU time), compiled 0 variants (0.00s CPU time), skipped 0 variants
     Prepared data for serialisation in 0.00s
 Serialized binary data for shader Legacy Shaders/VertexLit in 0.00s
     glcore (total internal programs: 6, unique: 6)
@@ -2126,7 +2123,7 @@ Compiling shader "Legacy Shaders/Diffuse" pass "FORWARD" (vp)
     After scriptable stripping: 16
     Processed in 0.00 seconds
     starting compilation...
-    finished in 0.01 seconds. Local cache hits 16 (0.17s CPU time), remote cache hits 0 (0.00s CPU time), compiled 0 variants (0.00s CPU time), skipped 0 variants
+    finished in 0.00 seconds. Local cache hits 16 (0.02s CPU time), remote cache hits 0 (0.00s CPU time), compiled 0 variants (0.00s CPU time), skipped 0 variants
     Prepared data for serialisation in 0.00s
 Compiling shader "Legacy Shaders/Diffuse" pass "FORWARD" (vp)
     Full variant space:         40
@@ -2135,7 +2132,7 @@ Compiling shader "Legacy Shaders/Diffuse" pass "FORWARD" (vp)
     After scriptable stripping: 10
     Processed in 0.00 seconds
     starting compilation...
-    finished in 0.04 seconds. Local cache hits 10 (0.13s CPU time), remote cache hits 0 (0.00s CPU time), compiled 0 variants (0.00s CPU time), skipped 0 variants
+    finished in 0.00 seconds. Local cache hits 10 (0.01s CPU time), remote cache hits 0 (0.00s CPU time), compiled 0 variants (0.00s CPU time), skipped 0 variants
     Prepared data for serialisation in 0.00s
 Compiling shader "Legacy Shaders/Diffuse" pass "DEFERRED" (vp)
     Full variant space:         152
@@ -2144,7 +2141,7 @@ Compiling shader "Legacy Shaders/Diffuse" pass "DEFERRED" (vp)
     After scriptable stripping: 8
     Processed in 0.00 seconds
     starting compilation...
-    finished in 0.01 seconds. Local cache hits 8 (0.06s CPU time), remote cache hits 0 (0.00s CPU time), compiled 0 variants (0.00s CPU time), skipped 0 variants
+    finished in 0.00 seconds. Local cache hits 8 (0.01s CPU time), remote cache hits 0 (0.00s CPU time), compiled 0 variants (0.00s CPU time), skipped 0 variants
     Prepared data for serialisation in 0.00s
 Serialized binary data for shader Legacy Shaders/Diffuse in 0.00s
     glcore (total internal programs: 17, unique: 17)
@@ -2156,7 +2153,7 @@ Compiling shader "Hidden/Internal-StencilWrite" pass "" (vp)
     After scriptable stripping: 2
     Processed in 0.00 seconds
     starting compilation...
-    finished in 0.01 seconds. Local cache hits 2 (0.01s CPU time), remote cache hits 0 (0.00s CPU time), compiled 0 variants (0.00s CPU time), skipped 0 variants
+    finished in 0.00 seconds. Local cache hits 2 (0.00s CPU time), remote cache hits 0 (0.00s CPU time), compiled 0 variants (0.00s CPU time), skipped 0 variants
     Prepared data for serialisation in 0.00s
 Serialized binary data for shader Hidden/Internal-StencilWrite in 0.00s
     glcore (total internal programs: 1, unique: 1)
@@ -2168,52 +2165,7 @@ Compiling shader "Hidden/Internal-DepthNormalsTexture" pass "" (vp)
     After scriptable stripping: 2
     Processed in 0.00 seconds
     starting compilation...
-    finished in 0.01 seconds. Local cache hits 2 (0.01s CPU time), remote cache hits 0 (0.00s CPU time), compiled 0 variants (0.00s CPU time), skipped 0 variants
-    Prepared data for serialisation in 0.00s
-Compiling shader "Hidden/Internal-DepthNormalsTexture" pass "" (vp)
-    Full variant space:         2
-    After settings filtering:   2
-    After built-in stripping:   2
-    After scriptable stripping: 2
-    Processed in 0.00 seconds
-    starting compilation...
-    finished in 0.01 seconds. Local cache hits 2 (0.01s CPU time), remote cache hits 0 (0.00s CPU time), compiled 0 variants (0.00s CPU time), skipped 0 variants
-    Prepared data for serialisation in 0.00s
-Compiling shader "Hidden/Internal-DepthNormalsTexture" pass "" (vp)
-    Full variant space:         2
-    After settings filtering:   2
-    After built-in stripping:   2
-    After scriptable stripping: 2
-    Processed in 0.00 seconds
-    starting compilation...
-    finished in 0.01 seconds. Local cache hits 2 (0.02s CPU time), remote cache hits 0 (0.00s CPU time), compiled 0 variants (0.00s CPU time), skipped 0 variants
-    Prepared data for serialisation in 0.00s
-Compiling shader "Hidden/Internal-DepthNormalsTexture" pass "" (vp)
-    Full variant space:         2
-    After settings filtering:   2
-    After built-in stripping:   2
-    After scriptable stripping: 2
-    Processed in 0.00 seconds
-    starting compilation...
-    finished in 0.01 seconds. Local cache hits 2 (0.01s CPU time), remote cache hits 0 (0.00s CPU time), compiled 0 variants (0.00s CPU time), skipped 0 variants
-    Prepared data for serialisation in 0.00s
-Compiling shader "Hidden/Internal-DepthNormalsTexture" pass "" (vp)
-    Full variant space:         2
-    After settings filtering:   2
-    After built-in stripping:   2
-    After scriptable stripping: 2
-    Processed in 0.00 seconds
-    starting compilation...
-    finished in 0.01 seconds. Local cache hits 2 (0.01s CPU time), remote cache hits 0 (0.00s CPU time), compiled 0 variants (0.00s CPU time), skipped 0 variants
-    Prepared data for serialisation in 0.00s
-Compiling shader "Hidden/Internal-DepthNormalsTexture" pass "" (vp)
-    Full variant space:         2
-    After settings filtering:   2
-    After built-in stripping:   2
-    After scriptable stripping: 2
-    Processed in 0.00 seconds
-    starting compilation...
-    finished in 0.01 seconds. Local cache hits 2 (0.01s CPU time), remote cache hits 0 (0.00s CPU time), compiled 0 variants (0.00s CPU time), skipped 0 variants
+    finished in 0.00 seconds. Local cache hits 2 (0.00s CPU time), remote cache hits 0 (0.00s CPU time), compiled 0 variants (0.00s CPU time), skipped 0 variants
     Prepared data for serialisation in 0.00s
 Compiling shader "Hidden/Internal-DepthNormalsTexture" pass "" (vp)
     Full variant space:         2
@@ -2231,7 +2183,7 @@ Compiling shader "Hidden/Internal-DepthNormalsTexture" pass "" (vp)
     After scriptable stripping: 2
     Processed in 0.00 seconds
     starting compilation...
-    finished in 0.01 seconds. Local cache hits 2 (0.02s CPU time), remote cache hits 0 (0.00s CPU time), compiled 0 variants (0.00s CPU time), skipped 0 variants
+    finished in 0.00 seconds. Local cache hits 2 (0.00s CPU time), remote cache hits 0 (0.00s CPU time), compiled 0 variants (0.00s CPU time), skipped 0 variants
     Prepared data for serialisation in 0.00s
 Compiling shader "Hidden/Internal-DepthNormalsTexture" pass "" (vp)
     Full variant space:         2
@@ -2240,7 +2192,7 @@ Compiling shader "Hidden/Internal-DepthNormalsTexture" pass "" (vp)
     After scriptable stripping: 2
     Processed in 0.00 seconds
     starting compilation...
-    finished in 0.01 seconds. Local cache hits 2 (0.02s CPU time), remote cache hits 0 (0.00s CPU time), compiled 0 variants (0.00s CPU time), skipped 0 variants
+    finished in 0.00 seconds. Local cache hits 2 (0.00s CPU time), remote cache hits 0 (0.00s CPU time), compiled 0 variants (0.00s CPU time), skipped 0 variants
     Prepared data for serialisation in 0.00s
 Compiling shader "Hidden/Internal-DepthNormalsTexture" pass "" (vp)
     Full variant space:         2
@@ -2249,7 +2201,52 @@ Compiling shader "Hidden/Internal-DepthNormalsTexture" pass "" (vp)
     After scriptable stripping: 2
     Processed in 0.00 seconds
     starting compilation...
-    finished in 0.01 seconds. Local cache hits 2 (0.02s CPU time), remote cache hits 0 (0.00s CPU time), compiled 0 variants (0.00s CPU time), skipped 0 variants
+    finished in 0.00 seconds. Local cache hits 2 (0.00s CPU time), remote cache hits 0 (0.00s CPU time), compiled 0 variants (0.00s CPU time), skipped 0 variants
+    Prepared data for serialisation in 0.00s
+Compiling shader "Hidden/Internal-DepthNormalsTexture" pass "" (vp)
+    Full variant space:         2
+    After settings filtering:   2
+    After built-in stripping:   2
+    After scriptable stripping: 2
+    Processed in 0.00 seconds
+    starting compilation...
+    finished in 0.00 seconds. Local cache hits 2 (0.00s CPU time), remote cache hits 0 (0.00s CPU time), compiled 0 variants (0.00s CPU time), skipped 0 variants
+    Prepared data for serialisation in 0.00s
+Compiling shader "Hidden/Internal-DepthNormalsTexture" pass "" (vp)
+    Full variant space:         2
+    After settings filtering:   2
+    After built-in stripping:   2
+    After scriptable stripping: 2
+    Processed in 0.00 seconds
+    starting compilation...
+    finished in 0.00 seconds. Local cache hits 2 (0.00s CPU time), remote cache hits 0 (0.00s CPU time), compiled 0 variants (0.00s CPU time), skipped 0 variants
+    Prepared data for serialisation in 0.00s
+Compiling shader "Hidden/Internal-DepthNormalsTexture" pass "" (vp)
+    Full variant space:         2
+    After settings filtering:   2
+    After built-in stripping:   2
+    After scriptable stripping: 2
+    Processed in 0.00 seconds
+    starting compilation...
+    finished in 0.00 seconds. Local cache hits 2 (0.00s CPU time), remote cache hits 0 (0.00s CPU time), compiled 0 variants (0.00s CPU time), skipped 0 variants
+    Prepared data for serialisation in 0.00s
+Compiling shader "Hidden/Internal-DepthNormalsTexture" pass "" (vp)
+    Full variant space:         2
+    After settings filtering:   2
+    After built-in stripping:   2
+    After scriptable stripping: 2
+    Processed in 0.00 seconds
+    starting compilation...
+    finished in 0.00 seconds. Local cache hits 2 (0.00s CPU time), remote cache hits 0 (0.00s CPU time), compiled 0 variants (0.00s CPU time), skipped 0 variants
+    Prepared data for serialisation in 0.00s
+Compiling shader "Hidden/Internal-DepthNormalsTexture" pass "" (vp)
+    Full variant space:         2
+    After settings filtering:   2
+    After built-in stripping:   2
+    After scriptable stripping: 2
+    Processed in 0.00 seconds
+    starting compilation...
+    finished in 0.00 seconds. Local cache hits 2 (0.00s CPU time), remote cache hits 0 (0.00s CPU time), compiled 0 variants (0.00s CPU time), skipped 0 variants
     Prepared data for serialisation in 0.00s
 Serialized binary data for shader Hidden/Internal-DepthNormalsTexture in 0.00s
     glcore (total internal programs: 10, unique: 10)
@@ -2261,7 +2258,7 @@ Compiling shader "Hidden/Internal-ScreenSpaceShadows" pass "" (vp)
     After scriptable stripping: 8
     Processed in 0.00 seconds
     starting compilation...
-    finished in 0.01 seconds. Local cache hits 8 (0.05s CPU time), remote cache hits 0 (0.00s CPU time), compiled 0 variants (0.00s CPU time), skipped 0 variants
+    finished in 0.00 seconds. Local cache hits 8 (0.01s CPU time), remote cache hits 0 (0.00s CPU time), compiled 0 variants (0.00s CPU time), skipped 0 variants
     Prepared data for serialisation in 0.00s
 Compiling shader "Hidden/Internal-ScreenSpaceShadows" pass "" (vp)
     Full variant space:         8
@@ -2270,7 +2267,7 @@ Compiling shader "Hidden/Internal-ScreenSpaceShadows" pass "" (vp)
     After scriptable stripping: 8
     Processed in 0.00 seconds
     starting compilation...
-    finished in 0.01 seconds. Local cache hits 8 (0.05s CPU time), remote cache hits 0 (0.00s CPU time), compiled 0 variants (0.00s CPU time), skipped 0 variants
+    finished in 0.00 seconds. Local cache hits 8 (0.01s CPU time), remote cache hits 0 (0.00s CPU time), compiled 0 variants (0.00s CPU time), skipped 0 variants
     Prepared data for serialisation in 0.00s
 Compiling shader "Hidden/Internal-ScreenSpaceShadows" pass "" (vp)
     Full variant space:         8
@@ -2279,7 +2276,7 @@ Compiling shader "Hidden/Internal-ScreenSpaceShadows" pass "" (vp)
     After scriptable stripping: 8
     Processed in 0.00 seconds
     starting compilation...
-    finished in 0.01 seconds. Local cache hits 8 (0.06s CPU time), remote cache hits 0 (0.00s CPU time), compiled 0 variants (0.00s CPU time), skipped 0 variants
+    finished in 0.00 seconds. Local cache hits 8 (0.01s CPU time), remote cache hits 0 (0.00s CPU time), compiled 0 variants (0.00s CPU time), skipped 0 variants
     Prepared data for serialisation in 0.00s
 Compiling shader "Hidden/Internal-ScreenSpaceShadows" pass "" (vp)
     Full variant space:         8
@@ -2288,7 +2285,7 @@ Compiling shader "Hidden/Internal-ScreenSpaceShadows" pass "" (vp)
     After scriptable stripping: 8
     Processed in 0.00 seconds
     starting compilation...
-    finished in 0.01 seconds. Local cache hits 8 (0.08s CPU time), remote cache hits 0 (0.00s CPU time), compiled 0 variants (0.00s CPU time), skipped 0 variants
+    finished in 0.00 seconds. Local cache hits 8 (0.01s CPU time), remote cache hits 0 (0.00s CPU time), compiled 0 variants (0.00s CPU time), skipped 0 variants
     Prepared data for serialisation in 0.00s
 Serialized binary data for shader Hidden/Internal-ScreenSpaceShadows in 0.00s
     glcore (total internal programs: 16, unique: 16)
@@ -2300,7 +2297,7 @@ Compiling shader "Hidden/Internal-CombineDepthNormals" pass "" (vp)
     After scriptable stripping: 2
     Processed in 0.00 seconds
     starting compilation...
-    finished in 0.01 seconds. Local cache hits 2 (0.02s CPU time), remote cache hits 0 (0.00s CPU time), compiled 0 variants (0.00s CPU time), skipped 0 variants
+    finished in 0.00 seconds. Local cache hits 2 (0.00s CPU time), remote cache hits 0 (0.00s CPU time), compiled 0 variants (0.00s CPU time), skipped 0 variants
     Prepared data for serialisation in 0.00s
 Serialized binary data for shader Hidden/Internal-CombineDepthNormals in 0.00s
     glcore (total internal programs: 1, unique: 1)
@@ -2312,7 +2309,7 @@ Compiling shader "Hidden/BlitCopy" pass "" (vp)
     After scriptable stripping: 2
     Processed in 0.00 seconds
     starting compilation...
-    finished in 0.01 seconds. Local cache hits 2 (0.02s CPU time), remote cache hits 0 (0.00s CPU time), compiled 0 variants (0.00s CPU time), skipped 0 variants
+    finished in 0.00 seconds. Local cache hits 2 (0.00s CPU time), remote cache hits 0 (0.00s CPU time), compiled 0 variants (0.00s CPU time), skipped 0 variants
     Prepared data for serialisation in 0.00s
 Serialized binary data for shader Hidden/BlitCopy in 0.00s
     glcore (total internal programs: 1, unique: 1)
@@ -2324,7 +2321,7 @@ Compiling shader "Hidden/BlitCopyDepth" pass "" (vp)
     After scriptable stripping: 2
     Processed in 0.00 seconds
     starting compilation...
-    finished in 0.01 seconds. Local cache hits 2 (0.02s CPU time), remote cache hits 0 (0.00s CPU time), compiled 0 variants (0.00s CPU time), skipped 0 variants
+    finished in 0.00 seconds. Local cache hits 2 (0.00s CPU time), remote cache hits 0 (0.00s CPU time), compiled 0 variants (0.00s CPU time), skipped 0 variants
     Prepared data for serialisation in 0.00s
 Serialized binary data for shader Hidden/BlitCopyDepth in 0.00s
     glcore (total internal programs: 1, unique: 1)
@@ -2336,7 +2333,7 @@ Compiling shader "Hidden/ConvertTexture" pass "" (vp)
     After scriptable stripping: 2
     Processed in 0.00 seconds
     starting compilation...
-    finished in 0.01 seconds. Local cache hits 2 (0.02s CPU time), remote cache hits 0 (0.00s CPU time), compiled 0 variants (0.00s CPU time), skipped 0 variants
+    finished in 0.00 seconds. Local cache hits 2 (0.00s CPU time), remote cache hits 0 (0.00s CPU time), compiled 0 variants (0.00s CPU time), skipped 0 variants
     Prepared data for serialisation in 0.00s
 Serialized binary data for shader Hidden/ConvertTexture in 0.00s
     glcore (total internal programs: 1, unique: 1)
@@ -2348,7 +2345,7 @@ Compiling shader "Hidden/Internal-DeferredShading" pass "" (vp)
     After scriptable stripping: 52
     Processed in 0.00 seconds
     starting compilation...
-    finished in 0.03 seconds. Local cache hits 52 (0.75s CPU time), remote cache hits 0 (0.00s CPU time), compiled 0 variants (0.00s CPU time), skipped 0 variants
+    finished in 0.01 seconds. Local cache hits 52 (0.13s CPU time), remote cache hits 0 (0.00s CPU time), compiled 0 variants (0.00s CPU time), skipped 0 variants
     Prepared data for serialisation in 0.00s
 Compiling shader "Hidden/Internal-DeferredShading" pass "" (vp)
     Full variant space:         2
@@ -2357,7 +2354,7 @@ Compiling shader "Hidden/Internal-DeferredShading" pass "" (vp)
     After scriptable stripping: 2
     Processed in 0.00 seconds
     starting compilation...
-    finished in 0.01 seconds. Local cache hits 2 (0.01s CPU time), remote cache hits 0 (0.00s CPU time), compiled 0 variants (0.00s CPU time), skipped 0 variants
+    finished in 0.00 seconds. Local cache hits 2 (0.00s CPU time), remote cache hits 0 (0.00s CPU time), compiled 0 variants (0.00s CPU time), skipped 0 variants
     Prepared data for serialisation in 0.00s
 Serialized binary data for shader Hidden/Internal-DeferredShading in 0.00s
     glcore (total internal programs: 27, unique: 27)
@@ -2369,7 +2366,7 @@ Compiling shader "Hidden/Internal-DeferredReflections" pass "" (vp)
     After scriptable stripping: 2
     Processed in 0.00 seconds
     starting compilation...
-    finished in 0.01 seconds. Local cache hits 2 (0.02s CPU time), remote cache hits 0 (0.00s CPU time), compiled 0 variants (0.00s CPU time), skipped 0 variants
+    finished in 0.00 seconds. Local cache hits 2 (0.00s CPU time), remote cache hits 0 (0.00s CPU time), compiled 0 variants (0.00s CPU time), skipped 0 variants
     Prepared data for serialisation in 0.00s
 Compiling shader "Hidden/Internal-DeferredReflections" pass "" (vp)
     Full variant space:         4
@@ -2378,7 +2375,7 @@ Compiling shader "Hidden/Internal-DeferredReflections" pass "" (vp)
     After scriptable stripping: 4
     Processed in 0.00 seconds
     starting compilation...
-    finished in 0.01 seconds. Local cache hits 4 (0.03s CPU time), remote cache hits 0 (0.00s CPU time), compiled 0 variants (0.00s CPU time), skipped 0 variants
+    finished in 0.00 seconds. Local cache hits 4 (0.00s CPU time), remote cache hits 0 (0.00s CPU time), compiled 0 variants (0.00s CPU time), skipped 0 variants
     Prepared data for serialisation in 0.00s
 Serialized binary data for shader Hidden/Internal-DeferredReflections in 0.00s
     glcore (total internal programs: 3, unique: 3)
@@ -2399,7 +2396,7 @@ Compiling shader "Hidden/Internal-MotionVectors" pass "" (vp)
     After scriptable stripping: 2
     Processed in 0.00 seconds
     starting compilation...
-    finished in 0.01 seconds. Local cache hits 2 (0.01s CPU time), remote cache hits 0 (0.00s CPU time), compiled 0 variants (0.00s CPU time), skipped 0 variants
+    finished in 0.00 seconds. Local cache hits 2 (0.00s CPU time), remote cache hits 0 (0.00s CPU time), compiled 0 variants (0.00s CPU time), skipped 0 variants
     Prepared data for serialisation in 0.00s
 Compiling shader "Hidden/Internal-MotionVectors" pass "" (vp)
     Full variant space:         2
@@ -2408,7 +2405,7 @@ Compiling shader "Hidden/Internal-MotionVectors" pass "" (vp)
     After scriptable stripping: 2
     Processed in 0.00 seconds
     starting compilation...
-    finished in 0.01 seconds. Local cache hits 2 (0.02s CPU time), remote cache hits 0 (0.00s CPU time), compiled 0 variants (0.00s CPU time), skipped 0 variants
+    finished in 0.00 seconds. Local cache hits 2 (0.00s CPU time), remote cache hits 0 (0.00s CPU time), compiled 0 variants (0.00s CPU time), skipped 0 variants
     Prepared data for serialisation in 0.00s
 Serialized binary data for shader Hidden/Internal-MotionVectors in 0.00s
     glcore (total internal programs: 3, unique: 3)
@@ -2420,7 +2417,7 @@ Compiling shader "Hidden/Internal-Flare" pass "" (vp)
     After scriptable stripping: 2
     Processed in 0.00 seconds
     starting compilation...
-    finished in 0.01 seconds. Local cache hits 2 (0.01s CPU time), remote cache hits 0 (0.00s CPU time), compiled 0 variants (0.00s CPU time), skipped 0 variants
+    finished in 0.00 seconds. Local cache hits 2 (0.00s CPU time), remote cache hits 0 (0.00s CPU time), compiled 0 variants (0.00s CPU time), skipped 0 variants
     Prepared data for serialisation in 0.00s
 Serialized binary data for shader Hidden/Internal-Flare in 0.00s
     glcore (total internal programs: 1, unique: 1)
@@ -2432,7 +2429,7 @@ Compiling shader "Hidden/Internal-Halo" pass "" (vp)
     After scriptable stripping: 2
     Processed in 0.00 seconds
     starting compilation...
-    finished in 0.01 seconds. Local cache hits 2 (0.02s CPU time), remote cache hits 0 (0.00s CPU time), compiled 0 variants (0.00s CPU time), skipped 0 variants
+    finished in 0.00 seconds. Local cache hits 2 (0.00s CPU time), remote cache hits 0 (0.00s CPU time), compiled 0 variants (0.00s CPU time), skipped 0 variants
     Prepared data for serialisation in 0.00s
 Serialized binary data for shader Hidden/Internal-Halo in 0.00s
     glcore (total internal programs: 1, unique: 1)
@@ -2444,7 +2441,7 @@ Compiling shader "Hidden/BlitCopyWithDepth" pass "" (vp)
     After scriptable stripping: 2
     Processed in 0.00 seconds
     starting compilation...
-    finished in 0.01 seconds. Local cache hits 2 (0.01s CPU time), remote cache hits 0 (0.00s CPU time), compiled 0 variants (0.00s CPU time), skipped 0 variants
+    finished in 0.00 seconds. Local cache hits 2 (0.00s CPU time), remote cache hits 0 (0.00s CPU time), compiled 0 variants (0.00s CPU time), skipped 0 variants
     Prepared data for serialisation in 0.00s
 Serialized binary data for shader Hidden/BlitCopyWithDepth in 0.00s
     glcore (total internal programs: 1, unique: 1)
@@ -2492,7 +2489,7 @@ Compiling shader "Hidden/Internal-DebugPattern" pass "Target Color and DepthSten
     After scriptable stripping: 2
     Processed in 0.00 seconds
     starting compilation...
-    finished in 0.01 seconds. Local cache hits 2 (0.01s CPU time), remote cache hits 0 (0.00s CPU time), compiled 0 variants (0.00s CPU time), skipped 0 variants
+    finished in 0.00 seconds. Local cache hits 2 (0.00s CPU time), remote cache hits 0 (0.00s CPU time), compiled 0 variants (0.00s CPU time), skipped 0 variants
     Prepared data for serialisation in 0.00s
 Compiling shader "Hidden/Internal-DebugPattern" pass "Target only Color" (vp)
     Full variant space:         2
@@ -2501,7 +2498,7 @@ Compiling shader "Hidden/Internal-DebugPattern" pass "Target only Color" (vp)
     After scriptable stripping: 2
     Processed in 0.00 seconds
     starting compilation...
-    finished in 0.01 seconds. Local cache hits 2 (0.01s CPU time), remote cache hits 0 (0.00s CPU time), compiled 0 variants (0.00s CPU time), skipped 0 variants
+    finished in 0.00 seconds. Local cache hits 2 (0.00s CPU time), remote cache hits 0 (0.00s CPU time), compiled 0 variants (0.00s CPU time), skipped 0 variants
     Prepared data for serialisation in 0.00s
 Compiling shader "Hidden/Internal-DebugPattern" pass "Target only DepthStencil" (vp)
     Full variant space:         2
@@ -2510,7 +2507,7 @@ Compiling shader "Hidden/Internal-DebugPattern" pass "Target only DepthStencil" 
     After scriptable stripping: 2
     Processed in 0.00 seconds
     starting compilation...
-    finished in 0.01 seconds. Local cache hits 2 (0.01s CPU time), remote cache hits 0 (0.00s CPU time), compiled 0 variants (0.00s CPU time), skipped 0 variants
+    finished in 0.00 seconds. Local cache hits 2 (0.00s CPU time), remote cache hits 0 (0.00s CPU time), compiled 0 variants (0.00s CPU time), skipped 0 variants
     Prepared data for serialisation in 0.00s
 Serialized binary data for shader Hidden/Internal-DebugPattern in 0.00s
     glcore (total internal programs: 3, unique: 3)
@@ -2543,7 +2540,7 @@ Compiling shader "Hidden/Internal-GUITextureClipText" pass "" (vp)
     After scriptable stripping: 2
     Processed in 0.00 seconds
     starting compilation...
-    finished in 0.01 seconds. Local cache hits 2 (0.01s CPU time), remote cache hits 0 (0.00s CPU time), compiled 0 variants (0.00s CPU time), skipped 0 variants
+    finished in 0.00 seconds. Local cache hits 2 (0.00s CPU time), remote cache hits 0 (0.00s CPU time), compiled 0 variants (0.00s CPU time), skipped 0 variants
     Prepared data for serialisation in 0.00s
 Compiling shader "Hidden/Internal-GUITextureClipText" pass "" (vp)
     Full variant space:         2
@@ -2564,7 +2561,7 @@ Compiling shader "Hidden/Internal-GUITexture" pass "" (vp)
     After scriptable stripping: 2
     Processed in 0.00 seconds
     starting compilation...
-    finished in 0.01 seconds. Local cache hits 2 (0.01s CPU time), remote cache hits 0 (0.00s CPU time), compiled 0 variants (0.00s CPU time), skipped 0 variants
+    finished in 0.00 seconds. Local cache hits 2 (0.00s CPU time), remote cache hits 0 (0.00s CPU time), compiled 0 variants (0.00s CPU time), skipped 0 variants
     Prepared data for serialisation in 0.00s
 Compiling shader "Hidden/Internal-GUITexture" pass "" (vp)
     Full variant space:         2
@@ -2585,7 +2582,7 @@ Compiling shader "Hidden/Internal-GUITextureBlit" pass "" (vp)
     After scriptable stripping: 2
     Processed in 0.00 seconds
     starting compilation...
-    finished in 0.01 seconds. Local cache hits 2 (0.02s CPU time), remote cache hits 0 (0.00s CPU time), compiled 0 variants (0.00s CPU time), skipped 0 variants
+    finished in 0.00 seconds. Local cache hits 2 (0.00s CPU time), remote cache hits 0 (0.00s CPU time), compiled 0 variants (0.00s CPU time), skipped 0 variants
     Prepared data for serialisation in 0.00s
 Compiling shader "Hidden/Internal-GUITextureBlit" pass "" (vp)
     Full variant space:         2
@@ -2606,7 +2603,7 @@ Compiling shader "Hidden/Internal-GUIRoundedRect" pass "" (vp)
     After scriptable stripping: 2
     Processed in 0.00 seconds
     starting compilation...
-    finished in 0.01 seconds. Local cache hits 2 (0.01s CPU time), remote cache hits 0 (0.00s CPU time), compiled 0 variants (0.00s CPU time), skipped 0 variants
+    finished in 0.00 seconds. Local cache hits 2 (0.00s CPU time), remote cache hits 0 (0.00s CPU time), compiled 0 variants (0.00s CPU time), skipped 0 variants
     Prepared data for serialisation in 0.00s
 Compiling shader "Hidden/Internal-GUIRoundedRect" pass "" (vp)
     Full variant space:         2
@@ -2615,7 +2612,7 @@ Compiling shader "Hidden/Internal-GUIRoundedRect" pass "" (vp)
     After scriptable stripping: 2
     Processed in 0.00 seconds
     starting compilation...
-    finished in 0.01 seconds. Local cache hits 2 (0.01s CPU time), remote cache hits 0 (0.00s CPU time), compiled 0 variants (0.00s CPU time), skipped 0 variants
+    finished in 0.00 seconds. Local cache hits 2 (0.00s CPU time), remote cache hits 0 (0.00s CPU time), compiled 0 variants (0.00s CPU time), skipped 0 variants
     Prepared data for serialisation in 0.00s
 Serialized binary data for shader Hidden/Internal-GUIRoundedRect in 0.00s
     glcore (total internal programs: 2, unique: 1)
@@ -2627,7 +2624,7 @@ Compiling shader "Hidden/Internal-GUIRoundedRectWithColorPerBorder" pass "" (vp)
     After scriptable stripping: 2
     Processed in 0.00 seconds
     starting compilation...
-    finished in 0.01 seconds. Local cache hits 2 (0.02s CPU time), remote cache hits 0 (0.00s CPU time), compiled 0 variants (0.00s CPU time), skipped 0 variants
+    finished in 0.00 seconds. Local cache hits 2 (0.00s CPU time), remote cache hits 0 (0.00s CPU time), compiled 0 variants (0.00s CPU time), skipped 0 variants
     Prepared data for serialisation in 0.00s
 Compiling shader "Hidden/Internal-GUIRoundedRectWithColorPerBorder" pass "" (vp)
     Full variant space:         2
@@ -2636,7 +2633,7 @@ Compiling shader "Hidden/Internal-GUIRoundedRectWithColorPerBorder" pass "" (vp)
     After scriptable stripping: 2
     Processed in 0.00 seconds
     starting compilation...
-    finished in 0.01 seconds. Local cache hits 2 (0.01s CPU time), remote cache hits 0 (0.00s CPU time), compiled 0 variants (0.00s CPU time), skipped 0 variants
+    finished in 0.00 seconds. Local cache hits 2 (0.00s CPU time), remote cache hits 0 (0.00s CPU time), compiled 0 variants (0.00s CPU time), skipped 0 variants
     Prepared data for serialisation in 0.00s
 Serialized binary data for shader Hidden/Internal-GUIRoundedRectWithColorPerBorder in 0.00s
     glcore (total internal programs: 2, unique: 1)
@@ -2648,7 +2645,7 @@ Compiling shader "Hidden/Internal-UIRDefault" pass "" (vp)
     After scriptable stripping: 4
     Processed in 0.00 seconds
     starting compilation...
-    finished in 0.01 seconds. Local cache hits 4 (0.03s CPU time), remote cache hits 0 (0.00s CPU time), compiled 0 variants (0.00s CPU time), skipped 0 variants
+    finished in 0.00 seconds. Local cache hits 4 (0.00s CPU time), remote cache hits 0 (0.00s CPU time), compiled 0 variants (0.00s CPU time), skipped 0 variants
     Prepared data for serialisation in 0.00s
 Serialized binary data for shader Hidden/Internal-UIRDefault in 0.00s
     glcore (total internal programs: 2, unique: 2)
@@ -2660,7 +2657,7 @@ Compiling shader "Hidden/Internal-UIRAtlasBlitCopy" pass "" (vp)
     After scriptable stripping: 2
     Processed in 0.00 seconds
     starting compilation...
-    finished in 0.01 seconds. Local cache hits 2 (0.01s CPU time), remote cache hits 0 (0.00s CPU time), compiled 0 variants (0.00s CPU time), skipped 0 variants
+    finished in 0.00 seconds. Local cache hits 2 (0.00s CPU time), remote cache hits 0 (0.00s CPU time), compiled 0 variants (0.00s CPU time), skipped 0 variants
     Prepared data for serialisation in 0.00s
 Serialized binary data for shader Hidden/Internal-UIRAtlasBlitCopy in 0.00s
     glcore (total internal programs: 1, unique: 1)
@@ -2672,7 +2669,7 @@ Compiling shader "Hidden/Internal-UIRDefaultWorld" pass "" (vp)
     After scriptable stripping: 2
     Processed in 0.00 seconds
     starting compilation...
-    finished in 0.01 seconds. Local cache hits 2 (0.02s CPU time), remote cache hits 0 (0.00s CPU time), compiled 0 variants (0.00s CPU time), skipped 0 variants
+    finished in 0.00 seconds. Local cache hits 2 (0.00s CPU time), remote cache hits 0 (0.00s CPU time), compiled 0 variants (0.00s CPU time), skipped 0 variants
     Prepared data for serialisation in 0.00s
 Serialized binary data for shader Hidden/Internal-UIRDefaultWorld in 0.00s
     glcore (total internal programs: 1, unique: 1)
@@ -2684,7 +2681,7 @@ Compiling shader "Sprites/Default" pass "" (vp)
     After scriptable stripping: 8
     Processed in 0.00 seconds
     starting compilation...
-    finished in 0.01 seconds. Local cache hits 8 (0.05s CPU time), remote cache hits 0 (0.00s CPU time), compiled 0 variants (0.00s CPU time), skipped 0 variants
+    finished in 0.00 seconds. Local cache hits 8 (0.01s CPU time), remote cache hits 0 (0.00s CPU time), compiled 0 variants (0.00s CPU time), skipped 0 variants
     Prepared data for serialisation in 0.00s
 Serialized binary data for shader Sprites/Default in 0.00s
     glcore (total internal programs: 4, unique: 4)
@@ -2696,7 +2693,7 @@ Compiling shader "Sprites/Mask" pass "" (vp)
     After scriptable stripping: 8
     Processed in 0.00 seconds
     starting compilation...
-    finished in 0.01 seconds. Local cache hits 8 (0.04s CPU time), remote cache hits 0 (0.00s CPU time), compiled 0 variants (0.00s CPU time), skipped 0 variants
+    finished in 0.00 seconds. Local cache hits 8 (0.01s CPU time), remote cache hits 0 (0.00s CPU time), compiled 0 variants (0.00s CPU time), skipped 0 variants
     Prepared data for serialisation in 0.00s
 Serialized binary data for shader Sprites/Mask in 0.00s
     glcore (total internal programs: 4, unique: 4)
@@ -2708,7 +2705,7 @@ Compiling shader "UI/Default" pass "Default" (vp)
     After scriptable stripping: 8
     Processed in 0.00 seconds
     starting compilation...
-    finished in 0.03 seconds. Local cache hits 8 (0.08s CPU time), remote cache hits 0 (0.00s CPU time), compiled 0 variants (0.00s CPU time), skipped 0 variants
+    finished in 0.00 seconds. Local cache hits 8 (0.01s CPU time), remote cache hits 0 (0.00s CPU time), compiled 0 variants (0.00s CPU time), skipped 0 variants
     Prepared data for serialisation in 0.00s
 Serialized binary data for shader UI/Default in 0.00s
     glcore (total internal programs: 4, unique: 4)
@@ -2720,7 +2717,7 @@ Compiling shader "UI/DefaultETC1" pass "Default" (vp)
     After scriptable stripping: 8
     Processed in 0.00 seconds
     starting compilation...
-    finished in 0.01 seconds. Local cache hits 8 (0.05s CPU time), remote cache hits 0 (0.00s CPU time), compiled 0 variants (0.00s CPU time), skipped 0 variants
+    finished in 0.00 seconds. Local cache hits 8 (0.01s CPU time), remote cache hits 0 (0.00s CPU time), compiled 0 variants (0.00s CPU time), skipped 0 variants
     Prepared data for serialisation in 0.00s
 Serialized binary data for shader UI/DefaultETC1 in 0.00s
     glcore (total internal programs: 4, unique: 4)
@@ -2732,7 +2729,7 @@ Compiling shader "Hidden/CubeBlur" pass "" (vp)
     After scriptable stripping: 2
     Processed in 0.00 seconds
     starting compilation...
-    finished in 0.01 seconds. Local cache hits 2 (0.02s CPU time), remote cache hits 0 (0.00s CPU time), compiled 0 variants (0.00s CPU time), skipped 0 variants
+    finished in 0.00 seconds. Local cache hits 2 (0.00s CPU time), remote cache hits 0 (0.00s CPU time), compiled 0 variants (0.00s CPU time), skipped 0 variants
     Prepared data for serialisation in 0.00s
 Compiling shader "Hidden/CubeBlur" pass "" (vp)
     Full variant space:         2
@@ -2741,7 +2738,7 @@ Compiling shader "Hidden/CubeBlur" pass "" (vp)
     After scriptable stripping: 2
     Processed in 0.00 seconds
     starting compilation...
-    finished in 0.01 seconds. Local cache hits 2 (0.02s CPU time), remote cache hits 0 (0.00s CPU time), compiled 0 variants (0.00s CPU time), skipped 0 variants
+    finished in 0.00 seconds. Local cache hits 2 (0.00s CPU time), remote cache hits 0 (0.00s CPU time), compiled 0 variants (0.00s CPU time), skipped 0 variants
     Prepared data for serialisation in 0.00s
 Serialized binary data for shader Hidden/CubeBlur in 0.00s
     glcore (total internal programs: 2, unique: 2)
@@ -2774,7 +2771,7 @@ Compiling shader "Hidden/CubeBlend" pass "" (vp)
     After scriptable stripping: 2
     Processed in 0.00 seconds
     starting compilation...
-    finished in 0.02 seconds. Local cache hits 2 (0.02s CPU time), remote cache hits 0 (0.00s CPU time), compiled 0 variants (0.00s CPU time), skipped 0 variants
+    finished in 0.00 seconds. Local cache hits 2 (0.00s CPU time), remote cache hits 0 (0.00s CPU time), compiled 0 variants (0.00s CPU time), skipped 0 variants
     Prepared data for serialisation in 0.00s
 Compiling shader "Hidden/CubeBlend" pass "" (vp)
     Full variant space:         2
@@ -2795,7 +2792,7 @@ Compiling shader "Hidden/VR/BlitTexArraySlice" pass "" (vp)
     After scriptable stripping: 2
     Processed in 0.00 seconds
     starting compilation...
-    finished in 0.01 seconds. Local cache hits 2 (0.02s CPU time), remote cache hits 0 (0.00s CPU time), compiled 0 variants (0.00s CPU time), skipped 0 variants
+    finished in 0.00 seconds. Local cache hits 2 (0.00s CPU time), remote cache hits 0 (0.00s CPU time), compiled 0 variants (0.00s CPU time), skipped 0 variants
     Prepared data for serialisation in 0.00s
 Serialized binary data for shader Hidden/VR/BlitTexArraySlice in 0.00s
     glcore (total internal programs: 1, unique: 1)
@@ -2807,7 +2804,7 @@ Compiling shader "Hidden/Internal-ODSWorldTexture" pass "" (vp)
     After scriptable stripping: 2
     Processed in 0.00 seconds
     starting compilation...
-    finished in 0.01 seconds. Local cache hits 2 (0.01s CPU time), remote cache hits 0 (0.00s CPU time), compiled 0 variants (0.00s CPU time), skipped 0 variants
+    finished in 0.00 seconds. Local cache hits 2 (0.00s CPU time), remote cache hits 0 (0.00s CPU time), compiled 0 variants (0.00s CPU time), skipped 0 variants
     Prepared data for serialisation in 0.00s
 Compiling shader "Hidden/Internal-ODSWorldTexture" pass "" (vp)
     Full variant space:         2
@@ -2816,43 +2813,7 @@ Compiling shader "Hidden/Internal-ODSWorldTexture" pass "" (vp)
     After scriptable stripping: 2
     Processed in 0.00 seconds
     starting compilation...
-    finished in 0.01 seconds. Local cache hits 2 (0.01s CPU time), remote cache hits 0 (0.00s CPU time), compiled 0 variants (0.00s CPU time), skipped 0 variants
-    Prepared data for serialisation in 0.00s
-Compiling shader "Hidden/Internal-ODSWorldTexture" pass "" (vp)
-    Full variant space:         2
-    After settings filtering:   2
-    After built-in stripping:   2
-    After scriptable stripping: 2
-    Processed in 0.00 seconds
-    starting compilation...
-    finished in 0.01 seconds. Local cache hits 2 (0.02s CPU time), remote cache hits 0 (0.00s CPU time), compiled 0 variants (0.00s CPU time), skipped 0 variants
-    Prepared data for serialisation in 0.00s
-Compiling shader "Hidden/Internal-ODSWorldTexture" pass "" (vp)
-    Full variant space:         2
-    After settings filtering:   2
-    After built-in stripping:   2
-    After scriptable stripping: 2
-    Processed in 0.00 seconds
-    starting compilation...
-    finished in 0.01 seconds. Local cache hits 2 (0.01s CPU time), remote cache hits 0 (0.00s CPU time), compiled 0 variants (0.00s CPU time), skipped 0 variants
-    Prepared data for serialisation in 0.00s
-Compiling shader "Hidden/Internal-ODSWorldTexture" pass "" (vp)
-    Full variant space:         2
-    After settings filtering:   2
-    After built-in stripping:   2
-    After scriptable stripping: 2
-    Processed in 0.00 seconds
-    starting compilation...
-    finished in 0.01 seconds. Local cache hits 2 (0.01s CPU time), remote cache hits 0 (0.00s CPU time), compiled 0 variants (0.00s CPU time), skipped 0 variants
-    Prepared data for serialisation in 0.00s
-Compiling shader "Hidden/Internal-ODSWorldTexture" pass "" (vp)
-    Full variant space:         2
-    After settings filtering:   2
-    After built-in stripping:   2
-    After scriptable stripping: 2
-    Processed in 0.00 seconds
-    starting compilation...
-    finished in 0.01 seconds. Local cache hits 2 (0.01s CPU time), remote cache hits 0 (0.00s CPU time), compiled 0 variants (0.00s CPU time), skipped 0 variants
+    finished in 0.00 seconds. Local cache hits 2 (0.00s CPU time), remote cache hits 0 (0.00s CPU time), compiled 0 variants (0.00s CPU time), skipped 0 variants
     Prepared data for serialisation in 0.00s
 Compiling shader "Hidden/Internal-ODSWorldTexture" pass "" (vp)
     Full variant space:         2
@@ -2879,7 +2840,7 @@ Compiling shader "Hidden/Internal-ODSWorldTexture" pass "" (vp)
     After scriptable stripping: 2
     Processed in 0.00 seconds
     starting compilation...
-    finished in 0.01 seconds. Local cache hits 2 (0.01s CPU time), remote cache hits 0 (0.00s CPU time), compiled 0 variants (0.00s CPU time), skipped 0 variants
+    finished in 0.00 seconds. Local cache hits 2 (0.00s CPU time), remote cache hits 0 (0.00s CPU time), compiled 0 variants (0.00s CPU time), skipped 0 variants
     Prepared data for serialisation in 0.00s
 Compiling shader "Hidden/Internal-ODSWorldTexture" pass "" (vp)
     Full variant space:         2
@@ -2888,7 +2849,43 @@ Compiling shader "Hidden/Internal-ODSWorldTexture" pass "" (vp)
     After scriptable stripping: 2
     Processed in 0.00 seconds
     starting compilation...
-    finished in 0.01 seconds. Local cache hits 2 (0.02s CPU time), remote cache hits 0 (0.00s CPU time), compiled 0 variants (0.00s CPU time), skipped 0 variants
+    finished in 0.00 seconds. Local cache hits 2 (0.00s CPU time), remote cache hits 0 (0.00s CPU time), compiled 0 variants (0.00s CPU time), skipped 0 variants
+    Prepared data for serialisation in 0.00s
+Compiling shader "Hidden/Internal-ODSWorldTexture" pass "" (vp)
+    Full variant space:         2
+    After settings filtering:   2
+    After built-in stripping:   2
+    After scriptable stripping: 2
+    Processed in 0.00 seconds
+    starting compilation...
+    finished in 0.00 seconds. Local cache hits 2 (0.00s CPU time), remote cache hits 0 (0.00s CPU time), compiled 0 variants (0.00s CPU time), skipped 0 variants
+    Prepared data for serialisation in 0.00s
+Compiling shader "Hidden/Internal-ODSWorldTexture" pass "" (vp)
+    Full variant space:         2
+    After settings filtering:   2
+    After built-in stripping:   2
+    After scriptable stripping: 2
+    Processed in 0.00 seconds
+    starting compilation...
+    finished in 0.00 seconds. Local cache hits 2 (0.00s CPU time), remote cache hits 0 (0.00s CPU time), compiled 0 variants (0.00s CPU time), skipped 0 variants
+    Prepared data for serialisation in 0.00s
+Compiling shader "Hidden/Internal-ODSWorldTexture" pass "" (vp)
+    Full variant space:         2
+    After settings filtering:   2
+    After built-in stripping:   2
+    After scriptable stripping: 2
+    Processed in 0.00 seconds
+    starting compilation...
+    finished in 0.00 seconds. Local cache hits 2 (0.00s CPU time), remote cache hits 0 (0.00s CPU time), compiled 0 variants (0.00s CPU time), skipped 0 variants
+    Prepared data for serialisation in 0.00s
+Compiling shader "Hidden/Internal-ODSWorldTexture" pass "" (vp)
+    Full variant space:         2
+    After settings filtering:   2
+    After built-in stripping:   2
+    After scriptable stripping: 2
+    Processed in 0.00 seconds
+    starting compilation...
+    finished in 0.00 seconds. Local cache hits 2 (0.00s CPU time), remote cache hits 0 (0.00s CPU time), compiled 0 variants (0.00s CPU time), skipped 0 variants
     Prepared data for serialisation in 0.00s
 Serialized binary data for shader Hidden/Internal-ODSWorldTexture in 0.00s
     glcore (total internal programs: 10, unique: 9)
@@ -2921,7 +2918,7 @@ Compiling shader "Hidden/VR/BlitFromTex2DToTexArraySlice" pass "" (vp)
     After scriptable stripping: 2
     Processed in 0.00 seconds
     starting compilation...
-    finished in 0.01 seconds. Local cache hits 2 (0.01s CPU time), remote cache hits 0 (0.00s CPU time), compiled 0 variants (0.00s CPU time), skipped 0 variants
+    finished in 0.00 seconds. Local cache hits 2 (0.00s CPU time), remote cache hits 0 (0.00s CPU time), compiled 0 variants (0.00s CPU time), skipped 0 variants
     Prepared data for serialisation in 0.00s
 Serialized binary data for shader Hidden/VR/BlitFromTex2DToTexArraySlice in 0.00s
     glcore (total internal programs: 2, unique: 2)
@@ -2945,7 +2942,7 @@ Compiling shader "Hidden/VideoDecode" pass "YCbCr_To_RGB1" (vp)
     After scriptable stripping: 4
     Processed in 0.00 seconds
     starting compilation...
-    finished in 0.01 seconds. Local cache hits 4 (0.02s CPU time), remote cache hits 0 (0.00s CPU time), compiled 0 variants (0.00s CPU time), skipped 0 variants
+    finished in 0.00 seconds. Local cache hits 4 (0.00s CPU time), remote cache hits 0 (0.00s CPU time), compiled 0 variants (0.00s CPU time), skipped 0 variants
     Prepared data for serialisation in 0.00s
 Compiling shader "Hidden/VideoDecode" pass "YCbCrA_To_RGBAFull" (vp)
     Full variant space:         4
@@ -2954,7 +2951,7 @@ Compiling shader "Hidden/VideoDecode" pass "YCbCrA_To_RGBAFull" (vp)
     After scriptable stripping: 4
     Processed in 0.00 seconds
     starting compilation...
-    finished in 0.01 seconds. Local cache hits 4 (0.03s CPU time), remote cache hits 0 (0.00s CPU time), compiled 0 variants (0.00s CPU time), skipped 0 variants
+    finished in 0.00 seconds. Local cache hits 4 (0.00s CPU time), remote cache hits 0 (0.00s CPU time), compiled 0 variants (0.00s CPU time), skipped 0 variants
     Prepared data for serialisation in 0.00s
 Compiling shader "Hidden/VideoDecode" pass "YCbCrA_To_RGBA" (vp)
     Full variant space:         4
@@ -2963,7 +2960,7 @@ Compiling shader "Hidden/VideoDecode" pass "YCbCrA_To_RGBA" (vp)
     After scriptable stripping: 4
     Processed in 0.00 seconds
     starting compilation...
-    finished in 0.01 seconds. Local cache hits 4 (0.02s CPU time), remote cache hits 0 (0.00s CPU time), compiled 0 variants (0.00s CPU time), skipped 0 variants
+    finished in 0.00 seconds. Local cache hits 4 (0.00s CPU time), remote cache hits 0 (0.00s CPU time), compiled 0 variants (0.00s CPU time), skipped 0 variants
     Prepared data for serialisation in 0.00s
 Compiling shader "Hidden/VideoDecode" pass "Flip_RGBA_To_RGBA" (vp)
     Full variant space:         4
@@ -2972,7 +2969,7 @@ Compiling shader "Hidden/VideoDecode" pass "Flip_RGBA_To_RGBA" (vp)
     After scriptable stripping: 4
     Processed in 0.00 seconds
     starting compilation...
-    finished in 0.01 seconds. Local cache hits 4 (0.03s CPU time), remote cache hits 0 (0.00s CPU time), compiled 0 variants (0.00s CPU time), skipped 0 variants
+    finished in 0.00 seconds. Local cache hits 4 (0.00s CPU time), remote cache hits 0 (0.00s CPU time), compiled 0 variants (0.00s CPU time), skipped 0 variants
     Prepared data for serialisation in 0.00s
 Compiling shader "Hidden/VideoDecode" pass "Flip_RGBASplit_To_RGBA" (vp)
     Full variant space:         4
@@ -2981,7 +2978,7 @@ Compiling shader "Hidden/VideoDecode" pass "Flip_RGBASplit_To_RGBA" (vp)
     After scriptable stripping: 4
     Processed in 0.00 seconds
     starting compilation...
-    finished in 0.01 seconds. Local cache hits 4 (0.02s CPU time), remote cache hits 0 (0.00s CPU time), compiled 0 variants (0.00s CPU time), skipped 0 variants
+    finished in 0.00 seconds. Local cache hits 4 (0.00s CPU time), remote cache hits 0 (0.00s CPU time), compiled 0 variants (0.00s CPU time), skipped 0 variants
     Prepared data for serialisation in 0.00s
 Compiling shader "Hidden/VideoDecode" pass "Flip_NV12_To_RGB1" (vp)
     Full variant space:         4
@@ -2990,7 +2987,7 @@ Compiling shader "Hidden/VideoDecode" pass "Flip_NV12_To_RGB1" (vp)
     After scriptable stripping: 4
     Processed in 0.00 seconds
     starting compilation...
-    finished in 0.01 seconds. Local cache hits 4 (0.02s CPU time), remote cache hits 0 (0.00s CPU time), compiled 0 variants (0.00s CPU time), skipped 0 variants
+    finished in 0.00 seconds. Local cache hits 4 (0.00s CPU time), remote cache hits 0 (0.00s CPU time), compiled 0 variants (0.00s CPU time), skipped 0 variants
     Prepared data for serialisation in 0.00s
 Compiling shader "Hidden/VideoDecode" pass "Flip_NV12_To_RGBA" (vp)
     Full variant space:         4
@@ -2999,7 +2996,7 @@ Compiling shader "Hidden/VideoDecode" pass "Flip_NV12_To_RGBA" (vp)
     After scriptable stripping: 4
     Processed in 0.00 seconds
     starting compilation...
-    finished in 0.01 seconds. Local cache hits 4 (0.03s CPU time), remote cache hits 0 (0.00s CPU time), compiled 0 variants (0.00s CPU time), skipped 0 variants
+    finished in 0.00 seconds. Local cache hits 4 (0.00s CPU time), remote cache hits 0 (0.00s CPU time), compiled 0 variants (0.00s CPU time), skipped 0 variants
     Prepared data for serialisation in 0.00s
 Compiling shader "Hidden/VideoDecode" pass "Flip_P010_To_RGB1" (vp)
     Full variant space:         2
@@ -3008,7 +3005,7 @@ Compiling shader "Hidden/VideoDecode" pass "Flip_P010_To_RGB1" (vp)
     After scriptable stripping: 2
     Processed in 0.00 seconds
     starting compilation...
-    finished in 0.01 seconds. Local cache hits 2 (0.01s CPU time), remote cache hits 0 (0.00s CPU time), compiled 0 variants (0.00s CPU time), skipped 0 variants
+    finished in 0.00 seconds. Local cache hits 2 (0.00s CPU time), remote cache hits 0 (0.00s CPU time), compiled 0 variants (0.00s CPU time), skipped 0 variants
     Prepared data for serialisation in 0.00s
 Serialized binary data for shader Hidden/VideoDecode in 0.00s
     glcore (total internal programs: 15, unique: 15)
@@ -3020,21 +3017,21 @@ Compiling shader "Hidden/TextCore/Distance Field SSD" pass "" (vp)
     After scriptable stripping: 2
     Processed in 0.00 seconds
     starting compilation...
-    finished in 0.01 seconds. Local cache hits 2 (0.02s CPU time), remote cache hits 0 (0.00s CPU time), compiled 0 variants (0.00s CPU time), skipped 0 variants
+    finished in 0.00 seconds. Local cache hits 2 (0.00s CPU time), remote cache hits 0 (0.00s CPU time), compiled 0 variants (0.00s CPU time), skipped 0 variants
     Prepared data for serialisation in 0.00s
 Serialized binary data for shader Hidden/TextCore/Distance Field SSD in 0.00s
     glcore (total internal programs: 1, unique: 1)
     vulkan (total internal programs: 1, unique: 1)
-Asset Pipeline Refresh (id=a05b5980384ddc74584b965114977f67): Total: 0.043 seconds - Initiated by RefreshV2(NoUpdateAssetOptions)
+Asset Pipeline Refresh (id=6dafcc74a5c13cc4bbb9a64d3ca26567): Total: 0.042 seconds - Initiated by RefreshV2(NoUpdateAssetOptions)
 Shader Hidden/ProbeVolume/VoxelizeScene is not supported: GPU does not support conservative rasterization
 Starting: C:\Program Files\Unity\Hub\Editor\6000.0.60f1\Editor\Data\bee_backend.exe --ipc --dagfile="Library/Bee/Playerc4aed1ea.dag" --profile="Library/Bee/backend1.traceevents" Player
 WorkingDir: D:/KDNet/KDnetUnity/Linux
 DisplayProgressbar: Incremental Player Build
-ExitCode: 0 Duration: 2s338ms
-Refreshing native plugins compatible for Editor in 1.34 ms, found 3 plugins.
+ExitCode: 0 Duration: 0s300ms
+Refreshing native plugins compatible for Editor in 3.78 ms, found 3 plugins.
 Preloading 0 native plugins for Editor in 0.00 ms.
-Asset Pipeline Refresh (id=ffdfa00a9b1d5d848b3c47dd31baf542): Total: 0.053 seconds - Initiated by RefreshV2(NoUpdateAssetOptions)
-Refreshing native plugins compatible for Editor in 1.44 ms, found 3 plugins.
+Asset Pipeline Refresh (id=61dc6aa7599ef20448781da4e749bb45): Total: 0.048 seconds - Initiated by RefreshV2(NoUpdateAssetOptions)
+Refreshing native plugins compatible for Editor in 1.57 ms, found 3 plugins.
 Preloading 0 native plugins for Editor in 0.00 ms.
 
 -------------------------------------------------------------------------------
@@ -3049,7 +3046,7 @@ Other Assets           312.2 kb	 3.3%
 Levels                 0.0 kb	 0.0% 
 File headers           124.1 kb	 1.3% 
 Total User Assets      9.1 mb	 100.0% 
-Complete build size    138.9 mb
+Complete build size    139.1 mb
 Used Assets and files from the Resources folder, sorted by uncompressed size:
  2.7 mb	 1.9% Built-in Texture2D: Splash Screen Unity Logo
  733.4 kb	 0.5% Packages/com.unity.render-pipelines.universal/Shaders/Lit.shader
@@ -5223,27 +5220,27 @@ Used Assets and files from the Resources folder, sorted by uncompressed size:
 -------------------------------------------------------------------------------
 Unloading 0 Unused Serialized files (Serialized files now loaded: 0)
 Unloading 2093 unused Assets / (3.8 MB). Loaded Objects now: 6912.
-Memory consumption went from 190.2 MB to 186.4 MB.
-Total: 9.917800 ms (FindLiveObjects: 0.522300 ms CreateObjectMapping: 0.175300 ms MarkObjects: 7.389800 ms  DeleteObjects: 1.829300 ms)
+Memory consumption went from 195.4 MB to 191.6 MB.
+Total: 11.617000 ms (FindLiveObjects: 0.500600 ms CreateObjectMapping: 0.318900 ms MarkObjects: 7.240700 ms  DeleteObjects: 3.555700 ms)
 
 DisplayProgressNotification: Build Successful
 Build Finished, Result: Success.
-Total cache size 268411196
-Total cache size after purge 268411196, took 00:00:00.5021674
-##utp:{"type":"PlayerBuildInfo","version":2,"phase":"Immediate","time":1764898749426,"processId":15956,"steps":[{"description":"Preprocess Player","duration":103},{"description":"Prepare For Build","duration":2},{"description":"ProducePlayerScriptAssemblies","duration":2140},{"description":"Verify Build setup","duration":243},{"description":"Prepare assets for target platform","duration":13},{"description":"Prepare splash screen","duration":11},{"description":"Building scenes","duration":1356},{"description":"Build scripts DLLs","duration":72},{"description":"Build GlobalGameManagers file","duration":184},{"description":"Writing asset files","duration":3231},{"description":"Building Resources/unity_builtin_extra","duration":940},{"description":"Write data build dirty tracking information","duration":209},{"description":"Postprocess built player","duration":3387}],"duration":11891}
+##utp:{"type":"PlayerBuildInfo","version":2,"phase":"Immediate","time":1764911534513,"processId":37416,"steps":[{"description":"Preprocess Player","duration":88},{"description":"Prepare For Build","duration":4},{"description":"ProducePlayerScriptAssemblies","duration":1772},{"description":"Verify Build setup","duration":254},{"description":"Prepare assets for target platform","duration":7},{"description":"Prepare splash screen","duration":3},{"description":"Building scenes","duration":835},{"description":"Build scripts DLLs","duration":64},{"description":"Build GlobalGameManagers file","duration":189},{"description":"Writing asset files","duration":1872},{"description":"Building Resources/unity_builtin_extra","duration":148},{"description":"Write data build dirty tracking information","duration":223},{"description":"Postprocess built player","duration":1305}],"duration":6764}
 Unloading 0 Unused Serialized files (Serialized files now loaded: 0)
 Loaded scene 'Temp/__Backupscenes/0.backup'
-	Deserialize:            0.444 ms
-	Integration:            197.016 ms
+	Deserialize:            0.436 ms
+	Integration:            187.668 ms
 	Integration of assets:  0.002 ms
-	Thread Wait Time:       0.513 ms
-	Total Operation Time:   197.975 ms
-Unloading 0 unused Assets / (0 B). Loaded Objects now: 6905.
-Memory consumption went from 185.5 MB to 185.5 MB.
-Total: 8.449600 ms (FindLiveObjects: 0.264400 ms CreateObjectMapping: 0.123600 ms MarkObjects: 8.043300 ms  DeleteObjects: 0.017300 ms)
+	Thread Wait Time:       0.013 ms
+	Total Operation Time:   188.120 ms
+Unloading 0 unused Assets / (208 B). Loaded Objects now: 6905.
+Memory consumption went from 190.7 MB to 190.7 MB.
+Total: 7.595700 ms (FindLiveObjects: 0.345900 ms CreateObjectMapping: 0.120900 ms MarkObjects: 7.096100 ms  DeleteObjects: 0.031900 ms)
 
-Build succeeded: 145686707 bytes
+Build succeeded: 145822699 bytes
 Batchmode quit successfully invoked - shutting down!
+Total cache size 268411196
+Total cache size after purge 268411196, took 00:00:00.7369841
 [Physics::Module] Cleanup current backned.
 [Physics::Module] Id: 0xf2b8ea05
 Input System module state changed to: ShutdownInProgress.

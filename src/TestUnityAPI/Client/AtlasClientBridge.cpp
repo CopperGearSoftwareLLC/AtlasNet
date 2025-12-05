@@ -7,8 +7,11 @@ static std::unique_ptr<AtlasNetClient> g_client;
 extern "C" int atlas_client_initialize(const char *exe_path, const char *client_name, const char *server_name)
 {
     g_client = std::make_unique<AtlasNetClient>();
+    IPAddress GameCoordinatorIP;
+    GameCoordinatorIP.SetIPv4(127,0,0,1,_PORT_GAMECOORDINATOR);
     AtlasNetClient::InitializeProperties props{
     };
+    props.GameCoordinatorAddress = GameCoordinatorIP;
 
     try {
         g_client->Initialize(props);
