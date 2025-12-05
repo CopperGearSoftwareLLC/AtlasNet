@@ -254,7 +254,7 @@ void AtlasNetBootstrap::CreatePartitionImage()
 
 #else
     std::string UserBuildCmds = "";
-    std::string ProjToBuild = "Partition SandboxServer";
+    std::string ProjToBuild = "Partition UnitTestsServer";
 #endif
 
     const std::string EntryPointCmd = MacroParse(R"(

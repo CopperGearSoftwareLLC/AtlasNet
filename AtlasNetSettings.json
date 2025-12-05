@@ -3,8 +3,8 @@
     "HeuristicMode": "Automatic",
 
     "SourceDirectory" :["Tests","src","srcRun","premake5.lua","vcpkg.json"],
-    "GameServerBuildCmds" :["./Tests/SampleGame/build.sh","make -C build SandboxServer -j $(nproc)"],
-    "GameServerRunCmds":["./bin/DebugDocker/SandboxServer/SandboxServer"],
+    "GameServerBuildCmds" :["./Tests/SampleGame/build.sh","make -C build UnitTestsServer -j $(nproc)"],
+    "GameServerRunCmds":["./bin/DebugDocker/UnitTestsServer/UnitTestsServer"],
     "GameCoordinatorBinary": "UnitGameCoordinator",
     "GameCoordinatorPort" : 44474,
     "Workers--": [
