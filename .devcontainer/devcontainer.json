@@ -1,47 +1,63 @@
 {
-  "name": "Ubuntu Dev Container",
-  "image": "ubuntu:24.04",
-
-  // Create a portable xauth file in .devcontainer/.xauth by copying the *real* cookie for $DISPLAY
-  "initializeCommand": "sh -c 'set -eu; mkdir -p .devcontainer; XAUTH_IN=\"${XAUTHORITY:-$HOME/.Xauthority}\"; XAUTH_OUT=\"$(pwd)/.devcontainer/.xauth\"; if [ ! -s \"$XAUTH_IN\" ]; then echo \"Host XAUTHORITY not found at $XAUTH_IN\" >&2; exit 1; fi; : > \"$XAUTH_OUT\"; xauth -f \"$XAUTH_IN\" nlist \"${DISPLAY}\" | sed -e \"s/^..../ffff/\" | xauth -f \"$XAUTH_OUT\" nmerge -; chmod 600 \"$XAUTH_OUT\"'",
-
-  "postCreateCommand": "./.devcontainer/setup.sh",
-
-  "forwardPorts": [8000, 9443, 5000],
-
-  "mounts": [
-    "source=${localWorkspaceFolder},target=/workspace,type=bind",
-
-    // mount the generated xauth file into the container
-    "source=${localWorkspaceFolder}/.devcontainer/.xauth,target=/tmp/.Xauthority,type=bind,readonly",
-  ],
-
-  "runArgs": [
-    "--env=DISPLAY=${localEnv:DISPLAY}",
-    "--env=XAUTHORITY=/tmp/.Xauthority",
-
-    // helps some apps that hate MIT-SHM in containers
-    "--ipc=host",
-      "--volume=/tmp/.X11-unix:/tmp/.X11-unix:rw",
-    // your NixOS label workaround (fine to keep)
-    "--security-opt=label=disable"
-  ],
-
-  "features": {
-    "ghcr.io/devcontainers/features/docker-in-docker:2": {}
+  "name": "AtlasNet + DinD + WebDesktop (LLVMpipe)",
+  "build": {
+    "dockerfile": "Dockerfile"
   },
-
+  "overrideCommand": false,
+  "remoteUser": "vscode",
+  "runArgs": [
+    "--privileged",
+    "--init",
+    "--shm-size=1g"
+  ],
+  "mounts": [
+    "source=dind-var-lib-docker,target=/var/lib/docker,type=volume"
+  ],
+  "forwardPorts": [
+    3000,
+    5000,
+    8000,
+    8080,
+    8443,
+    9443,
+    5901,
+    6080
+  ],
+  "portsAttributes": {
+    "6080": {
+      "label": "Web Desktop (noVNC)",
+      "onAutoForward": "openBrowser"
+    },
+    "5901": {
+      "label": "VNC (raw)",
+      "onAutoForward": "silent"
+    },
+      "9000": { "label": "Portainer (HTTP)", "onAutoForward": "openBrowser" },
+  "9443": { "label": "Portainer (HTTPS)", "onAutoForward": "silent" }
+  },
+  "containerEnv": {
+    "DISPLAY": ":1",
+    "LIBGL_ALWAYS_SOFTWARE": "1",
+    "MESA_LOADER_DRIVER_OVERRIDE": "llvmpipe",
+    "GALLIUM_DRIVER": "llvmpipe"
+  },
+  "features": {
+    "ghcr.io/msclock/features/vcpkg:2": {}
+  },
   "customizations": {
     "vscode": {
+      "settings": {
+        "terminal.integrated.defaultProfile.linux": "bash"
+      },
       "extensions": [
-        "ms-vscode.cpptools-extension-pack",
+        "llvm-vs-code-extensions.vscode-clangd",
         "ms-azuretools.vscode-docker",
-        "docker.docker",
         "PKief.material-icon-theme",
-        "cschlosser.doxdocgen",
+        "ms-vscode.cmake-tools",
+        "ms-azuretools.vscode-containers",
+        "docker.docker",
         "mhutchie.git-graph",
-        "cweijan.vscode-redis-client",
-        "yzhang.markdown-all-in-one"
+        "ms-vscode.cpptools-extension-pack"
       ]
     }
   }

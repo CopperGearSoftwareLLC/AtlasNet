@@ -2,7 +2,7 @@
 #include "Connection.hpp"
 #include "Debug/Log.hpp"
 #include "Globals.hpp"
-#include "Singleton.hpp"
+#include "misc/Singleton.hpp"
 #include "pch.hpp"
 #include "InterlinkMessage.hpp"
 #include "Docker/DockerIO.hpp"

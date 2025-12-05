@@ -1,7 +1,7 @@
 #pragma once
 #include "../AtlasEntity.hpp"
 #include "../AtlasNetInterface.hpp"
-#include "Singleton.hpp"
+#include "misc/Singleton.hpp"
 #include "pch.hpp"
 #include "Debug/Log.hpp"
 #include "Docker/DockerEvents.hpp"

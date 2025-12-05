@@ -1,6 +1,6 @@
 #pragma once
 #include "pch.hpp"
-#include "Singleton.hpp"
+#include "misc/Singleton.hpp"
 class SecretGenerator: public Singleton<SecretGenerator>
 {
     public:

@@ -1,6 +1,6 @@
 #pragma once
 #include "pch.hpp"
-#include "Singleton.hpp"
+#include "misc/Singleton.hpp"
 #include "Debug/Log.hpp"
 #include "AtlasNet.hpp"
 

@@ -1,8 +1,11 @@
 {
     "TickRatePerSecond": 20,
     "HeuristicMode": "Automatic",
-
+    "TLSDirectory" : "temp/keys",
     "SourceDirectory" :["Tests","src","srcRun","premake5.lua","vcpkg.json"],
+    "GameServerDockerFile" :"./apps/Sandbox/Server/SandboxServer.dockerfile",
+    "GameServerRunCommand" :"", 
+
     "GameServerBuildCmds" :["./Tests/SampleGame/build.sh","make -C build SandboxServer -j $(nproc)"],
     "GameServerRunCmds":["./bin/DebugDocker/SandboxServer/SandboxServer"],
     "GameCoordinatorBinary": "UnitGameCoordinator",
@@ -20,7 +23,7 @@
     "RuntimeArches": [
         "x86_64"
     ],
-    "BuildCacheDir" : "docker_cache",
+    "BuildCacheDir" : "temp/docker/cache",
     "NetworkInterface" : null,
     "BuilderMemoryGb": 15
 }

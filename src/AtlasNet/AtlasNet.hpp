@@ -1,7 +1,7 @@
 #pragma once
 //#include "Server/AtlasNetServer.hpp"
 //#include "Client/AtlasNetClient.hpp"
-#include "Singleton.hpp"
+#include "misc/Singleton.hpp"
 #include "pch.hpp"
 #include "Debug/Log.hpp"
 enum class AtlasNetMessageHeader : uint8_t
