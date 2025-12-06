@@ -39,7 +39,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 DOCKER_FILE_DEF GET_REQUIRED_RUN_PKGS = R"(
 RUN apt-get update && apt-get install -y --no-install-recommends \
     # Init / quality-of-life
-    binutils \
+    binutils supervisor tini \
     && rm -rf /var/lib/apt/lists/*
 )";
 DOCKER_FILE_DEF VCPKG_Install = R"(
@@ -68,10 +68,7 @@ COPY vcpkg.json ./vcpkg.json
 RUN vcpkg install
 )";
 DOCKER_FILE_DEF CopyBuild_StripLib = R"(
-COPY --from=builder ${WORKDIR}/bin ${WORKDIR}/
-#COPY --from=builder ${WORKDIR}/CMakeLists.txt ${WORKDIR}/CMakeLists.txt
-COPY --from=builder ${WORKDIR}/build/vcpkg_installed/x64-linux/lib/*.so /usr/local/lib
+COPY --from=builder ${WORKDIR}/bin/ .
+COPY --from=builder ${WORKDIR}/deps/*.so /usr/local/lib
 RUN ldconfig
-#run apt update && apt install cmake -y
-#RUN cmake --install ${WORKDIR}/build 
 )";

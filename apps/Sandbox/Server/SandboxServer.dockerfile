@@ -66,28 +66,32 @@ COPY apps ./apps
 COPY libs ./libs
 
 RUN mkdir build
-RUN  --mount=type=cache,target=/build \ 
-    cmake -S . -B build -DCMAKE_BUILD_TYPE=Debug
-RUN  --mount=type=cache,target=/build/apps \
-    --mount=type=cache,target=/build/libs \
-     cmake --build build --parallel --target SandboxServer 
-RUN --mount=type=cache,target=/build \
-    cmake --install build --component SandboxServer --prefix /atlasnet/
+RUN --mount=type=cache,target=/atlasnet/build \
+    cmake -S . -B /atlasnet/build -DCMAKE_BUILD_TYPE=Debug
 
-FROM ubuntu:24.04 AS runner
+RUN --mount=type=cache,target=/atlasnet/build \
+    cmake --build /atlasnet/build --parallel --target SandboxServer
+
+RUN --mount=type=cache,target=/atlasnet/build \
+    cmake --install /atlasnet/build --component SandboxServer --prefix /atlasnet
+
+RUN --mount=type=cache,target=/atlasnet/build \
+    mkdir -p "/atlasnet/deps" && \
+    cd "/atlasnet/build/vcpkg_installed" && \
+    find . -type f -name '*.so*' -print0 | while IFS= read -r -d '' f; do \
+        mkdir -p "/atlasnet/deps/$(dirname "$$f")"; \
+        cp "$$f" "/atlasnet/deps/$$f"; \
+    done
+
+${ATLASNET_PARTITION_INHERIT}
 WORKDIR /atlasnet
-
 RUN apt-get update && apt-get install -y --no-install-recommends \
     # Init / quality-of-life
     binutils \
     && rm -rf /var/lib/apt/lists/*
-
 COPY --from=builder /atlasnet/bin /atlasnet/
-
-COPY --from=builder /atlasnet/build/vcpkg_installed/x64-linux/lib/*.so /usr/local/lib
+COPY --from=builder /atlasnet/ /atlasnet/
+COPY --from=builder /atlasnet/deps /usr/local/lib
 RUN ldconfig
-#${ATLASNET_PARTITION_INHERIT}
-#WORKDIR /atlasnet
-#COPY --from=runner /atlasnet/bin /atlasnet/
-#COPY --from=runner /atlasnet/build/vcpkg_installed/x64-linux/lib/*.so /usr/local/lib
-#RUN ldconfig
+
+${ATLASNET_PARTITION_ENTRYPOINT}

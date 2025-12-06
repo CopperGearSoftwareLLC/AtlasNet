@@ -27,7 +27,7 @@ void SandboxClient::SetImGui()
     glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 3);
     glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
 
-    window = glfwCreateWindow(1920, 1080, "Cartograph", nullptr, nullptr);
+    window = glfwCreateWindow(1280, 720, "Cartograph", nullptr, nullptr);
     if (!window)
     {
         logger.Warning("failed to create window");
@@ -79,7 +79,6 @@ void SandboxClient::RenderView()
         plot_size = ImPlot::GetPlotSize();
         const float s_v = ((ImGui::IsKeyDown(ImGuiKey_Q)?1.0f:0.0f) + (ImGui::IsKeyDown(ImGuiKey_E)?-1.0f:0.0f) - ImGui::GetIO().MouseWheel);
         CameraSizeX = glm::max(1.0f, CameraSizeX +s_v);
-        std::cerr << s_v << " " << CameraSizeX << " " << std::endl;
         const bool wPressed = ImGui::IsKeyDown(ImGuiKey_W), sPressed = ImGui::IsKeyDown(ImGuiKey_S), aPressed = ImGui::IsKeyDown(ImGuiKey_A), dPressed = ImGui::IsKeyDown(ImGuiKey_D);
         const float x_v = dPressed + (aPressed?-1.0f:0.0f);
         const float y_v = wPressed + (sPressed?-1.0f:0.0f);

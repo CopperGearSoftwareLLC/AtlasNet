@@ -57,7 +57,9 @@
         "ms-azuretools.vscode-containers",
         "docker.docker",
         "mhutchie.git-graph",
-        "ms-vscode.cpptools-extension-pack"
+        "ms-vscode.cpptools-extension-pack",
+        "cweijan.dbclient-jdbc",
+        "cweijan.vscode-redis-client"
       ]
     }
   }

@@ -1,6 +1,6 @@
 #pragma once
 #include "pch.hpp"
-#include "AtlasNet/Client/AtlasNetClient.hpp"
+#include "AtlasNetClient.hpp"
 
 class SandboxClient
 {

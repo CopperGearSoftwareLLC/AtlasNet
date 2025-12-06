@@ -1,6 +1,6 @@
 #include "AtlasNetClient.hpp"
-#include "../../Database/ServerRegistry.hpp"
-#include "../../Docker/DockerIO.hpp"
+#include "Database/ServerRegistry.hpp"
+#include "Docker/DockerIO.hpp"
 #include "misc/UUID.hpp"
 void AtlasNetClient::Initialize(AtlasNetClient::InitializeProperties& props)
 {

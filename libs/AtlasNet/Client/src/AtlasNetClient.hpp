@@ -4,11 +4,11 @@
 #include <mutex>
 #include "AtlasNet/AtlasNetInterface.hpp"
 #include "misc/Singleton.hpp"
-#include "../AtlasEntity.hpp"
-#include "../../Interlink/Interlink.hpp"
-#include "../../Debug/Crash/CrashHandler.hpp"
-#include "../../Docker/DockerIO.hpp"
-#include "../AtlasNet.hpp"
+#include "AtlasNet/AtlasEntity.hpp"
+#include "Interlink/Interlink.hpp"
+#include "Debug/Crash/CrashHandler.hpp"
+#include "Docker/DockerIO.hpp"
+#include "AtlasNet/AtlasNet.hpp"
 #include "Interlink/Connection.hpp"
 class AtlasNetClient: public AtlasNetInterface, public Singleton<AtlasNetClient>
 {

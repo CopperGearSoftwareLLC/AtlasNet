@@ -63,6 +63,7 @@ void Demigod::Init()
 
 void Demigod::Run()
 {
+    Init();
     logger->Debug("[Demigod] Running main loop...");
     while (!ShouldShutdown)
     {

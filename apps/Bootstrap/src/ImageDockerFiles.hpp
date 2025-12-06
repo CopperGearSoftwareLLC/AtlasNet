@@ -19,7 +19,7 @@ services:
         condition: on-failure
 
   ${PARTITION_SERVICE_NAME}:
-    image: ${REGISTRY_ADDR}${PARTITION_IMAGE_NAME}:latest
+    image: ${REGISTRY_ADDR}${GAME_SERVER_IMAGE_NAME}:latest
     networks: [${ATLASNET_NETWORK_NAME}]
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
@@ -43,6 +43,11 @@ services:
     image: redis:7
     command: ["redis-server", "--appendonly", "yes"]
     networks: [${ATLASNET_NETWORK_NAME}]
+    ports:
+      - target: 6379
+        published: 6379
+        protocol: tcp
+        mode: ingress
     deploy:
       mode: replicated
       replicas: 1
@@ -93,7 +98,7 @@ DOCKER_FILE_DEF ATLASNET_STACK =
 				{"ATLASNET_NETWORK_NAME", _ATLASNET_NETWORK_NAME},
 				{"GOD_REPLICA_NUM", std::to_string(1)},
 				{"REGISTRY_ADDR", ""},	//"localhost/"
-				{"PARTITION_IMAGE_NAME", _PARTITION_IMAGE_NAME},
+				{"GAME_SERVER_IMAGE_NAME", _GAME_SERVER_IMAGE_NAME},
 				{"PARTITION_SERVICE_NAME", _PARTITION_SERVICE_NAME},
 				{"CLUSTERDB_IMAGE_NAME", _CLUSTERDB_IMAGE_NAME},
 				{"CLUSTERDB_SERVICE_NAME", _CLUSTERDB_SERVICE_NAME},
@@ -120,33 +125,44 @@ COPY CMakeLists.txt CMakeLists.txt
 COPY apps ./apps
 COPY libs ./libs
 )";
-DOCKER_FILE_DEF BUILD_ATLASNET_SRC = R"(
+DOCKER_FILE_DEF BUILD_ATLASNET_SRC = R"DOCKER(
 RUN mkdir build
-RUN  --mount=type=cache,target=/build \ 
-    cmake -S . -B build -DCMAKE_BUILD_TYPE=Debug
-RUN  --mount=type=cache,target=/build/apps \
-    --mount=type=cache,target=/build/libs \
-     cmake --build build --parallel --target ${BUILD_PROJECT} 
-RUN --mount=type=cache,target=/build \
-    cmake --install build --component ${BUILD_PROJECT} --prefix ${WORKDIR}/
-)";
+RUN --mount=type=cache,target=${WORKDIR}/build \
+    cmake -S . -B ${WORKDIR}/build -DCMAKE_BUILD_TYPE=Debug
+
+RUN --mount=type=cache,target=${WORKDIR}/build \
+    cmake --build ${WORKDIR}/build --parallel --target ${BUILD_PROJECT}
+
+RUN --mount=type=cache,target=${WORKDIR}/build \
+    cmake --install ${WORKDIR}/build --component ${BUILD_PROJECT} --prefix ${WORKDIR}/bin
+
+RUN --mount=type=cache,target=${WORKDIR}/build \
+    mkdir -p "${WORKDIR}/deps" && \
+    cd "${WORKDIR}/build/vcpkg_installed" && \
+    find . -type f -name '*.so*' | while read -r f; do \
+        base=$(basename "$f"); \
+        cp "$f" "${WORKDIR}/deps/$base"; \
+    done
+
+
+)DOCKER";
 
 DOCKER_FILE_DEF GodDockerFile = MacroParse(
 	Generic_Builder_Header + GET_REQUIRED_BUILD_PKGS + VCPKG_Install + COPY_ATLASNET_SRC +
 		BUILD_ATLASNET_SRC + Generic_Run_Header + GET_REQUIRED_RUN_PKGS + CopyBuild_StripLib +
-		R"(ENTRYPOINT ["${WORKDIR}/God"])",
+		R"(ENTRYPOINT ["${WORKDIR}/bin/God"])",
 	{{"OS_VERSION", _DOCKER_OS_}, {"WORKDIR", _DOCKER_WORKDIR_}, {"BUILD_PROJECT", "God"}});
 
 DOCKER_FILE_DEF DemiGodDockerFile = MacroParse(
 	Generic_Builder_Header + GET_REQUIRED_BUILD_PKGS + VCPKG_Install + COPY_ATLASNET_SRC +
 		BUILD_ATLASNET_SRC + Generic_Run_Header + GET_REQUIRED_RUN_PKGS + CopyBuild_StripLib +
-		R"(ENTRYPOINT ["${WORKDIR}/DemiGod"])",
+		R"(ENTRYPOINT ["${WORKDIR}/bin/DemiGod"])",
 	{{"OS_VERSION", _DOCKER_OS_}, {"WORKDIR", _DOCKER_WORKDIR_}, {"BUILD_PROJECT", "DemiGod"}});
 
 DOCKER_FILE_DEF ClusterDBDockerFile = MacroParse(
 	Generic_Builder_Header + GET_REQUIRED_BUILD_PKGS + VCPKG_Install + COPY_ATLASNET_SRC +
 		BUILD_ATLASNET_SRC + Generic_Run_Header + GET_REQUIRED_RUN_PKGS + CopyBuild_StripLib +
-		R"(ENTRYPOINT ["${WORKDIR}/ClusterDB"])",
+		R"(ENTRYPOINT ["${WORKDIR}/bin/ClusterDB"])",
 	{{"OS_VERSION", _DOCKER_OS_}, {"WORKDIR", _DOCKER_WORKDIR_}, {"BUILD_PROJECT", "ClusterDB"}});
 
 DOCKER_FILE_DEF GameCoordinatorDockerFile = MacroParse(
@@ -159,3 +175,31 @@ DOCKER_FILE_DEF PartitionDockerFile = MacroParse(
 	Generic_Builder_Header + GET_REQUIRED_BUILD_PKGS + VCPKG_Install + COPY_ATLASNET_SRC +
 		BUILD_ATLASNET_SRC + Generic_Run_Header + GET_REQUIRED_RUN_PKGS + CopyBuild_StripLib,
 	{{"OS_VERSION", _DOCKER_OS_}, {"WORKDIR", _DOCKER_WORKDIR_}, {"BUILD_PROJECT", "Partition"}});
+
+DOCKER_FILE_DEF PartitionSuperVisordConf = R"(
+[supervisord]
+nodaemon=true
+
+[program:partition]
+command=/atlasnet/bin/Partition
+autorestart=true
+stdout_logfile=/dev/stdout
+stdout_logfile_maxbytes=0
+stderr_logfile=/dev/stderr
+stderr_logfile_maxbytes=0
+
+[program:game_server]
+command=${GAMESERVER_RUN_COMMAND}
+autorestart=true
+stdout_logfile=/dev/stdout
+stdout_logfile_maxbytes=0
+stderr_logfile=/dev/stderr
+stderr_logfile_maxbytes=0
+  )";
+
+DOCKER_FILE_DEF PartitionEntryPoint = R"(
+  # Create supervisord config file
+
+  CMD ["/usr/bin/supervisord", "-c", "${WORKDIR}/supervisord.conf"]
+  
+  )";

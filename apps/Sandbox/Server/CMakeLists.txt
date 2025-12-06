@@ -17,7 +17,7 @@ target_include_directories(SandboxServer
     "${CMAKE_CURRENT_SOURCE_DIR}/src"
 )
 
-install(TARGETS ${_target_name}
+install(TARGETS SandboxServer
     RUNTIME DESTINATION bin      # Linux/macOS executables
-    COMPONENT ${_target_name}
+    COMPONENT SandboxServer
 )

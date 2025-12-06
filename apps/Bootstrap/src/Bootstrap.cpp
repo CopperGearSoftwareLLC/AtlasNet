@@ -372,6 +372,16 @@ void Bootstrap::BuildImages()
 }
 void Bootstrap::BuildGameServer()
 {
+	const std::string SuperVisordConf = MacroParse(
+		PartitionSuperVisordConf,
+		{{"GAMESERVER_RUN_COMMAND", AtlasNet::Get().GetSettings().GameServerRunCommand}});
+
+	const auto SuperVisorConfFilePath = _DOCKER_TEMP_FILES_DIR + std::string("supervisord.conf");
+	std::ofstream SuperVisordConfFile(SuperVisorConfFilePath);
+	SuperVisordConfFile << SuperVisordConf;
+	SuperVisordConfFile.close();
+	const std::string CopySupervisordConf = std::format("COPY {} {}\n",SuperVisorConfFilePath,_DOCKER_WORKDIR_);
+
 	const auto GameServerDockerFile = AtlasNet::Get().GetSettings().GameServerDockerFile;
 	std::ifstream input(GameServerDockerFile);
 	if (!input.is_open())
@@ -383,8 +393,11 @@ void Bootstrap::BuildGameServer()
 	std::stringstream buffer;  // Create a stringstream object
 	buffer << input.rdbuf();   // Read the entire file buffer into the stringstream
 	GSDockerContent = buffer.str();
-	GSDockerContent =
-		MacroParse(GSDockerContent, {{"ATLASNET_PARTITION_INHERIT", std::format("FROM {} AS compose",_PARTITION_IMAGE_NAME)}});
+	GSDockerContent = MacroParse(
+		GSDockerContent,
+		{{"ATLASNET_PARTITION_INHERIT", std::format("FROM {} AS compose", _PARTITION_IMAGE_NAME)},
+		 {"ATLASNET_PARTITION_ENTRYPOINT", CopySupervisordConf+PartitionEntryPoint},
+		{"WORKDIR",_DOCKER_WORKDIR_}});
 
 	BuildDockerImageLocally(GSDockerContent, _GAME_SERVER_IMAGE_NAME);
 }
@@ -397,7 +410,7 @@ void Bootstrap::BuildDockerImageLocally(const std::string &DockerFileContent,
 	file << DockerFileContent;
 	file.close();
 	std::string buildCmd = std::format(
-		"DOCKER_BUILDKIT=1 docker build --progress=tty "
+		"docker buildx build --progress=tty "
 		"-f {} "
 		"-t {} "
 		" .",

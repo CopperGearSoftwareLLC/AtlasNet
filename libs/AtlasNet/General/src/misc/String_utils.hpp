@@ -35,49 +35,60 @@ static std::string ToLower(const std::string& input) {
                    [](unsigned char c){ return std::tolower(c); });
     return result;
 }
-static std::string MacroParse(std::string input, std::unordered_map<std::string, std::string> macros)
+static std::string MacroParse(const std::string& input,
+                              const std::unordered_map<std::string, std::string>& macros)
 {
-    std::regex macroPattern(R"(\$\{([^}]+)\})");
+    static const std::regex macroPattern(R"(\$\{([^}]+)\})");
+
     std::string result;
+    result.reserve(input.size());
+
     std::sregex_iterator it(input.begin(), input.end(), macroPattern);
     std::sregex_iterator end;
 
     size_t lastPos = 0;
-    result.reserve(input.size());
 
-    while (it != end)
+    // First-pass substitution
+    for (; it != end; ++it)
     {
+        const std::smatch& match = *it;
 
-        for (; it != end; ++it)
+        // Append raw text before match
+        result.append(input, lastPos, match.position() - lastPos);
+
+        std::string key = match[1].str(); // extract VAR in ${VAR}
+
+        if (auto found = macros.find(key); found != macros.end())
         {
-            const std::smatch &match = *it;
-            result.append(input, lastPos, match.position() - lastPos);
+            result += found->second; // substitute
+        }
+        else
+        {
+            result += match.str(); // keep original ${VAR}
+        }
 
-            std::string key = match[1].str();
-            auto found = macros.find(key);
-            if (found != macros.end())
-            {
-                result += found->second;
-            }
+        lastPos = match.position() + match.length();
+    }
 
-            else
-                result += match.str(); // keep original ${VAR} if not found
+    // Append any leftover text after last match
+    result.append(input, lastPos, std::string::npos);
 
-            lastPos = match.position() + match.length();
+    // --- Check for unresolved macros that CAN be expanded ---
+    bool needsReparse = false;
+
+    std::sregex_iterator checkIt(result.begin(), result.end(), macroPattern);
+    for (; checkIt != end; ++checkIt)
+    {
+        std::string key = (*checkIt)[1].str();
+        if (macros.contains(key)) {
+            needsReparse = true;
+            break;
         }
     }
 
-    result.append(input, lastPos, std::string::npos);
-    bool fullyParsed = true;
-    if (auto it = std::sregex_iterator(result.begin(), result.end(), macroPattern); it != end)
-    {
-        for (; it != end; ++it)
-            if (macros.find(it->str()) == macros.end())
-            {
-                fullyParsed = false;
-            }
-        if (fullyParsed)
-            result = MacroParse(result, macros);
-    };
+    // Re-run only if we discovered *expandable* macros
+    if (needsReparse)
+        return MacroParse(result, macros);
+
     return result;
 }
