@@ -30,5 +30,6 @@
   "editor.rulers": [
     100
   ],
-  "cmake.ctest.allowParallelJobs": true
+  "cmake.ctest.allowParallelJobs": true,
+  "files.eol": "\n"
 }
