@@ -405,6 +405,7 @@ void Bootstrap::BuildDockerImageLocally(const std::string &DockerFileContent,
 										const std::string &ImageName)
 {
 	// Build the image
+  std::filesystem::create_directories(_DOCKER_TEMP_FILES_DIR);
 	const auto dockerFile = _DOCKER_TEMP_FILES_DIR + ImageName + ".dockerfile";
 	std::ofstream file(dockerFile);
 	file << DockerFileContent;
