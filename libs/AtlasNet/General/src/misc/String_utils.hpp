@@ -1,4 +1,5 @@
 #pragma once
+#include <filesystem>
 #include <string>
 #include <cctype>
 
@@ -91,4 +92,14 @@ static std::string MacroParse(const std::string& input,
         return MacroParse(result, macros);
 
     return result;
+}
+inline void WriteTextFile(const std::string& path, const std::string& content)
+{
+
+    std::filesystem::create_directories(std::filesystem::path(path).parent_path());
+    std::ofstream out(path);
+    if (!out.is_open())
+        throw std::runtime_error("Failed to open file: " + path);
+
+    out << content;
 }

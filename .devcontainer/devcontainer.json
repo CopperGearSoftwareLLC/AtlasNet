@@ -9,7 +9,13 @@
   "runArgs": [
     "--privileged",
     "--init",
-    "--shm-size=1g"
+    "--shm-size=2g" ,
+    "--network=host",
+    "--memory=8g",
+    "--memory-swap=8g",
+     "--cap-add=SYS_PTRACE",
+    "--cap-add=SYS_ADMIN",                 // sometimes needed for perf/tracepoints
+    "--security-opt=seccomp=unconfined"    // Docker default seccomp blocks perf_event_open
   ],
   "mounts": [
     "source=dind-var-lib-docker,target=/var/lib/docker,type=volume"
@@ -44,7 +50,7 @@
   },
   "features": {
     "ghcr.io/msclock/features/vcpkg:2": {},
-     "ghcr.io/devcontainers/features/docker-in-docker:2": {}
+    "ghcr.io/devcontainers/features/docker-in-docker:2": {}
   },
   "customizations": {
     "vscode": {
@@ -61,7 +67,8 @@
         "mhutchie.git-graph",
         "ms-vscode.cpptools-extension-pack",
         "cweijan.dbclient-jdbc",
-        "cweijan.vscode-redis-client"
+        "cweijan.vscode-redis-client",
+        "mutantdino.resourcemonitor"
       ]
     }
   }

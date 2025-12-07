@@ -2,22 +2,18 @@
     "TickRatePerSecond": 20,
     "HeuristicMode": "Automatic",
     "TLSDirectory" : "temp/keys",
+    "ManagerIsWorker" : true,
 
-    
     "GameServerDockerFile" :"./apps/Sandbox/Server/SandboxServer.dockerfile",
     "GameServerRunCommand" :"/atlasnet/bin/SandboxServer", 
 
 
     "GameCoordinatorBinary": "UnitGameCoordinator",
     "GameCoordinatorPort" : 44474,
-    "Workers--": [
+    "Workers": [
         {
             "Name": "Dumpster",
-            "Address": "192.168.2.101"
-        },
-        {
-            "Name": "Camila Thinkpad",
-            "Address": "192.168.2.104"
+            "Address": "192.168.2.100"
         }
     ],
     "RuntimeArches": [

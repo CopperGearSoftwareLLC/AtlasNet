@@ -60,6 +60,14 @@ add_compile_definitions(
 
   #Game Server
   _GAME_SERVER_IMAGE_NAME="game-server"
+
+  #Registry
+  _REGISTRY_CERT_SECRET_NAME="registry_tls_cert"
+  _REGISTRY_KEY_SECRET_NAME="registry_tls_key"
+  _REGISTRY_PORT=5000
+
+  # Builder
+  _BUILDER_CONTAINER_NAME="atlasnet_builder"
 )
 
 # --- Dependencies via vcpkg ---
@@ -72,14 +80,21 @@ add_compile_definitions(
 add_subdirectory(libs/AtlasNet/General)
 add_subdirectory(libs/AtlasNet/Client)
 add_subdirectory(libs/AtlasNet/Server)
+
+add_subdirectory(libs/ImguiAppBase)
+
 add_subdirectory(apps/God)
 add_subdirectory(apps/DemiGod)
 add_subdirectory(apps/Cartograph)
 add_subdirectory(apps/Partition)
 add_subdirectory(apps/ClusterDB)
-add_subdirectory(apps/Bootstrap)
-add_subdirectory(apps/GameCoordinator_Sample)
-add_subdirectory(libs/Sandbox)
-add_subdirectory(apps/Sandbox/Client)
-add_subdirectory(apps/Sandbox/Server)
+add_subdirectory(apps/Launcher)
 
+
+add_subdirectory(dev/Sandbox/lib)
+add_subdirectory(dev/Sandbox/client)
+add_subdirectory(dev/Sandbox/server)
+
+add_subdirectory(dev/GameCoordinator_Sample)
+add_subdirectory(dev/GameServer_Unity_Sample)
+add_subdirectory(dev/Minecraft-fabric-neoforge)

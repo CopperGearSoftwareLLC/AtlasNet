@@ -1,9 +1,9 @@
-#include "Bootstrap.hpp"
+#include "Launcher.hpp"
 #include "Debug/Crash/CrashHandler.hpp"
 
 int main(int argc, char **argv)
 {
     CrashHandler::Get().Init();
-    Bootstrap bs;
-    bs.Run();
+    Launcher launcher;
+    launcher.Run();
 }

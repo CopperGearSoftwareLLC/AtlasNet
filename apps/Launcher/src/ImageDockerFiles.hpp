@@ -8,7 +8,7 @@ version: "3.8"
 
 services:
   ${GOD_SERVICE_NAME}:
-    image: ${REGISTRY_ADDR}${GOD_IMAGE_NAME}
+    image: ${REGISTRY_ADDR_OPT}${GOD_IMAGE_NAME}
     networks: [${ATLASNET_NETWORK_NAME}]
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
@@ -19,7 +19,7 @@ services:
         condition: on-failure
 
   ${PARTITION_SERVICE_NAME}:
-    image: ${REGISTRY_ADDR}${GAME_SERVER_IMAGE_NAME}:latest
+    image: ${REGISTRY_ADDR_OPT}${GAME_SERVER_IMAGE_NAME}:latest
     networks: [${ATLASNET_NETWORK_NAME}]
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
@@ -30,7 +30,7 @@ services:
         condition: on-failure
 
   ${CLUSTERDB_SERVICE_NAME}:
-    image: ${REGISTRY_ADDR}${CLUSTERDB_IMAGE_NAME}:latest
+    image: ${REGISTRY_ADDR_OPT}${CLUSTERDB_IMAGE_NAME}:latest
     networks: [${ATLASNET_NETWORK_NAME}]
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
@@ -55,7 +55,7 @@ services:
         condition: on-failure
 
   ${GAME_COORDINATOR_SERVICE_NAME}:
-    image: ${REGISTRY_ADDR}${GAME_COORDINATOR_IMAGE_NAME}:latest
+    image: ${REGISTRY_ADDR_OPT}${GAME_COORDINATOR_IMAGE_NAME}:latest
     networks: [${ATLASNET_NETWORK_NAME}]
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
@@ -71,7 +71,7 @@ services:
         condition: on-failure
 
   ${DEMIGOD_SERVICE_NAME}:
-    image: ${REGISTRY_ADDR}${DEMIGOD_IMAGE_NAME}:latest
+    image: ${REGISTRY_ADDR_OPT}${DEMIGOD_IMAGE_NAME}:latest
     networks: [${ATLASNET_NETWORK_NAME}]
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
@@ -91,6 +91,9 @@ networks:
     external: true
     name: ${ATLASNET_NETWORK_NAME}
 )";
+
+
+
 DOCKER_FILE_DEF ATLASNET_STACK =
 	MacroParse(ATLASNET_STACK_RAW,
 			   {{"GOD_IMAGE_NAME", _GOD_IMAGE_NAME},

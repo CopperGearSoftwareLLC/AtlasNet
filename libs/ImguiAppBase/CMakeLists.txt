@@ -11,11 +11,11 @@ file(GLOB_RECURSE _sources CONFIGURE_DEPENDS
   "${CMAKE_CURRENT_SOURCE_DIR}/src/*.cpp"
 )
 
-add_executable(${_target_name} ${_sources})
+add_library(${_target_name} ${_sources})
 target_link_libraries(${_target_name} AtlasNetGeneral)
 # Optional, but common: local includes
 target_include_directories(${_target_name}
-  PRIVATE
+  PUBLIC
     "${CMAKE_CURRENT_SOURCE_DIR}/src"
 )
 install(TARGETS ${_target_name}
