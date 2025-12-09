@@ -1,5 +1,6 @@
 #pragma once
 #include <pch.hpp>
+
 template <typename Type, typename ConstructorArguments = void> class Singleton
 {
   private:

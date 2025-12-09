@@ -9,9 +9,16 @@ file(GLOB_RECURSE _lib_sources CONFIGURE_DEPENDS
   "${CMAKE_CURRENT_SOURCE_DIR}/src/*.cxx"
   "${CMAKE_CURRENT_SOURCE_DIR}/src/*.cpp"
 )
+option(ATLASNETGENERAL_SHARED "Build AtlasNetGeneral as a shared library" OFF)
 
-dev/Minecraft-fabric-neoforge/src/fabric/run/saves/New World/DIM1/data/chunks.datadd_library(AtlasNetGeneral STATIC ${_lib_sources})
-set_target_properties(AtlasNetGeneral PROPERTIES POSITION_INDEPENDENT_CODE ON)
+if(ATLASNETGENERAL_SHARED)
+  add_library(AtlasNetGeneral SHARED ${_lib_sources})
+  target_compile_definitions(AtlasNetGeneral PRIVATE ATLASNET_BUILD)
+else()
+  add_library(AtlasNetGeneral STATIC ${_lib_sources})
+  set_target_properties(AtlasNetGeneral PROPERTIES POSITION_INDEPENDENT_CODE ON)
+endif()
+
 target_include_directories(AtlasNetGeneral
   PUBLIC
     "${CMAKE_CURRENT_SOURCE_DIR}/src"

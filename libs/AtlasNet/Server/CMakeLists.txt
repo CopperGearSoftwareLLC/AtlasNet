@@ -22,3 +22,4 @@ target_include_directories(AtlasNetServer_Shared
   PUBLIC
     "${CMAKE_CURRENT_SOURCE_DIR}/src"
 )
+add_subdirectory(java)
