@@ -2,6 +2,8 @@
 #include "Interlink/InterlinkIdentifier.hpp"
 #include "Database/ServerRegistry.hpp"
 #include "Docker/DockerIO.hpp"
+#include "AtlasNet/AtlasNet.hpp"
+#include "AtlasNet/AtlasEntity.hpp"
 
 Demigod::Demigod() {}
 Demigod::~Demigod() { Shutdown(); }
@@ -151,12 +153,33 @@ void Demigod::OnMessageReceived(const Connection& from,
     // Route data either from clients to partitions or from partitions -> clients.
     if (from.target.Type == InterlinkType::eGameClient)
     {
-        //ForwardClientToPartition(from, data);
-        ForwardClientToClient(from, data); // for testing purposes
+      // Peek at the header
+        AtlasNetMessageHeader header = static_cast<AtlasNetMessageHeader>(data[0]);
+
+        if (header == AtlasNetMessageHeader::EntityIncoming)
+        {
+            // If the client is sending "EntityIncoming" (first spawn), 
+            // broadcast it to ALL known partitions so they can decide who owns it.            
+            logger->DebugFormatted("[Demigod] Broadcasting EntityIncoming from {} to {} partitions", 
+                                   from.target.ToString(), partitions.size());
+
+            for (const auto& partitionID : partitions)
+            {
+                Interlink::Get().SendMessageRaw(partitionID, data, 
+                                                InterlinkMessageSendFlag::eReliableNow);
+            }
+        }
+        else
+        {
+            // For all other messages (EntityUpdate, etc.), use standard routing
+            ForwardClientToPartition(from, data);
+        }
+        //ForwardClientToClient(from, data); // for testing purposes
     }
     else if (from.target.Type == InterlinkType::ePartition)
     {
-        ForwardPartitionToClient(from, data);
+        //ForwardPartitionToClient(from, data);
+        HandlePartitionMessage(from, data);
     }
     else
     {
@@ -181,7 +204,7 @@ void Demigod::HandleControlMessage(const Connection& /*from*/,
         logger->ErrorFormatted("[Demigod] Invalid AuthorityChange message: {}", msg);
         return;
     }
-
+ 
     std::string clientID   = rest.substr(0, spacePos);
     std::string partitionS = rest.substr(spacePos + 1);
 
@@ -217,11 +240,8 @@ void Demigod::ForwardClientToPartition(const Connection& from,
         const auto& fallbackPartition = *partitions.begin();
         clientToPartitionMap[clientKey] = fallbackPartition;
 
-        logger->WarningFormatted("[Demigod] No authority mapping for client {}; "
-                                 "assigning fallback partition {}",
+        logger->ErrorFormatted("[Demigod] No authority mapping for client {}, dropped packet",
                                  clientKey, fallbackPartition.ToString());
-        Interlink::Get().SendMessageRaw(fallbackPartition, data,
-                                        InterlinkMessageSendFlag::eReliableNow);
         return;
     }
 
@@ -237,34 +257,62 @@ void Demigod::ForwardPartitionToClient(const Connection& from,
 {
     const InterLinkIdentifier& partitionID = from.target;
 
-    // no mapping yet, heuristic not implemented
-    /*
-    for (auto& [clientKey, mappedPartition] : clientToPartitionMap)
-    {
-        if (mappedPartition == partitionID)
-        {
-            auto maybeClient = InterLinkIdentifier::FromString(clientKey);
-            if (!maybeClient.has_value())
-            {
-                logger->ErrorFormatted("[Demigod] Failed to parse client identifier '{}'",
-                                       clientKey);
-                continue;
-            }
-
-            Interlink::Get().SendMessageRaw(maybeClient.value(), data,
-                                            InterlinkMessageSendFlag::eReliableNow);
-            logger->DebugFormatted("[Demigod] Forwarded {} bytes from partition {} to client {}",
-                                   data.size(), partitionID.ToString(), clientKey);
-        }
-    }
-*/    
     for (const auto& clientID : clients)
     {
         Interlink::Get().SendMessageRaw(clientID, data,
-                                        InterlinkMessageSendFlag::eReliableNow);
+                                        InterlinkMessageSendFlag::eUnreliableNow);
         logger->DebugFormatted("[Demigod] Forwarded {} bytes from partition {} to client {}",
                                 data.size(), partitionID.ToString(), clientID.ToString());
     }
+}
+
+void Demigod::HandlePartitionMessage(const Connection& from, std::span<const std::byte> data)
+{
+  // Safety check
+    if (data.size() <= 1) return;
+
+    AtlasNetMessageHeader header = static_cast<AtlasNetMessageHeader>(data[0]);
+
+    // 1. Handle Routing Logic (Map/Unmap)
+    if (header == AtlasNetMessageHeader::EntityIncoming || 
+        header == AtlasNetMessageHeader::EntityOutgoing)
+    {
+        const std::byte* payload = data.data() + 1;
+        size_t payloadSize = data.size() - 1;
+        
+        // Basic safety check for struct alignment
+        if (payloadSize % sizeof(AtlasEntity) == 0)
+        {
+            size_t count = payloadSize / sizeof(AtlasEntity);
+            const AtlasEntity* entities = reinterpret_cast<const AtlasEntity*>(payload);
+
+            for (size_t i = 0; i < count; ++i)
+            {
+                // Assuming Entity ID corresponds to the Client Key
+                std::string clientKey = std::to_string(entities[i].ID);
+
+                if (header == AtlasNetMessageHeader::EntityIncoming)
+                {
+                    // Map this client to the sending partition
+                    clientToPartitionMap[clientKey] = from.target;
+                    // logger->DebugFormatted("[Demigod] Mapped Client {} to Partition {}", clientKey, from.target.ToString());
+                }
+                else // EntityOutgoing
+                {
+                    // Only remove if the current owner is the one sending the remove message
+                    auto it = clientToPartitionMap.find(clientKey);
+                    if (it != clientToPartitionMap.end() && it->second == from.target)
+                    {
+                        clientToPartitionMap.erase(it);
+                        // logger->DebugFormatted("[Demigod] Unmapped Client {} from Partition {}", clientKey, from.target.ToString());
+                    }
+                }
+            }
+        }
+    }
+
+    // 2. Forward to Clients (Broadcast)
+    ForwardPartitionToClient(from, data);
 }
 
 void Demigod::ForwardClientToClient(const Connection& from,

@@ -13,6 +13,7 @@ extern "C" {
 // returns 0 on success
 ATLAS_API int atlas_client_initialize(const char *exe_path, const char *client_name, const char *server_name);
 ATLAS_API void atlas_client_send_entity(AtlasEntity entity);
+ATLAS_API void atlas_client_init_our_entity(AtlasEntity entity);
 ATLAS_API int atlas_client_get_entities(AtlasEntity *buffer, int maxCount);
 ATLAS_API void atlas_client_shutdown(void);
 }

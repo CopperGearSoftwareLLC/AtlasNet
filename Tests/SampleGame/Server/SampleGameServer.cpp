@@ -120,7 +120,7 @@ void SampleGameServer::Run()
         std::span<AtlasEntity> myspan(entities);
         std::vector<AtlasEntity> Incoming;
         std::vector<AtlasEntityID> Outgoing;
-        AtlasNetServer::Get().Update(myspan, Incoming, Outgoing);
+        //AtlasNetServer::Get().Update(myspan, Incoming, Outgoing);
 
         // Print positions every second
         // scene.printPositions();

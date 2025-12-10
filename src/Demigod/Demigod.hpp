@@ -41,6 +41,7 @@ private:
 
     // --- Routing helpers ----------------------------------------------------
 
+    // doesn't forward if client not mapped yet
     void ForwardClientToPartition(const Connection& from, std::span<const std::byte> data);
     void ForwardPartitionToClient(const Connection& from, std::span<const std::byte> data);
     // for testing purposes, do not use in production
@@ -48,6 +49,7 @@ private:
 
     // Handle text-based control messages like "AuthorityChange:..."
     void HandleControlMessage(const Connection& from, const std::string& msg);
+    void HandlePartitionMessage(const Connection& from, std::span<const std::byte> data);
 private:
     std::shared_ptr<Log> logger = std::make_shared<Log>("Demigod");
     bool ShouldShutdown = false;

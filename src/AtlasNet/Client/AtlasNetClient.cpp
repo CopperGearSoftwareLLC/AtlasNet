@@ -35,6 +35,22 @@ void AtlasNetClient::Initialize(AtlasNetClient::InitializeProperties& props)
     logger->Debug("[AtlasNetClient] establishing connection to Game Coordinator");
 }
 
+void AtlasNetClient::InitClientEntity(const AtlasEntity &entity)
+{
+    std::vector<std::byte> buffer;
+    buffer.reserve(1 + sizeof(AtlasEntity));
+
+    buffer.push_back(static_cast<std::byte>(AtlasNetMessageHeader::EntityIncoming));
+
+    const std::byte *ptr = reinterpret_cast<const std::byte *>(&entity);
+    buffer.insert(buffer.end(), ptr, ptr + sizeof(AtlasEntity));
+
+    if (proxyID.ID.empty())
+        return;
+
+    Interlink::Get().SendMessageRaw(proxyID, std::as_bytes(std::span(buffer)), InterlinkMessageSendFlag::eReliableNow);
+}
+
 void AtlasNetClient::SendEntityUpdate(const AtlasEntity &entity)
 {
     std::vector<std::byte> buffer;
@@ -45,8 +61,10 @@ void AtlasNetClient::SendEntityUpdate(const AtlasEntity &entity)
     const std::byte *ptr = reinterpret_cast<const std::byte *>(&entity);
     buffer.insert(buffer.end(), ptr, ptr + sizeof(AtlasEntity));
 
-    if (!proxyID.ID.empty())
-        Interlink::Get().SendMessageRaw(proxyID, std::as_bytes(std::span(buffer)), InterlinkMessageSendFlag::eUnreliableNow);
+    if (proxyID.ID.empty())
+        return;
+
+    Interlink::Get().SendMessageRaw(proxyID, std::as_bytes(std::span(buffer)), InterlinkMessageSendFlag::eUnreliableNow);
 }
 void AtlasNetClient::Tick()
 {
