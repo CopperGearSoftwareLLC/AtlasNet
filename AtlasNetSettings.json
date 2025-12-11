@@ -1,26 +1,13 @@
 {
-    "TickRatePerSecond": 20,
-    "HeuristicMode": "Automatic",
-
-    "SourceDirectory" :["Tests","src","srcRun","premake5.lua","vcpkg.json"],
-    "GameServerBuildCmds" :["./Tests/SampleGame/build.sh","make -C build SandboxServer -j $(nproc)"],
-    "GameServerRunCmds":["./bin/DebugDocker/SandboxServer/SandboxServer"],
-    "GameCoordinatorBinary": "UnitGameCoordinator",
-    "GameCoordinatorPort" : 44474,
+    "TLSDirectory" : "temp/keys",
+    "GameServerTaskFile": "dev/Minecraft-fabric-neoforge/fabric-server.json",
     "Workers--": [
         {
             "Name": "Dumpster",
-            "Address": "192.168.2.101"
-        },
-        {
-            "Name": "Camila Thinkpad",
-            "Address": "192.168.2.104"
+            "Address": "192.168.2.100"
         }
     ],
     "RuntimeArches": [
         "x86_64"
-    ],
-    "BuildCacheDir" : "docker_cache",
-    "NetworkInterface" : null,
-    "BuilderMemoryGb": 15
+    ]
 }

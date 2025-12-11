@@ -1,0 +1,13 @@
+{
+    "TLSDirectory" : "temp/keys",
+    "GameServerTaskFile": "fabric-server.json",
+    "Workers--": [
+        {
+            "Name": "Dumpster",
+            "Address": "192.168.2.100"
+        }
+    ],
+    "RuntimeArches": [
+        "x86_64"
+    ]
+}

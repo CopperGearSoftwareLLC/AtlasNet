@@ -1,0 +1,13 @@
+src/fabric/run
+src/neoforge/run
+.atlasnet
+natives
+build
+src/build
+.jar
+run
+.architectury-transformer
+src/common/build/
+src/fabric/build/
+src/neoforge/build/
+src/build/

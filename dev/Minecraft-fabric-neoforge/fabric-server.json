@@ -1,0 +1,31 @@
+{
+  "build":
+  {
+    "dockerfile":"fabric.dockerfile"
+  },
+  "run": {
+    "workdir": "/data",
+    "command": ["/image/scripts/start"],
+    "args": [],
+    "env": {
+      "LOG_LEVEL": "info"
+    },
+    "ports": [
+      { "container": 25565, "protocol": "tcp" },
+      { "container": 25565, "protocol": "udp" }
+    ]
+  },
+  "health": {
+    "type": "tcp",
+    "port": 25565,
+    "intervalSeconds": 5,
+    "timeoutSeconds": 2,
+    "retries": 3,
+    "startPeriodSeconds": 10
+  },
+  "shutdown": {
+    "signal": "SIGTERM",
+    "graceSeconds": 15,
+    "killAfterSeconds": 5
+  }
+}
