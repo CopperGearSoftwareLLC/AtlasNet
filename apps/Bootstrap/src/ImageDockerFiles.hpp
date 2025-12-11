@@ -58,21 +58,7 @@ services:
       restart_policy:
         condition: on-failure
 
-  ${GAME_COORDINATOR_SERVICE_NAME}:
-    image: ${REGISTRY_ADDR_OPT}${GAME_COORDINATOR_IMAGE_NAME}:latest
-    networks: [${ATLASNET_NETWORK_NAME}]
-    volumes:
-      - /var/run/docker.sock:/var/run/docker.sock
-    ports:
-      - target: ${GAME_COORDINATOR_PORT_TARGET}      # container port
-        published: ${GAME_COORDINATOR_PORT_PUBLISHED}   # host port
-        protocol: udp
-        mode: ingress
-    deploy:
-      mode: replicated
-      replicas: 1
-      restart_policy:
-        condition: on-failure
+
 
   ${DEMIGOD_SERVICE_NAME}:
     image: ${REGISTRY_ADDR_OPT}${DEMIGOD_IMAGE_NAME}:latest
@@ -95,7 +81,22 @@ networks:
     external: true
     name: ${ATLASNET_NETWORK_NAME}
 )";
-
+/*
+  ${GAME_COORDINATOR_SERVICE_NAME}:
+    image: ${REGISTRY_ADDR_OPT}${GAME_COORDINATOR_IMAGE_NAME}:latest
+    networks: [${ATLASNET_NETWORK_NAME}]
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+    ports:
+      - target: ${GAME_COORDINATOR_PORT_TARGET}      # container port
+        published: ${GAME_COORDINATOR_PORT_PUBLISHED}   # host port
+        protocol: udp
+        mode: ingress
+    deploy:
+      mode: replicated
+      replicas: 1
+      restart_policy:
+        condition: on-failure*/
 DOCKER_FILE_DEF ATLASNET_STACK =
 	MacroParse(ATLASNET_STACK_RAW,
 			   {{"GOD_IMAGE_NAME", _GOD_IMAGE_NAME},
@@ -125,11 +126,9 @@ FROM ${OS_VERSION} AS runner
 WORKDIR ${WORKDIR}
 )";
 
-DOCKER_FILE_DEF COPY_ATLASNET_SRC = R"(
-COPY CMakeLists.txt CMakeLists.txt
-COPY apps ./apps
-COPY libs ./libs
-)";
+DOCKER_FILE_DEF COPY_ATLASNET_SRC = MacroParse( R"(
+COPY ${BOOTSTRAP_RUNTIME_SRC_DIR}/. ./
+)",{{"BOOTSTRAP_RUNTIME_SRC_DIR",BOOTSTRAP_RUNTIME_SRC_DIR}});
 DOCKER_FILE_DEF BUILD_ATLASNET_SRC = R"DOCKER(
 RUN mkdir build
 RUN --mount=type=cache,target=${WORKDIR}/build \
@@ -208,6 +207,7 @@ stderr_logfile_maxbytes=0
 DOCKER_FILE_DEF GameServerEntryPoint = MacroParse(
 	R"(
 COPY --from=${PARTITION_IMAGE} ${WORKDIR} ${WORKDIR}
+ENV LD_LIBRARY_PATH="${WORKDIR}/deps:${LD_LIBRARY_PATH}"
 ${PARTITION_INSTALL_RUNTIME_DEPS}
 ${WRITE_SUPERVISOR_FILE}
 ENTRYPOINT ["/usr/bin/supervisord", "-c", "/supervisord.conf"])",

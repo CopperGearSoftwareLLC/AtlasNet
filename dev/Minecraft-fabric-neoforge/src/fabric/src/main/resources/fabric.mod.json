@@ -16,14 +16,16 @@
   "environment": "*",
   "entrypoints": {
     "main": [
-      "com.guacnet.atlasnet.fabric.ExampleModFabric"
+      "com.atlasnet.fabric.ExampleModFabric"
     ],
     "client": [
-      "com.guacnet.atlasnet.fabric.client.ExampleModFabricClient"
+      "com.atlasnet.fabric.client.ExampleModFabricClient"
+    ],
+    "server":[
+      "com.atlasnet.fabric.server.ExampleModFabricServer"
     ]
   },
   "mixins": [
-    "atlasnet.mixins.json"
   ],
   "depends": {
     "fabricloader": ">=0.18.1",

@@ -1,5 +1,6 @@
 #pragma once
 #include <filesystem>
+
 #include "misc/String_utils.hpp"
 #define DOCKER_FILE_DEF const static inline std::string
 
@@ -36,15 +37,20 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     \
     # DinD
     docker.io iptables uidmap \
+
+    openjdk-21-jdk\
     && rm -rf /var/lib/apt/lists/*
 )";
 DOCKER_FILE_DEF GET_REQUIRED_RUN_PKGS = R"(
 RUN apt-get update && apt-get install -y --no-install-recommends \
     # Init / quality-of-life
     binutils supervisor tini \
+    # for debugging
+    lf \
     && rm -rf /var/lib/apt/lists/*
 )";
-DOCKER_FILE_DEF VCPKG_Install = R"(
+DOCKER_FILE_DEF VCPKG_Install =
+	MacroParse(R"(
 
 ARG DEBIAN_FRONTEND=noninteractive
 ARG VCPKG_ROOT=/opt/vcpkg
@@ -66,17 +72,18 @@ RUN git clone https://github.com/microsoft/vcpkg.git "${VCPKG_ROOT}" \
 # Optional: make CMake pick up vcpkg toolchain automatically if you want
 # ENV CMAKE_TOOLCHAIN_FILE="${VCPKG_ROOT}/scripts/buildsystems/vcpkg.cmake"
 # ENV VCPKG_DEFAULT_TRIPLET="x64-linux"
-COPY vcpkg.json ./vcpkg.json
+COPY ${BOOTSTRAP_RUNTIME_SRC_DIR}/vcpkg.json ./vcpkg.json
 RUN vcpkg install
-)";
+)",
+			   {{"BOOTSTRAP_RUNTIME_SRC_DIR", BOOTSTRAP_RUNTIME_SRC_DIR}});
 DOCKER_FILE_DEF CopyBuild_StripLib = R"(
 COPY --from=builder ${WORKDIR}/bin/ .
-COPY --from=builder ${WORKDIR}/deps/*.so /usr/local/lib
-RUN ldconfig
+COPY --from=builder ${WORKDIR}/deps/ ${WORKDIR}/deps/
+ENV LD_LIBRARY_PATH="${WORKDIR}/deps:${LD_LIBRARY_PATH}"
 )";
 
-DOCKER_FILE_DEF REGISTRY_STACK =
-	MacroParse(R"(
+DOCKER_FILE_DEF REGISTRY_STACK = MacroParse(
+	R"(
 version: "3.8"
 
 services:
@@ -128,10 +135,11 @@ secrets:
   ${REGISTRY_KEY_SECRET_NAME}:
     external: true
 )",
-			   {{"ATLASNET_NETWORK_NAME", _ATLASNET_NETWORK_NAME},
-				{"REGISTRY_KEY_SECRET_NAME", _REGISTRY_KEY_SECRET_NAME},
-				{"REGISTRY_CERT_SECRET_NAME", _REGISTRY_CERT_SECRET_NAME},
-				{"NGINX_CONFIG_PATH", std::filesystem::absolute(std::string("./")+_DOCKER_TEMP_FILES_DIR + std::string("nginx.conf"))}});
+	{{"ATLASNET_NETWORK_NAME", _ATLASNET_NETWORK_NAME},
+	 {"REGISTRY_KEY_SECRET_NAME", _REGISTRY_KEY_SECRET_NAME},
+	 {"REGISTRY_CERT_SECRET_NAME", _REGISTRY_CERT_SECRET_NAME},
+	 {"NGINX_CONFIG_PATH", std::filesystem::absolute(std::string("./") + _DOCKER_TEMP_FILES_DIR +
+													 std::string("nginx.conf"))}});
 
 DOCKER_FILE_DEF NGINX_CONFIG = MacroParse(R"(
 server {

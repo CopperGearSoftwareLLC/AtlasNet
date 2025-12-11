@@ -40,6 +40,55 @@ static Json ReadJsonFile(std::filesystem::path file_path)
 {
 	return Json::parse(ReadFile(file_path));
 }
+Bootstrap::Settings Bootstrap::ParseSettingsFile(const std::filesystem::path &file)
+{
+	Settings settings;
+	std::ifstream settingsFile(file);
+	if (!settingsFile.is_open())
+	{
+		
+		throw std::runtime_error(std::format("Unable to find {}. set the path to your settings file with {} <path>",file.string(),BOOTSTRAP_SETTINGS_FILE_FLAG));
+	}
+	Ordered_Json parsedJson;
+	settingsFile >> parsedJson;
+	settingsFile.close();
+	auto IsEntryValid = [](const Json &json, const std::string &str)
+	{ return json.contains(str) && !json[str].is_null(); };
+	if (IsEntryValid(parsedJson, "Workers"))
+	{
+		for (const auto &workerJ : parsedJson["Workers"])
+		{
+			Settings::Worker worker;
+			worker.IP = workerJ["Address"];
+			worker.Name = workerJ["Name"];
+			settings.workers.push_back(worker);
+		}
+	}
+	if (IsEntryValid(parsedJson, "GameServerTaskFile"))
+	{
+		settings.GameServerTaskFile = parsedJson["GameServerTaskFile"].get<std::string>();
+	}
+
+	// --- GameServerRunCmd ---
+	settings.RuntimeArches;
+	for (const auto &arch : parsedJson["RuntimeArches"])
+	{
+		settings.RuntimeArches.insert(arch);
+	}
+	settings.BuildCacheDir =
+		IsEntryValid(parsedJson, "BuildCacheDir") ? parsedJson["BuildCacheDir"] : "";
+	settings.NetworkInterface =
+		IsEntryValid(parsedJson, "NetworkInterface") ? parsedJson["NetworkInterface"] : "";
+	if (IsEntryValid(parsedJson, "BuilderMemoryGb"))
+	{
+		settings.BuilderMemoryGb = parsedJson["BuilderMemoryGb"].get<uint32>();
+	}
+	if (IsEntryValid(parsedJson, "TLSDirectory"))
+	{
+		settings.TlsDir = parsedJson["TLSDirectory"].get<std::string>();
+	}
+	return settings;
+}
 Bootstrap::Task Bootstrap::ParseTaskFile(std::filesystem::path file_path)
 {
 	const Json json = ReadJsonFile(file_path);
@@ -116,10 +165,11 @@ Bootstrap::Task Bootstrap::ParseTaskFile(std::filesystem::path file_path)
 
 	return task;
 }
-void Bootstrap::Run()
+void Bootstrap::Run(const RunArgs& args)
 {
-	const auto &settings = AtlasNet::Get().GetSettings();
-	game_server_task = ParseTaskFile(settings.GameServerTaskFile);
+	settings = ParseSettingsFile(args.AtlasNetSettingsPath.value_or("./AtlasNetSettings"));
+	std::filesystem::path game_server_task_file_path = args.AtlasNetSettingsPath.value_or("./AtlasNetSettings").parent_path().string() + "/"+settings.GameServerTaskFile;
+	game_server_task = ParseTaskFile(game_server_task_file_path);
 	MultiNodeMode = !settings.workers.empty();
 	InitSwarm();
 	if (MultiNodeMode)
@@ -172,7 +222,7 @@ void Bootstrap::InitSwarm()
 	logger.DebugFormatted("🧩 Initializing Docker Swarm on port {}", swarmPort);
 
 	// Resolve configured network interface
-	std::string preferredInterface = AtlasNet::Get().GetSettings().NetworkInterface;
+	std::string preferredInterface = settings.NetworkInterface;
 	if (!MultiNodeMode)
 		preferredInterface = "lo";	// if running locally then use the loop back interface 127.0.0.1
 	std::string interfaceIP;
@@ -288,7 +338,7 @@ void Bootstrap::InitSwarm()
 
 void Bootstrap::CreateTLS()
 {
-	const std::string TLS_Directory = AtlasNet::Get().GetSettings().TlsDir.value_or("keys");
+	const std::string TLS_Directory = settings.TlsDir.value_or("keys");
 	const std::string certPath = TLS_Directory + "/server.crt";
 	const std::string keyPath = TLS_Directory + "/server.key";
 	const std::string configPath = TLS_Directory + "/san.cnf";
@@ -420,7 +470,7 @@ void Bootstrap::SetupRegistry()
 		logger.Error("❌ Failed to create registry volume.");
 		return;
 	}
-	const std::string TLS_Directory = AtlasNet::Get().GetSettings().TlsDir.value_or("keys");
+	const std::string TLS_Directory = settings.TlsDir.value_or("keys");
 	const std::string certPath = TLS_Directory + "/server.crt";
 	const std::string keyPath = TLS_Directory + "/server.key";
 	const std::string configPath = TLS_Directory + "/san.cnf";
@@ -494,10 +544,14 @@ void Bootstrap::BuildGameServer()
 										{"GAME_SERVER_RUN_COMMAND", runCommand},
 										{"GAME_SERVER_WORK_DIR", game_server_task.run.workdir}});
 
-	BuildDockerImageLocally(DockerFileContents, _GAME_SERVER_IMAGE_NAME,game_server_task.task_path.parent_path());
+	std::cerr << DockerFileContents << " \nat : " << game_server_task.task_path.parent_path()
+			  << std::endl;
+	BuildDockerImageLocally(DockerFileContents, _GAME_SERVER_IMAGE_NAME,
+							game_server_task.task_path.parent_path());
 }
 void Bootstrap::BuildDockerImageLocally(const std::string &DockerFileContent,
-										const std::string &ImageName,std::filesystem::path workingDir)
+										const std::string &ImageName,
+										std::filesystem::path workingDir)
 {
 	// Build the image
 	const auto dockerFile = _DOCKER_TEMP_FILES_DIR + ImageName + ".dockerfile";
@@ -507,7 +561,8 @@ void Bootstrap::BuildDockerImageLocally(const std::string &DockerFileContent,
 		"-f {} "
 		"-t {} "
 		" .",
-		std::filesystem::absolute(workingDir).string(),std::filesystem::absolute(dockerFile).string(), ImageName);
+		std::filesystem::absolute(workingDir).string(),
+		std::filesystem::absolute(dockerFile).string(), ImageName);
 
 	logger.DebugFormatted("🏗️ Building image '{}' for arch '{}' ", ImageName, dockerFile);
 	if (system(buildCmd.c_str()) != 0)

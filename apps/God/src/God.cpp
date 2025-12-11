@@ -57,7 +57,7 @@ void God::Init()
 	InterLinkProps.ThisID = InterLinkIdentifier::MakeIDGod();
 	Interlink::Get().Init(InterLinkProps);
 
-	SetPartitionCount(2);
+	SetPartitionCount(1);
 	// std::this_thread::sleep_for(std::chrono::seconds(4));
 	// god.removePartition(4);
 	using clock = std::chrono::steady_clock;

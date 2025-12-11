@@ -36,7 +36,6 @@ subprojects {
     }
 
     dependencies {
-        implementation(fileTree(dir: rootProject.file(".atlasnet"), include: ["*.jar"]))
         minecraft "net.minecraft:minecraft:$rootProject.minecraft_version"
         mappings loom.officialMojangMappings()
     }

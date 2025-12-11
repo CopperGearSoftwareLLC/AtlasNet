@@ -12,32 +12,3 @@ enum class AtlasNetMessageHeader : uint8_t
     EntityOutgoing = 2,
     FetchGridShape = 3
 };
-struct Worker
-{
-    std::string Name;
-    std::string IP;
-};
-struct AtlasNetSettings
-{
-    std::vector<Worker> workers;
-    std::unordered_set<std::string> RuntimeArches;
-    std::string BuildCacheDir;
-    std::string NetworkInterface;
-    std::optional<uint32> BuilderMemoryGb;
-    std::optional<std::string> TlsDir;
-
-    std::string GameServerTaskFile;
-    std::string GameServerRunCommand;
-    std::string GameServerBuildDir;
-};
-class AtlasNet : public Singleton<AtlasNet>
-{
-    Log log = Log("AtlasNet");
-    const static inline std::string AtlasNetSettingsFile = "AtlasNetSettings.json";
-    const AtlasNetSettings settings;
-    
-    static AtlasNetSettings ParseSettingsFile();
-    public:
-    const auto& GetSettings() const {return settings;}
-    AtlasNet();
-};

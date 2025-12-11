@@ -32,5 +32,8 @@
   ],
   "cmake.ctest.allowParallelJobs": true,
   "files.eol": "\n",
-  "chat.agent.enabled": false
+  "chat.agent.enabled": false,
+  "typescript.tsserver.maxTsServerMemory": 1024,
+  "java.compile.nullAnalysis.mode": "disabled",
+  "java.configuration.updateBuildConfiguration": "automatic"
 }

@@ -19,6 +19,4 @@ keys
 flake.lock
 .gradle
 
-dev/Minecraft-fabric-neoforge/src/common/build/
-dev/Minecraft-fabric-neoforge/src/fabric/build/
-dev/Minecraft-fabric-neoforge/src/neoforge/build/
+

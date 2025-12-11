@@ -12,7 +12,6 @@ file(GLOB_RECURSE _sources CONFIGURE_DEPENDS
 )
 
 add_library(${_target_name} ${_sources})
-target_link_libraries(${_target_name} AtlasNetGeneral)
 # Optional, but common: local includes
 target_include_directories(${_target_name}
   PUBLIC
@@ -20,4 +19,20 @@ target_include_directories(${_target_name}
 )
 install(TARGETS ${_target_name}
     RUNTIME DESTINATION bin      # Linux/macOS executables
+)
+
+find_package(GLEW REQUIRED)
+find_package(glfw3 CONFIG REQUIRED)
+find_package(imgui CONFIG REQUIRED)
+find_package(implot CONFIG REQUIRED)
+find_package(Stb REQUIRED)
+target_link_libraries(${_target_name}
+  PUBLIC
+  AtlasNetGeneral
+    glfw
+    GLEW::GLEW
+    imgui::imgui
+    implot::implot
+    ${Stb_INCLUDE_DIR}
+    GL
 )

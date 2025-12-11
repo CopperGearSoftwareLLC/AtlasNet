@@ -10,8 +10,13 @@ public final class AtlasNetServer {
 
     // JNI hook
     private static native void nativeInit();
+    private static native void nativeTick();
 
     public static void init() {
         nativeInit();
+    }
+    public static void tick()
+    {
+        nativeTick();
     }
 }

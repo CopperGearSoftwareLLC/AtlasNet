@@ -4,77 +4,132 @@ cmake_minimum_required(VERSION 3.16)
 get_filename_component(_target_name "${CMAKE_CURRENT_SOURCE_DIR}" NAME)
 
 # ------------------------------------------------------------------------------
-# AtlasNetServer (C++ -> Java dist) -> stage into this Gradle project
-#   Producer target (from CMake1): AtlasNetServer_Java
-#   Exposed properties on that target:
-#     ATLASNETSERVER_JAVA_DIST_DIR
-#     ATLASNETSERVER_JAVA_DIST_JAR
-#     ATLASNETSERVER_JAVA_DIST_NATIVES_DIR (optional, not needed here)
+# Paths (AtlasNet-mc layout)
 # ------------------------------------------------------------------------------
+set(_mc_root     "${CMAKE_CURRENT_LIST_DIR}")
+set(_gradle_root "${_mc_root}/src")
 
-# Where gradlew lives
-# Where gradlew lives
-# Where gradlew lives
-set(_gradle_root "${CMAKE_CURRENT_LIST_DIR}/src")
+# Where AtlasNetServer_Java outputs should be staged for the Gradle project to consume
+set(_stage_jars    "${_gradle_root}/.atlasnet")  # jars go here
+set(_stage_natives "${_mc_root}/natives")        # .so go here (next to CMakeLists)
 
-# Generated/ignored staging area inside the Gradle root
-set(_stage_root "${_gradle_root}/.atlasnet")
-set(_stage_nat  "${CMAKE_CURRENT_LIST_DIR}/natives")
+# Where final built mod jars (fabric/neoforge) should be copied
+set(_out_mods "${_mc_root}/build")
 
-# Producer outputs (full paths)
+# Keep Gradle cache out of src/
+set(_gradle_user_home "${_mc_root}/build/.gradle")
+
+# Producer outputs (from AtlasNetServer_Java target)
 set(_dist_dir "$<TARGET_PROPERTY:AtlasNetServer_Java,ATLASNETSERVER_JAVA_DIST_DIR>")
 set(_dist_jar "$<TARGET_PROPERTY:AtlasNetServer_Java,ATLASNETSERVER_JAVA_DIST_JAR>")
 
+# ------------------------------------------------------------------------------
+# Stage AtlasNetServer_Java artifacts into this repo layout
+# ------------------------------------------------------------------------------
 add_custom_target(${_target_name}_stage_atlasnetserver_java
   DEPENDS AtlasNetServer_Java
-  COMMAND ${CMAKE_COMMAND} -E make_directory "${_stage_root}"
-  COMMAND ${CMAKE_COMMAND} -E make_directory "${_stage_nat}"
 
-  # Copy jar into the folder, preserving whatever filename it has
+  # Clean + recreate staging dirs to avoid stale files
+  COMMAND ${CMAKE_COMMAND} -E rm -rf "${_stage_jars}"
+  COMMAND ${CMAKE_COMMAND} -E rm -rf "${_stage_natives}"
+  COMMAND ${CMAKE_COMMAND} -E make_directory "${_stage_jars}"
+  COMMAND ${CMAKE_COMMAND} -E make_directory "${_stage_natives}"
+
+  # Copy jar into src/.atlasnet/
   COMMAND ${CMAKE_COMMAND} -E copy_if_different
           "${_dist_jar}"
-          "${_stage_root}"
+          "${_stage_jars}/"
 
-  # Copy natives
+  # Copy natives (.so) into natives/
   COMMAND ${CMAKE_COMMAND} -E copy_directory
           "${_dist_dir}/natives"
-          "${_stage_nat}"
+          "${_stage_natives}"
 
   USES_TERMINAL
 )
 
+# ------------------------------------------------------------------------------
+# Script to collect Fabric + NeoForge jars after Gradle build
+# ------------------------------------------------------------------------------
+set(_collect_script "${CMAKE_CURRENT_BINARY_DIR}/${_target_name}_collect_mods.cmake")
+file(WRITE "${_collect_script}" [=[
+if(NOT DEFINED GRADLE_ROOT)
+  message(FATAL_ERROR "GRADLE_ROOT not set")
+endif()
+if(NOT DEFINED OUT_DIR)
+  message(FATAL_ERROR "OUT_DIR not set")
+endif()
+
+file(MAKE_DIRECTORY "${OUT_DIR}")
+
+# Find built jars (Architectury-ish builds can output in root or submodules)
+file(GLOB_RECURSE _fabric_jars
+  "${GRADLE_ROOT}/build/libs/*fabric*.jar"
+  "${GRADLE_ROOT}/*/build/libs/*fabric*.jar"
+)
+file(GLOB_RECURSE _neoforge_jars
+  "${GRADLE_ROOT}/build/libs/*neoforge*.jar"
+  "${GRADLE_ROOT}/*/build/libs/*neoforge*.jar"
+  # some setups still say "forge" in the filename
+  "${GRADLE_ROOT}/build/libs/*forge*.jar"
+  "${GRADLE_ROOT}/*/build/libs/*forge*.jar"
+)
+
+set(_all_jars ${_fabric_jars} ${_neoforge_jars})
+
+if(_all_jars STREQUAL "")
+  message(FATAL_ERROR
+    "No Fabric/NeoForge jars found. Looked under: ${GRADLE_ROOT}/**/build/libs/*.jar"
+  )
+endif()
+
+foreach(j IN LISTS _all_jars)
+  message(STATUS "Copying mod jar: ${j}")
+  file(COPY "${j}" DESTINATION "${OUT_DIR}")
+endforeach()
+]=])
 
 # ------------------------------------------------------------------------------
-# Gradle build target
+# Gradle build
 # ------------------------------------------------------------------------------
-
-add_custom_target(${_target_name} ALL
+add_custom_target(${_target_name}_gradle_build
   COMMAND ${CMAKE_COMMAND} -E env
-          GRADLE_USER_HOME=${CMAKE_CURRENT_LIST_DIR}/build/.gradle
-          ${CMAKE_CURRENT_LIST_DIR}/src/gradlew --console=auto --info build
-  WORKING_DIRECTORY ${CMAKE_CURRENT_LIST_DIR}/src
+          GRADLE_USER_HOME="${_gradle_user_home}"
+          "${_gradle_root}/gradlew" --console=auto --info build
+  WORKING_DIRECTORY "${_gradle_root}"
+  DEPENDS ${_target_name}_stage_atlasnetserver_java
   USES_TERMINAL
 )
 
-# Ensure Gradle build runs AFTER staging (and thus after AtlasNetServer_Java produced dist)
-add_dependencies(${_target_name} ${_target_name}_stage_atlasnetserver_java)
+# Collect fabric + neoforge outputs into ./build
+add_custom_target(${_target_name}_collect_mods
+  COMMAND ${CMAKE_COMMAND}
+          -DGRADLE_ROOT="${_gradle_root}"
+          -DOUT_DIR="${_out_mods}"
+          -P "${_collect_script}"
+  DEPENDS ${_target_name}_gradle_build
+  USES_TERMINAL
+)
+
+# Main target (builds everything)
+add_custom_target(${_target_name} ALL
+  DEPENDS ${_target_name}_collect_mods
+)
 
 # ------------------------------------------------------------------------------
-# Ensure Bootstrap is compiled AFTER the Gradle project builds
-# (Bootstrap must already be defined somewhere else via add_executable(Bootstrap ...))
+# Launch task (unchanged)
 # ------------------------------------------------------------------------------
-
-add_dependencies(Bootstrap ${_target_name})
-
 # ------------------------------------------------------------------------------
-# Launch task: builds Gradle + Bootstrap (via deps) then runs Bootstrap
+# Launch task (build this project first, then run Bootstrap)
 # ------------------------------------------------------------------------------
-
 add_custom_target(${_target_name}_launch
   COMMAND ${CMAKE_COMMAND} -E env
           DOCKER_BUILDKIT=1
-          ${CMAKE_COMMAND} -E chdir $<TARGET_PROPERTY:Bootstrap,SOURCE_DIR>
-          $<TARGET_FILE:Bootstrap>
-  DEPENDS Bootstrap
+          ${CMAKE_COMMAND} -E chdir "$<TARGET_FILE_DIR:Bootstrap>"
+          "$<TARGET_FILE:Bootstrap>" -f "${CMAKE_CURRENT_SOURCE_DIR}/AtlasNetSettings.json"
+  DEPENDS
+          ${_target_name}
+          Bootstrap
   USES_TERMINAL
+  VERBATIM
 )

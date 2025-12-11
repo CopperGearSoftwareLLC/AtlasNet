@@ -10,7 +10,7 @@
 void AtlasNetServer::Initialize(AtlasNetServer::InitializeProperties &properties)
 {
     // --- Core setup ---
-    CrashHandler::Get().Init();
+    //CrashHandler::Get().Init();
     DockerEvents::Get().Init(DockerEventsInit{.OnShutdownRequest = properties.OnShutdownRequest});
 
     InterLinkIdentifier myID(InterlinkType::eGameServer,

@@ -415,7 +415,7 @@ void Interlink::Init(const InterlinkProperties &Properties)
   }
 
   logger->Debug("Registered local");
-
+/*
   // Register public address (host ip:published port), if available
   // seems to never trigger in service containers?
   if (b_InDockerNetwork&& DockerIO::Get().GetSelfExposedPorts().empty() == false)
@@ -442,26 +442,7 @@ void Interlink::Init(const InterlinkProperties &Properties)
 
       logger->DebugFormatted("[Interlink] Registered public address: {}", pubAddr.ToString());
     }
-    /*
-              if (auto mappedHostPort = DockerIO::Get().GetSelfExposedPortForInternalBind(ListenPort))
-      {
-          SteamNetworkingIPAddr publicAddr;
-          uint32_t ignored = 0;
-          std::string hostIP = DockerIO::Get().GetSelfPublicIP(ignored);
-          publicAddr.ParseString(hostIP.c_str());
-          publicAddr.m_port = *mappedHostPort;
-
-          SteamNetworkingConfigValue_t opt;
-          opt.SetPtr(k_ESteamNetworkingConfig_Callback_ConnectionStatusChanged,
-                    (void *)SteamNetConnectionStatusChanged);
-
-          auto PublicSocket = networkInterface->CreateListenSocketIP(publicAddr, 1, &opt);
-          if (PublicSocket == k_HSteamListenSocket_Invalid)
-              logger->Error("Failed to open public listen socket on");
-          else
-              logger->Debug("Opened public listen socket on");
-      }
-    */
+    
   }
   else
   {
@@ -475,7 +456,7 @@ void Interlink::Init(const InterlinkProperties &Properties)
                            ListenPort, MyIdentity.ToString());
     }
     
-  }
+  }*/
 
   logger->Debug("Registered public");
 

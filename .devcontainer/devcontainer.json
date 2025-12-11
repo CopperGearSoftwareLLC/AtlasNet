@@ -3,16 +3,15 @@
   "build": {
     "dockerfile": "Dockerfile"
   },
-  "postCreateCommand": "sudo usermod -aG docker $USER && sudo chmod 666 /var/run/docker.sock",
+  //"postCreateCommand": "sudo usermod -aG docker $USER && sudo chmod 666 /var/run/docker.sock",
   "overrideCommand": false,
   "remoteUser": "vscode",
   "runArgs": [
-    "--privileged",
     "--init",
     "--shm-size=2g" ,
-    "--network=host",
-    "--memory=8g",
-    "--memory-swap=8g",
+    //"--network=host",
+    //"--memory=10g",
+    //"--memory-swap=10g",
      "--cap-add=SYS_PTRACE",
     "--cap-add=SYS_ADMIN",                 // sometimes needed for perf/tracepoints
     "--security-opt=seccomp=unconfined"    // Docker default seccomp blocks perf_event_open
@@ -69,7 +68,8 @@
         "cweijan.dbclient-jdbc",
         "cweijan.vscode-redis-client",
         "mutantdino.resourcemonitor",
-        "vscjava.vscode-java-pack"
+        "vscjava.vscode-java-pack",
+        "twxs.cmake"
       ]
     }
   }

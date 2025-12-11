@@ -1,15 +1,6 @@
 {
-    "TickRatePerSecond": 20,
-    "HeuristicMode": "Automatic",
     "TLSDirectory" : "temp/keys",
-    "ManagerIsWorker" : true,
-
-
     "GameServerTaskFile": "dev/Minecraft-fabric-neoforge/fabric-server.json",
-
-
-    "GameCoordinatorBinary": "UnitGameCoordinator",
-    "GameCoordinatorPort" : 44474,
     "Workers--": [
         {
             "Name": "Dumpster",
@@ -18,8 +9,5 @@
     ],
     "RuntimeArches": [
         "x86_64"
-    ],
-    "BuildCacheDir" : "temp/docker/cache",
-    "NetworkInterface" : null,
-    "BuilderMemoryGb": 15
+    ]
 }

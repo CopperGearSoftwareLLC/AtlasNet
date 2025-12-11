@@ -611,6 +611,7 @@ void Launcher::BuildImages()
 }
 void Launcher::BuildGameServer()
 {
+	/*
 	const std::string SuperVisordConf = MacroParse(
 		PartitionSuperVisordConf,
 		{{"GAMESERVER_RUN_COMMAND", AtlasNet::Get().GetSettings().GameServerRunCommand}});
@@ -639,7 +640,7 @@ void Launcher::BuildGameServer()
 		 {"ATLASNET_PARTITION_ENTRYPOINT", CopySupervisordConf + PartitionEntryPoint},
 		 {"WORKDIR", _DOCKER_WORKDIR_}});
 
-	BuildDockerImageLocally(GSDockerContent, _GAME_SERVER_IMAGE_NAME);
+	BuildDockerImageLocally(GSDockerContent, _GAME_SERVER_IMAGE_NAME);*/
 }
 void Launcher::BuildDockerImageBuildX(const std::string &DockerFileContent,
 									  const std::string &ImageName,
