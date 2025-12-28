@@ -1,0 +1,11 @@
+CompileFlags:
+  CompilationDatabase: /workspaces/AtlasNetNew/build/wasm
+  Add:
+    - -isystem
+    - /usr/local/emsdk/upstream/emscripten/cache/sysroot/include
+    - -isystem
+    - /usr/local/emsdk/upstream/emscripten/cache/sysroot/include/c++/v1
+    - -isystem
+    - /usr/local/emsdk/upstream/emscripten/cache/ports/emdawnwebgpu/emdawnwebgpu_pkg/webgpu_cpp/include   # <-- adjust to what `find` showed
+    - -isystem
+    - /usr/local/emsdk/upstream/emscripten/cache/ports/emdawnwebgpu/emdawnwebgpu_pkg/webgpu/include

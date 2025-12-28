@@ -12,6 +12,7 @@
 #include "ImageDockerFiles.hpp"
 #include "misc/String_utils.hpp"
 #include "pch.hpp"
+#include "CartographDockerFiles.hpp"
 #pragma once
 static void WriteFile(std::filesystem::path file_path, const std::string_view str)
 {
@@ -526,6 +527,7 @@ void Bootstrap::BuildImages()
 	BuildDockerImageLocally(DemiGodDockerFile, _DEMIGOD_IMAGE_NAME);
 	BuildDockerImageLocally(ClusterDBDockerFile, _CLUSTERDB_IMAGE_NAME);
 	BuildDockerImageLocally(GameCoordinatorDockerFile, _GAME_COORDINATOR_IMAGE_NAME);
+	BuildDockerImageLocally(CartographDockerFile, _CARTOGRAPH_IMAGE_NAME);
 }
 
 void Bootstrap::BuildGameServer()

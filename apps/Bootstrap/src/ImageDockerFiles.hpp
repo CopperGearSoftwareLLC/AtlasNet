@@ -13,6 +13,9 @@ services:
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
     deploy:
+      placement:
+          constraints:
+            - 'node.role == manager'
       mode: replicated
       replicas: ${GOD_REPLICA_NUM}
       restart_policy:
@@ -57,7 +60,22 @@ services:
       replicas: 1
       restart_policy:
         condition: on-failure
-
+  ${CARTOGRAPH_SERVICE_NAME}:
+    image: ${CARTOGRAPH_IMAGE_NAME}
+    networks: [${ATLASNET_NETWORK_NAME}]
+    ports:
+      - target: 3000
+        published: 3000
+        protocol: tcp
+        mode: ingress
+    deploy:
+      placement:
+          constraints:
+            - 'node.role == manager'
+      mode: replicated
+      replicas: 1
+      restart_policy:
+        condition: on-failure
 
 
   ${DEMIGOD_SERVICE_NAME}:
@@ -83,20 +101,20 @@ networks:
 )";
 /*
   ${GAME_COORDINATOR_SERVICE_NAME}:
-    image: ${REGISTRY_ADDR_OPT}${GAME_COORDINATOR_IMAGE_NAME}:latest
-    networks: [${ATLASNET_NETWORK_NAME}]
-    volumes:
-      - /var/run/docker.sock:/var/run/docker.sock
-    ports:
-      - target: ${GAME_COORDINATOR_PORT_TARGET}      # container port
-        published: ${GAME_COORDINATOR_PORT_PUBLISHED}   # host port
-        protocol: udp
-        mode: ingress
-    deploy:
-      mode: replicated
-      replicas: 1
-      restart_policy:
-        condition: on-failure*/
+	image: ${REGISTRY_ADDR_OPT}${GAME_COORDINATOR_IMAGE_NAME}:latest
+	networks: [${ATLASNET_NETWORK_NAME}]
+	volumes:
+	  - /var/run/docker.sock:/var/run/docker.sock
+	ports:
+	  - target: ${GAME_COORDINATOR_PORT_TARGET}      # container port
+		published: ${GAME_COORDINATOR_PORT_PUBLISHED}   # host port
+		protocol: udp
+		mode: ingress
+	deploy:
+	  mode: replicated
+	  replicas: 1
+	  restart_policy:
+		condition: on-failure*/
 DOCKER_FILE_DEF ATLASNET_STACK =
 	MacroParse(ATLASNET_STACK_RAW,
 			   {{"GOD_IMAGE_NAME", _GOD_IMAGE_NAME},
@@ -112,6 +130,8 @@ DOCKER_FILE_DEF ATLASNET_STACK =
 				{"GAME_COORDINATOR_SERVICE_NAME", _GAME_COORDINATOR_SERVICE_NAME},
 				{"GAME_COORDINATOR_PORT_TARGET", std::to_string(_GAME_COORDINATOR_PORT)},
 				{"GAME_COORDINATOR_PORT_PUBLISHED", std::to_string(_GAME_COORDINATOR_PORT)},
+				{"CARTOGRAPH_IMAGE_NAME", _CARTOGRAPH_IMAGE_NAME},
+				{"CARTOGRAPH_SERVICE_NAME", _CARTOGRAPH_SERVICE_NAME},
 				{"DEMIGOD_IMAGE_NAME", _DEMIGOD_IMAGE_NAME},
 				{"DEMIGOD_SERVICE_NAME", _DEMIGOD_SERVICE_NAME},
 				{"REDIS_SERVICE_NAME", _REDIS_SERVICE_NAME}});
@@ -126,9 +146,11 @@ FROM ${OS_VERSION} AS runner
 WORKDIR ${WORKDIR}
 )";
 
-DOCKER_FILE_DEF COPY_ATLASNET_SRC = MacroParse( R"(
+DOCKER_FILE_DEF COPY_ATLASNET_SRC =
+	MacroParse(R"(
 COPY ${BOOTSTRAP_RUNTIME_SRC_DIR}/. ./
-)",{{"BOOTSTRAP_RUNTIME_SRC_DIR",BOOTSTRAP_RUNTIME_SRC_DIR}});
+)",
+			   {{"BOOTSTRAP_RUNTIME_SRC_DIR", BOOTSTRAP_RUNTIME_SRC_DIR}});
 DOCKER_FILE_DEF BUILD_ATLASNET_SRC = R"DOCKER(
 RUN mkdir build
 RUN --mount=type=cache,target=${WORKDIR}/build \

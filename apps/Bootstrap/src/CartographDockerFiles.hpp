@@ -1,3 +1,9 @@
+#include "MiscDockerFiles.hpp"
+
+
+DOCKER_FILE_DEF CartographDockerFile = R"(
+    
+ARG CartographPath=BootstrapRuntime/apps/Cartograph/
 # ---------- Base image with Node ----------
 FROM node:22-alpine AS base
 
@@ -6,9 +12,9 @@ WORKDIR /app
 
 # ---------- Install dependencies ----------
 FROM base AS deps
-
+ARG CartographPath
 # Copy only package files first (better Docker cache)
-COPY web/package*.json ./web/
+COPY ${CartographPath}web/package*.json ./web/
 
 WORKDIR /app/web
 RUN npm install
@@ -17,13 +23,15 @@ RUN npm install
 FROM base AS builder
 
 WORKDIR /app/web
-
+ARG CartographPath
 # Bring in node_modules from deps stage
-COPY --from=deps /app/web/node_modules ./node_modules
 
 # Copy the rest of your Next.js project from /web
-COPY web/ ./
+COPY ${CartographPath}web/ ./
+RUN rm -rf ./node_modules
+RUN rm -rf ./.next
 
+COPY --from=deps /app/web/node_modules ./node_modules
 # Build for production
 RUN npm run build
 
@@ -42,3 +50,5 @@ EXPOSE 3000
 # Start your Next.js app
 # (Assumes "start" script is defined in /web/package.json)
 CMD ["npm", "start"]
+
+)";

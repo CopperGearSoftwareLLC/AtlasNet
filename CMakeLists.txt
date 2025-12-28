@@ -1,15 +1,4 @@
 cmake_minimum_required(VERSION 3.24)
-
-# --- vcpkg toolchain (must be set BEFORE project()) ---
-# Prefer: -DCMAKE_TOOLCHAIN_FILE=/path/to/vcpkg/scripts/buildsystems/vcpkg.cmake
-# Fallback: read it from environment variable VCPKG_ROOT
-if(NOT DEFINED CMAKE_TOOLCHAIN_FILE)
-  if(DEFINED ENV{VCPKG_ROOT})
-    set(CMAKE_TOOLCHAIN_FILE "$ENV{VCPKG_ROOT}/scripts/buildsystems/vcpkg.cmake"
-        CACHE FILEPATH "vcpkg toolchain file")
-  endif()
-endif()
-
 project(AtlasNet LANGUAGES C CXX)
 
 # --- Global settings ---
@@ -52,6 +41,9 @@ add_compile_definitions(
   _DEMIGOD_IMAGE_NAME="demi-god"
   _DEMIGOD_SERVICE_NAME="DemiGod"
 
+  #Cartograph
+  _CARTOGRAPH_IMAGE_NAME="cartograph"
+  _CARTOGRAPH_SERVICE_NAME="Cartograph"
 
   #Game Coordinator
   _GAME_COORDINATOR_IMAGE_NAME="game-coordinator"
@@ -77,22 +69,27 @@ add_compile_definitions(
 # find_package(nlohmann_json CONFIG REQUIRED)
 
 # --- Add subprojects ---
-add_subdirectory(libs/AtlasNet/General)
-add_subdirectory(libs/AtlasNet/Client)
-add_subdirectory(libs/AtlasNet/Server)
-
-add_subdirectory(libs/ImguiAppBase)
-
-add_subdirectory(apps/God)
-add_subdirectory(apps/DemiGod)
-add_subdirectory(apps/Cartograph)
-add_subdirectory(apps/Partition)
-add_subdirectory(apps/ClusterDB)
-add_subdirectory(apps/Launcher)
-add_subdirectory(apps/Bootstrap)
 
 
-foreach(_dir IN ITEMS
+
+if(ATLASNET_BUILD_WASM)
+  # Only include wasm-safe libs + Cartograph
+  #add_subdirectory(libs/AtlasNet/General)   # or whatever subset you can compile to wasm
+  add_subdirectory(apps/Cartograph)
+else()
+
+# Full native build
+  add_subdirectory(libs/AtlasNet/Server)
+  add_subdirectory(libs/AtlasNet/Client)
+  add_subdirectory(libs/AtlasNet/General)
+  add_subdirectory(libs/ImguiAppBase)
+  add_subdirectory(apps/God)
+  add_subdirectory(apps/Cartograph)
+  add_subdirectory(apps/DemiGod)
+  add_subdirectory(apps/Partition)
+  add_subdirectory(apps/ClusterDB)
+  add_subdirectory(apps/Bootstrap)
+  foreach(_dir IN ITEMS
   "${CMAKE_CURRENT_SOURCE_DIR}/dev/Sandbox/lib"
   "${CMAKE_CURRENT_SOURCE_DIR}/dev/Sandbox/client"
   "${CMAKE_CURRENT_SOURCE_DIR}/dev/Sandbox/server"
@@ -106,3 +103,5 @@ foreach(_dir IN ITEMS
     add_subdirectory("${_rel}")
   endif()
 endforeach()
+endif()
+

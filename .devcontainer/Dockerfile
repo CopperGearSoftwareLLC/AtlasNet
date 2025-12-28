@@ -30,9 +30,13 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 
     # Java
     openjdk-21-jdk\
+
+    # NPM
+    npm \
     && rm -rf /var/lib/apt/lists/*
 
 RUN usermod -aG docker vscode
+
 
 COPY supervisord.conf /etc/supervisor/conf.d/supervisord.conf
 COPY startup.sh /usr/local/bin/startup.sh

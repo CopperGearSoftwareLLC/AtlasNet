@@ -1,0 +1,40 @@
+  {
+    "version": 6,
+    "configurePresets": [
+      {
+        "name": "native",
+        "generator": "Ninja",
+        "binaryDir": "${sourceDir}/build/${presetName}",
+        "cacheVariables": {
+          "CMAKE_EXPORT_COMPILE_COMMANDS": "ON",
+          "CMAKE_TOOLCHAIN_FILE": "$env{VCPKG_ROOT}/scripts/buildsystems/vcpkg.cmake",
+          "VCPKG_MANIFEST_FEATURES": "native",
+          "VCPKG_FEATURE_FLAGS": "manifests,versions",
+          "VCPKG_INSTALLED_DIR": "${sourceDir}/build/${presetName}/vcpkg_installed/${presetName}"
+        }
+      },
+      {
+        "name": "wasm",
+        "inherits": "native",
+        "binaryDir": "${sourceDir}/build/${presetName}",
+        "cacheVariables": {
+          "ATLASNET_BUILD_WASM": "ON",
+          "VCPKG_MANIFEST_FEATURES": "wasm",
+          "VCPKG_CHAINLOAD_TOOLCHAIN_FILE": "$env{EMSDK_DIR}/upstream/emscripten/cmake/Modules/Platform/Emscripten.cmake",
+          "CMAKE_TOOLCHAIN_FILE": "$env{VCPKG_ROOT}/scripts/buildsystems/vcpkg.cmake",
+          "VCPKG_TARGET_TRIPLET": "wasm32-emscripten",
+          "CMAKE_SYSTEM_NAME": "Emscripten"
+        }
+      }
+    ],
+    "buildPresets": [
+      {
+        "name": "native",
+        "configurePreset": "native"
+      },
+      {
+        "name": "wasm",
+        "configurePreset": "wasm"
+      }
+    ]
+  }
