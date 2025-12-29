@@ -1,5 +1,6 @@
 #pragma once
 
+#include <string>
 #include "MiscDockerFiles.hpp"
 #include "Misc/String_utils.hpp"
 
@@ -38,7 +39,7 @@ services:
 
   ${INTERNAL_REDIS_SERVICE_NAME}:
     image: redis:7
-    command: ["redis-server", "--appendonly", "yes"]
+    command: ["redis-server", "--appendonly", "yes","--port", "${INTERNAL_REDIS_PORT}"]
     networks: [${ATLASNET_NETWORK_NAME}]
     ports:
       - target: 6379
@@ -83,6 +84,8 @@ services:
       replicas: 1
       restart_policy:
         condition: on-failure
+        
+${BUILTIN_DB_STACK}
 
 networks:
   ${ATLASNET_NETWORK_NAME}:
@@ -118,7 +121,8 @@ DOCKER_FILE_DEF ATLASNET_STACK =
 				{"CARTOGRAPH_SERVICE_NAME", _CARTOGRAPH_SERVICE_NAME},
 				{"PROXY_IMAGE_NAME", _PROXY_IMAGE_NAME},
 				{"PROXY_SERVICE_NAME", _PROXY_SERVICE_NAME},
-				{"INTERNAL_REDIS_SERVICE_NAME", _INTERNAL_REDIS_SERVICE_NAME}});
+				{"INTERNAL_REDIS_SERVICE_NAME", _INTERNAL_REDIS_SERVICE_NAME},
+      {"INTERNAL_REDIS_PORT",std::to_string(_INTERNAL_REDIS_PORT)}});
 DOCKER_FILE_DEF Generic_Builder_Header = R"(
 FROM ${OS_VERSION} AS builder
 WORKDIR ${WORKDIR}

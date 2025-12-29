@@ -1,21 +1,24 @@
 #include "Bootstrap.hpp"
 
+#include <arpa/inet.h>
+#include <ifaddrs.h>
+#include <netdb.h>
+#include <netinet/in.h>
+
 #include <cstdlib>
 #include <filesystem>
 #include <fstream>
 #include <sstream>
 #include <stdexcept>
 #include <string_view>
-#include <netdb.h>  
-#include <ifaddrs.h>
-#include <arpa/inet.h>
-#include <netinet/in.h>
+
+#include "BuiltInDbDockerFiles.hpp"
 #include "CartographDockerFiles.hpp"
 #include "CommandTools.hpp"
+#include "DockerIO.hpp"
 #include "ImageDockerFiles.hpp"
 #include "Misc/String_utils.hpp"
 #include "pch.hpp"
-#include "DockerIO.hpp"
 
 static void WriteFile(std::filesystem::path file_path, const std::string_view str)
 {
@@ -64,7 +67,7 @@ Bootstrap::Settings Bootstrap::ParseSettingsFile(const std::filesystem::path &fi
 		for (const auto &workerJ : parsedJson["Workers"])
 		{
 			Settings::Worker worker;
-			worker.IP = workerJ["Address"];
+			worker.MAC = workerJ["MACAddress"];
 			worker.Name = workerJ["Name"];
 			settings.workers.push_back(worker);
 		}
@@ -80,17 +83,27 @@ Bootstrap::Settings Bootstrap::ParseSettingsFile(const std::filesystem::path &fi
 	{
 		settings.RuntimeArches.insert(arch);
 	}
-	settings.BuildCacheDir =
-		IsEntryValid(parsedJson, "BuildCacheDir") ? parsedJson["BuildCacheDir"] : "";
+
 	settings.NetworkInterface =
 		IsEntryValid(parsedJson, "NetworkInterface") ? parsedJson["NetworkInterface"] : "";
-	if (IsEntryValid(parsedJson, "BuilderMemoryGb"))
-	{
-		settings.BuilderMemoryGb = parsedJson["BuilderMemoryGb"].get<uint32_t>();
-	}
+
 	if (IsEntryValid(parsedJson, "TLSDirectory"))
 	{
 		settings.TlsDir = parsedJson["TLSDirectory"].get<std::string>();
+	}
+	if (IsEntryValid(parsedJson["BuiltInDB"], "Enable"))
+	{
+		settings.BuiltInDBopt.Enable = parsedJson["BuiltInDB"]["Enable"];
+	}
+	if (IsEntryValid(parsedJson["BuiltInDB"]["Transient"], "MasterReplicas"))
+	{
+		settings.BuiltInDBopt.transient.MasterReplicas =
+			parsedJson["BuiltInDB"]["Transient"]["MasterReplicas"];
+	}
+	if (IsEntryValid(parsedJson["BuiltInDB"]["Transient"], "SlaveReplicas"))
+	{
+		settings.BuiltInDBopt.transient.SlaveReplicas =
+			parsedJson["BuiltInDB"]["Transient"]["SlaveReplicas"];
 	}
 	return settings;
 }
@@ -439,6 +452,8 @@ void Bootstrap::SendTLSToWorkers() {}
 
 void Bootstrap::DeployStack()
 {
+	const std::string ProcessedStackFile = MacroParse(
+		ATLASNET_STACK, {{"BUILTIN_DB_STACK", settings.BuiltInDBopt.Enable ? BuiltInDbStack : ""}});
 	// e.g. "/tmp/atlasnet/"
 	std::filesystem::create_directories(_DOCKER_TEMP_FILES_DIR);
 	const auto stackymlFilePath = _DOCKER_TEMP_FILES_DIR + std::string("stack.yml");
@@ -447,7 +462,7 @@ void Bootstrap::DeployStack()
 	{
 		throw std::runtime_error("Failed to save stack yml file");
 	}
-	file << ATLASNET_STACK;
+	file << ProcessedStackFile;
 	file.close();
 
 	std::system(std::format("docker stack deploy --detach=true -c {} {}", stackymlFilePath,
@@ -531,8 +546,8 @@ void Bootstrap::BuildImages()
 	BuildDockerImageLocally(ShardDockerFile, _SHARD_IMAGE_NAME);
 	BuildGameServer();	// must happen after partition
 	BuildDockerImageLocally(ProxyDockerFile, _PROXY_IMAGE_NAME);
-	//BuildDockerImageLocally(GameCoordinatorDockerFile, _GAME_COORDINATOR_IMAGE_NAME);
-	//BuildDockerImageLocally(CartographDockerFile, _CARTOGRAPH_IMAGE_NAME);
+	// BuildDockerImageLocally(GameCoordinatorDockerFile, _GAME_COORDINATOR_IMAGE_NAME);
+	// BuildDockerImageLocally(CartographDockerFile, _CARTOGRAPH_IMAGE_NAME);
 }
 
 void Bootstrap::BuildGameServer()

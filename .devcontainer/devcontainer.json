@@ -75,7 +75,8 @@
         "cweijan.vscode-redis-client",
         "mutantdino.resourcemonitor",
         "vscjava.vscode-java-pack",
-        "twxs.cmake"
+        "twxs.cmake",
+        "tintinweb.graphviz-interactive-preview"
       ]
     }
   }

@@ -3,12 +3,13 @@
 #include "Crash/CrashHandler.hpp"
 
 #include "DockerIO.hpp"
-
+#include "BuiltInDB.hpp"
 // ============================================================================
 // Initialize server and setup Interlink callbacks
 // ============================================================================
 void AtlasNetServer::Initialize(AtlasNetServer::InitializeProperties &properties)
 {
+
     // --- Core setup ---
     //CrashHandler::Get().Init();
     DockerEvents::Get().Init(DockerEventsInit{.OnShutdownRequest = properties.OnShutdownRequest});
@@ -22,7 +23,9 @@ void AtlasNetServer::Initialize(AtlasNetServer::InitializeProperties &properties
     );
     logger = std::make_shared<Log>(myID.ToString());
     logger->Debug("AtlasNet Initialize");
-
+        BuiltInDB::Get().Transient()->Set("test", "ass");
+        std::cerr << "WROTE TO BUILT IN" << std::endl;
+        logger->DebugFormatted("Wrote to Built In test:{}",BuiltInDB::Get().Transient()->Get("test").value());
     // --- Interlink setup ---
     Interlink::Check();
     Interlink::Get().Init({

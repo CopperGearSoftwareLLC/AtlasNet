@@ -26,8 +26,11 @@ set(_dist_jar "$<TARGET_PROPERTY:AtlasNetServer_Java,ATLASNETSERVER_JAVA_DIST_JA
 # ------------------------------------------------------------------------------
 # Stage AtlasNetServer_Java artifacts into this repo layout
 # ------------------------------------------------------------------------------
-add_custom_target(${_target_name}_stage_atlasnetserver_java
-  DEPENDS AtlasNetServer_Java
+# Track staging with an actual OUTPUT so build tools can order/skip correctly.
+set(_stage_stamp "${CMAKE_CURRENT_BINARY_DIR}/${_target_name}_atlasnetserver_java.stage.stamp")
+
+add_custom_command(
+  OUTPUT "${_stage_stamp}"
 
   # Clean + recreate staging dirs to avoid stale files
   COMMAND ${CMAKE_COMMAND} -E rm -rf "${_stage_jars}"
@@ -45,7 +48,20 @@ add_custom_target(${_target_name}_stage_atlasnetserver_java
           "${_dist_dir}/natives"
           "${_stage_natives}"
 
+  # Stamp to mark this step completed
+  COMMAND ${CMAKE_COMMAND} -E touch "${_stage_stamp}"
+
+  # IMPORTANT: depend on the *actual artifact* we copy, not just the target.
+  DEPENDS
+    AtlasNetServer_Java
+    "${_dist_jar}"
+
+  VERBATIM
   USES_TERMINAL
+)
+
+add_custom_target(${_target_name}_stage_atlasnetserver_java
+  DEPENDS "${_stage_stamp}"
 )
 
 # ------------------------------------------------------------------------------

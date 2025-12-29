@@ -43,6 +43,14 @@ add_compile_definitions(
 
   #InternalDB
   _INTERNAL_REDIS_SERVICE_NAME="InternalDB"
+  _INTERNAL_REDIS_PORT=6379
+
+  #BuiltInDB
+  _BUILTINDB_REDIS_SERVICE_NAME="BuiltInDB_Redis"
+  _BUILTINDB_REDIS_PORT=2380
+  _BUILTINDB_POSTGRES_SERVICE_NAME="BuiltInDB_PostGres"
+  _BUILTINDB_POSTGRES_PORT=5432
+
   #Shard
   _SHARD_SERVICE_NAME="Shard"
   _SHARD_IMAGE_NAME="shard"
@@ -70,15 +78,6 @@ add_compile_definitions(
   # Builder
   _BUILDER_CONTAINER_NAME="atlasnet_builder"
 )
-
-# --- Dependencies via vcpkg ---
-# find_package(fmt CONFIG REQUIRED)
-# find_package(spdlog CONFIG REQUIRED)
-# find_package(asio CONFIG REQUIRED)
-# find_package(nlohmann_json CONFIG REQUIRED)
-
-# --- Add subprojects ---
-
 
 
 if(ATLASNET_BUILD_WASM)

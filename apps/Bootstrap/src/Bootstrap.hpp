@@ -1,10 +1,12 @@
 #pragma once
 
+#include <cstdint>
 #include <filesystem>
 #include <optional>
 #include <string>
 #include <string_view>
 #include <unordered_set>
+
 #include "Log.hpp"
 class Bootstrap
 {
@@ -13,18 +15,25 @@ class Bootstrap
 		struct Worker
 		{
 			std::string Name;
-			std::string IP;
+			std::string MAC;
 		};
 		std::vector<Worker> workers;
 		std::unordered_set<std::string> RuntimeArches;
-		std::string BuildCacheDir;
 		std::string NetworkInterface;
-		std::optional<uint32_t> BuilderMemoryGb;
 		std::optional<std::string> TlsDir;
 
 		std::string GameServerTaskFile;
-		std::string GameServerRunCommand;
-		std::string GameServerBuildDir;
+
+		struct BuiltInDBOpt
+		{
+			bool Enable;
+			struct Transient
+			{
+				uint32_t MasterReplicas = 1;
+				uint32_t SlaveReplicas = 1;
+			} transient;
+		} BuiltInDBopt;
+
 	} settings;
 	static Settings ParseSettingsFile(const std::filesystem::path& file);
 	struct Task

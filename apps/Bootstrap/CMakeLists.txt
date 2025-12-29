@@ -83,3 +83,22 @@ add_custom_target(stage_${_target_name} ALL
 
 # Also ensure build order in IDEs / multi-config generators.
 add_dependencies(stage_${_target_name} ${_target_name})
+# ---------------- Run / Test configuration ----------------
+
+# Choose the working directory you want when running.
+# Common choice: run from the executable folder (since you stage .Runtime next to it).
+set(BOOTSTRAP_RUN_WORKDIR "$<TARGET_FILE_DIR:${_target_name}>")
+
+# Arguments you want at runtime (edit as needed)
+# Example: pass "-f" + a path relative to BOOTSTRAP_RUN_WORKDIR
+set(BOOTSTRAP_RUN_ARGS
+  "-f" "${CMAKE_SOURCE_DIR}/AtlasNetSettings.json"
+)
+
+# A convenient target: `cmake --build . --target run_<name>`
+add_custom_target(${_target_name}_testrun
+  COMMAND ${CMAKE_COMMAND} -E chdir "${BOOTSTRAP_RUN_WORKDIR}"
+          "$<TARGET_FILE:${_target_name}>" ${BOOTSTRAP_RUN_ARGS}
+  DEPENDS ${_target_name} stage_${_target_name}
+  USES_TERMINAL
+)
