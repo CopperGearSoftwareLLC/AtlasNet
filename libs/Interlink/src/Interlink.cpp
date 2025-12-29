@@ -1,9 +1,8 @@
-#include "Interlink/Interlink.hpp"
-
 #include "Interlink.hpp"
-#include "Database/ServerRegistry.hpp"
-#include "Database/ProxyRegistry.hpp"
-#include "Docker/DockerIO.hpp"
+#include "GameNetworkingSockets.hpp"
+#include "ServerRegistry.hpp"
+#include "ProxyRegistry.hpp"
+#include "DockerIO.hpp"
 #include <atomic>
 #include <chrono>
 #include <thread>
@@ -53,7 +52,7 @@ void Interlink::OnSteamNetConnectionStatusChanged(SteamNetConnectionStatusChange
         "[GNS] ProblemDetectedLocally. desc='{}' reason={} debug='{}'",
         pInfo->m_info.m_szConnectionDescription,
         (int)pInfo->m_info.m_eEndReason,
-        pInfo->m_info.m_szEndDebug ? pInfo->m_info.m_szEndDebug : "(null)");
+         pInfo->m_info.m_szEndDebug);
     break;
   case k_ESteamNetworkingConnectionState_FinWait:
     logger->Debug("k_ESteamNetworkingConnectionState_FinWait");
@@ -311,7 +310,7 @@ void Interlink::ReceiveMessages()
     size_t size = msg->m_cbSize;
 
     // NEW: God can proxy external messages to internal targets.
-    if (MyIdentity.Type == InterlinkType::eGod && sender.IsExternal())
+    if (MyIdentity.Type == InterlinkType::eWatchDog && sender.IsExternal())
     {
       // Temporary rule: forward to the main GameServer
       // InterLinkIdentifier target = InterLinkIdentifier::MakeIDGameServer("main");
@@ -379,7 +378,7 @@ void Interlink::Init(const InterlinkProperties &Properties)
   IPAddress ipAddress;
   switch (MyIdentity.Type)
   {
-  case InterlinkType::eDemigod:
+  case InterlinkType::eProxy:
     // Register Demigod in ProxyRegistry
     ListenPort = Type2ListenPort.at(MyIdentity.Type);
     ipAddress.Parse(DockerIO::Get().GetSelfContainerIP() + ":" + std::to_string(ListenPort));
@@ -466,7 +465,7 @@ void Interlink::Init(const InterlinkProperties &Properties)
   case InterlinkType::eGameServer:
   {
     InterLinkIdentifier PartitionID = MyIdentity;
-    PartitionID.Type = InterlinkType::ePartition;
+    PartitionID.Type = InterlinkType::eShard;
     EstablishConnectionTo(PartitionID);
   }
   break;
@@ -479,13 +478,13 @@ void Interlink::Init(const InterlinkProperties &Properties)
   }
   break;
 
-  case InterlinkType::ePartition:
+  case InterlinkType::eShard:
   {
     EstablishConnectionTo(InterLinkIdentifier::MakeIDGod());
   }
   break;
 
-  case InterlinkType::eDemigod:
+  case InterlinkType::eProxy:
   {
     // connect with everything for now to test
     std::unordered_map<InterLinkIdentifier, ServerRegistryEntry> serverMap =
@@ -493,8 +492,8 @@ void Interlink::Init(const InterlinkProperties &Properties)
 
     for (auto &server : serverMap)
     {
-      if (server.first.Type == InterlinkType::ePartition ||
-          server.first.Type == InterlinkType::eGod ||
+      if (server.first.Type == InterlinkType::eShard ||
+          server.first.Type == InterlinkType::eWatchDog ||
           server.first.Type == InterlinkType::eGameCoordinator)
       {
         EstablishConnectionTo(server.first);
@@ -515,7 +514,7 @@ void Interlink::Init(const InterlinkProperties &Properties)
   }
   break;
 
-  case InterlinkType::eGod:
+  case InterlinkType::eWatchDog:
   default:
     break;
   }
@@ -595,8 +594,8 @@ bool Interlink::EstablishConnectionTo(const InterLinkIdentifier &id)
   // ---------------------------------------------------------------
   // INTERNAL: must exist in ServerRegistry
   // ---------------------------------------------------------------
-  if (id.Type == InterlinkType::eGod ||
-      id.Type == InterlinkType::ePartition ||
+  if (id.Type == InterlinkType::eWatchDog ||
+      id.Type == InterlinkType::eShard ||
       id.Type == InterlinkType::eGameServer ||
       id.Type == InterlinkType::eGameCoordinator)
   {
@@ -628,7 +627,7 @@ bool Interlink::EstablishConnectionTo(const InterLinkIdentifier &id)
   // ---------------------------------------------------------------
   // INTERNAL: must exist in ProxyRegistry
   // ---------------------------------------------------------------
-  if (id.Type == InterlinkType::eDemigod)
+  if (id.Type == InterlinkType::eProxy)
   {
     auto IP = ProxyRegistry::Get().GetIPOfID(id);
 

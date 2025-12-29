@@ -11,7 +11,8 @@ file(GLOB_RECURSE viewer_sources CONFIGURE_DEPENDS
 )
 
 add_executable(${CARTOGRAPH_TARGET} ${viewer_sources})
-
+set(VCPKG_INSTALLED_DIR "${CMAKE_BINARY_DIR}/vcpkg_installed"
+    CACHE PATH "vcpkg installed dir")
 
 
 target_include_directories(${CARTOGRAPH_TARGET}
@@ -60,8 +61,14 @@ target_compile_options(${CARTOGRAPH_TARGET} PRIVATE "--use-port=emdawnwebgpu")
     # so DO NOT use --no-entry unless you truly want a pure library.
     # "--no-entry"
   )
-  find_package(glfw3 CONFIG REQUIRED)
-target_link_libraries(${CARTOGRAPH_TARGET} PRIVATE glfw)
+  find_package(glfw3  CONFIG REQUIRED)
+  find_package(glm CONFIG REQUIRED)
+  find_package(imgui CONFIG REQUIRED)
+  find_package(implot CONFIG REQUIRED)
+  find_package(nlohmann_json CONFIG REQUIRED)
+  
+target_link_libraries(${CARTOGRAPH_TARGET} PRIVATE glfw glm::glm imgui::imgui implot::implot nlohmann_json::nlohmann_json)
+
   # Copy output to Next public/wasm after build
   add_custom_command(TARGET ${CARTOGRAPH_TARGET} POST_BUILD
     COMMAND ${CMAKE_COMMAND} -E make_directory "${NEXT_PUBLIC_WASM_DIR}"

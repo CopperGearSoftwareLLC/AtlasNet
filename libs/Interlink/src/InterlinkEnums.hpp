@@ -1,4 +1,5 @@
 #pragma once
+#include "GameNetworkingSockets.hpp"
 #include <pch.hpp>
 enum class ConnectionKind : uint8_t {
     eInternal,  // Cluster connections (God, Partition, GameServer, etc.)
@@ -8,15 +9,15 @@ enum class ConnectionKind : uint8_t {
 enum class InterlinkType
 {
 	eInvalid = 0,
-	ePartition = 1,	 // partition Server
-	eGod = 2,		 // God
+	eShard = 1,	 // partition Server
+	eWatchDog = 2,		 // God
 	eCartograph = 3,	 // God Debug Tool
 	eGameClient = 4, // Game Client / Player
 	eGameServer = 5,	 // Game Server
-  eDemigod = 6,
+  eProxy = 6,
   eGameCoordinator = 7
 };
-BOOST_DESCRIBE_ENUM(InterlinkType, eInvalid, ePartition, eGod, eCartograph, eGameClient, eGameServer, eDemigod, eGameCoordinator)
+BOOST_DESCRIBE_ENUM(InterlinkType, eInvalid, eShard, eWatchDog, eCartograph, eGameClient, eGameServer, eProxy, eGameCoordinator)
 
 enum class ConnectionState
 {

@@ -128,6 +128,7 @@ add_custom_target(${_target_name}_launch
           ${CMAKE_COMMAND} -E chdir "$<TARGET_FILE_DIR:Bootstrap>"
           "$<TARGET_FILE:Bootstrap>" -f "${CMAKE_CURRENT_SOURCE_DIR}/AtlasNetSettings.json"
   DEPENDS
+          stage_Bootstrap   # <-- runs staging first
           ${_target_name}
           Bootstrap
   USES_TERMINAL

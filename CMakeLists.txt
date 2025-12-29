@@ -1,18 +1,35 @@
 cmake_minimum_required(VERSION 3.24)
+
+if(NOT DEFINED CMAKE_TOOLCHAIN_FILE)
+  if(DEFINED ENV{VCPKG_ROOT})
+    set(CMAKE_TOOLCHAIN_FILE "$ENV{VCPKG_ROOT}/scripts/buildsystems/vcpkg.cmake"
+        CACHE FILEPATH "vcpkg toolchain file")
+  endif()
+endif()
+
+# Always set install dir (do not hide behind the toolchain fallback)
+# Use build dir, not "sourceDir"
+set(VCPKG_INSTALLED_DIR "${CMAKE_BINARY_DIR}/vcpkg_installed"
+    CACHE PATH "vcpkg installed dir")
+
+# If you want manifest features, also cache it (or use vcpkg.json)
+set(VCPKG_MANIFEST_FEATURES "native"
+    CACHE STRING "vcpkg manifest features")
+
 project(AtlasNet LANGUAGES C CXX)
 
 # --- Global settings ---
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
+set(CMAKE_POSITION_INDEPENDENT_CODE ON)
 
 set_property(GLOBAL PROPERTY USE_FOLDERS ON)
 add_compile_definitions(
-  _PORT_GOD=25564
-  _PORT_PARTITION=25565
+  _PORT_WATCHDOG=25564
+  _PORT_SHARD=25565
   _PORT_GAMESERVER=25566
-  _PORT_GAMECOORDINATOR=25567
-  _PORT_DEMIGOD=25568
+  _PORT_PROXY=25568
 
   #Docker Settings
   _DOCKER_OS_="ubuntu:24.04"
@@ -23,35 +40,27 @@ add_compile_definitions(
   _ATLASNET_NETWORK_NAME="AtlasNet"
   _REGISTRY_SERVICE_NAME="registry"
   _REGISTRY_PORT=5000
-  #Cluster Database
-  _CLUSTERDB_IMAGE_NAME="cluster-db"
-  _CLUSTERDB_SERVICE_NAME="ClusterDB"
 
-  #REDIS
-  _REDIS_SERVICE_NAME="redis"
-  #Partition
-  _PARTITION_SERVICE_NAME="Partition_GameServer"
-  _PARTITION_IMAGE_NAME="partition"
+  #InternalDB
+  _INTERNAL_REDIS_SERVICE_NAME="InternalDB"
+  #Shard
+  _SHARD_SERVICE_NAME="Shard"
+  _SHARD_IMAGE_NAME="shard"
 
-  #God
-  _GOD_IMAGE_NAME="god"
-  _GOD_SERVICE_NAME="God"
+  #WatchDog
+  _WATCHDOG_IMAGE_NAME="watchdog"
+  _WATCHDOG_SERVICE_NAME="WatchDog"
 
-  #DemiGod
-  _DEMIGOD_IMAGE_NAME="demi-god"
-  _DEMIGOD_SERVICE_NAME="DemiGod"
+  #Proxy
+  _PROXY_IMAGE_NAME="proxy"
+  _PROXY_SERVICE_NAME="Proxy"
 
   #Cartograph
   _CARTOGRAPH_IMAGE_NAME="cartograph"
   _CARTOGRAPH_SERVICE_NAME="Cartograph"
 
-  #Game Coordinator
-  _GAME_COORDINATOR_IMAGE_NAME="game-coordinator"
-  _GAME_COORDINATOR_SERVICE_NAME="GameCoordinator"
-  _GAME_COORDINATOR_PORT=25567
-
   #Game Server
-  _GAME_SERVER_IMAGE_NAME="game-server"
+  _GAME_SERVER_IMAGE_NAME="shard_game_server"
 
   #Registry
   _REGISTRY_CERT_SECRET_NAME="registry_tls_cert"
@@ -81,13 +90,17 @@ else()
 # Full native build
   add_subdirectory(libs/AtlasNet/Server)
   add_subdirectory(libs/AtlasNet/Client)
-  add_subdirectory(libs/AtlasNet/General)
-  add_subdirectory(libs/ImguiAppBase)
-  add_subdirectory(apps/God)
-  add_subdirectory(apps/Cartograph)
-  add_subdirectory(apps/DemiGod)
-  add_subdirectory(apps/Partition)
-  add_subdirectory(apps/ClusterDB)
+  add_subdirectory(libs/AtlasNet/Global)
+  add_subdirectory(libs/BuiltInDB)
+  add_subdirectory(libs/Database)
+  add_subdirectory(libs/Debug)
+  add_subdirectory(libs/Docker)
+  add_subdirectory(libs/Heuristic)
+  add_subdirectory(libs/Interlink)
+  add_subdirectory(libs/InternalDB)
+  add_subdirectory(apps/WatchDog)
+  add_subdirectory(apps/Proxy)
+  add_subdirectory(apps/Shard)
   add_subdirectory(apps/Bootstrap)
   foreach(_dir IN ITEMS
   "${CMAKE_CURRENT_SOURCE_DIR}/dev/Sandbox/lib"

@@ -9,5 +9,9 @@
     ],
     "RuntimeArches": [
         "x86_64"
-    ]
+    ],
+    "BuiltInDB":{
+        "Enabled" : true,
+        "PersistentDBFilePath"
+    }
 }

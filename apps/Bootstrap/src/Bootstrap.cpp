@@ -3,17 +3,20 @@
 #include <cstdlib>
 #include <filesystem>
 #include <fstream>
+#include <sstream>
 #include <stdexcept>
 #include <string_view>
-
-#include "AtlasNet/AtlasNet.hpp"
-#include "CommandTools.hpp"
-#include "Docker/DockerIO.hpp"
-#include "ImageDockerFiles.hpp"
-#include "misc/String_utils.hpp"
-#include "pch.hpp"
+#include <netdb.h>  
+#include <ifaddrs.h>
+#include <arpa/inet.h>
+#include <netinet/in.h>
 #include "CartographDockerFiles.hpp"
-#pragma once
+#include "CommandTools.hpp"
+#include "ImageDockerFiles.hpp"
+#include "Misc/String_utils.hpp"
+#include "pch.hpp"
+#include "DockerIO.hpp"
+
 static void WriteFile(std::filesystem::path file_path, const std::string_view str)
 {
 	std::filesystem::create_directories(file_path.parent_path());
@@ -47,8 +50,9 @@ Bootstrap::Settings Bootstrap::ParseSettingsFile(const std::filesystem::path &fi
 	std::ifstream settingsFile(file);
 	if (!settingsFile.is_open())
 	{
-		
-		throw std::runtime_error(std::format("Unable to find {}. set the path to your settings file with {} <path>",file.string(),BOOTSTRAP_SETTINGS_FILE_FLAG));
+		throw std::runtime_error(
+			std::format("Unable to find {}. set the path to your settings file with {} <path>",
+						file.string(), BOOTSTRAP_SETTINGS_FILE_FLAG));
 	}
 	Ordered_Json parsedJson;
 	settingsFile >> parsedJson;
@@ -82,7 +86,7 @@ Bootstrap::Settings Bootstrap::ParseSettingsFile(const std::filesystem::path &fi
 		IsEntryValid(parsedJson, "NetworkInterface") ? parsedJson["NetworkInterface"] : "";
 	if (IsEntryValid(parsedJson, "BuilderMemoryGb"))
 	{
-		settings.BuilderMemoryGb = parsedJson["BuilderMemoryGb"].get<uint32>();
+		settings.BuilderMemoryGb = parsedJson["BuilderMemoryGb"].get<uint32_t>();
 	}
 	if (IsEntryValid(parsedJson, "TLSDirectory"))
 	{
@@ -166,10 +170,12 @@ Bootstrap::Task Bootstrap::ParseTaskFile(std::filesystem::path file_path)
 
 	return task;
 }
-void Bootstrap::Run(const RunArgs& args)
+void Bootstrap::Run(const RunArgs &args)
 {
 	settings = ParseSettingsFile(args.AtlasNetSettingsPath.value_or("./AtlasNetSettings"));
-	std::filesystem::path game_server_task_file_path = args.AtlasNetSettingsPath.value_or("./AtlasNetSettings").parent_path().string() + "/"+settings.GameServerTaskFile;
+	std::filesystem::path game_server_task_file_path =
+		args.AtlasNetSettingsPath.value_or("./AtlasNetSettings").parent_path().string() + "/" +
+		settings.GameServerTaskFile;
 	game_server_task = ParseTaskFile(game_server_task_file_path);
 	MultiNodeMode = !settings.workers.empty();
 	InitSwarm();
@@ -521,13 +527,12 @@ void Bootstrap::SetupRegistry()
 }
 void Bootstrap::BuildImages()
 {
-	BuildDockerImageLocally(GodDockerFile, _GOD_IMAGE_NAME);
-	BuildDockerImageLocally(PartitionDockerFile, _PARTITION_IMAGE_NAME);
+	BuildDockerImageLocally(WatchDogDockerFile, _WATCHDOG_IMAGE_NAME);
+	BuildDockerImageLocally(ShardDockerFile, _SHARD_IMAGE_NAME);
 	BuildGameServer();	// must happen after partition
-	BuildDockerImageLocally(DemiGodDockerFile, _DEMIGOD_IMAGE_NAME);
-	BuildDockerImageLocally(ClusterDBDockerFile, _CLUSTERDB_IMAGE_NAME);
-	BuildDockerImageLocally(GameCoordinatorDockerFile, _GAME_COORDINATOR_IMAGE_NAME);
-	BuildDockerImageLocally(CartographDockerFile, _CARTOGRAPH_IMAGE_NAME);
+	BuildDockerImageLocally(ProxyDockerFile, _PROXY_IMAGE_NAME);
+	//BuildDockerImageLocally(GameCoordinatorDockerFile, _GAME_COORDINATOR_IMAGE_NAME);
+	//BuildDockerImageLocally(CartographDockerFile, _CARTOGRAPH_IMAGE_NAME);
 }
 
 void Bootstrap::BuildGameServer()

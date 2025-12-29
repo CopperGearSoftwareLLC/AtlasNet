@@ -37,7 +37,6 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 
 RUN usermod -aG docker vscode
 
-
 COPY supervisord.conf /etc/supervisor/conf.d/supervisord.conf
 COPY startup.sh /usr/local/bin/startup.sh
 RUN chmod +x /usr/local/bin/startup.sh

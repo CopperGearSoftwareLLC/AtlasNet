@@ -1,14 +1,14 @@
 #pragma once
 
 #include "MiscDockerFiles.hpp"
-#include "misc/String_utils.hpp"
+#include "Misc/String_utils.hpp"
 
 DOCKER_FILE_DEF ATLASNET_STACK_RAW = R"(
 version: "3.8"
 
 services:
-  ${GOD_SERVICE_NAME}:
-    image: ${REGISTRY_ADDR_OPT}${GOD_IMAGE_NAME}
+  ${WATCHDOG_SERVICE_NAME}:
+    image: ${REGISTRY_ADDR_OPT}${WATCHDOG_IMAGE_NAME}
     networks: [${ATLASNET_NETWORK_NAME}]
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
@@ -17,11 +17,11 @@ services:
           constraints:
             - 'node.role == manager'
       mode: replicated
-      replicas: ${GOD_REPLICA_NUM}
+      replicas: ${WATCHDOG_REPLICA_NUM}
       restart_policy:
         condition: on-failure
 
-  ${PARTITION_SERVICE_NAME}:
+  ${SHARD_SERVICE_NAME}:
     image: ${REGISTRY_ADDR_OPT}${GAME_SERVER_IMAGE_NAME}:latest
     networks: [${ATLASNET_NETWORK_NAME}]
     volumes:
@@ -36,17 +36,7 @@ services:
      restart_policy:
        condition: on-failure
 
-  ${CLUSTERDB_SERVICE_NAME}:
-    image: ${REGISTRY_ADDR_OPT}${CLUSTERDB_IMAGE_NAME}:latest
-    networks: [${ATLASNET_NETWORK_NAME}]
-    volumes:
-      - /var/run/docker.sock:/var/run/docker.sock
-    deploy:
-      mode: replicated
-      replicas: 1
-      restart_policy:
-        condition: on-failure
-  ${REDIS_SERVICE_NAME}:
+  ${INTERNAL_REDIS_SERVICE_NAME}:
     image: redis:7
     command: ["redis-server", "--appendonly", "yes"]
     networks: [${ATLASNET_NETWORK_NAME}]
@@ -78,8 +68,8 @@ services:
         condition: on-failure
 
 
-  ${DEMIGOD_SERVICE_NAME}:
-    image: ${REGISTRY_ADDR_OPT}${DEMIGOD_IMAGE_NAME}:latest
+  ${PROXY_SERVICE_NAME}:
+    image: ${REGISTRY_ADDR_OPT}${PROXY_IMAGE_NAME}:latest
     networks: [${ATLASNET_NETWORK_NAME}]
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
@@ -117,24 +107,18 @@ networks:
 		condition: on-failure*/
 DOCKER_FILE_DEF ATLASNET_STACK =
 	MacroParse(ATLASNET_STACK_RAW,
-			   {{"GOD_IMAGE_NAME", _GOD_IMAGE_NAME},
-				{"GOD_SERVICE_NAME", _GOD_SERVICE_NAME},
+			   {{"WATCHDOG_IMAGE_NAME", _WATCHDOG_IMAGE_NAME},
+				{"WATCHDOG_SERVICE_NAME", _WATCHDOG_SERVICE_NAME},
 				{"ATLASNET_NETWORK_NAME", _ATLASNET_NETWORK_NAME},
-				{"GOD_REPLICA_NUM", std::to_string(1)},
+				{"WATCHDOG_REPLICA_NUM", std::to_string(1)},
 				{"REGISTRY_ADDR", ""},	//"localhost/"
 				{"GAME_SERVER_IMAGE_NAME", _GAME_SERVER_IMAGE_NAME},
-				{"PARTITION_SERVICE_NAME", _PARTITION_SERVICE_NAME},
-				{"CLUSTERDB_IMAGE_NAME", _CLUSTERDB_IMAGE_NAME},
-				{"CLUSTERDB_SERVICE_NAME", _CLUSTERDB_SERVICE_NAME},
-				{"GAME_COORDINATOR_IMAGE_NAME", _GAME_COORDINATOR_IMAGE_NAME},
-				{"GAME_COORDINATOR_SERVICE_NAME", _GAME_COORDINATOR_SERVICE_NAME},
-				{"GAME_COORDINATOR_PORT_TARGET", std::to_string(_GAME_COORDINATOR_PORT)},
-				{"GAME_COORDINATOR_PORT_PUBLISHED", std::to_string(_GAME_COORDINATOR_PORT)},
+				{"SHARD_SERVICE_NAME", _SHARD_SERVICE_NAME},
 				{"CARTOGRAPH_IMAGE_NAME", _CARTOGRAPH_IMAGE_NAME},
 				{"CARTOGRAPH_SERVICE_NAME", _CARTOGRAPH_SERVICE_NAME},
-				{"DEMIGOD_IMAGE_NAME", _DEMIGOD_IMAGE_NAME},
-				{"DEMIGOD_SERVICE_NAME", _DEMIGOD_SERVICE_NAME},
-				{"REDIS_SERVICE_NAME", _REDIS_SERVICE_NAME}});
+				{"PROXY_IMAGE_NAME", _PROXY_IMAGE_NAME},
+				{"PROXY_SERVICE_NAME", _PROXY_SERVICE_NAME},
+				{"INTERNAL_REDIS_SERVICE_NAME", _INTERNAL_REDIS_SERVICE_NAME}});
 DOCKER_FILE_DEF Generic_Builder_Header = R"(
 FROM ${OS_VERSION} AS builder
 WORKDIR ${WORKDIR}
@@ -173,17 +157,17 @@ RUN --mount=type=cache,target=${WORKDIR}/build \
 
 )DOCKER";
 
-DOCKER_FILE_DEF GodDockerFile = MacroParse(
+DOCKER_FILE_DEF WatchDogDockerFile = MacroParse(
 	Generic_Builder_Header + GET_REQUIRED_BUILD_PKGS + VCPKG_Install + COPY_ATLASNET_SRC +
 		BUILD_ATLASNET_SRC + Generic_Run_Header + GET_REQUIRED_RUN_PKGS + CopyBuild_StripLib +
-		R"(ENTRYPOINT ["${WORKDIR}/bin/God"])",
-	{{"OS_VERSION", _DOCKER_OS_}, {"WORKDIR", _DOCKER_WORKDIR_}, {"BUILD_PROJECT", "God"}});
+		R"(ENTRYPOINT ["${WORKDIR}/bin/WatchDog"])",
+	{{"OS_VERSION", _DOCKER_OS_}, {"WORKDIR", _DOCKER_WORKDIR_}, {"BUILD_PROJECT", "WatchDog"}});
 
-DOCKER_FILE_DEF DemiGodDockerFile = MacroParse(
+DOCKER_FILE_DEF ProxyDockerFile = MacroParse(
 	Generic_Builder_Header + GET_REQUIRED_BUILD_PKGS + VCPKG_Install + COPY_ATLASNET_SRC +
 		BUILD_ATLASNET_SRC + Generic_Run_Header + GET_REQUIRED_RUN_PKGS + CopyBuild_StripLib +
-		R"(ENTRYPOINT ["${WORKDIR}/bin/DemiGod"])",
-	{{"OS_VERSION", _DOCKER_OS_}, {"WORKDIR", _DOCKER_WORKDIR_}, {"BUILD_PROJECT", "DemiGod"}});
+		R"(ENTRYPOINT ["${WORKDIR}/bin/Proxy"])",
+	{{"OS_VERSION", _DOCKER_OS_}, {"WORKDIR", _DOCKER_WORKDIR_}, {"BUILD_PROJECT", "Proxy"}});
 
 DOCKER_FILE_DEF ClusterDBDockerFile = MacroParse(
 	Generic_Builder_Header + GET_REQUIRED_BUILD_PKGS + VCPKG_Install + COPY_ATLASNET_SRC +
@@ -195,19 +179,19 @@ DOCKER_FILE_DEF GameCoordinatorDockerFile = MacroParse(
 	Generic_Builder_Header + GET_REQUIRED_BUILD_PKGS + VCPKG_Install + COPY_ATLASNET_SRC +
 		BUILD_ATLASNET_SRC + Generic_Run_Header + GET_REQUIRED_RUN_PKGS + CopyBuild_StripLib +
 		R"(ENTRYPOINT [""])",
-	{{"OS_VERSION", _DOCKER_OS_}, {"WORKDIR", _DOCKER_WORKDIR_}, {"BUILD_PROJECT", "God"}});
+	{{"OS_VERSION", _DOCKER_OS_}, {"WORKDIR", _DOCKER_WORKDIR_}, {"BUILD_PROJECT", "WatchDog"}});
 
-DOCKER_FILE_DEF PartitionDockerFile = MacroParse(
+DOCKER_FILE_DEF ShardDockerFile = MacroParse(
 	Generic_Builder_Header + GET_REQUIRED_BUILD_PKGS + VCPKG_Install + COPY_ATLASNET_SRC +
 		BUILD_ATLASNET_SRC + Generic_Run_Header + GET_REQUIRED_RUN_PKGS + CopyBuild_StripLib,
-	{{"OS_VERSION", _DOCKER_OS_}, {"WORKDIR", _DOCKER_WORKDIR_}, {"BUILD_PROJECT", "Partition"}});
+	{{"OS_VERSION", _DOCKER_OS_}, {"WORKDIR", _DOCKER_WORKDIR_}, {"BUILD_PROJECT", "Shard"}});
 
-DOCKER_FILE_DEF PartitionSuperVisordConf = R"(
+DOCKER_FILE_DEF ShardSuperVisordConf = R"(
 [supervisord]
 nodaemon=true
 
-[program:partition]
-command=${WORKDIR}/bin/Partition
+[program:shard]
+command=${WORKDIR}/bin/Shard
 directory=${WORKDIR}
 autorestart=true
 stdout_logfile=/dev/stdout
@@ -228,9 +212,9 @@ stderr_logfile_maxbytes=0
 
 DOCKER_FILE_DEF GameServerEntryPoint = MacroParse(
 	R"(
-COPY --from=${PARTITION_IMAGE} ${WORKDIR} ${WORKDIR}
+COPY --from=${SHARD_IMAGE} ${WORKDIR} ${WORKDIR}
 ENV LD_LIBRARY_PATH="${WORKDIR}/deps:${LD_LIBRARY_PATH}"
-${PARTITION_INSTALL_RUNTIME_DEPS}
+${SHARD_INSTALL_RUNTIME_DEPS}
 ${WRITE_SUPERVISOR_FILE}
 ENTRYPOINT ["/usr/bin/supervisord", "-c", "/supervisord.conf"])",
 	{{"WRITE_SUPERVISOR_FILE", R"(
@@ -238,7 +222,7 @@ RUN cat > /supervisord.conf <<'EOF'
 ${SUPERVISORD_CONF}
 EOF
 )"},
-	 {"PARTITION_INSTALL_RUNTIME_DEPS", GET_REQUIRED_RUN_PKGS},
-	 {"PARTITION_IMAGE", _PARTITION_IMAGE_NAME},
+	 {"SHARD_INSTALL_RUNTIME_DEPS", GET_REQUIRED_RUN_PKGS},
+	 {"SHARD_IMAGE", _SHARD_IMAGE_NAME},
 	 {"WORKDIR", _DOCKER_WORKDIR_},
-	 {"SUPERVISORD_CONF", PartitionSuperVisordConf}});
+	 {"SUPERVISORD_CONF", ShardSuperVisordConf}});

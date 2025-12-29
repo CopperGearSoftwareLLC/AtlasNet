@@ -29,7 +29,12 @@
         "boost-stacktrace",
         "gamenetworkingsockets",
         "curl",
-        "redis-plus-plus",
+         {
+          "name": "redis-plus-plus",
+          "features": [
+            "async"
+          ]
+        },
         "hiredis",
         "ftxui"
       ]

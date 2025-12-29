@@ -1,10 +1,11 @@
 #pragma once
+#include "GameNetworkingSockets.hpp"
 #include "Connection.hpp"
-#include "Debug/Log.hpp"
-#include "misc/Singleton.hpp"
+#include "Log.hpp"
+#include "Misc/Singleton.hpp"
 #include "pch.hpp"
 #include "InterlinkMessage.hpp"
-#include "Docker/DockerIO.hpp"
+#include "DockerIO.hpp"
 
 struct InterlinkCallbacks
 {
@@ -76,11 +77,10 @@ class Interlink : public Singleton<Interlink>
 	PortType ListenPort;
 	bool b_InDockerNetwork = true;
 	const static inline std::unordered_map<InterlinkType, uint32> Type2ListenPort = {
-		{InterlinkType::eGod, _PORT_GOD},
-		{InterlinkType::ePartition, _PORT_PARTITION},
+		{InterlinkType::eWatchDog, _PORT_WATCHDOG},
+		{InterlinkType::eShard, _PORT_SHARD},
 		{InterlinkType::eGameServer, _PORT_GAMESERVER},
-    {InterlinkType::eGameCoordinator, _PORT_GAMECOORDINATOR},
-    {InterlinkType::eDemigod, _PORT_DEMIGOD},
+    {InterlinkType::eProxy, _PORT_PROXY},
 		{InterlinkType::eGameClient, 25569} // temp client port
 	};
 

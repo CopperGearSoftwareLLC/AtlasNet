@@ -3,12 +3,12 @@
 #include <span>
 #include <string>
 #include "Bootstrap.hpp"
-#include "Debug/Crash/CrashHandler.hpp"
+#include <iostream>
 
 int main(int argc, char **argv)
 {
     std::span<char*> args(argv, argc);
-    CrashHandler::Get().Init();
+    //CrashHandler::Get().Init();
     for (int i = 0; i < argc;i++)
     {
         std::cout << argv[i] << "";

@@ -1,5 +1,5 @@
 #include <jni.h>
-#include "AtlasNet/AtlasEntity.hpp"
+#include "AtlasEntity.hpp"
 #include "AtlasNetServer.hpp"  // from ../src
 
 // Example: Java class com.atlasnet.server.AtlasNetServer

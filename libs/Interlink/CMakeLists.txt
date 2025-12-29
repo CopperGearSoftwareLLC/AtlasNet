@@ -20,7 +20,10 @@ target_include_directories(${_target_name}
 install(TARGETS ${_target_name}
     RUNTIME DESTINATION bin      # Linux/macOS executables
 )
-
+find_package(GameNetworkingSockets CONFIG REQUIRED)
 target_link_libraries(${_target_name}
-
+InternalDB
+Docker
+GameNetworkingSockets::GameNetworkingSockets_s # _s means static
+Debug
 )

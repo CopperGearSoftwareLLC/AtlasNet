@@ -1,8 +1,8 @@
 #include "AtlasNetServer.hpp"
 
-#include "Debug/Crash/CrashHandler.hpp"
-#include "Database/ServerRegistry.hpp"
-#include "Docker/DockerIO.hpp"
+#include "Crash/CrashHandler.hpp"
+
+#include "DockerIO.hpp"
 
 // ============================================================================
 // Initialize server and setup Interlink callbacks
@@ -76,7 +76,7 @@ void AtlasNetServer::Update(std::span<AtlasEntity> entities,
             CachedEntities[entity.ID] = entity;
         }
 
-        InterLinkIdentifier partitionID(InterlinkType::ePartition, DockerIO::Get().GetSelfContainerName());
+        InterLinkIdentifier partitionID(InterlinkType::eShard, DockerIO::Get().GetSelfContainerName());
         Interlink::Get().SendMessageRaw(partitionID, std::span(buffer), InterlinkMessageSendFlag::eReliableNow);
 
         logger->DebugFormatted("[Server] Sent EntityUpdate ({} entities) to partition", entities.size());
@@ -188,7 +188,7 @@ void AtlasNetServer::HandleMessage(const Connection &fromWhom, std::span<const s
                 Interlink::Get().SendMessageRaw(id, data);
         }
     }
-    else if (fromWhom.target.Type == InterlinkType::ePartition)
+    else if (fromWhom.target.Type == InterlinkType::eShard)
     {
         for (const auto &id : ConnectedClients)
             Interlink::Get().SendMessageRaw(id, data);

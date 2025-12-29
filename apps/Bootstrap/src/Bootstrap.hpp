@@ -4,8 +4,8 @@
 #include <optional>
 #include <string>
 #include <string_view>
-
-#include "Debug/Log.hpp"
+#include <unordered_set>
+#include "Log.hpp"
 class Bootstrap
 {
 	struct Settings
@@ -19,7 +19,7 @@ class Bootstrap
 		std::unordered_set<std::string> RuntimeArches;
 		std::string BuildCacheDir;
 		std::string NetworkInterface;
-		std::optional<uint32> BuilderMemoryGb;
+		std::optional<uint32_t> BuilderMemoryGb;
 		std::optional<std::string> TlsDir;
 
 		std::string GameServerTaskFile;

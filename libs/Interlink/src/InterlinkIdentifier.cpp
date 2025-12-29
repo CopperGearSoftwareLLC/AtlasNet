@@ -1,11 +1,12 @@
 #include "InterlinkIdentifier.hpp"
 #include "InterlinkEnums.hpp"
-#include "misc/String_utils.hpp"
+#include "Misc/String_utils.hpp"
+#include <iostream>
 InterLinkIdentifier InterLinkIdentifier::MakeIDGod()
 
 {
     InterLinkIdentifier id;
-    id.Type = InterlinkType::eGod;
+    id.Type = InterlinkType::eWatchDog;
     id.ID.clear();
     return id;
 }
@@ -13,7 +14,7 @@ InterLinkIdentifier InterLinkIdentifier::MakeIDGod()
 InterLinkIdentifier InterLinkIdentifier::MakeIDPartition(const std::string &_ID)
 {
     InterLinkIdentifier id;
-    id.Type = InterlinkType::ePartition;
+    id.Type = InterlinkType::eShard;
     id.ID = _ID;
     return id;
 }

@@ -1,13 +1,14 @@
 #pragma once
-#include "AtlasNet/AtlasEntity.hpp"
-#include "AtlasNet/AtlasNet.hpp"
-#include "AtlasNet/AtlasNetInterface.hpp"
-#include "Debug/Log.hpp"
-#include "Docker/DockerEvents.hpp"
-#include "Interlink/Interlink.hpp"
-#include "misc/Singleton.hpp"
+#include "AtlasEntity.hpp"
+#include "AtlasNet.hpp"
+#include "AtlasNetInterface.hpp"
+#include "Log.hpp"
+#include "DockerEvents.hpp"
+#include "Interlink.hpp"
+#include "Misc/Singleton.hpp"
 #include "pch.hpp"
 #include "AtlasNetApi.hpp"
+#include <unordered_set>
 enum KDServerRequestType
 {
 	Raycast,
