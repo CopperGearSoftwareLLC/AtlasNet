@@ -1,0 +1,11 @@
+#pragma once
+#include "GameNetworkingSockets/steam/steamnetworkingsockets.h"
+#include "GameNetworkingSockets/steam/isteamnetworkingsockets.h"
+#include "GameNetworkingSockets/steam/isteamnetworkingutils.h"
+#include "GameNetworkingSockets/steam/isteamnetworkingmessages.h"
+#include "GameNetworkingSockets/steam/steam_api_common.h"
+#include "GameNetworkingSockets/steam/steamclientpublic.h"
+#include "GameNetworkingSockets/steam/steamnetworkingcustomsignaling.h"
+#include "GameNetworkingSockets/steam/steamnetworkingtypes.h"
+#include "GameNetworkingSockets/steam/steamtypes.h"
+#include "GameNetworkingSockets/steam/steamuniverse.h"

@@ -1,14 +1,15 @@
 #include "AtlasNetServer.hpp"
 
-#include "Debug/Crash/CrashHandler.hpp"
-#include "Database/ServerRegistry.hpp"
-#include "Docker/DockerIO.hpp"
+#include "Crash/CrashHandler.hpp"
 
+#include "DockerIO.hpp"
+#include "BuiltInDB.hpp"
 // ============================================================================
 // Initialize server and setup Interlink callbacks
 // ============================================================================
 void AtlasNetServer::Initialize(AtlasNetServer::InitializeProperties &properties)
 {
+
     // --- Core setup ---
     //CrashHandler::Get().Init();
     DockerEvents::Get().Init(DockerEventsInit{.OnShutdownRequest = properties.OnShutdownRequest});
@@ -22,7 +23,9 @@ void AtlasNetServer::Initialize(AtlasNetServer::InitializeProperties &properties
     );
     logger = std::make_shared<Log>(myID.ToString());
     logger->Debug("AtlasNet Initialize");
-
+        BuiltInDB::Get().Transient()->Set("test", "ass");
+        std::cerr << "WROTE TO BUILT IN" << std::endl;
+        logger->DebugFormatted("Wrote to Built In test:{}",BuiltInDB::Get().Transient()->Get("test").value());
     // --- Interlink setup ---
     Interlink::Check();
     Interlink::Get().Init({
@@ -76,7 +79,7 @@ void AtlasNetServer::Update(std::span<AtlasEntity> entities,
             CachedEntities[entity.ID] = entity;
         }
 
-        InterLinkIdentifier partitionID(InterlinkType::ePartition, DockerIO::Get().GetSelfContainerName());
+        InterLinkIdentifier partitionID(InterlinkType::eShard, DockerIO::Get().GetSelfContainerName());
         Interlink::Get().SendMessageRaw(partitionID, std::span(buffer), InterlinkMessageSendFlag::eReliableNow);
 
         logger->DebugFormatted("[Server] Sent EntityUpdate ({} entities) to partition", entities.size());
@@ -188,7 +191,7 @@ void AtlasNetServer::HandleMessage(const Connection &fromWhom, std::span<const s
                 Interlink::Get().SendMessageRaw(id, data);
         }
     }
-    else if (fromWhom.target.Type == InterlinkType::ePartition)
+    else if (fromWhom.target.Type == InterlinkType::eShard)
     {
         for (const auto &id : ConnectedClients)
             Interlink::Get().SendMessageRaw(id, data);

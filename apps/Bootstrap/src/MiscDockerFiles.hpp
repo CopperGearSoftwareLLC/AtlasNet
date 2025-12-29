@@ -1,7 +1,7 @@
 #pragma once
 #include <filesystem>
 
-#include "misc/String_utils.hpp"
+#include "Misc/String_utils.hpp"
 #define DOCKER_FILE_DEF const static inline std::string
 
 DOCKER_FILE_DEF GET_REQUIRED_BUILD_PKGS = R"(
@@ -47,6 +47,12 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     binutils supervisor tini \
     # for debugging
     lf \
+    ca-certificates \
+    libc6 \
+    libstdc++6 \
+    libgcc-s1 \
+    libatomic1 \
+    libgomp1 \
     && rm -rf /var/lib/apt/lists/*
 )";
 DOCKER_FILE_DEF VCPKG_Install =

@@ -1,18 +1,25 @@
 #include "Bootstrap.hpp"
 
+#include <arpa/inet.h>
+#include <ifaddrs.h>
+#include <netdb.h>
+#include <netinet/in.h>
+
 #include <cstdlib>
 #include <filesystem>
 #include <fstream>
+#include <sstream>
 #include <stdexcept>
 #include <string_view>
 
-#include "AtlasNet/AtlasNet.hpp"
+#include "BuiltInDbDockerFiles.hpp"
+#include "CartographDockerFiles.hpp"
 #include "CommandTools.hpp"
-#include "Docker/DockerIO.hpp"
+#include "DockerIO.hpp"
 #include "ImageDockerFiles.hpp"
-#include "misc/String_utils.hpp"
+#include "Misc/String_utils.hpp"
 #include "pch.hpp"
-#pragma once
+
 static void WriteFile(std::filesystem::path file_path, const std::string_view str)
 {
 	std::filesystem::create_directories(file_path.parent_path());
@@ -46,8 +53,9 @@ Bootstrap::Settings Bootstrap::ParseSettingsFile(const std::filesystem::path &fi
 	std::ifstream settingsFile(file);
 	if (!settingsFile.is_open())
 	{
-		
-		throw std::runtime_error(std::format("Unable to find {}. set the path to your settings file with {} <path>",file.string(),BOOTSTRAP_SETTINGS_FILE_FLAG));
+		throw std::runtime_error(
+			std::format("Unable to find {}. set the path to your settings file with {} <path>",
+						file.string(), BOOTSTRAP_SETTINGS_FILE_FLAG));
 	}
 	Ordered_Json parsedJson;
 	settingsFile >> parsedJson;
@@ -59,7 +67,7 @@ Bootstrap::Settings Bootstrap::ParseSettingsFile(const std::filesystem::path &fi
 		for (const auto &workerJ : parsedJson["Workers"])
 		{
 			Settings::Worker worker;
-			worker.IP = workerJ["Address"];
+			worker.MAC = workerJ["MACAddress"];
 			worker.Name = workerJ["Name"];
 			settings.workers.push_back(worker);
 		}
@@ -75,17 +83,27 @@ Bootstrap::Settings Bootstrap::ParseSettingsFile(const std::filesystem::path &fi
 	{
 		settings.RuntimeArches.insert(arch);
 	}
-	settings.BuildCacheDir =
-		IsEntryValid(parsedJson, "BuildCacheDir") ? parsedJson["BuildCacheDir"] : "";
+
 	settings.NetworkInterface =
 		IsEntryValid(parsedJson, "NetworkInterface") ? parsedJson["NetworkInterface"] : "";
-	if (IsEntryValid(parsedJson, "BuilderMemoryGb"))
-	{
-		settings.BuilderMemoryGb = parsedJson["BuilderMemoryGb"].get<uint32>();
-	}
+
 	if (IsEntryValid(parsedJson, "TLSDirectory"))
 	{
 		settings.TlsDir = parsedJson["TLSDirectory"].get<std::string>();
+	}
+	if (IsEntryValid(parsedJson["BuiltInDB"], "Enable"))
+	{
+		settings.BuiltInDBopt.Enable = parsedJson["BuiltInDB"]["Enable"];
+	}
+	if (IsEntryValid(parsedJson["BuiltInDB"]["Transient"], "MasterReplicas"))
+	{
+		settings.BuiltInDBopt.transient.MasterReplicas =
+			parsedJson["BuiltInDB"]["Transient"]["MasterReplicas"];
+	}
+	if (IsEntryValid(parsedJson["BuiltInDB"]["Transient"], "SlaveReplicas"))
+	{
+		settings.BuiltInDBopt.transient.SlaveReplicas =
+			parsedJson["BuiltInDB"]["Transient"]["SlaveReplicas"];
 	}
 	return settings;
 }
@@ -165,10 +183,12 @@ Bootstrap::Task Bootstrap::ParseTaskFile(std::filesystem::path file_path)
 
 	return task;
 }
-void Bootstrap::Run(const RunArgs& args)
+void Bootstrap::Run(const RunArgs &args)
 {
 	settings = ParseSettingsFile(args.AtlasNetSettingsPath.value_or("./AtlasNetSettings"));
-	std::filesystem::path game_server_task_file_path = args.AtlasNetSettingsPath.value_or("./AtlasNetSettings").parent_path().string() + "/"+settings.GameServerTaskFile;
+	std::filesystem::path game_server_task_file_path =
+		args.AtlasNetSettingsPath.value_or("./AtlasNetSettings").parent_path().string() + "/" +
+		settings.GameServerTaskFile;
 	game_server_task = ParseTaskFile(game_server_task_file_path);
 	MultiNodeMode = !settings.workers.empty();
 	InitSwarm();
@@ -432,6 +452,8 @@ void Bootstrap::SendTLSToWorkers() {}
 
 void Bootstrap::DeployStack()
 {
+	const std::string ProcessedStackFile = MacroParse(
+		ATLASNET_STACK, {{"BUILTIN_DB_STACK", settings.BuiltInDBopt.Enable ? BuiltInDbStack : ""}});
 	// e.g. "/tmp/atlasnet/"
 	std::filesystem::create_directories(_DOCKER_TEMP_FILES_DIR);
 	const auto stackymlFilePath = _DOCKER_TEMP_FILES_DIR + std::string("stack.yml");
@@ -440,7 +462,7 @@ void Bootstrap::DeployStack()
 	{
 		throw std::runtime_error("Failed to save stack yml file");
 	}
-	file << ATLASNET_STACK;
+	file << ProcessedStackFile;
 	file.close();
 
 	std::system(std::format("docker stack deploy --detach=true -c {} {}", stackymlFilePath,
@@ -520,12 +542,12 @@ void Bootstrap::SetupRegistry()
 }
 void Bootstrap::BuildImages()
 {
-	BuildDockerImageLocally(GodDockerFile, _GOD_IMAGE_NAME);
-	BuildDockerImageLocally(PartitionDockerFile, _PARTITION_IMAGE_NAME);
+	BuildDockerImageLocally(WatchDogDockerFile, _WATCHDOG_IMAGE_NAME);
+	BuildDockerImageLocally(ShardDockerFile, _SHARD_IMAGE_NAME);
 	BuildGameServer();	// must happen after partition
-	BuildDockerImageLocally(DemiGodDockerFile, _DEMIGOD_IMAGE_NAME);
-	BuildDockerImageLocally(ClusterDBDockerFile, _CLUSTERDB_IMAGE_NAME);
-	BuildDockerImageLocally(GameCoordinatorDockerFile, _GAME_COORDINATOR_IMAGE_NAME);
+	BuildDockerImageLocally(ProxyDockerFile, _PROXY_IMAGE_NAME);
+	// BuildDockerImageLocally(GameCoordinatorDockerFile, _GAME_COORDINATOR_IMAGE_NAME);
+	// BuildDockerImageLocally(CartographDockerFile, _CARTOGRAPH_IMAGE_NAME);
 }
 
 void Bootstrap::BuildGameServer()

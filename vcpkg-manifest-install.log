@@ -1,0 +1,213 @@
+Detecting compiler hash for triplet x64-linux...
+Compiler found: /usr/bin/c++
+The following packages are already installed:
+  * abseil:x64-linux@20250814.1
+  * boost-assert:x64-linux@1.90.0
+  * boost-bind:x64-linux@1.90.0
+  * boost-cmake:x64-linux@1.90.0
+  * boost-concept-check:x64-linux@1.90.0
+  * boost-config:x64-linux@1.90.0
+    boost-container:x64-linux@1.90.0
+  * boost-container-hash:x64-linux@1.90.0
+  * boost-core:x64-linux@1.90.0
+    boost-describe:x64-linux@1.90.0
+  * boost-detail:x64-linux@1.90.0
+  * boost-function:x64-linux@1.90.0
+  * boost-function-types:x64-linux@1.90.0
+  * boost-functional:x64-linux@1.90.0
+  * boost-fusion:x64-linux@1.90.0
+  * boost-headers:x64-linux@1.90.0
+  * boost-integer:x64-linux@1.90.0
+  * boost-intrusive:x64-linux@1.90.0
+  * boost-io:x64-linux@1.90.0
+  * boost-iterator:x64-linux@1.90.0
+  * boost-move:x64-linux@1.90.0
+  * boost-mp11:x64-linux@1.90.0
+  * boost-mpl:x64-linux@1.90.0
+    boost-multi-index:x64-linux@1.90.0
+  * boost-optional:x64-linux@1.90.0
+  * boost-predef:x64-linux@1.90.0
+  * boost-preprocessor:x64-linux@1.90.0
+  * boost-smart-ptr:x64-linux@1.90.0
+    boost-stacktrace[backtrace,core]:x64-linux@1.90.0
+  * boost-static-assert:x64-linux@1.90.0
+  * boost-throw-exception:x64-linux@1.90.0
+  * boost-tuple:x64-linux@1.90.0
+    boost-type-traits:x64-linux@1.90.0
+  * boost-typeof:x64-linux@1.90.0
+  * boost-uninstall:x64-linux@1.90.0
+  * boost-utility:x64-linux@1.90.0
+    boost-uuid:x64-linux@1.90.0
+  * boost-winapi:x64-linux@1.90.0
+    curl[core,non-http,openssl,ssl]:x64-linux@8.17.0
+  * egl-registry:x64-linux@2025-05-27
+    ftxui:x64-linux@6.1.9
+    gamenetworkingsockets:x64-linux@1.4.1#1
+    glew:x64-linux@2.2.0#6
+    glfw3:x64-linux@3.4#1
+    glm:x64-linux@1.0.2
+    hiredis:x64-linux@1.3.0
+    imgui[core,docking-experimental,glfw-binding,opengl3-binding]:x64-linux@1.91.9
+    implot:x64-linux@0.17
+  * libbacktrace:x64-linux@2024-11-30
+  * libuv:x64-linux@1.51.0
+    nlohmann-json:x64-linux@3.12.0#1
+  * opengl:x64-linux@2022-12-04#3
+  * opengl-registry:x64-linux@2025-10-23
+  * openssl:x64-linux@3.6.0#3
+  * protobuf:x64-linux@5.29.5#3
+    redis-plus-plus[async,core]:x64-linux@1.3.15
+    stb:x64-linux@2024-07-29#1
+  * utf8-range:x64-linux@5.29.5
+  * vcpkg-boost:x64-linux@2025-03-29
+  * vcpkg-cmake:x64-linux@2024-04-23
+  * vcpkg-cmake-config:x64-linux@2024-05-23
+  * vcpkg-cmake-get-vars:x64-linux@2025-05-29
+  * zlib:x64-linux@1.3.1
+boost-container provides CMake targets:
+
+  # this is heuristically generated, and may not be correct
+  find_package(boost_container CONFIG REQUIRED)
+  target_link_libraries(main PRIVATE Boost::container)
+
+boost-describe provides CMake targets:
+
+  # this is heuristically generated, and may not be correct
+  find_package(boost_describe CONFIG REQUIRED)
+  target_link_libraries(main PRIVATE Boost::describe)
+
+boost-type-traits provides CMake targets:
+
+  # this is heuristically generated, and may not be correct
+  find_package(boost_type_traits CONFIG REQUIRED)
+  target_link_libraries(main PRIVATE Boost::type_traits)
+
+boost-multi-index provides CMake targets:
+
+  # this is heuristically generated, and may not be correct
+  find_package(boost_multi_index CONFIG REQUIRED)
+  target_link_libraries(main PRIVATE Boost::multi_index)
+
+boost-stacktrace provides CMake targets:
+
+  # this is heuristically generated, and may not be correct
+  find_package(boost_stacktrace_addr2line CONFIG REQUIRED)
+  target_link_libraries(main PRIVATE Boost::stacktrace_addr2line)
+
+  find_package(boost_stacktrace_backtrace CONFIG REQUIRED)
+  target_link_libraries(main PRIVATE Boost::stacktrace_backtrace)
+
+  find_package(boost_stacktrace_basic CONFIG REQUIRED)
+  target_link_libraries(main PRIVATE Boost::stacktrace_basic)
+
+  find_package(boost_stacktrace_from_exception CONFIG REQUIRED)
+  target_link_libraries(main PRIVATE Boost::stacktrace_from_exception)
+
+  find_package(boost_stacktrace_noop CONFIG REQUIRED)
+  target_link_libraries(main PRIVATE Boost::stacktrace_noop)
+
+boost-uuid provides CMake targets:
+
+  # this is heuristically generated, and may not be correct
+  find_package(boost_uuid CONFIG REQUIRED)
+  target_link_libraries(main PRIVATE Boost::uuid)
+
+curl is compatible with built-in CMake targets:
+
+    find_package(CURL REQUIRED)
+    target_link_libraries(main PRIVATE CURL::libcurl)
+
+ftxui provides CMake targets:
+
+  # this is heuristically generated, and may not be correct
+  find_package(ftxui CONFIG REQUIRED)
+  target_link_libraries(main PRIVATE ftxui::dom ftxui::screen ftxui::component)
+
+ftxui provides pkg-config modules:
+
+  # C++ Functional Terminal User Interface.
+  ftxui
+
+gamenetworkingsockets provides CMake targets:
+
+  # this is heuristically generated, and may not be correct
+  find_package(GameNetworkingSockets CONFIG REQUIRED)
+  target_link_libraries(main PRIVATE GameNetworkingSockets::shared GameNetworkingSockets::static GameNetworkingSockets::GameNetworkingSockets GameNetworkingSockets::GameNetworkingSockets_s)
+
+The package glew is compatible with built-in CMake targets:
+
+    find_package(GLEW REQUIRED)
+    target_link_libraries(main PRIVATE GLEW::GLEW)
+
+glfw3 provides CMake targets:
+
+  # this is heuristically generated, and may not be correct
+  find_package(glfw3 CONFIG REQUIRED)
+  target_link_libraries(main PRIVATE glfw)
+
+glfw3 provides pkg-config modules:
+
+  # A multi-platform library for OpenGL, window and input
+  glfw3
+
+The package glm provides CMake targets:
+
+    find_package(glm CONFIG REQUIRED)
+    target_link_libraries(main PRIVATE glm::glm)
+
+    # Or use the header-only version
+    find_package(glm CONFIG REQUIRED)
+    target_link_libraries(main PRIVATE glm::glm-header-only)
+
+hiredis provides CMake targets:
+
+  # this is heuristically generated, and may not be correct
+  find_package(hiredis CONFIG REQUIRED)
+  target_link_libraries(main PRIVATE hiredis::hiredis)
+
+hiredis provides pkg-config modules:
+
+  # Minimalistic C client library for Redis.
+  hiredis
+
+imgui provides CMake targets:
+
+  # this is heuristically generated, and may not be correct
+  find_package(imgui CONFIG REQUIRED)
+  target_link_libraries(main PRIVATE imgui::imgui)
+
+implot provides CMake targets:
+
+  # this is heuristically generated, and may not be correct
+  find_package(implot CONFIG REQUIRED)
+  target_link_libraries(main PRIVATE implot::implot)
+
+The package nlohmann-json provides CMake targets:
+
+    find_package(nlohmann_json CONFIG REQUIRED)
+    target_link_libraries(main PRIVATE nlohmann_json::nlohmann_json)
+
+The package nlohmann-json can be configured to not provide implicit conversions via a custom triplet file:
+
+    set(nlohmann-json_IMPLICIT_CONVERSIONS OFF)
+
+For more information, see the docs here:
+    
+    https://json.nlohmann.me/api/macros/json_use_implicit_conversions/
+
+redis-plus-plus provides CMake targets:
+
+  # this is heuristically generated, and may not be correct
+  find_package(redis++ CONFIG REQUIRED)
+  target_link_libraries(main PRIVATE redis++::redis++_static)
+
+redis-plus-plus provides pkg-config modules:
+
+  # This is a Redis client, based on hiredis and written in C++11. It supports scritpting, pub/sub, pipeline, transaction, Redis Cluster, Redis Sentinel, connection pool, ACL, SSL and thread safety.
+  redis++
+
+The package stb provides CMake targets:
+
+    find_package(Stb REQUIRED)
+    target_include_directories(main PRIVATE ${Stb_INCLUDE_DIR})
+All requested installations completed successfully in: 618 us

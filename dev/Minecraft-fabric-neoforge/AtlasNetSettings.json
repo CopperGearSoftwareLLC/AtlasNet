@@ -4,10 +4,19 @@
     "Workers--": [
         {
             "Name": "Dumpster",
-            "Address": "192.168.2.100"
+            "MACAddress": "some address"
         }
     ],
     "RuntimeArches": [
         "x86_64"
-    ]
+    ],
+    "BuiltInDB": {
+        "Enable": true,
+        "Transient": {
+            "Enable" : true,
+            "MasterReplicas": 1,
+            "SlaveReplicas":1
+        },
+        "Persistent": {}
+    }
 }

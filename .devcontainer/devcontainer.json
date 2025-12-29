@@ -48,8 +48,14 @@
     "GALLIUM_DRIVER": "llvmpipe"
   },
   "features": {
+    //"ghcr.io/rio/features/k3d:1":{},
+    //"ghcr.io/devcontainers/features/kubectl-helm-minikube:1":{},
     "ghcr.io/msclock/features/vcpkg:2": {},
-    "ghcr.io/devcontainers/features/docker-in-docker:2": {}
+    "ghcr.io/devcontainers/features/docker-in-docker:2": {},
+    "ghcr.io/ebaskoro/devcontainer-features/emscripten:1": {},
+    "ghcr.io/devcontainers/features/node:1": {
+      "version": "lts"
+    }
   },
   "customizations": {
     "vscode": {
@@ -69,7 +75,8 @@
         "cweijan.vscode-redis-client",
         "mutantdino.resourcemonitor",
         "vscjava.vscode-java-pack",
-        "twxs.cmake"
+        "twxs.cmake",
+        "tintinweb.graphviz-interactive-preview"
       ]
     }
   }
