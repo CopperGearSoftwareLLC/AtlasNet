@@ -11,3 +11,4 @@ src/common/build/
 src/fabric/build/
 src/neoforge/build/
 src/build/
+src/.gradle/
