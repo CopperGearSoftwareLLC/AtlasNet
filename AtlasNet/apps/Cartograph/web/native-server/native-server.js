@@ -1,7 +1,7 @@
 // native-server.js
 const express = require('express');
 const cors = require('cors');
-const addon = require('../nextjs/native/Render.node');
+const addon = require('../nextjs/native/Web.node');
 const { HeuristicDraw, IBoundsDrawShape, std_vector_IBoundsDrawShape_ } = addon; // your .node file
 function inspectObject(name, obj) {
     console.log(`${name} keys:`, Object.keys(obj));

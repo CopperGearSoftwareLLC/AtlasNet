@@ -46,46 +46,22 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     libgcc-s1 \
     libatomic1 \
     libgomp1 \
+    libcurl4 \
+    libuv1 \
+    libprotobuf32 \
     && rm -rf /var/lib/apt/lists/*
 )";
-DOCKER_FILE_DEF VCPKG_Install =
-	MacroParse(R"(
-
-ARG DEBIAN_FRONTEND=noninteractive
-ARG VCPKG_ROOT=/opt/vcpkg
-ARG VCPKG_COMMIT= # optional: pin to a commit for reproducibility
-
-ENV VCPKG_ROOT=${VCPKG_ROOT}
-ENV PATH="${VCPKG_ROOT}:${PATH}"
-ENV VCPKG_INSTALLED_DIR=/opt/vcpkg_installed
-
-RUN apt-get update && apt-get install -y --no-install-recommends \
-ca-certificates curl git unzip tar zip cmake ninja-build \
-build-essential pkg-config \
-&& rm -rf /var/lib/apt/lists/*
-
-# Install vcpkg
-RUN git clone https://github.com/microsoft/vcpkg.git "${VCPKG_ROOT}" \
-&& if [ -n "${VCPKG_COMMIT}" ]; then cd "${VCPKG_ROOT}" && git checkout "${VCPKG_COMMIT}"; fi \
-&& "${VCPKG_ROOT}/bootstrap-vcpkg.sh" -disableMetrics
-
-# Optional: make CMake pick up vcpkg toolchain automatically if you want
-# ENV CMAKE_TOOLCHAIN_FILE="${VCPKG_ROOT}/scripts/buildsystems/vcpkg.cmake"
-# ENV VCPKG_DEFAULT_TRIPLET="x64-linux"
-#COPY ${BOOTSTRAP_RUNTIME_SRC_DIR}/vcpkg.json ./vcpkg.json
-
-ENV VCPKG_INSTALLED_DIR="${WORKDIR}/build/vcpkg_installed"
-COPY cmake/vcpkg.json ./.
-#COPY ./sdk/vcpkg.json  ${WORKDIR}/vcpkg.json
-# RUN vcpkg install
 
 
-)",
-			   {{"BOOTSTRAP_RUNTIME_SRC_DIR", BOOTSTRAP_RUNTIME_SRC_DIR}});
+DOCKER_FILE_DEF InstallDeps = R"(
+COPY ./cmake/AtlasNetSetup.sh  ${WORKDIR}/AtlasNetSetup.sh
+RUN chmod +x ./AtlasNetSetup.sh
+RUN ./AtlasNetSetup.sh
+)";
 DOCKER_FILE_DEF CopyBuild_StripLib = R"(
 COPY --from=builder ${WORKDIR}/bin/ .
-COPY --from=builder ${WORKDIR}/deps/ ${WORKDIR}/deps/
-ENV LD_LIBRARY_PATH="${WORKDIR}/deps:${LD_LIBRARY_PATH}"
+#COPY --from=builder ${WORKDIR}/deps/ ${WORKDIR}/deps/
+#ENV LD_LIBRARY_PATH="${WORKDIR}/deps:${LD_LIBRARY_PATH}"
 )";
 
 DOCKER_FILE_DEF REGISTRY_STACK = MacroParse(

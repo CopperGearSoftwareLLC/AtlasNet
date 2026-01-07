@@ -17,13 +17,13 @@ target_include_directories(${_target_name}
   PUBLIC
     "${CMAKE_CURRENT_SOURCE_DIR}/src"
 )
-find_package(redis++ CONFIG REQUIRED)
-find_package(hiredis CONFIG REQUIRED)
+#find_package(redis++ CONFIG REQUIRED)
+#find_package(hiredis CONFIG REQUIRED)
 
 
 target_link_libraries(${_target_name}
-redis++::redis++_static
-hiredis::hiredis
+#redis++::redis++_static
+#hiredis::hiredis
 AtlasNetGlobal
 Database
 Debug

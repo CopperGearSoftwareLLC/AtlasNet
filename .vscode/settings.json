@@ -7,13 +7,13 @@
   "cmake.debugConfig": {
     "cwd": "${workspaceFolder}"
   },
-  //"cmake.configureArgs": [
-  //   "-DCMAKE_TOOLCHAIN_FILE=$env{VCPKG_ROOT}/scripts/buildsystems/vcpkg.cmake",
+  "cmake.configureArgs": [
+     "-DCMAKE_TOOLCHAIN_FILE=${workspaceFolder}/AtlasNet/AtlasNetToolchain.cmake",
   //  "-DVCPKG_TARGET_TRIPLET=wasm32-emscripten",
   //  "-DVCPKG_CHAINLOAD_TOOLCHAIN_FILE=$env{EMSDK}/upstream/emscripten/cmake/Modules/Platform/Emscripten.cmake",
   //  "-DCMAKE_C_COMPILER=$env{EMSDK}/upstream/emscripten/emcc",
   //  "-DCMAKE_CXX_COMPILER=$env{EMSDK}/upstream/emscripten/em++"
-  //],
+  ],
   "cmake.configureSettings": {
     "CMAKE_C_COMPILER": "clang",
     "CMAKE_CXX_COMPILER": "clang++"

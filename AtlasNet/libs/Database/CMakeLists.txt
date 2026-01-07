@@ -18,13 +18,29 @@ target_include_directories(${_target_name}
     "${CMAKE_CURRENT_SOURCE_DIR}/src"
 )
 
-find_package(redis++ CONFIG REQUIRED)
-find_package(hiredis CONFIG REQUIRED)
+set(REDIS_PLUS_PLUS_ROOT "${CMAKE_SOURCE_DIR}/deps/redis-plus-plus_install")
+set(HIREDIS_ROOT "${CMAKE_SOURCE_DIR}/deps/hiredis_install")  # hiredis is inside the same install
 
-
+# Add include directories
+target_include_directories(${_target_name} PUBLIC
+    "${REDIS_PLUS_PLUS_ROOT}/include"
+    "${HIREDIS_ROOT}/include"
+)
+message(STATUS "REDIS_PLUS_PLUS_ROOT = ${REDIS_PLUS_PLUS_ROOT}")
+# Add library directories
+link_directories("${REDIS_PLUS_PLUS_ROOT}/lib")
+find_package(PkgConfig REQUIRED)
+pkg_check_modules(LIBUV REQUIRED libuv)
+find_package(OpenSSL REQUIRED)
+find_package(Protobuf REQUIRED)
+# Manually link the static libraries
 target_link_libraries(${_target_name}
-redis++::redis++_static
-$<IF:$<TARGET_EXISTS:libuv::uv_a>,libuv::uv_a,libuv::uv>
-hiredis::hiredis
-AtlasNetGlobal
+    "${REDIS_PLUS_PLUS_ROOT}/lib/libredis++.a"
+    "${HIREDIS_ROOT}/lib/libhiredis_ssld.a"
+    "${HIREDIS_ROOT}/lib/libhiredisd.a"
+    ${LIBUV_LIBRARIES} 
+    AtlasNetGlobal
+    OpenSSL::SSL
+    OpenSSL::Crypto
+    ${Protobuf_LIBRARIES}
 )

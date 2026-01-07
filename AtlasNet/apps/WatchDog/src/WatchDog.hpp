@@ -1,5 +1,5 @@
 #pragma once
-#include <steam/steamtypes.h>
+
 #include <stop_token>
 #include <thread>
 #include "Heuristic/IHeuristic.hpp"

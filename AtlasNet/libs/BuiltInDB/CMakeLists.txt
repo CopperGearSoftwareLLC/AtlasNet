@@ -13,10 +13,18 @@ file(GLOB_RECURSE _sources CONFIGURE_DEPENDS
 
 add_library(${_target_name} ${_sources})
 # Optional, but common: local includes
+
 target_include_directories(${_target_name}
   PUBLIC
-    "${CMAKE_CURRENT_SOURCE_DIR}/src"
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/src>
+    $<INSTALL_INTERFACE:include>
 )
+#install(TARGETS ${_target_name}
+#    EXPORT AtlasNetTargets
+#    ARCHIVE DESTINATION ${ATLASNET_INSTALL_LIB}
+#    LIBRARY DESTINATION ${ATLASNET_INSTALL_LIB}
+#    COMPONENT ${ATLASNET_INSTALL_BOOTSTRAP_CMD}
+#)
 
 
 target_link_libraries(${_target_name}

@@ -1,6 +1,5 @@
 #include "Interlink.hpp"
 
-#include <steam/steamtypes.h>
 
 #include <atomic>
 #include <boost/describe/enum_to_string.hpp>

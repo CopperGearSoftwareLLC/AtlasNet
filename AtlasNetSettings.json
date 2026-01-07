@@ -1,6 +1,6 @@
 {
     "TLSDirectory": "temp/keys",
-    "GameServerTaskFile": "dev/Minecraft-fabric-neoforge/fabric-server.json",
+    "GameServerTaskFile": "Examples/Minecraft/fabric-server.json",
     "Workers--": [
         {
             "Name": "Dumpster",

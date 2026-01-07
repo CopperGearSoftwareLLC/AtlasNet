@@ -30,22 +30,22 @@ add_custom_command(
     VERBATIM
 )
 
-set(ENV_FILE "${CARTOGRAPH_WEB_ROOT}/.env")
-
-file(WRITE "${ENV_FILE}" "")
-foreach(def IN LISTS GLOBAL_DEFINITIONS)
-    # Split key/value
-    string(REGEX MATCH "^[^=]+" key ${def})
-    string(REGEX REPLACE "^[^=]+=" "" value ${def})
-    
-    # Remove quotes from CMake string if needed
-    string(REGEX REPLACE "^\"|\"$" "" value ${value})
-
-    # Next.js requires env vars starting with NEXT_PUBLIC_ to expose to client-side
-    set(js_key "NEXT_PUBLIC_${key}")
-    file(APPEND "${ENV_FILE}" "${js_key}=${value}\n")
-endforeach()
-message(STATUS "Generated Next.js .env file at ${ENV_FILE}")
+#set(ENV_FILE "${CARTOGRAPH_WEB_ROOT}/.env")
+#
+#file(WRITE "${ENV_FILE}" "")
+#foreach(def IN LISTS GLOBAL_DEFINITIONS)
+#    # Split key/value
+#    string(REGEX MATCH "^[^=]+" key ${def})
+#    string(REGEX REPLACE "^[^=]+=" "" value ${def})
+#    
+#    # Remove quotes from CMake string if needed
+#    string(REGEX REPLACE "^\"|\"$" "" value ${value})
+#
+#    # Next.js requires env vars starting with NEXT_PUBLIC_ to expose to client-side
+#    set(js_key "NEXT_PUBLIC_${key}")
+#    file(APPEND "${ENV_FILE}" "${js_key}=${value}\n")
+#endforeach()
+#message(STATUS "Generated Next.js .env file at ${ENV_FILE}")
 # --- Next.js helpers (unchanged, but your -E chdir usage is correct) ---
 find_program(NPM_EXECUTABLE npm REQUIRED)
 # Optional: also ensure node exists

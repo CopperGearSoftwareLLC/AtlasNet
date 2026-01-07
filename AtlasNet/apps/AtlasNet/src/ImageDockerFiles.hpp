@@ -144,56 +144,55 @@ ENV CC=clang
 ENV CXX=clang++
 #--mount=type=cache,target=${WORKDIR}/build
 
-RUN --mount=type=cache,target=${WORKDIR}/build/vcpkg_installed cmake -S . -B ${WORKDIR}/build -DCMAKE_BUILD_TYPE=Debug ${CMAKE_ARGS}
+RUN cmake -S . -B ${WORKDIR}/build -DCMAKE_BUILD_TYPE=Debug ${CMAKE_ARGS}
 
 
-RUN --mount=type=cache,target=${WORKDIR}/build/vcpkg_installed cmake --build build --target help && cmake --build ${WORKDIR}/build --parallel --target ${BUILD_PROJECT}
+RUN cmake --build ${WORKDIR}/build --parallel --target ${BUILD_PROJECT}
 
 
-RUN --mount=type=cache,target=${WORKDIR}/build/vcpkg_installed cmake --install ${WORKDIR}/build --component ${BUILD_PROJECT} --prefix ${WORKDIR}/bin
+RUN cmake --install ${WORKDIR}/build --component ${BUILD_PROJECT} --prefix ${WORKDIR}/bin
 
 
-RUN --mount=type=cache,target=${WORKDIR}/build/vcpkg_installed mkdir -p "${WORKDIR}/deps" && \
-    cd "${WORKDIR}/build/vcpkg_installed" && \
-    find . -type f -name '*.so*' | while read -r f; do \
-        base=$(basename "$f"); \
-        cp "$f" "${WORKDIR}/deps/$base"; \
-    done
-
+# 8RUN mkdir -p /usr/local/lib && \
+# 8    find /deps -maxdepth 4 -type f -name '*.so*' | while read -r f; do \
+# 8        cp "$f" /usr/local/lib/; \
+# 8    done && \
+# 8    # Update the dynamic linker cache
+# 8    ldconfig
 
 )DOCKER";
 
 DOCKER_FILE_DEF WatchDogDockerFile = MacroParse(
-	Generic_Builder_Header + GET_REQUIRED_BUILD_PKGS + VCPKG_Install + COPY_ATLASNET_SRC +
+	Generic_Builder_Header + GET_REQUIRED_BUILD_PKGS + InstallDeps + COPY_ATLASNET_SRC +
 		BUILD_ATLASNET_SRC + Generic_Run_Header + GET_REQUIRED_RUN_PKGS + CopyBuild_StripLib +
 		R"(ENTRYPOINT ["${WORKDIR}/bin/WatchDog"])",
 	{{"OS_VERSION", _DOCKER_OS_}, {"WORKDIR", _DOCKER_WORKDIR_}, {"BUILD_PROJECT", "WatchDog"},{"CMAKE_ARGS",""}});
 
 DOCKER_FILE_DEF ProxyDockerFile = MacroParse(
-	Generic_Builder_Header + GET_REQUIRED_BUILD_PKGS + VCPKG_Install + COPY_ATLASNET_SRC +
+	Generic_Builder_Header + GET_REQUIRED_BUILD_PKGS + InstallDeps + COPY_ATLASNET_SRC +
 		BUILD_ATLASNET_SRC + Generic_Run_Header + GET_REQUIRED_RUN_PKGS + CopyBuild_StripLib +
 		R"(ENTRYPOINT ["${WORKDIR}/bin/Proxy"])",
 	{{"OS_VERSION", _DOCKER_OS_}, {"WORKDIR", _DOCKER_WORKDIR_}, {"BUILD_PROJECT", "Proxy"},{"CMAKE_ARGS",""}});
 
 DOCKER_FILE_DEF ClusterDBDockerFile = MacroParse(
-	Generic_Builder_Header + GET_REQUIRED_BUILD_PKGS + VCPKG_Install + COPY_ATLASNET_SRC +
+	Generic_Builder_Header + GET_REQUIRED_BUILD_PKGS + InstallDeps + COPY_ATLASNET_SRC +
 		BUILD_ATLASNET_SRC + Generic_Run_Header + GET_REQUIRED_RUN_PKGS + CopyBuild_StripLib +
 		R"(ENTRYPOINT ["${WORKDIR}/bin/ClusterDB"])",
 	{{"OS_VERSION", _DOCKER_OS_}, {"WORKDIR", _DOCKER_WORKDIR_}, {"BUILD_PROJECT", "ClusterDB"},{"CMAKE_ARGS",""}});
 
 DOCKER_FILE_DEF GameCoordinatorDockerFile = MacroParse(
-	Generic_Builder_Header + GET_REQUIRED_BUILD_PKGS + VCPKG_Install + COPY_ATLASNET_SRC +
+	Generic_Builder_Header + GET_REQUIRED_BUILD_PKGS + InstallDeps + COPY_ATLASNET_SRC +
 		BUILD_ATLASNET_SRC + Generic_Run_Header + GET_REQUIRED_RUN_PKGS + CopyBuild_StripLib +
 		R"(ENTRYPOINT [""])",
 	{{"OS_VERSION", _DOCKER_OS_}, {"WORKDIR", _DOCKER_WORKDIR_}, {"BUILD_PROJECT", "WatchDog"},{"CMAKE_ARGS",""}});
 
 DOCKER_FILE_DEF ShardDockerFile = MacroParse(
-	Generic_Builder_Header + GET_REQUIRED_BUILD_PKGS + VCPKG_Install + COPY_ATLASNET_SRC +
+	Generic_Builder_Header + GET_REQUIRED_BUILD_PKGS + InstallDeps + COPY_ATLASNET_SRC +
 		BUILD_ATLASNET_SRC + Generic_Run_Header + GET_REQUIRED_RUN_PKGS + CopyBuild_StripLib,
 	{{"OS_VERSION", _DOCKER_OS_}, {"WORKDIR", _DOCKER_WORKDIR_}, {"BUILD_PROJECT", "Shard"},{"CMAKE_ARGS",""}});
 
 DOCKER_FILE_DEF CartographDockerFile = MacroParse(
-	Generic_Builder_Header + GET_REQUIRED_BUILD_PKGS + VCPKG_Install + COPY_ATLASNET_SRC +
+	Generic_Builder_Header + GET_REQUIRED_BUILD_PKGS + InstallDeps + COPY_ATLASNET_SRC +
 		BUILD_ATLASNET_SRC + Generic_Run_Header + GET_REQUIRED_RUN_PKGS + R"(WORKDIR ${WORKDIR}/web
 ENV NODE_ENV=development
 RUN apt update \
@@ -203,9 +202,11 @@ RUN apt update \
  && node -v \
  && npm -v
 # Copy built app + node_modules
-COPY --from=builder ${WORKDIR}/apps/Cartograph/web ./
-RUN rm -rf ./node_modules ./.next ./native-server/node_modules
+COPY runtime/Cartograph/web/. ./
 RUN  npm install
+COPY --from=builder ${WORKDIR}/apps/Cartograph/web/nextjs ./nextjs/
+#COPY --from=builder ${WORKDIR}/apps/Cartograph/web ./
+#RUN rm -rf ./node_modules ./.next ./native-server/node_modules
 # RUN npm run build
 # Next.js default port
 EXPOSE 3000

@@ -10,18 +10,23 @@ file(GLOB_RECURSE _sources CONFIGURE_DEPENDS
   "${CMAKE_CURRENT_SOURCE_DIR}/src/*.cxx"
   "${CMAKE_CURRENT_SOURCE_DIR}/src/*.cpp"
 )
+set(GAMENETWORKINGSOCKETS_ROOT "${CMAKE_SOURCE_DIR}/deps/GameNetworkingSockets_install")
 
 add_library(${_target_name} ${_sources})
 # Optional, but common: local includes
 target_include_directories(${_target_name}
   PUBLIC
     "${CMAKE_CURRENT_SOURCE_DIR}/src"
+    "${GAMENETWORKINGSOCKETS_ROOT}/include"
 )
-
-find_package(GameNetworkingSockets CONFIG REQUIRED)
 target_link_libraries(${_target_name}
 InternalDB
 Docker
-GameNetworkingSockets::GameNetworkingSockets_s # _s means static
+    "${GAMENETWORKINGSOCKETS_ROOT}/lib/libGameNetworkingSockets_s.a"
 Debug
 )
+
+install(TARGETS ${_target_name}
+    RUNTIME DESTINATION ${ATLASNET_INSTALL_BIN}
+    COMPONENT ${ATLASNET_INSTALL_BOOTSTRAP_CMD}
+    )

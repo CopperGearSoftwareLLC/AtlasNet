@@ -1,8 +1,7 @@
 # Global fallback flags for files not in AtlasNet
-FallbackFlags: [-std=c++20]
 
 # Files in AtlasNet use the build compile_commands.json
 If:
   PathMatch: "AtlasNet/.*"
 CompileFlags:
-  CompilationDatabase: "AtlasNet/build/compile_commands.json"
+  CompilationDatabase: "/workspaces/AtlasNetNew/AtlasNet/build/compile_commands.json"

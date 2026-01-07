@@ -2,12 +2,7 @@ cmake_minimum_required(VERSION 3.16)
 
 set(TARGET_NAME AtlasNetGlobal)
 
-# Use user-defined name if provided, otherwise use folder name
-if(NOT DEFINED TARGET_NAME)
-    get_filename_component(TARGET_NAME "${CMAKE_CURRENT_SOURCE_DIR}" NAME)
-endif()
-
-# Recursively collect sources under ./src
+# Collect sources
 file(GLOB_RECURSE _sources CONFIGURE_DEPENDS
   "${CMAKE_CURRENT_SOURCE_DIR}/src/*.c"
   "${CMAKE_CURRENT_SOURCE_DIR}/src/*.cc"
@@ -19,30 +14,33 @@ file(GLOB_RECURSE _sources CONFIGURE_DEPENDS
 
 add_library(${TARGET_NAME} ${_sources})
 
-# Optional, but common: local includes
+# Find Boost first
+set(BOOST_ROOT "${CMAKE_SOURCE_DIR}/deps/boost_install")  # path to your local Boost
+set(BOOST_INCLUDEDIR "${BOOST_ROOT}/include")
+set(BOOST_LIBRARYDIR "${BOOST_ROOT}/lib")
+
+message(STATUS ${BOOST_INCLUDEDIR})
+# Optional: Node.js includes (if needed)
+# target_include_directories(${TARGET_NAME} PUBLIC ${NODE_INCLUDE_DIR} ${NODE_ADDON_API_INCLUDE})
+
+# Include directories
 target_include_directories(${TARGET_NAME}
-  PUBLIC
-    "${CMAKE_CURRENT_SOURCE_DIR}/src"
-    ${NODE_INCLUDE_DIR}
-    ${NODE_ADDON_API_INCLUDE}
+    PUBLIC
+        "${CMAKE_CURRENT_SOURCE_DIR}/src"
+        ${BOOST_INCLUDEDIR}   # now Boost headers are included
+)
+file(GLOB BOOST_LIBS "${BOOST_LIBRARYDIR}/*.a")
+# Link libraries
+target_link_libraries(${TARGET_NAME}
+    PUBLIC
+        ${BOOST_LIBS}      # link uuid if needed
 )
 
-find_package(Boost REQUIRED COMPONENTS container)
-find_package(Boost REQUIRED COMPONENTS stacktrace_addr2line)
-find_package(Boost REQUIRED COMPONENTS describe)
-find_package(Boost REQUIRED COMPONENTS type_traits)
-find_package(Boost REQUIRED COMPONENTS uuid)
-find_package(Boost REQUIRED COMPONENTS multi_index)
+# Other dependencies
 find_package(glm CONFIG REQUIRED)
 find_package(nlohmann_json CONFIG REQUIRED)
 target_link_libraries(${TARGET_NAME}
-  PUBLIC
-    Boost::container
-    Boost::stacktrace_addr2line
-    Boost::describe
-    Boost::type_traits
-    Boost::multi_index
-    Boost::uuid
-    glm::glm
-    nlohmann_json::nlohmann_json
+    PUBLIC
+        glm::glm
+        nlohmann_json::nlohmann_json
 )
