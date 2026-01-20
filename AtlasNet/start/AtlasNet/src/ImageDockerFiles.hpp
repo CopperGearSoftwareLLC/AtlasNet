@@ -171,13 +171,13 @@ RUN cmake --install ${WORKDIR}/build --component ${BUILD_PROJECT} --prefix ${WOR
 DOCKER_FILE_DEF WatchDogDockerFile = MacroParse(
 	Generic_Builder_Header + GET_REQUIRED_BUILD_PKGS + InstallDeps +SETUP_ATLASNET_PRJ+ COPY_ATLASNET_SRC +
 		BUILD_ATLASNET_SRC + Generic_Run_Header + GET_REQUIRED_RUN_PKGS + CopyBuild_StripLib +
-		R"(ENTRYPOINT ["${WORKDIR}/bin/WatchDog"])",
+		R"(ENTRYPOINT ["${WORKDIR}/bin/watchdog"])",
 	{{"OS_VERSION", _DOCKER_OS_}, {"WORKDIR", _DOCKER_WORKDIR_}, {"BUILD_PROJECT", "watchdog"},{"CMAKE_ARGS",""}});
 
 DOCKER_FILE_DEF ProxyDockerFile = MacroParse(
 	Generic_Builder_Header + GET_REQUIRED_BUILD_PKGS + InstallDeps +SETUP_ATLASNET_PRJ+ COPY_ATLASNET_SRC +
 		BUILD_ATLASNET_SRC + Generic_Run_Header + GET_REQUIRED_RUN_PKGS + CopyBuild_StripLib +
-		R"(ENTRYPOINT ["${WORKDIR}/bin/Proxy"])",
+		R"(ENTRYPOINT ["${WORKDIR}/bin/proxy"])",
 	{{"OS_VERSION", _DOCKER_OS_}, {"WORKDIR", _DOCKER_WORKDIR_}, {"BUILD_PROJECT", "proxy"},{"CMAKE_ARGS",""}});
 
 
