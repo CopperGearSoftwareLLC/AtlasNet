@@ -29,6 +29,8 @@ target_include_directories(${TARGET_NAME}
 
 target_link_libraries(${TARGET_NAME}
     Heuristic
+    Interlink
+    AtlasNetGlobal
 )
 
 add_swig_library_for_target(${TARGET_NAME}
@@ -36,11 +38,12 @@ add_swig_library_for_target(${TARGET_NAME}
         "std_vector.i"
         "std_map.i"
         "std_pair.i"
+        "std_string.i"
     STL_TEMPLATES
         "std::vector<IBoundsDrawShape>"
         "std::vector<std::pair<float,float>>"
         "std::pair<float,float>"
-    #   "std::vector<std::string>"
+        "std::vector<std::string>"
     #   "std::unordered_map<IBounds::BoundsID, ByteReader>"
 )
 

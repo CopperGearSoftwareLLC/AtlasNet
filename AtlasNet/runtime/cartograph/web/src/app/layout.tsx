@@ -75,6 +75,13 @@ export default function RootLayout({
                 <Server className="h-4 w-4" />
                 <span>Workers</span>
               </Link>
+              <Link
+                href="/network"
+                className="flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-slate-900"
+              >
+                <Server className="h-4 w-4" />
+                <span>Network</span>
+              </Link>
             </nav>
 
             <div className="px-3 text-xs text-slate-500">

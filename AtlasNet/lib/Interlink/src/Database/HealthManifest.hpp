@@ -71,7 +71,7 @@ class HealthManifest : public Singleton<HealthManifest>
 	void GetExpiredPings(std::vector<KeyType>& out_expired);
 
 	template <typename KeyType = std::string>
-	void GetLivePings(std::vector<KeyType>& out_live);
+	void GetLivePings(std::vector<KeyType>& out_live); // this one
 
 	template <typename Keytype = std::string>
 	void RemovePing(const Keytype& key);
@@ -163,7 +163,7 @@ inline void HealthManifest::GetLivePings(std::vector<KeyType>& out_live)
 
 	for (const auto& [member, scoreOpt] : all_pings)
 	{
-		if (!scoreOpt || *scoreOpt > now)
+		if (scoreOpt > now)
 		{
 			continue;
 		}
