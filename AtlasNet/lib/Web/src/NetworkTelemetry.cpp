@@ -3,6 +3,7 @@
 #include <unordered_map>
 #include "Database/HealthManifest.hpp"
 #include "Telemetry/NetworkManifest.hpp"
+#include "Telemetry/ConnectionTelemetry.hpp"
 #include "Serialize/ByteReader.hpp"
 #include "InterlinkIdentifier.hpp"
 
@@ -19,12 +20,22 @@ void NetworkTelemetry::GetLivePingIDs(std::vector<std::string>& out_live_ids) {
 
         std::cerr << id.ToString() << std::endl;
 
-        // for each live ping, grab all network telemetry
-
         out_live_ids.push_back(id.ToString());
     }
 
     std::cerr << "Live Ping IDs: " << out_live_ids.size() << std::endl;
+}
+
+void NetworkTelemetry::GetAllTelemetry(std::vector<std::vector<std::string>>& out_telemetry) {
+    NetworkManifest::Get().GetAllTelemetry(out_telemetry);
+
+
+    for (const auto& telemetry_entry : out_telemetry) {
+        std::cerr << "Telemetry Entry:" << std::endl;
+        for (const auto& field : telemetry_entry) {
+            std::cerr << "  " << field << std::endl;
+        }
+    }
 }
 
 void NetworkTelemetry::GetLivePingUploadSpeed(float &out_upload_kbps) {

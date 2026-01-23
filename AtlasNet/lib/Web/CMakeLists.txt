@@ -44,6 +44,7 @@ add_swig_library_for_target(${TARGET_NAME}
         "std::vector<std::pair<float,float>>"
         "std::pair<float,float>"
         "std::vector<std::string>"
+        "std::vector<std::vector<std::string>>"
     #   "std::unordered_map<IBounds::BoundsID, ByteReader>"
 )
 

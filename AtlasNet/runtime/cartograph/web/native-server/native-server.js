@@ -20,14 +20,16 @@ app.use(cors()); // allow your frontend to call it
 
 app.get('/networktelemetry', (req, res) => {
   try {
-    const { NetworkTelemetry, std_vector_std_string_ } = addon;
+    const { NetworkTelemetry, std_vector_std_string_, std_vector_std_vector_std_string__ } = addon;
 
     const nt = new NetworkTelemetry();
 
     // SWIG string vector
     const idsVec = new std_vector_std_string_();
-    nt.GetLivePingIDs(idsVec);
+    const telemetryVec = new std_vector_std_vector_std_string__();
 
+    nt.GetLivePingIDs(idsVec);
+    nt.GetAllTelemetry(telemetryVec);
     const ids = [];
     for (let i = 0; i < idsVec.size(); i++) {
       //ids.push(String(idsVec.get(i)));
