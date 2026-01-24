@@ -38,43 +38,45 @@ public:
 			});
 	}
 
-    void TelemetryUpdate(const InterLinkIdentifier& identifier)
-	{
-        std::string_view s_b, s_id;
-        // set data from interlink
-        std::vector<ConnectionTelemetry> out;
-        Interlink::Get().GetConnectionTelemetry(out);
-		ByteWriter bw;
+void TelemetryUpdate(const InterLinkIdentifier& identifier)
+{
+    // Gather telemetry
+    std::vector<ConnectionTelemetry> connections;
+    Interlink::Get().GetConnectionTelemetry(connections);
 
-        // testing with 1 entry
-        if (out.size() > 0)
-        {
-            out[0].Serialize(bw);
-            std::cerr << out[0].targetId << std::endl;
-            std::cerr << out[0].pingMs << std::endl;
-            std::cerr << out[0].inBytesPerSec << std::endl;
-            std::cerr << out[0].outBytesPerSec << std::endl;
-        }
-        // may prepend connection count in future
-        //for (const auto& t : out) {
-        //    t.Serialize(bw);
-        //    std::cerr << t.targetId << std::endl;
-        //}
-        s_b = bw.as_string_view();
+    // ============================
+    // Serialize VALUE (connections)
+    // ============================
+    ByteWriter valueBW;
+    valueBW.u32(static_cast<uint32_t>(connections.size()));
+    for (const auto& t : connections)
+    {
+        t.Serialize(valueBW);
+    }
 
-        ByteWriter bw_id;
-		bw_id.str(identifier.ID);
-		s_id = bw_id.as_string_view();
+    // ============================
+    // Serialize FIELD (shard ID)
+    // ============================
+    ByteWriter fieldBW;
+    fieldBW.str(identifier.ID);
 
-        // write to internal db
-        // needs to overwrite val using identity + target (concat?) as name
-		const auto setResult = InternalDB::Get()->HSet(NetworkTelemetryTable, s_id, s_b);
-		if (setResult != 0)
-		{
-			std::printf("Failed to update network telemetry in Network Manifest. HSET result: %lli",setResult);
-		}
-	
-	}
+    // ============================
+    // Write to Redis (binary-safe)
+    // ============================
+    const auto result = InternalDB::Get()->HSet(
+        NetworkTelemetryTable,
+        fieldBW.as_string_view(),   // binary field
+        valueBW.as_string_view()    // binary value
+    );
+
+    if (result != 0)
+    {
+        std::printf(
+            "Failed to update network telemetry. HSET result: %lli\n",
+            result
+        );
+    }
+}
 
     //=================================
 	//===          GET              ===
@@ -82,35 +84,57 @@ public:
 	void GetAllTelemetry(std::vector<std::vector<std::string>>& out_telemetry);
 };
 
-// maps as target id to serialized telemetry data
-inline void NetworkManifest::GetAllTelemetry(std::vector<std::vector<std::string>>& out_telemetry)
+// Produces rows of telemetry, one row per connection.
+// Column 0 is shardId (the Redis hash field), then ConnectionTelemetry fields after it.
+void NetworkManifest::GetAllTelemetry(
+    std::vector<std::vector<std::string>>& out_telemetry)
 {
-    ConnectionTelemetry telemetry;
     out_telemetry.clear();
-    
-    // assume 1 or none telemetry entry for now
-    const auto All_Telemetry = InternalDB::Get()->HGetAll(NetworkTelemetryTable);
 
-    for (const auto& pair : All_Telemetry)
+    const auto all = InternalDB::Get()->HGetAll(NetworkTelemetryTable);
+
+    for (const auto& pair : all)
     {
-        ByteReader br(pair.second);
-        telemetry.Deserialize(br);
+        // ============================
+        // Deserialize FIELD (shard ID)
+        // ============================
+        ByteReader fieldBR(pair.first);
+        std::string shardId = fieldBR.str();
 
-        std::vector<std::string> telemetry_data;
-        telemetry_data.push_back(telemetry.IdentityId);
-        telemetry_data.push_back(telemetry.targetId);
-        telemetry_data.push_back(std::to_string(telemetry.pingMs));
-        telemetry_data.push_back(std::to_string(telemetry.inBytesPerSec));
-        telemetry_data.push_back(std::to_string(telemetry.outBytesPerSec));
-        telemetry_data.push_back(std::to_string(telemetry.inPacketsPerSec));
-        telemetry_data.push_back(std::to_string(telemetry.pendingReliableBytes));
-        telemetry_data.push_back(std::to_string(telemetry.pendingUnreliableBytes));
-        telemetry_data.push_back(std::to_string(telemetry.sentUnackedReliableBytes));
-        telemetry_data.push_back(std::to_string(telemetry.queueTimeUsec));
-        telemetry_data.push_back(std::to_string(telemetry.qualityLocal));
-        telemetry_data.push_back(std::to_string(telemetry.qualityRemote));
-        telemetry_data.push_back(std::to_string(telemetry.state));
+        // ============================
+        // Deserialize VALUE (connections)
+        // ============================
+        ByteReader valueBR(pair.second);
+        const uint32_t count = valueBR.u32();
 
-        out_telemetry.push_back(telemetry_data);
+        for (uint32_t i = 0; i < count; ++i)
+        {
+            ConnectionTelemetry t;
+            t.Deserialize(valueBR);
+
+            std::vector<std::string> row;
+            row.reserve(13);
+
+            //row.push_back(shardId);
+            row.push_back(t.IdentityId);
+            row.push_back(t.targetId);
+            row.push_back(std::to_string(t.pingMs));
+            row.push_back(std::to_string(t.inBytesPerSec));
+            row.push_back(std::to_string(t.outBytesPerSec));
+            row.push_back(std::to_string(t.inPacketsPerSec));
+            row.push_back(std::to_string(t.pendingReliableBytes));
+            row.push_back(std::to_string(t.pendingUnreliableBytes));
+            row.push_back(std::to_string(t.sentUnackedReliableBytes));
+            row.push_back(std::to_string(t.queueTimeUsec));
+            row.push_back(std::to_string(t.qualityLocal));
+            row.push_back(std::to_string(t.qualityRemote));
+            row.push_back(std::to_string(t.state));
+
+            for (auto& field : row) {
+                std::cerr << "  " << field << std::endl;
+            }
+
+            out_telemetry.push_back(std::move(row));
+        }
     }
 }

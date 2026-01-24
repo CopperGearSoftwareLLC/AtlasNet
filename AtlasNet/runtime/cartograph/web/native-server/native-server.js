@@ -40,8 +40,6 @@ app.get('/networktelemetry', (req, res) => {
   try {
     const { NetworkTelemetry, std_vector_std_string_, std_vector_std_vector_std_string__ } = addon;
 
-    //const nt = new NetworkTelemetry();
-
     // SWIG string vector
     const idsVec = new std_vector_std_string_();
     const telemetryVec = new std_vector_std_vector_std_string__();
@@ -51,10 +49,7 @@ app.get('/networktelemetry', (req, res) => {
     const ids = [];
     for (let i = 0; i < idsVec.size(); i++) {
       ids.push(String(idsVec.get(i)));
-      //console.log(idsVec.get(i));
-
     }
-    //console.log(ids);
 
     // Convert telemetryVec: std::vector<std::vector<std::string>> -> string[][]
     const allRows = [];
@@ -64,7 +59,6 @@ app.get('/networktelemetry', (req, res) => {
       for (let j = 0; j < rowVec.size(); j++) 
       {
         row.push(String(rowVec.get(j)));
-        //console.log(String(rowVec.get(j)));
       }
       allRows.push(row);
     }
@@ -83,13 +77,11 @@ app.get('/networktelemetry', (req, res) => {
         rowsByShard.set(shardId, []);
     }
     rowsByShard.get(shardId).push(decoded);
-    console.log(`Decoded row for shard ${shardId}:`, decoded);
+    //console.log(`Decoded row for shard ${shardId}:`, decoded);
     }
 
-    // Upload/Download: your C++ methods currently do nothing (commented out),
+    // Upload/Download: currently do nothing,
     // so hardcode here for now OR return null/0 until implemented.
-    // For your current UI, you want per-shard speeds, so map ids -> fake speeds.
-
     const telemetry = ids.map((id, idx) => ({
       shardId: id,
       downloadKbps: 200 + idx * 50, // fake for now
