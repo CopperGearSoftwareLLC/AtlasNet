@@ -55,8 +55,17 @@ export default function NetworkTelemetryPage() {
         const data = (await res.json()) as ShardTelemetry[];
 
         if (!alive) return;
-
+        
+        // uncomment for proper implementation
         setLatestTelemetry(data);
+        // remove later. testing multi connections in UI
+        //setLatestTelemetry(
+        //  data.map(shard => ({
+        //    ...shard,
+        //    connections: data.flatMap(s => s.connections),
+        //  }))
+        //);
+
 
         setShards(prev => {
           const prevById = new Map(prev.map(s => [s.shardId, s]));

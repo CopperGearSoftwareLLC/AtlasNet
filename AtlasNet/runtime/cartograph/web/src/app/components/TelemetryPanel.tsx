@@ -1,27 +1,25 @@
 'use client';
 
+import { useEffect } from 'react';
 import type { ShardTelemetry } from '../lib/networkTelemetryTypes';
 
-const CONNECTION_FIELDS = [
-  { key: 'IdentityId', label: 'IdentityId' },
-  { key: 'targetId', label: 'targetId' },
-  { key: 'pingMs', label: 'ping (ms)', align: 'right' },
-  { key: 'inBytesPerSec', label: 'In KB/s', align: 'right' },
-  { key: 'outBytesPerSec', label: 'Out KB/s', align: 'right' },
-  { key: 'inPacketsPerSec', label: 'In Packets/s', align: 'right' },
-  { key: 'pendingReliableBytes', label: 'Pending Reliable Bytes', align: 'right' },
-  { key: 'pendingUnreliableBytes', label: 'Pending Unreliable Bytes', align: 'right' },
-  { key: 'sentUnackedReliableBytes', label: 'Sent Unacked Reliable Bytes', align: 'right' },
-  { key: 'queueTimeUsec', label: 'Queue Time (us)', align: 'right' },
-  { key: 'qualityLocal', label: 'Local Quality', align: 'right' },
-  { key: 'qualityRemote', label: 'Remote Quality', align: 'right' },
-  { key: 'state', label: 'State' },
-] as const;
-
-function getMaxCols(rows: string[][]): number {
-  let max = 0;
-  for (const r of rows) max = Math.max(max, r.length);
-  return max;
+function Metric({
+  label,
+  value,
+  mono = true,
+}: {
+  label: string;
+  value: string | number;
+  mono?: boolean;
+}) {
+  return (
+    <div>
+      <div className="text-xs text-slate-400">{label}</div>
+      <div className={mono ? 'font-mono text-sm text-slate-200' : 'text-sm'}>
+        {value}
+      </div>
+    </div>
+  );
 }
 
 export function TelemetryPanel({
@@ -31,95 +29,106 @@ export function TelemetryPanel({
   shard: ShardTelemetry;
   onClose: () => void;
 }) {
-  const rows = shard.connections ?? [];
-  const colCount = getMaxCols(rows);
-  const headers = Array.from({ length: colCount }, (_, i) => `F${i}`);
+  // ✅ ESC key support (minimal, safe)
+  useEffect(() => {
+    function onKeyDown(e: KeyboardEvent) {
+      if (e.key === 'Escape') {
+        onClose();
+      }
+    }
+
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, [onClose]);
 
   return (
-    <aside
-      style={{
-        position: 'fixed',
-        right: 0,
-        top: 0,
-        width: '85%',
-        height: '100%',
-        background: '#111',
-        color: '#eee',
-        borderLeft: '1px solid #333',
-        padding: 12,
-        overflow: 'auto',
-        zIndex: 1000,
-      }}
-      //refactor to have connection table display as rows, not columns
+    // ✅ Fullscreen overlay
+    <div
+      className="fixed inset-0 z-50 bg-black/40"
+      onClick={onClose} // click outside closes
     >
-      <header style={{ display: 'flex', justifyContent: 'space-between' }}>
-        <h3>Shard {shard.shardId}</h3>
-        <button onClick={onClose}>Close</button>
-      </header>
-
-      <table>
-        <thead>
-          <tr>
-            {CONNECTION_FIELDS.map(f => (
-              <th key={f.key}>{f.label}</th>
-            ))}
-          </tr>
-        </thead>
-
-        <tbody>
-          {shard.connections.map((c, i) => (
-            <tr key={i}>
-              {CONNECTION_FIELDS.map(f => (
-                <td key={f.key} style={{ textAlign: f.align ?? 'left' }}>
-                  {c[f.key]}
-                </td>
-              ))}
-            </tr>
-          ))}
-        </tbody>
-      </table>
-      <div style={{ marginBottom: 8, fontFamily: 'monospace', fontSize: 12 }}>
-        <div>rows: {rows.length}</div>
-      </div>
-
-      <table
-        style={{
-          width: '100%',
-          borderCollapse: 'collapse',
-          fontSize: 12,
-          fontFamily: 'monospace',
-        }}
+      {/* ✅ Panel */}
+      <aside
+        className="absolute right-0 top-0 h-full w-[85%] bg-slate-950 border-l border-slate-800 overflow-y-auto"
+        onClick={(e) => e.stopPropagation()} // prevent close when interacting
       >
-        <thead>
-          <tr>
-            {headers.map(h => (
-              <th key={h} style={{ borderBottom: '1px solid #444', textAlign: 'left' }}>
-                {h}
-              </th>
-            ))}
-          </tr>
-        </thead>
+        <div className="space-y-6 p-6">
+          {/* Header */}
+          <div className="flex items-center justify-between">
+            <div>
+              <h2 className="text-xl font-semibold text-slate-100">
+                Shard {shard.shardId}
+              </h2>
+              <p className="text-sm text-slate-400">
+                Live network telemetry
+              </p>
+            </div>
 
-        <tbody>
-          {rows.map((r, i) => (
-            <tr key={i}>
-              {headers.map((_, c) => (
-                <td
-                  key={c}
-                  style={{
-                    padding: '2px 4px',
-                    textAlign: 'left',
-                    borderBottom: '1px solid #222',
-                    whiteSpace: 'nowrap',
-                  }}
-                >
-                  {r[c] ?? ''}
-                </td>
-              ))}
-            </tr>
-          ))}
-        </tbody>
-      </table>
-    </aside>
+            <button
+              onClick={onClose}
+              className="rounded-xl border border-slate-700 px-3 py-1 text-sm text-slate-300 hover:bg-slate-800"
+            >
+              Close
+            </button>
+          </div>
+
+          {/* Summary */}
+          <div className="grid grid-cols-3 gap-4 rounded-2xl bg-slate-900/60 border border-slate-800 p-4">
+            <Metric label="Download" value={`${shard.downloadKbps.toFixed(1)} KB/s`} />
+            <Metric label="Upload" value={`${shard.uploadKbps.toFixed(1)} KB/s`} />
+            <Metric label="Connections" value={shard.connections.length} />
+          </div>
+
+          {/* Connections */}
+          <div className="space-y-4">
+            <h3 className="text-sm font-medium text-slate-300">
+              Connections
+            </h3>
+
+            {shard.connections.map((c, idx) => (
+              <div
+                key={idx}
+                className="rounded-2xl bg-slate-900/80 border border-slate-800 p-4 space-y-3"
+              >
+                {/* Identity row */}
+                <div className="flex items-center justify-between">
+                  <div>
+                    <div className="text-sm font-medium text-slate-100">
+                      {c.IdentityId} → {c.targetId}
+                    </div>
+                  </div>
+                </div>
+
+                {/* Metrics */}
+                <div className="grid grid-cols-4 gap-4">
+                  {/* Latency / quality */}
+                  <Metric label="Ping (ms)" value={c.pingMs} />
+                  <Metric label="Local Quality" value={c.qualityLocal} />
+                  <Metric label="Remote Quality" value={c.qualityRemote} />
+                  <Metric label="Queue (µs)" value={c.queueTimeUsec} />
+
+                  {/* Throughput */}
+                  <Metric label="In KB/s" value={c.inBytesPerSec} />
+                  <Metric label="Out KB/s" value={c.outBytesPerSec} />
+                  <Metric label="In Packets/s" value={c.inPacketsPerSec} />
+
+                  {/* Reliability */}
+                  <Metric label="Pending Reliable Bytes" value={c.pendingReliableBytes} />
+                  <Metric label="Pending Unreliable Bytes" value={c.pendingUnreliableBytes} />
+                  <Metric label="Unacked Reliable Bytes" value={c.sentUnackedReliableBytes} />
+                  <Metric label="State" value={c.state} />
+                </div>
+              </div>
+            ))}
+
+            {shard.connections.length === 0 && (
+              <div className="text-sm text-slate-500 italic">
+                No active connections.
+              </div>
+            )}
+          </div>
+        </div>
+      </aside>
+    </div>
   );
 }
