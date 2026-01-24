@@ -13,6 +13,12 @@ export type ShardTelemetryRowProps = {
   /** Rolling histories (for graphs) */
   downloadHistory: number[];
   uploadHistory: number[];
+
+  /**
+   * Called when the user wants to open the detailed telemetry side panel
+   * for this shard.
+   */
+  onOpenTelemetry: (shardId: string) => void;
 };
 
 /**
@@ -24,10 +30,28 @@ export function ShardTelemetryRow({
   uploadKbps,
   downloadHistory,
   uploadHistory,
+  onOpenTelemetry,
 }: ShardTelemetryRowProps) {
   return (
     <tr>
-      <td style={{ padding: 8 }}>{shardId}</td>
+      <td style={{ padding: 8 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          <span>{shardId}</span>
+          <button
+            type="button"
+            onClick={() => onOpenTelemetry(shardId)}
+            style={{
+              padding: '2px 8px',
+              fontSize: 12,
+              cursor: 'pointer',
+            }}
+            aria-label={`Open detailed telemetry for ${shardId}`}
+            title="Open detailed telemetry"
+          >
+            Details
+          </button>
+        </div>
+      </td>
 
       <td style={{ padding: 8, textAlign: 'right', whiteSpace: 'nowrap' }}>
         {downloadKbps.toFixed(1)} KB/s

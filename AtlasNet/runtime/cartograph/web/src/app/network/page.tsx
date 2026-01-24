@@ -1,8 +1,11 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useMemo } from 'react';
 import type { ShardTelemetry } from '../lib/networkTelemetryTypes';
 import { ShardTelemetryRow } from '../components/ShardTelemetryRow';
+import { TelemetryPanel } from '../components/TelemetryPanel';
+
+const ENABLE_NETWORK_TELEMETRY = true;
 
 type ShardState = {
   shardId: string;
@@ -24,8 +27,18 @@ function pushRolling(prev: number[], value: number): number[] {
 
 export default function NetworkTelemetryPage() {
   const [shards, setShards] = useState<ShardState[]>([]);
+  const [latestTelemetry, setLatestTelemetry] = useState<ShardTelemetry[]>([]);
+  const [selectedShardId, setSelectedShardId] = useState<string | null>(null);
+
+  const latestById = useMemo(() => {
+    return new Map(latestTelemetry.map(t => [t.shardId, t]));
+  }, [latestTelemetry]);
+
+  const selectedShard = selectedShardId ? latestById.get(selectedShardId) : null;
 
   useEffect(() => {
+    if (!ENABLE_NETWORK_TELEMETRY) return;
+
     let alive = true;
 
     async function poll() {
@@ -42,6 +55,8 @@ export default function NetworkTelemetryPage() {
         const data = (await res.json()) as ShardTelemetry[];
 
         if (!alive) return;
+
+        setLatestTelemetry(data);
 
         setShards(prev => {
           const prevById = new Map(prev.map(s => [s.shardId, s]));
@@ -108,10 +123,14 @@ export default function NetworkTelemetryPage() {
               uploadKbps={s.uploadKbps}
               downloadHistory={s.downloadHistory}
               uploadHistory={s.uploadHistory}
+              onOpenTelemetry={setSelectedShardId}
             />
           ))}
         </tbody>
       </table>
+      {selectedShard && (
+        <TelemetryPanel shard={selectedShard} onClose={() => setSelectedShardId(null)} />
+      )}
     </div>
   );
 }

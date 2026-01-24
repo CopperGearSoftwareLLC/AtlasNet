@@ -1,3 +1,5 @@
+'use server';
+
 import { NextResponse } from 'next/server';
 import type { ShardTelemetry } from '../../lib/networkTelemetryTypes';
 
@@ -14,5 +16,6 @@ export async function GET() {
   }
 
   const data = (await response.json()) as ShardTelemetry[];
+  //const data = (await response.json()) as string[][];
   return NextResponse.json(data);
 }

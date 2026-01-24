@@ -97,6 +97,7 @@ inline void NetworkManifest::GetAllTelemetry(std::vector<std::vector<std::string
         telemetry.Deserialize(br);
 
         std::vector<std::string> telemetry_data;
+        telemetry_data.push_back(telemetry.IdentityId);
         telemetry_data.push_back(telemetry.targetId);
         telemetry_data.push_back(std::to_string(telemetry.pingMs));
         telemetry_data.push_back(std::to_string(telemetry.inBytesPerSec));
