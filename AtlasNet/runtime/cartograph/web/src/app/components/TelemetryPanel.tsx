@@ -41,7 +41,7 @@ export function TelemetryPanel({
         position: 'fixed',
         right: 0,
         top: 0,
-        width: '40%',
+        width: '85%',
         height: '100%',
         background: '#111',
         color: '#eee',
@@ -50,6 +50,7 @@ export function TelemetryPanel({
         overflow: 'auto',
         zIndex: 1000,
       }}
+      //refactor to have connection table display as rows, not columns
     >
       <header style={{ display: 'flex', justifyContent: 'space-between' }}>
         <h3>Shard {shard.shardId}</h3>
@@ -78,8 +79,6 @@ export function TelemetryPanel({
         </tbody>
       </table>
       <div style={{ marginBottom: 8, fontFamily: 'monospace', fontSize: 12 }}>
-        {/*<div>downloadKbps: {shard.downloadKbps}</div>*/}
-        {/*<div>uploadKbps: {shard.uploadKbps}</div>*/}
         <div>rows: {rows.length}</div>
       </div>
 

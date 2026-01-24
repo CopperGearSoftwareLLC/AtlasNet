@@ -35,11 +35,12 @@ for (const [key, value] of Object.entries(addon)) {
 const app = express();
 app.use(cors()); // allow your frontend to call it
 
+const nt = new addon.NetworkTelemetry();
 app.get('/networktelemetry', (req, res) => {
   try {
     const { NetworkTelemetry, std_vector_std_string_, std_vector_std_vector_std_string__ } = addon;
 
-    const nt = new NetworkTelemetry();
+    //const nt = new NetworkTelemetry();
 
     // SWIG string vector
     const idsVec = new std_vector_std_string_();
@@ -76,7 +77,7 @@ app.get('/networktelemetry', (req, res) => {
     const rowsByShard = new Map();
     for (const row of allRows) {
     const decoded = decodeConnectionRow(row);
-    const shardId = decoded.sourceShard;
+    const shardId = decoded.IdentityId;
 
     if (!rowsByShard.has(shardId)) {
         rowsByShard.set(shardId, []);
