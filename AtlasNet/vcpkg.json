@@ -1,30 +1,33 @@
 {
   "name": "atlasnet",
   "dependencies": [
-        "glm",
-        "nlohmann-json",
-        "boost-type-traits",
-        "boost-uuid",
-        "boost-multi-index",
-        "boost-container",
-        "boost-describe",
-        "boost-stacktrace",
-        "boost-static-string",
-        "gamenetworkingsockets",
-        "curl",
-        "zlib",
-        
-         {
-          "name": "redis-plus-plus",
-          "features": [
-            "async",
-            "async-std",
-            "tls",
-            "cxx17"
-          ]
-        },
-        "libuv",
-        "hiredis"
+    "glm",
+    "nlohmann-json",
+    "boost-type-traits",
+    "boost-uuid",
+    "boost-multi-index",
+    "boost-container",
+    "boost-describe",
+    "boost-stacktrace",
+    "boost-static-string",
+    "gamenetworkingsockets",
+    "curl",
+    "zlib",
+    {
+      "name": "redis-plus-plus",
+      "features": [
+        "tls",
+        "cxx17",
+        "async",
+        "async-std"
       ]
-
+    },
+    "libuv",
+    {
+      "name": "hiredis",
+      "features": [
+        "ssl"
+      ]
+    }
+  ]
 }
