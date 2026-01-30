@@ -258,6 +258,22 @@ class RedisConnection
 	 */
 	[[nodiscard]] std::future<std::optional<std::string>> HGetAsync(const std::string_view& key,
 															  const std::string_view& field) const;
+	/**
+	 * @brief Atomically claim one field/value from a pending hash into a claimed hash.
+	 * @details In Redis Cluster, both keys must share the same hash slot (use a hash tag).
+	 * @return std::optional<std::string> with claimed value, or empty if no pending entries exist.
+	 */
+	[[nodiscard]] std::optional<std::string> HClaimAtomic(
+		const std::string_view& pending_key, const std::string_view& claimed_key,
+		const std::string_view& claim_field) const;
+	/**
+	 * @brief Atomically move a claimed value back to pending.
+	 * @details In Redis Cluster, both keys must share the same hash slot (use a hash tag).
+	 * @return true if a claimed value was requeued, false otherwise.
+	 */
+	[[nodiscard]] bool HRequeueClaimedAtomic(
+		const std::string_view& claimed_key, const std::string_view& pending_key,
+		const std::string_view& claim_field) const;
 	// Returns all fields + values.
 	// NOTE: can be big; consider HSCAN for huge hashes.
 	[[nodiscard]] std::unordered_map<std::string, std::string> HGetAll(

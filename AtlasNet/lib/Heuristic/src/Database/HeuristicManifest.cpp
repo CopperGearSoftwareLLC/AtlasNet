@@ -40,6 +40,19 @@ void HeuristicManifest::StorePendingBoundsFromByteWriters(
 		InternalDB::Get()->HSet(PendingHashTable, s_id, writer.as_string_view());
 	}
 }
+long long HeuristicManifest::GetPendingBoundsCount() const
+{
+	return InternalDB::Get()->HLen(PendingHashTable);
+}
+long long HeuristicManifest::GetClaimedBoundsCount() const
+{
+	return InternalDB::Get()->HLen(ClaimedHashTable);
+}
+bool HeuristicManifest::RequeueClaimedBound(const std::string_view& claim_key)
+{
+	return InternalDB::Get()->HRequeueClaimedAtomic(
+		ClaimedHashTable, PendingHashTable, claim_key);
+}
 void HeuristicManifest::SetActiveHeuristicType(IHeuristic::Type type)
 {
 	const char* str = IHeuristic::TypeToString(type);

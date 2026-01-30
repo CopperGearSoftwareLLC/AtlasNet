@@ -7,7 +7,9 @@
 #include "Packet/CommandPacket.hpp"
 #include "pch.hpp"
 #include "Database/HealthManifest.hpp"
+#include "Database/HeuristicManifest.hpp"
 #include "Telemetry/NetworkManifest.hpp"
+#include "Heuristic/GridHeuristic/GridHeuristic.hpp"
 Partition::Partition()
 {
 
@@ -20,6 +22,19 @@ void Partition::Init()
 											DockerIO::Get().GetSelfContainerName());
 
 	logger = std::make_shared<Log>(partitionIdentifier.ToString());
+	{
+		GridShape claimedBounds;
+		const bool claimed = HeuristicManifest::Get().ClaimNextPendingBound<GridShape>(
+			partitionIdentifier.ToString(), claimedBounds);
+		if (claimed)
+		{
+			logger->DebugFormatted("Claimed bounds {} for shard", claimedBounds.GetID());
+		}
+		else
+		{
+			logger->Warning("No pending bounds available to claim");
+		}
+	}
 	HealthManifest::Get().ScheduleHealthPings(partitionIdentifier);
 	NetworkManifest::Get().ScheduleNetworkPings(partitionIdentifier);
 	Interlink::Get().Init(InterlinkProperties{

@@ -26,10 +26,11 @@ class HeuristicManifest : public Singleton<HeuristicManifest>
 	const std::string HeuristicTypeKey = "Heuristic_Type";
 	/*stores a list of available, unclaimed bounds*/
 	/*the bounds id is the shape*/
-	const std::string PendingHashTable = "Heuristic_Bounds_Pending";
+	// Shared hash tag keeps pending/claimed in the same Redis Cluster slot.
+	const std::string PendingHashTable = "{Heuristic_Bounds}:Pending";
 
 	/*HashTable of claimed Bounds*/
-	const std::string ClaimedHashTable = "Heuristic_Bounds_Claimed";
+	const std::string ClaimedHashTable = "{Heuristic_Bounds}:Claimed";
 
    public:
 	[[nodiscard]] IHeuristic::Type GetActiveHeuristicType() const;
@@ -39,10 +40,15 @@ class HeuristicManifest : public Singleton<HeuristicManifest>
 	void GetAllPendingBounds(std::vector<BoundType>& out_bounds);
 	template <typename BoundType, typename KeyType = std::string>
 	void StorePendingBounds(const std::vector<BoundType>& in_bounds);
+	template <typename BoundType>
+	bool ClaimNextPendingBound(const std::string_view& claim_key, BoundType& out_bound);
 	void StorePendingBoundsFromByteWriters(
 		const std::unordered_map<IBounds::BoundsID, ByteWriter>& in_writers);
 	void GetPendingBoundsAsByteReaders(std::vector<std::string>& data_for_readers,
 									   std::unordered_map<IBounds::BoundsID, ByteReader>& brs);
+	[[nodiscard]] long long GetPendingBoundsCount() const;
+	[[nodiscard]] long long GetClaimedBoundsCount() const;
+	bool RequeueClaimedBound(const std::string_view& claim_key);
 
 	template <typename BoundType, typename KeyType = std::string>
 	void GetAllClaimedBounds(std::unordered_map<KeyType, BoundType>& out_bounds);
@@ -157,6 +163,20 @@ void HeuristicManifest::StorePendingBounds(const std::vector<BoundType>& in_boun
 		s_id = bw_id.as_string_view();
 		InternalDB::Get()->HSet(PendingHashTable, s_id, s_b);
 	}
+}
+
+template <typename BoundType>
+bool HeuristicManifest::ClaimNextPendingBound(const std::string_view& claim_key,
+											  BoundType& out_bound)
+{
+	const auto claimed = InternalDB::Get()->HClaimAtomic(
+		PendingHashTable, ClaimedHashTable, claim_key);
+	if (!claimed)
+		return false;
+
+	ByteReader br(claimed.value());
+	out_bound.Deserialize(br);
+	return true;
 }
 
 template <typename BoundType, typename KeyType>

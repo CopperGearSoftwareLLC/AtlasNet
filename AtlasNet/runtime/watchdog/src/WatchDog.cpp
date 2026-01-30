@@ -50,6 +50,11 @@ void WatchDog::Init()
 		{
 			logger->ErrorFormatted("HEALTH CHECK FAIL : {}. Removing from Health Manifest",
 								   ID_fail.ToString());
+			const bool requeued = HeuristicManifest::Get().RequeueClaimedBound(ID_fail.ToString());
+			if (requeued)
+			{
+				logger->DebugFormatted("Requeued claimed bounds for {}", ID_fail.ToString());
+			}
 			HealthManifest::Get().RemovePing(key);
 		});
 	InterlinkProperties InterLinkProps;
@@ -130,7 +135,19 @@ void WatchDog::ComputeHeuristic()
 	Heuristic->Compute(entities.span());
 	std::unordered_map<IBounds::BoundsID, ByteWriter> bws;
 	Heuristic->SerializeBounds(bws);
-	HeuristicManifest::Get().StorePendingBoundsFromByteWriters(bws);
+	const long long pending_count = HeuristicManifest::Get().GetPendingBoundsCount();
+	const long long claimed_count = HeuristicManifest::Get().GetClaimedBoundsCount();
+	const long long total_known = pending_count + claimed_count;
+	const long long expected = static_cast<long long>(bws.size());
+	if (total_known < expected)
+	{
+		HeuristicManifest::Get().StorePendingBoundsFromByteWriters(bws);
+	}
+	else
+	{
+		logger->DebugFormatted("Skipping pending refresh (pending={}, claimed={}, expected={})",
+							   pending_count, claimed_count, expected);
+	}
 
 	std::vector<std::string> data;
 	std::unordered_map<IBounds::BoundsID, ByteReader> brs;
