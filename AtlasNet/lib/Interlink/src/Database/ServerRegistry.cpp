@@ -1,26 +1,30 @@
 #include "ServerRegistry.hpp"
 
+#include "Network/NetworkIdentity.hpp"
 #include "InternalDB.hpp"
 #include "Misc/String_utils.hpp"
+#include "Serialize/ByteReader.hpp"
+#include "Serialize/ByteWriter.hpp"
 
 static const std::string kPublicSuffix = "_public";
 
-void ServerRegistry::RegisterSelf(const InterLinkIdentifier &ID, IPAddress address)
+void ServerRegistry::RegisterSelf(const NetworkIdentity &ID, IPAddress address)
 {
-	InternalDB::Get()->HSet(HashTableNameID_IP, NukeString(ID.ToString()),
+	InternalDB::Get()->HSet(HashTableNameID_IP, GetKeyOfIdentifier(ID),
 							NukeString(address.ToString()));
 }
 
-void ServerRegistry::RegisterPublicAddress(const InterLinkIdentifier &ID, const IPAddress &address)
+void ServerRegistry::RegisterPublicAddress(const NetworkIdentity &ID, const IPAddress &address)
 {
-	InternalDB::Get()->HSet(HashTableNameID_IP + kPublicSuffix, NukeString(ID.ToString()),
+	InternalDB::Get()->HSet(HashTableNameID_IP + kPublicSuffix, GetKeyOfIdentifier(ID),
 							NukeString(address.ToString()));
 }
 
-void ServerRegistry::DeRegisterSelf(const InterLinkIdentifier &ID)
+void ServerRegistry::DeRegisterSelf(const NetworkIdentity &ID)
 {
-	InternalDB::Get()->HDel(HashTableNameID_IP, {NukeString(ID.ToString())});
-	InternalDB::Get()->HDel(HashTableNameID_IP + kPublicSuffix, {NukeString(ID.ToString())});
+	const std::string key = GetKeyOfIdentifier(ID);
+	InternalDB::Get()->HDel(HashTableNameID_IP, {key});
+	InternalDB::Get()->HDel(HashTableNameID_IP + kPublicSuffix, {key});
 }
 
 const decltype(ServerRegistry::servers) &ServerRegistry::GetServers()
@@ -30,17 +34,14 @@ const decltype(ServerRegistry::servers) &ServerRegistry::GetServers()
 	for (const auto &rawEntry : entries)
 	{
 		ServerRegistryEntry newEntry;
-		auto Type = InterLinkIdentifier::FromString(NukeString(rawEntry.first));
-		if (!Type.has_value())
-		{
-			std::cerr << "Unable to parse " << rawEntry.first << " " << rawEntry.second
-					  << std::endl;
-			continue;
-		}
-		newEntry.identifier = Type.value();
+		NetworkIdentity id;
+		ByteReader br(rawEntry.first);
+		id.Deserialize(br);
+		
+		newEntry.identifier = id;
 		newEntry.address.Parse(rawEntry.second);
 
-		ASSERT(newEntry.identifier.Type != InterlinkType::eInvalid,
+		ASSERT(newEntry.identifier.Type != NetworkIdentityType::eInvalid,
 			   "Invalid entry in server ServerRegistry");
 		ASSERT(!servers.contains(newEntry.identifier), "Duplicate entry in server ServerRegistry?");
 		servers.insert(std::make_pair(newEntry.identifier, newEntry));
@@ -48,10 +49,10 @@ const decltype(ServerRegistry::servers) &ServerRegistry::GetServers()
 	return servers;
 }
 
-std::optional<IPAddress> ServerRegistry::GetIPOfID(const InterLinkIdentifier &ID)
+std::optional<IPAddress> ServerRegistry::GetIPOfID(const NetworkIdentity &ID)
 {
 	std::string ret =
-		InternalDB::Get()->HGet(HashTableNameID_IP, NukeString(ID.ToString())).value();
+		InternalDB::Get()->HGet(HashTableNameID_IP, GetKeyOfIdentifier(ID)).value();
 	if (ret.empty())
 	{
 		return std::nullopt;
@@ -61,10 +62,10 @@ std::optional<IPAddress> ServerRegistry::GetIPOfID(const InterLinkIdentifier &ID
 	return ip;
 }
 
-std::optional<IPAddress> ServerRegistry::GetPublicAddress(const InterLinkIdentifier &ID)
+std::optional<IPAddress> ServerRegistry::GetPublicAddress(const NetworkIdentity &ID)
 {
 	std::string ret = InternalDB::Get()
-						  ->HGet(HashTableNameID_IP + kPublicSuffix, NukeString(ID.ToString()))
+						  ->HGet(HashTableNameID_IP + kPublicSuffix,GetKeyOfIdentifier(ID))
 						  .value();
 	if (ret.empty())
 	{
@@ -75,9 +76,11 @@ std::optional<IPAddress> ServerRegistry::GetPublicAddress(const InterLinkIdentif
 	return ip;
 }
 
-bool ServerRegistry::ExistsInRegistry(const InterLinkIdentifier &ID) const
+bool ServerRegistry::ExistsInRegistry(const NetworkIdentity &ID) const
 {
-	return InternalDB::Get()->HExists(HashTableNameID_IP, NukeString(ID.ToString()));
+	ByteWriter bw;
+	ID.Serialize(bw);
+	return InternalDB::Get()->HExists(HashTableNameID_IP, GetKeyOfIdentifier(ID));
 }
 
 void ServerRegistry::ClearAll()
@@ -87,3 +90,10 @@ void ServerRegistry::ClearAll()
 }
 
 ServerRegistry::ServerRegistry() {}
+const std::string ServerRegistry::GetKeyOfIdentifier(const NetworkIdentity &ID) {
+		ByteWriter bw;
+	ID.Serialize(bw);
+	std::string s(bw.as_string_view());
+	return s;
+}
+

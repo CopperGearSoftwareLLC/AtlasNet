@@ -1,6 +1,8 @@
 #include "ProxyRegistry.hpp"
+#include "InterlinkIdentifier.hpp"
 #include "InternalDB.hpp"
 #include "Misc/String_utils.hpp"
+#include "Serialize/ByteReader.hpp"
 #include <iostream>
 static const std::string kPublicSuffix = "_public";
 
@@ -81,7 +83,7 @@ uint32_t ProxyRegistry::GetLoad(const InterLinkIdentifier& proxyID)
 /*-------------------------------------------------------------
  * CLIENT to PROXY OWNERSHIP
  *------------------------------------------------------------*/
-
+/*
 void ProxyRegistry::AssignClientToProxy(const std::string& clientID,
                                         const InterLinkIdentifier& proxyID)
 {
@@ -94,17 +96,20 @@ void ProxyRegistry::AssignClientToProxy(const std::string& clientID,
 
 std::optional<InterLinkIdentifier> ProxyRegistry::GetProxyOfClient(const std::string& clientID)
 {
-    std::string ret = InternalDB::Get()->HGet(HashTableNameClientOwner, NukeString(clientID)).value();
+    const auto key = GetKeyOfIdentifier(id);
+    std::string ret = InternalDB::Get()->HGet(HashTableNameClientOwner, key).value();
     if (ret.empty())
         return std::nullopt;
 
+        InterLinkIdentifier id;
+        id.Deserialize(ByteReader(ret));
     auto maybeID = InterLinkIdentifier::FromString(ret);
     if (!maybeID.has_value())
         return std::nullopt;
 
     return maybeID;
 }
-
+*/
 
 /*-------------------------------------------------------------
  * PROXY ENUMERATION
@@ -120,14 +125,8 @@ ProxyRegistry::GetProxies()
     {
         ProxyRegistryEntry entry;
 
-        auto maybeID = InterLinkIdentifier::FromString(NukeString(raw.first));
-        if (!maybeID.has_value())
-        {
-            std::cerr << "ProxyRegistry: failed to parse identifier " << raw.first << std::endl;
-            continue;
-        }
-
-        entry.identifier = maybeID.value();
+        ByteReader br(raw.first);
+        entry.identifier.Deserialize(br);
         entry.address.Parse(raw.second);
 
         // Load from Redis
@@ -164,7 +163,7 @@ std::optional<InterLinkIdentifier> ProxyRegistry::GetLeastLoadedProxy()
 
 bool ProxyRegistry::ExistsInRegistry(const InterLinkIdentifier& id) const
 {
-    return InternalDB::Get()->HExists(HashTableNameID_IP, NukeString(id.ToString()));
+    return InternalDB::Get()->HExists(HashTableNameID_IP, GetKeyOfIdentifier(id));
 }
 
 void ProxyRegistry::ClearAll()
@@ -173,4 +172,10 @@ void ProxyRegistry::ClearAll()
     InternalDB::Get()->DelKey(HashTableNameID_IP + kPublicSuffix);
     InternalDB::Get()->DelKey(HashTableNameID_Load);
     InternalDB::Get()->DelKey(HashTableNameClientOwner);
+}
+const std::string ProxyRegistry::GetKeyOfIdentifier(const InterLinkIdentifier& ID){
+		ByteWriter bw;
+	ID.Serialize(bw);
+	std::string s(bw.as_string_view());
+	return s;
 }

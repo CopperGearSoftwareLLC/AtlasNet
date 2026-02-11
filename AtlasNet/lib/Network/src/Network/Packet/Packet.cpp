@@ -15,5 +15,5 @@ const IPacket& IPacket::Serialize(ByteWriter& bw) const
 }
 bool IPacket::Validate() const
 {
-	return (packet_type != PacketType::eInvalid) && ValidateData();
+	return (packet_type != -1) && ValidateData();
 }

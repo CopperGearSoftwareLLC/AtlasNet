@@ -1,67 +1,65 @@
-#include "InterlinkIdentifier.hpp"
-#include "InterlinkEnums.hpp"
+#include "NetworkIdentity.hpp"
+#include "NetworkEnums.hpp"
 #include "Misc/String_utils.hpp"
+#include <boost/uuid/uuid_io.hpp>
 #include <iostream>
-InterLinkIdentifier InterLinkIdentifier::MakeIDWatchDog()
+#include "Misc/UUID.hpp"
+#include "boost/uuid/name_generator.hpp"
+NetworkIdentity NetworkIdentity::MakeIDWatchDog()
 
 {
-    InterLinkIdentifier id;
-    id.Type = InterlinkType::eWatchDog;
-    id.ID.clear();
+    NetworkIdentity id;
+    id.Type = NetworkIdentityType::eWatchDog;
+     id.ID = UUID();
     return id;
 }
 
-InterLinkIdentifier InterLinkIdentifier::MakeIDShard(const std::string &_ID)
+NetworkIdentity NetworkIdentity::MakeIDShard(const UUID &_ID)
 {
-    InterLinkIdentifier id;
-    id.Type = InterlinkType::eShard;
+    NetworkIdentity id;
+    id.Type = NetworkIdentityType::eShard;
     id.ID = _ID;
     return id;
 }
 
-InterLinkIdentifier InterLinkIdentifier::MakeIDGameServer(const std::string &_ID)
+NetworkIdentity NetworkIdentity::MakeIDGameServer(const UUID &_ID)
 {
-    InterLinkIdentifier id;
-    id.Type = InterlinkType::eGameServer;
+    NetworkIdentity id;
+    id.Type = NetworkIdentityType::eGameServer;
     id.ID = _ID;
     return id;
 }
 
-InterLinkIdentifier InterLinkIdentifier::MakeIDGameClient(const std::string &_ID)
+NetworkIdentity NetworkIdentity::MakeIDGameClient(const UUID &_ID)
 {
-    InterLinkIdentifier id;
-    id.Type = InterlinkType::eGameClient;
+    NetworkIdentity id;
+    id.Type = NetworkIdentityType::eGameClient;
     id.ID = _ID;
     return id;
 }
 
-InterLinkIdentifier InterLinkIdentifier::MakeIDGameCoordinator()
+
+
+NetworkIdentity NetworkIdentity::MakeIDCartograph()
 {
-    InterLinkIdentifier id;
-    id.Type = InterlinkType::eGameCoordinator;
-    id.ID.clear();
+    NetworkIdentity id;
+    id.Type = NetworkIdentityType::eCartograph;
+    id.ID = UUID();
     return id;
 }
 
-InterLinkIdentifier InterLinkIdentifier::MakeIDCartograph()
-{
-    InterLinkIdentifier id;
-    id.Type = InterlinkType::eCartograph;
-    id.ID.clear();
-    return id;
-}
-
-std::string InterLinkIdentifier::ToString() const
+std::string NetworkIdentity::ToString() const
 {
     std::string type_string = boost::describe::enum_to_string(Type, "UnknownUnknownType?");
-    if (!ID.empty())
+    if (!ID.is_nil())
     {
-        type_string += std::string(" ") + (ID.c_str());
+
+        type_string += std::string(" ") +boost::uuids::to_string(ID);
     }
     return NukeString(type_string);
 }
-
-std::array<std::byte, 32> InterLinkIdentifier::ToEncodedByteStream() const
+/*
+std::array<std::byte, 32> NetworkIdentity::ToEncodedByteStream() const
 {
     std::array<std::byte, 32> result{std::byte(0)};
     result[0] = (std::byte)Type;
@@ -79,18 +77,19 @@ std::array<std::byte, 32> InterLinkIdentifier::ToEncodedByteStream() const
     }
     return result;
 }
-std::optional<InterLinkIdentifier> InterLinkIdentifier::FromEncodedByteStream(const std::array<std::byte, 32> &input)
+
+std::optional<NetworkIdentity> NetworkIdentity::FromEncodedByteStream(const std::array<std::byte, 32> &input)
 {
 
     return FromEncodedByteStream(input.data(), input.size());
 }
 
-std::optional<InterLinkIdentifier> InterLinkIdentifier::FromEncodedByteStream(const std::byte *data, size_t size)
+std::optional<NetworkIdentity> NetworkIdentity::FromEncodedByteStream(const std::byte *data, size_t size)
 {
 
     ASSERT(size <= 32, "Invalid Byte Stream size");
-    InterLinkIdentifier ID;
-    ID.Type = (InterlinkType)data[0];
+    NetworkIdentity ID;
+    ID.Type = (NetworkIdentityType)data[0];
     if ((char)data[1] != char(0))
     {
         
@@ -104,13 +103,13 @@ std::optional<InterLinkIdentifier> InterLinkIdentifier::FromEncodedByteStream(co
     }
     else
     {
-        ID.ID.clear();
+        ID.ID = UUID();
     }
 
     return ID;
-}
-
-std::optional<InterLinkIdentifier> InterLinkIdentifier::FromString(const std::string &input)
+}*/
+/*
+std::optional<NetworkIdentity> NetworkIdentity::FromString(const std::string &input)
 {
     std::istringstream iss(NukeString(input));
     std::string enumName;
@@ -126,7 +125,7 @@ std::optional<InterLinkIdentifier> InterLinkIdentifier::FromString(const std::st
     // Try to read a second token (optional)
     iss >> idValue;
 
-    InterLinkIdentifier id;
+    NetworkIdentity id;
 
     bool success = boost::describe::enum_from_string(enumName.c_str(), id.Type);
     if (!success)
@@ -138,7 +137,7 @@ std::optional<InterLinkIdentifier> InterLinkIdentifier::FromString(const std::st
     // If only one token was present (like "eGod"), make ID empty
     if (idValue.empty())
     {
-        id.ID.clear();
+        id.ID = UUID();
     }
     else
     {
@@ -147,3 +146,4 @@ std::optional<InterLinkIdentifier> InterLinkIdentifier::FromString(const std::st
 
     return id;
 }
+*/

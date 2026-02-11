@@ -4,7 +4,9 @@ target_compile_definitions(atlasnet_defs INTERFACE
     _PORT_WATCHDOG=25564
     _PORT_SHARD=25565
     _PORT_GAMESERVER=25566
+    _PORT_GAMECLIENT=25566
     _PORT_PROXY=25568
+    _PORT_PROXY_PUBLISHED=2555
     _DOCKER_OS_="ubuntu:24.04"
     _DOCKER_WORKDIR_="/atlasnet"
     _ATLASNET_STACK_NAME="atlasnet"

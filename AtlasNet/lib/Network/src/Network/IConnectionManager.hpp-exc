@@ -1,0 +1,112 @@
+#pragma once
+#include <steam/steamnetworkingtypes.h>
+
+#include <future>
+#include <stop_token>
+#include <thread>
+#include <type_traits>
+
+#include "Log.hpp"
+#include "Network/Connection.hpp"
+#include "Network/NetworkIdentity.hpp"
+#include "Network/Packet/Packet.hpp"
+#include "Network/Packet/PacketManager.hpp"
+#include "NetworkEnums.hpp"
+#include "boost/multi_index/hashed_index.hpp"
+#include "boost/multi_index/mem_fun.hpp"
+#include "boost/multi_index/member.hpp"
+#include "boost/multi_index/ordered_index.hpp"
+#include "boost/multi_index_container.hpp"
+
+class IConnectionManager
+{
+   public:
+	IConnectionManager(const NetworkIdentity &ID);
+
+   private:
+	/**
+	 * @brief The loop for polling messages
+	 *
+	 * @param st
+	 */
+	void PollLoop(std::stop_token st);
+
+	void FetchMessages();
+	std::optional<Connection> GetConnection(
+		HSteamNetConnection &steam_connection)
+	{
+		return *Connections.get<IndexByHSteamNetConnection>().find(
+			steam_connection);
+	}
+
+   public:
+	template <typename T>
+	void SendMessage(const NetworkIdentity &who, const T &packet,
+					 NetworkMessageSendFlag sendFlag)
+	{
+		std::shared_ptr<IPacket> packet_ptr = std::make_shared<T>(packet);
+		SendMessage(who, packet_ptr, sendFlag);
+	}
+	void SendMessage(const NetworkIdentity &who,
+					 const std::shared_ptr<IPacket> &packet,
+					 NetworkMessageSendFlag sendFlag);
+	PacketManager &GetPacketManager() { return packet_manager; }
+	[[nodiscard]] std::future<bool> ConnectToID(
+		const NetworkIdentity &who);
+	void GetConnectionTelemetry(std::vector<ConnectionTelemetry> &out) {}
+
+   private:
+	struct IndexByState
+	{
+	};
+	struct IndexByTarget
+	{
+	};
+	struct IndexByTargetType
+	{
+	};
+	struct IndexByHSteamNetConnection
+	{
+	};
+	/**
+	 * @brief Container that stores values by multiple indicies
+	 * 1. By State, Non unique
+	 * 2. By TargetType, Non Unique
+	 *
+	 */
+	boost::multi_index_container<
+		Connection,
+		boost::multi_index::indexed_by<
+			// non-unique by connection state
+			boost::multi_index::ordered_non_unique<
+				boost::multi_index::tag<IndexByState>,
+				boost::multi_index::member<Connection, ConnectionState,
+										   &Connection::state>>,
+			// non-unique by target interlinkType
+			boost::multi_index::ordered_non_unique<
+				boost::multi_index::tag<IndexByTargetType>,
+				boost::multi_index::const_mem_fun<
+					Connection, NetworkIdentityType,
+					&Connection::GetIdentityType>>,
+			// non-unique, the reason its non unique is because GameClient on
+			// connection dont have an ID
+			boost::multi_index::ordered_non_unique<
+				boost::multi_index::tag<IndexByTarget>,
+				boost::multi_index::member<Connection, NetworkIdentity,
+										   &Connection::target>>,
+			// Unique By HConnection
+			boost::multi_index::ordered_non_unique<
+				boost::multi_index::tag<IndexByHSteamNetConnection>,
+				boost::multi_index::member<Connection, HSteamNetConnection,
+										   &Connection::SteamConnection>>>>
+		Connections;
+
+	std::shared_ptr<Log> logger;
+	NetworkIdentity MyIdentity;
+	std::optional<HSteamListenSocket> ListeningSocket;
+	std::optional<HSteamNetPollGroup> PollGroup;
+	PacketManager packet_manager;
+	PortType ListenPort;
+
+	std::jthread PollThread;
+};

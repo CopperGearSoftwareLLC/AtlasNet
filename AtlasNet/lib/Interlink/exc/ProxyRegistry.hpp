@@ -45,8 +45,8 @@ public:
     uint32_t GetLoad(const InterLinkIdentifier& id);
 
     // Client to Proxy ownership. implicitly increments client load
-    void AssignClientToProxy(const std::string& clientID, const InterLinkIdentifier& proxyID);
-    std::optional<InterLinkIdentifier> GetProxyOfClient(const std::string& clientID);
+    //void AssignClientToProxy(const std::string& clientID, const InterLinkIdentifier& proxyID);
+    //std::optional<InterLinkIdentifier> GetProxyOfClient(const std::string& clientID);
 
     // Proxy enumeration
     const std::unordered_map<InterLinkIdentifier, ProxyRegistryEntry>& GetProxies();
@@ -55,8 +55,9 @@ public:
 
 private:
     ProxyRegistry();
+	const static std::string GetKeyOfIdentifier(const InterLinkIdentifier& ID);
 
-private:
+   private:
     // Cached proxy entries
     std::unordered_map<InterLinkIdentifier, ProxyRegistryEntry> proxies;
     // Redis table names

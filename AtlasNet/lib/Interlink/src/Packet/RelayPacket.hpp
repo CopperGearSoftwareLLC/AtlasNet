@@ -2,18 +2,18 @@
 #include <memory>
 
 #include "InterlinkEnums.hpp"
-#include "InterlinkIdentifier.hpp"
-#include "Packet.hpp"
+#include "Network/NetworkIdentity.hpp"
+#include "Network/Packet/Packet.hpp"
 #include "Packet/CommandPacket.hpp"
 #include "Serialize/ByteWriter.hpp"
-class RelayPacket : public TPacket<RelayPacket, PacketType::eRelay>
+class RelayPacket : public TPacket<RelayPacket, "RelayPacket">
 {
-	InterLinkIdentifier FinalTarget;
+	NetworkIdentity FinalTarget;
 	std::shared_ptr<IPacket> sub_Packet;
 
    public:
 	RelayPacket() : TPacket() {}
-	RelayPacket& SetFinalTarget(const InterLinkIdentifier& id)
+	RelayPacket& SetFinalTarget(const NetworkIdentity& id)
 	{
 		FinalTarget = id;
 		return *this;
@@ -38,7 +38,7 @@ class RelayPacket : public TPacket<RelayPacket, PacketType::eRelay>
 	}
 	bool ValidateData() const override
 	{
-		return (FinalTarget.Type != InterlinkType::eInvalid) && sub_Packet &&
+		return (FinalTarget.Type != NetworkIdentityType::eInvalid) && sub_Packet &&
 			   sub_Packet->Validate();
 	}
 };
@@ -55,6 +55,6 @@ void Test()
 
 	RelayPacket relayPacket;
 	relayPacket
-    .SetFinalTarget(InterLinkIdentifier::MakeIDWatchDog())
+    .SetFinalTarget(NetworkIdentity::MakeIDWatchDog())
     .SetSubPacket(cmdPacket);
 }

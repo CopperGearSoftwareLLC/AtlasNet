@@ -1,8 +1,8 @@
 
 #pragma once
+#include <atomic>
 #include <unordered_map>
 #include "Packet.hpp"
-#include "Packet/CommandPacket.hpp"
 class PacketManager
 {
     public:
@@ -11,7 +11,7 @@ class PacketManager
 
     struct CallbackEntry
 {
-    std::atomic<bool> alive{true};
+    std::atomic_bool alive{true};
     uint64_t id;
     Packet_Callback cb;
 };
@@ -26,11 +26,11 @@ public:
 	struct Subscription
     {
         PacketManager* owner = nullptr;
-        PacketType type{};
+        PacketTypeID type{};
         uint64_t id = 0;
 
         Subscription() = default;
-        Subscription(PacketManager* o, PacketType t, uint64_t i)
+        Subscription(PacketManager* o, PacketTypeID t, uint64_t i)
             : owner(o), type(t), id(i) {}
 
         Subscription(const Subscription&) = delete;
@@ -83,13 +83,13 @@ public:
 
         {
             std::lock_guard lock(m_mutex);
-            m_callbacks[TPacket::Type].push_back(std::move(entry));
+            m_callbacks[TPacket::TypeID].push_back(std::move(entry));
         }
 
-        return Subscription{ this, TPacket::Type, id };
+        return Subscription{ this, TPacket::TypeID, id };
     }
 
-    void Dispatch(const IPacket& pkt, PacketType type)
+    void Dispatch(const IPacket& pkt, PacketTypeID type)
     {
         std::vector<CallbackEntry*> snapshot;
 
@@ -127,7 +127,7 @@ public:
     }
 
 private:
-    void Deactivate(PacketType type, uint64_t id)
+    void Deactivate(PacketTypeID type, uint64_t id)
     {
         std::lock_guard lock(m_mutex);
 
@@ -147,7 +147,7 @@ private:
 
 private:
     std::unordered_map<
-        PacketType,
+        PacketTypeID,
         std::vector<std::unique_ptr<CallbackEntry>>
     > m_callbacks;
 

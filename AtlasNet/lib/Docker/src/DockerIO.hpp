@@ -24,7 +24,7 @@ class DockerIO : public Singleton<DockerIO>
 public:
     DockerIO(const std::string &sockPath = "/var/run/docker.sock") : unixSocket(sockPath)
     {
-        Curl::Check();
+        Curl::Get();
     }
     ~DockerIO() {
     }

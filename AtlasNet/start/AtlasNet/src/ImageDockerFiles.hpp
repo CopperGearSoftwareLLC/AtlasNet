@@ -19,7 +19,7 @@ services:
           constraints:
             - 'node.role == manager'
       mode: replicated
-      replicas: ${WATCHDOG_REPLICA_NUM}
+      replicas: 1
       restart_policy:
         condition: on-failure
 
@@ -74,10 +74,16 @@ services:
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
     ports:
-      - target: 2555
-        published: 2555
+      - target: ${PORT_PROXY}
+        published: ${PORT_PROXY_PUBLISHED}
         protocol: tcp
         mode: ingress
+      
+      - target: ${PORT_PROXY}
+        published: ${PORT_PROXY_PUBLISHED}
+        protocol: udp
+        mode: ingress
+
     deploy:
       mode: replicated
       replicas: 1
@@ -111,7 +117,6 @@ DOCKER_FILE_DEF ATLASNET_STACK =
 	MacroParse(ATLASNET_STACK_RAW, {{"WATCHDOG_IMAGE_NAME", _WATCHDOG_IMAGE_NAME},
 									{"WATCHDOG_SERVICE_NAME", _WATCHDOG_SERVICE_NAME},
 									{"ATLASNET_NETWORK_NAME", _ATLASNET_NETWORK_NAME},
-									{"WATCHDOG_REPLICA_NUM", std::to_string(1)},
 									{"REGISTRY_ADDR", ""},	//"localhost/"
 									{"GAME_SERVER_IMAGE_NAME", _GAME_SERVER_IMAGE_NAME},
 									{"SHARD_SERVICE_NAME", _SHARD_SERVICE_NAME},
@@ -119,6 +124,8 @@ DOCKER_FILE_DEF ATLASNET_STACK =
 									{"CARTOGRAPH_SERVICE_NAME", _CARTOGRAPH_SERVICE_NAME},
 									{"PROXY_IMAGE_NAME", _PROXY_IMAGE_NAME},
 									{"PROXY_SERVICE_NAME", _PROXY_SERVICE_NAME},
+                  {"PORT_PROXY",std::to_string(_PORT_PROXY)},
+                  {"PORT_PROXY_PUBLISHED",std::to_string(_PORT_PROXY_PUBLISHED)},
 									{"INTERNAL_REDIS_SERVICE_NAME", _INTERNAL_REDIS_SERVICE_NAME},
 									{"INTERNAL_REDIS_PORT", std::to_string(_INTERNAL_REDIS_PORT)}});
 DOCKER_FILE_DEF Generic_Builder_Header = R"(
@@ -144,7 +151,7 @@ RUN curl -L https://github.com/microsoft/vcpkg/archive/refs/tags/2026.01.16.tar.
 | tar -xz --strip-components=1 -C ${VCPKG_ROOT}
 RUN  /opt/vcpkg/bootstrap-vcpkg.sh 
 RUN apt-get update && apt-get install binutils build-essential -y
-RUN ${VCPKG_ROOT}/vcpkg install \
+RUN --mount=type=cache,target=${WORKDIR}/build/vcpkg_installed VCPKG_MANIFEST_MODE=ON ${VCPKG_ROOT}/vcpkg install \
        --x-install-root=${WORKDIR}/build/vcpkg_installed
 )";
 DOCKER_FILE_DEF COPY_ATLASNET_SRC = R"(
@@ -155,19 +162,19 @@ DOCKER_FILE_DEF BUILD_ATLASNET_SRC = R"DOCKER(
 #--mount=type=cache,target=${WORKDIR}/build \
 ENV CC=clang
 ENV CXX=clang++
-#--mount=type=cache,target=${WORKDIR}/build
+#--mount=type=cache,target=${WORKDIR}/build/vcpkg_installed
 
 
-RUN  cmake -S . -B ${WORKDIR}/build -G Ninja -DCMAKE_BUILD_TYPE=Debug -DCMAKE_POLICY_VERSION_MINIMUM=3.5 -DCMAKE_C_COMPILER=clang -DCMAKE_CXX_COMPILER=clang++ \
- -DATLASNET_INCLUDE_RUNTIME=ON -DATLASNET_INCLUDE_LIBS=ON \
+RUN --mount=type=cache,target=${WORKDIR}/build/vcpkg_installed cmake -S . -B ${WORKDIR}/build -G Ninja -DCMAKE_BUILD_TYPE=Debug -DCMAKE_POLICY_VERSION_MINIMUM=3.5 -DCMAKE_C_COMPILER=clang -DCMAKE_CXX_COMPILER=clang++ \
+ -DATLASNET_INCLUDE_RUNTIME=ON -DATLASNET_INCLUDE_LIBS=ON -DVCPKG_MANIFEST_MODE=ON \
   -DCMAKE_TOOLCHAIN_FILE=$VCPKG_ROOT/scripts/buildsystems/vcpkg.cmake \
   -DVCPKG_INSTALLED_DIR=${WORKDIR}/build/vcpkg_installed -DATLASNET_INCLUDE_WEB=OFF ${CMAKE_ARGS}
-RUN  cmake --build ${WORKDIR}/build --parallel --target BuiltInDB Database Debug Docker Entity Events Heuristic Interlink InternalDB
+RUN  --mount=type=cache,target=${WORKDIR}/build/vcpkg_installed cmake --build ${WORKDIR}/build --parallel --target BuiltInDB Database Debug Docker Entity Events Heuristic Interlink InternalDB
 
-RUN   cmake --build ${WORKDIR}/build --parallel --target ${BUILD_PROJECT}
+RUN --mount=type=cache,target=${WORKDIR}/build/vcpkg_installed  cmake --build ${WORKDIR}/build --parallel --target ${BUILD_PROJECT}
 
 
-RUN  cmake --install ${WORKDIR}/build --component ${BUILD_PROJECT} --prefix ${WORKDIR}/bin
+RUN --mount=type=cache,target=${WORKDIR}/build/vcpkg_installed cmake --install ${WORKDIR}/build --component ${BUILD_PROJECT} --prefix ${WORKDIR}/bin
 
 
 # 8RUN mkdir -p /usr/local/lib && \

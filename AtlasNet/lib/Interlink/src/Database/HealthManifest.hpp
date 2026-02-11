@@ -3,7 +3,7 @@
 #include <thread>
 #include <utility>
 
-#include "InterlinkIdentifier.hpp"
+#include "Network/NetworkIdentity.hpp"
 #include "InternalDB.hpp"
 #include "Misc/Singleton.hpp"
 #include "Serialize/ByteReader.hpp"
@@ -13,13 +13,13 @@ class HealthManifest : public Singleton<HealthManifest>
 {
 	const std::string HealthPingTable = "Health_Ping";
 
-	std::optional<InterLinkIdentifier> identifier;
+	std::optional<NetworkIdentity> identifier;
 	std::jthread HealthPingIntervalFunc;
 
 	std::jthread HealthCheckOnFailureFunc;
 
    public:
-	void ScheduleHealthPings(const InterLinkIdentifier& id)
+	void ScheduleHealthPings(const NetworkIdentity& id)
 	{
 		HealthPingIntervalFunc = std::jthread(
 			[ id = id](std::stop_token st)
@@ -33,7 +33,7 @@ class HealthManifest : public Singleton<HealthManifest>
 			});
 	}
 
-	void ScheduleHealthChecks(std::function<void(const InterLinkIdentifier&,const std::string&)> onHealthCheckFail)
+	void ScheduleHealthChecks(std::function<void(const NetworkIdentity&,const std::string&)> onHealthCheckFail)
 	{
 		HealthCheckOnFailureFunc = std::jthread(
 			[onHealthCheckFail = std::move(onHealthCheckFail)](std::stop_token st)
@@ -47,7 +47,7 @@ class HealthManifest : public Singleton<HealthManifest>
 						for (const auto expired_key : expired_pings)
 						{
 							ByteReader br(expired_key);
-							InterLinkIdentifier id;
+							NetworkIdentity id;
 							id.Deserialize(br);
 							//ASSERT(
 							//	expired_ID.has_value(),
@@ -80,7 +80,7 @@ class HealthManifest : public Singleton<HealthManifest>
 	//===          PING             ===
 	//=================================
 
-	void HealthUpdate(const InterLinkIdentifier& identifier)
+	void HealthUpdate(const NetworkIdentity& identifier)
 	{
 		ByteWriter bw;
 		identifier.Serialize(bw);

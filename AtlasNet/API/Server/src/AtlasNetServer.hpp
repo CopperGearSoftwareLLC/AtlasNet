@@ -26,7 +26,7 @@ class ATLASNET_API AtlasNetServer : public AtlasNetInterface, public Singleton<A
 {
 	std::shared_ptr<Log> logger = std::make_shared<Log>("AtlasNetServer");
 	std::unordered_map<AtlasEntity::EntityID, AtlasEntity> CachedEntities;
-	std::unordered_set<InterLinkIdentifier> ConnectedClients;
+	std::unordered_set<NetworkIdentity> ConnectedClients;
 	std::vector<AtlasEntity> IncomingCache;
 	std::vector<AtlasEntity::EntityID> OutgoingCache;
 
@@ -58,11 +58,5 @@ class ATLASNET_API AtlasNetServer : public AtlasNetInterface, public Singleton<A
 	void Update(std::span<AtlasEntity> entities, std::vector<AtlasEntity>& IncomingEntities,
 				std::vector<AtlasEntity::EntityID>& OutgoingEntities);
 
-	/**
-	 * @brief Handles incoming messages from Interlink.
-	 *
-	 * @param fromWhom
-	 * @param data
-	 */
-	void HandleMessage(const Connection& fromWhom, std::span<const std::byte> data);
+
 };

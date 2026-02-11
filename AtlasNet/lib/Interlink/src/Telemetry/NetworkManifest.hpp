@@ -3,10 +3,9 @@
 #include <thread>
 
 #include "Misc/Singleton.hpp"
-#include "InterlinkIdentifier.hpp"
+#include "Network/NetworkIdentity.hpp"
 #include "Interlink.hpp"
 #include "InternalDB.hpp"
-#include "ConnectionTelemetry.hpp"
 #include "Serialize/ByteReader.hpp"
 #include "Serialize/ByteWriter.hpp"
 
@@ -17,13 +16,13 @@ public:
 
     const std::string NetworkTelemetryTable = "Network_Telemetry";
 
-	std::optional<InterLinkIdentifier> identifier;
+	std::optional<NetworkIdentity> identifier;
 	std::jthread HealthPingIntervalFunc;
 
 	std::jthread HealthCheckOnFailureFunc;
 
 public:
-	void ScheduleNetworkPings(const InterLinkIdentifier& id)
+	void ScheduleNetworkPings(const NetworkIdentity& id)
 	{
         //
 		HealthPingIntervalFunc = std::jthread(
@@ -38,7 +37,7 @@ public:
 			});
 	}
 
-void TelemetryUpdate(const InterLinkIdentifier& identifier)
+void TelemetryUpdate(const NetworkIdentity& identifier)
 {
     // Gather telemetry
     std::vector<ConnectionTelemetry> connections;
@@ -67,7 +66,7 @@ void TelemetryUpdate(const InterLinkIdentifier& identifier)
     // Serialize FIELD (shard ID)
     // ============================
     ByteWriter fieldBW;
-    fieldBW.str(identifier.ID);
+    fieldBW.uuid(identifier.ID);
 
     // ============================
     // Write to Redis (binary-safe)

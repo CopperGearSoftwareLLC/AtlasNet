@@ -1,54 +1,67 @@
 #pragma once
+#include <cassert>
 #include <mutex>
-#include <pch.hpp>
-
-template <typename Type, typename ConstructorArguments = void> class Singleton
+#include <memory>
+template <typename Type>
+class Singleton
 {
-  private:
-  static inline std::mutex GetMutex;
+private:
+    static inline std::mutex Mutex;
     static inline std::unique_ptr<Type> Instance;
 
-
-  public:
+protected:
     Singleton() = default;
-    Singleton(const Singleton& o) = delete;  
-  // if constructor arguments
-    template <typename T = ConstructorArguments, std::enable_if_t<!std::is_void_v<T>, int> = 0>
-    [[nodiscard]] static Type &Get()
-    {
-      std::lock_guard lock(GetMutex);
-        ASSERT(Instance, "Singleton Not Set");
-        return *Instance;
-    }
 
-    template <typename T = ConstructorArguments, std::enable_if_t<!std::is_void_v<T>, int> = 0>
-    static Type &Make(const T &args)
-    {
-      std::lock_guard lock(GetMutex);
-        ASSERT(!Instance, "Singleton already exist");
-        Type *rawPtr = static_cast<Type *>(::operator new(sizeof(Type)));
-        Instance.reset(rawPtr);
-        new (rawPtr) Type(args);
-        return *Instance;
-    }
+public:
+    Singleton(const Singleton&) = delete;
+    Singleton& operator=(const Singleton&) = delete;
 
-    // if no constructor arguments
-    template <typename T = ConstructorArguments, std::enable_if_t<std::is_void_v<T>, int> = 0>
-    [[nodiscard]] static Type &Get()
+    // Get: constructs ONLY if default-constructible
+    [[nodiscard]] static Type& Get()
     {
-      std::lock_guard lock(GetMutex);
+        std::lock_guard lock(Mutex);
+
         if (!Instance)
         {
-            Type *rawPtr = static_cast<Type *>(::operator new(sizeof(Type)));
-            Instance.reset(rawPtr);
-            new (rawPtr) Type();
+            if constexpr (std::is_default_constructible_v<Type>)
+            {
+                Instance = std::make_unique<Type>();
+            }
+            else
+            {
+                assert(false&& "Singleton not constructed. Call Make(...) first.");
+            }
         }
+
         return *Instance;
     }
 
-    static void Check()
+    // Make: infer constructor args
+    template <typename... Args>
+    static Type& Make(Args&&... args)
     {
-        Type &v = Get();
-        ASSERT(Instance, "Failed check");
+        static_assert(
+            std::is_constructible_v<Type, Args...>,
+            "Type is not constructible with the given arguments"
+        );
+
+        std::lock_guard lock(Mutex);
+        assert(!Instance&&"Singleton already exists");
+
+        Instance = std::make_unique<Type>(std::forward<Args>(args)...);
+        return *Instance;
+    }
+
+    static bool Exists()
+    {
+        std::lock_guard lock(Mutex);
+        return static_cast<bool>(Instance);
+    }
+
+    static void Destroy()
+    {
+        std::lock_guard lock(Mutex);
+        Instance.reset();
     }
 };
+

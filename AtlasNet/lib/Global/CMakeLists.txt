@@ -44,6 +44,7 @@ target_link_libraries(${TARGET_NAME}
         Boost::static_string
         Boost::uuid
         atlasnet_defs
+        GameNetworkingSockets::GameNetworkingSockets_s
 )
 
 # Other dependencies

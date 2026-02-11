@@ -3,7 +3,7 @@
 
 #include "Misc/Singleton.hpp"
 #include "Log.hpp"
-#include "Connection.hpp"
+#include "Network/Connection.hpp"
 
 
 class Partition : public Singleton<Partition>

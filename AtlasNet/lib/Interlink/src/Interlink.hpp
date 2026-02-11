@@ -1,30 +1,28 @@
 #pragma once
+#include <memory>
+#include <thread>
 #include <type_traits>
+#include <unordered_map>
 
-#include "Connection.hpp"
 #include "DockerIO.hpp"
 #include "GameNetworkingSockets.hpp"
 #include "InterlinkEnums.hpp"
-#include "InterlinkIdentifier.hpp"
 #include "Log.hpp"
 #include "Misc/Singleton.hpp"
-#include "Packet/Packet.hpp"
-#include "Packet/PacketManager.hpp"
-#include "Telemetry/ConnectionTelemetry.hpp"
+#include "Network/Connection.hpp"
+#include "Network/ConnectionTelemetry.hpp"
+#include "Network/NetworkEnums.hpp"
+#include "Network/NetworkIdentity.hpp"
+#include "Network/Packet/Packet.hpp"
+#include "Network/Packet/PacketManager.hpp"
 #include "pch.hpp"
-struct InterlinkCallbacks
-{
-	std::function<bool(const Connection &)> acceptConnectionCallback;
-	std::function<void(const InterLinkIdentifier &)> OnConnectedCallback;
-	std::function<void(const InterLinkIdentifier &)> OnDisconnectedCallback;
-};
+
 struct InterlinkProperties
 {
-	InterLinkIdentifier ThisID;
+	NetworkIdentity ThisID;
 	std::shared_ptr<Log> logger;
-	InterlinkCallbacks callbacks;
 };
-inline InterlinkType GetTargetType(const Connection &c)
+inline NetworkIdentityType GetTargetType(const Connection &c)
 {
 	return c.target.Type;
 }
@@ -52,17 +50,22 @@ class Interlink : public Singleton<Interlink>
 	boost::multi_index_container<
 		Connection,
 		boost::multi_index::indexed_by<
-			// non-unique by state
+			// non-unique by connection state
 			boost::multi_index::ordered_non_unique<
 				boost::multi_index::tag<IndexByState>,
-				boost::multi_index::member<Connection, ConnectionState, &Connection::state>>,
+				boost::multi_index::member<Connection, ConnectionState,
+										   &Connection::state>>,
 			// non-unique by target interlinkType
 			boost::multi_index::ordered_non_unique<
 				boost::multi_index::tag<IndexByTargetType>,
-				boost::multi_index::global_fun<const Connection &, InterlinkType, GetTargetType>>,
-			boost::multi_index::ordered_unique<
+				boost::multi_index::global_fun<
+					const Connection &, NetworkIdentityType, GetTargetType>>,
+			// non-unique, the reason its non unique is because GameClient on
+			// connection dont have an ID
+			boost::multi_index::ordered_non_unique<
 				boost::multi_index::tag<IndexByTarget>,
-				boost::multi_index::member<Connection, InterLinkIdentifier, &Connection::target>>,
+				boost::multi_index::member<Connection, NetworkIdentity,
+										   &Connection::target>>,
 			// Unique By HConnection
 			boost::multi_index::ordered_non_unique<
 				boost::multi_index::tag<IndexByHSteamNetConnection>,
@@ -70,33 +73,35 @@ class Interlink : public Singleton<Interlink>
 										   &Connection::SteamConnection>>>>
 		Connections;
 
+	std::unordered_map<NetworkIdentity,
+					   std::vector<std::pair<std::shared_ptr<IPacket>,
+											 NetworkMessageSendFlag>>>
+		QueuedPacketsOnConnect;
 	std::shared_ptr<Log> logger;
 	ISteamNetworkingSockets *networkInterface;
-	InterLinkIdentifier MyIdentity;
+	NetworkIdentity MyIdentity;
 	std::optional<HSteamListenSocket> ListeningSocket;
 	std::optional<HSteamNetPollGroup> PollGroup;
 	PacketManager packet_manager;
-	InterlinkCallbacks callbacks;
 	PortType ListenPort;
 	bool b_InDockerNetwork = true;
-	const static inline std::unordered_map<InterlinkType, uint32> Type2ListenPort = {
-		{InterlinkType::eWatchDog, _PORT_WATCHDOG},
-		{InterlinkType::eShard, _PORT_SHARD},
-		{InterlinkType::eGameServer, _PORT_GAMESERVER},
-		{InterlinkType::eProxy, _PORT_PROXY},
-		{InterlinkType::eGameClient, 25569}	 // temp client port
-	};
+	const static inline std::unordered_map<NetworkIdentityType, uint32>
+		Type2ListenPort = {{NetworkIdentityType::eWatchDog, _PORT_WATCHDOG},
+						   {NetworkIdentityType::eShard, _PORT_SHARD},
+						   {NetworkIdentityType::eGameServer, _PORT_GAMESERVER},
+						   {NetworkIdentityType::eProxy, _PORT_PROXY}};
 
    public:
-	bool EstablishConnectionAtIP(const InterLinkIdentifier &who, const IPAddress &ip);
-	void CloseConnectionTo(const InterLinkIdentifier &id, int reason = 0,
+	bool EstablishConnectionAtIP(const NetworkIdentity &who,
+								 const IPAddress &ip);
+	void CloseConnectionTo(const NetworkIdentity &id, int reason = 0,
 						   const char *debug = nullptr);
-	bool EstablishConnectionTo(const InterLinkIdentifier &who);
+	bool EstablishConnectionTo(const NetworkIdentity &who);
 
    private:
-	void DispatchDisconnected(const InterLinkIdentifier &id);
 	void GenerateNewConnections();
-	void OnDebugOutput(ESteamNetworkingSocketsDebugOutputType eType, const char *pszMsg);
+	void OnDebugOutput(ESteamNetworkingSocketsDebugOutputType eType,
+					   const char *pszMsg);
 
 	template <typename... Args>
 	void Debug(std::string_view fmt, Args &&...args) const
@@ -114,21 +119,31 @@ class Interlink : public Singleton<Interlink>
 	void ReceiveMessages();
 
 	// void DebugPrint();
-	
-	public:
+	void OnClientConnected(const Connection &c);
+
+	void Tick();
+	std::jthread TickThread;
+
+   public:
 	void Init(const InterlinkProperties &properties);
 	void Shutdown();
-	
-	void Tick();
-	void OnSteamNetConnectionStatusChanged(SteamNetConnectionStatusChangedCallback_t *pInfo);
-	
-	void GetConnectionTelemetry(std::vector<ConnectionTelemetry>& out);
-	// void SendMessageRaw(const InterLinkIdentifier &who, std::span<const std::byte> data,
-	// InterlinkMessageSendFlag sendFlag = InterlinkMessageSendFlag::eReliableBatched);
-	template <typename T, std::enable_if_t<std::is_base_of_v<IPacket, T>>>
-	void SendMessage(const InterLinkIdentifier &who, const T &packet,
-					 InterlinkMessageSendFlag sendFlag);
-	void SendMessage(const InterLinkIdentifier &who, const std::shared_ptr<IPacket> &packet,
-					 InterlinkMessageSendFlag sendFlag);
+
+	void OnSteamNetConnectionStatusChanged(
+		SteamNetConnectionStatusChangedCallback_t *pInfo);
+
+	void GetConnectionTelemetry(std::vector<ConnectionTelemetry> &out);
+	// void SendMessageRaw(const InterLinkIdentifier &who, std::span<const
+	// std::byte> data, InterlinkMessageSendFlag sendFlag =
+	// InterlinkMessageSendFlag::eReliableBatched);
+	template <typename T>
+	void SendMessage(const NetworkIdentity &who, const T &packet,
+					 NetworkMessageSendFlag sendFlag)
+	{
+		std::shared_ptr<IPacket> packet_ptr = std::make_shared<T>(packet);
+		SendMessage(who, packet_ptr, sendFlag);
+	}
+	void SendMessage(const NetworkIdentity &who,
+					 const std::shared_ptr<IPacket> &packet,
+					 NetworkMessageSendFlag sendFlag);
 	PacketManager &GetPacketManager() { return packet_manager; }
 };

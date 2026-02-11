@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.16)
+cmake_minimum_required(VERSION 3.6)
 
 option(SANDBOX_ADD_ATLASNET        "Include AtlasNet" ON)
 if ((NOT ATLASNET_ROOT) AND SANDBOX_ADD_ATLASNET)
@@ -11,9 +11,13 @@ set(CMAKE_CXX_EXTENSIONS OFF)
 set(CMAKE_POSITION_INDEPENDENT_CODE ON)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
+option(SANDBOX_ADD_CLIENT        "Include AtlasNet" OFF)
+
 add_subdirectory(lib)
 add_subdirectory(server)
+if(SANDBOX_ADD_CLIENT)
 add_subdirectory(client)
+endif()
 #add_run_target(
 #    NAME run_atlasnet_sandbox
 #    TARGET AtlasNet

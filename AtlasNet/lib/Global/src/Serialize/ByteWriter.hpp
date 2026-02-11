@@ -4,6 +4,7 @@
 #include <string_view>
 
 #include "ByteStream.hpp"
+#include "Misc/UUID.hpp"
 #include "pch.hpp"
 #include <span>
 #include <bit>
@@ -142,7 +143,9 @@ class ByteWriter
 		var_u32(uint32_t(s.size()));
 		write(s.data(), s.size());
 	}
-
+	 void uuid(const UUID& id) {
+        write(id.data(), id.size());
+    }
 	void blob(std::span<const uint8_t> b)
 	{
 		var_u32(uint32_t(b.size()));

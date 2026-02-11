@@ -1,10 +1,10 @@
 #pragma once
 
-#include "Packet/Packet.hpp"
+#include "Network/Packet/Packet.hpp"
 #include "Serialize/ByteReader.hpp"
 #include "Serialize/ByteWriter.hpp"
 
-class CommandPacket : public TPacket<CommandPacket, PacketType::eCommand>
+class CommandPacket : public TPacket<CommandPacket, "CommandPacket">
 {
    public:
 	enum class Type
@@ -12,6 +12,7 @@ class CommandPacket : public TPacket<CommandPacket, PacketType::eCommand>
 		eInvalidCommand,
 		eFetchNewBounds,
 		eShutdown,
+		eGameClientUUIDAssign
 	};
 	Type command = Type::eInvalidCommand;
 	CommandPacket() : TPacket(){}

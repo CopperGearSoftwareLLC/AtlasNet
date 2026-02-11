@@ -1,0 +1,24 @@
+#pragma once
+
+#include <boost/multi_index/indexed_by.hpp>
+#include <boost/multi_index_container.hpp>
+#include <boost/multi_index_container_fwd.hpp>
+
+#include "Client.hpp"
+#include "GNS.hpp"
+#include "InterlinkIdentifier.hpp"
+#include "Misc/Singleton.hpp"
+#include "Network/IPAddress.hpp"
+#include "boost/multi_index/sequenced_index.hpp"
+#include "boost/multi_index_container.hpp"
+class ProxyLink : public Singleton<ProxyLink>
+{
+   public:
+	void Init(const InterLinkIdentifier& id) {}
+	void Update() { GNS::Get()->RunCallbacks(); }
+
+   private:
+	boost::multi_index_container<
+		Client, boost::multi_index::indexed_by<boost::multi_index::sequenced<>>>
+		clients;
+};

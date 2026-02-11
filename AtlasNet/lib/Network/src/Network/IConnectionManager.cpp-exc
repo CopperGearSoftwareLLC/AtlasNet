@@ -1,0 +1,73 @@
+#include "IConnectionManager.hpp"
+
+#include <steam/isteamnetworkingsockets.h>
+#include <steam/steamnetworkingsockets.h>
+
+#include <stop_token>
+#include <thread>
+
+#include "Network/Connection.hpp"
+#include "Network/NetworkIdentity.hpp"
+#include "pch.hpp"
+
+IConnectionManager::IConnectionManager(const NetworkIdentity &ID)
+	: MyIdentity(ID)
+{
+	SteamDatagramErrMsg errMsg;
+	if (!GameNetworkingSockets_Init(nullptr, errMsg))
+	{
+		std::cerr << (std::string("GameNetworkingSockets_Init failed: ") +
+					  errMsg)
+				  << std::endl;
+		throw std::runtime_error("GameNetworkingSockets_Init failed");
+	}
+
+	PollThread = std::jthread([this](std::stop_token st) { PollLoop(st); });
+}
+
+std::future<bool> IConnectionManager::ConnectToID(
+	const NetworkIdentity &who)
+{
+
+	Serverreg
+}
+void IConnectionManager::PollLoop(std::stop_token st)
+{
+	while (!st.stop_requested())
+	{
+		FetchMessages();
+	}
+}
+void IConnectionManager::FetchMessages()
+{
+	ISteamNetworkingMessage *pIncomingMessages[32];
+	int numMsgs = SteamNetworkingSockets()->ReceiveMessagesOnPollGroup(
+		PollGroup.value(), pIncomingMessages, 32);
+
+	for (int i = 0; i < numMsgs; ++i)
+	{
+		ISteamNetworkingMessage *msg = pIncomingMessages[i];
+
+		const std::optional<Connection> connection = GetConnection(msg->m_conn);
+		ASSERT(connection.has_value(),
+			   "Cannot receive a message from a connection not established");
+		const NetworkIdentity &sender = connection.value().target;
+		const void *data = msg->m_pData;
+		size_t size = msg->m_cbSize;
+
+		// Normal internal dispatch
+		std::span<const uint8_t> span =
+			std::span<const uint8_t>((uint8_t *)data, size);
+		const auto packet = PacketRegistry::Get().CreateFromBytes(span);
+		logger->DebugFormatted("Arrived Packet of type {}. Dispatching...",
+							   packet->GetPacketName());
+		packet_manager.Dispatch(*packet, packet->GetPacketType());
+
+		std::string text(reinterpret_cast<const char *>(data), size);
+		logger->DebugFormatted("Message from ({}{}) \"{}\"",
+							   sender.IsInternal() ? "" : "External",
+							   sender.ToString(), text);
+
+		msg->Release();
+	}
+}

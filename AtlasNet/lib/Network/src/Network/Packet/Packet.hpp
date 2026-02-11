@@ -5,6 +5,7 @@
 #include "Serialize/ByteReader.hpp"
 #include "Serialize/ByteWriter.hpp"
 #include "pch.hpp"
+/*
 enum class PacketType
 {
     eDummy,
@@ -15,21 +16,23 @@ enum class PacketType
     //Event System
     eEventSystemRequest,
 };
-BOOST_DESCRIBE_ENUM(PacketType, eInvalid, eRelay,eCommand,eEventSystemRequest)
+BOOST_DESCRIBE_ENUM(PacketType, eInvalid, eRelay,eCommand,eEventSystemRequest)*/
+using PacketTypeID = uint32_t;
 
 class IPacket
 {
-	PacketType packet_type = PacketType::eInvalid;
+	PacketTypeID packet_type = -1;
 
    public:
-	IPacket(PacketType t) : packet_type(t) {}
+	IPacket(PacketTypeID t) : packet_type(t) {}
 	virtual ~IPacket() = default;
-	IPacket& SetPacketType(PacketType t)
+	IPacket& SetPacketType(PacketTypeID t)
 	{
 		packet_type = t;
 		return *this;
 	}
-	PacketType GetPacketType() const { return packet_type; }
+    virtual const std::string_view GetPacketName() const = 0;
+	PacketTypeID GetPacketType() const { return packet_type; }
 	const IPacket& Serialize(ByteWriter& bw) const;
 	IPacket& Deserialize(ByteReader& br);
 	[[nodiscard]] bool Validate() const;
@@ -50,12 +53,12 @@ public:
         return instance;
     }
 
-    bool Register(PacketType type, FactoryFn fn)
+    bool Register(PacketTypeID type, FactoryFn fn)
     {
         return factories.emplace(type, fn).second;
     }
 
-    std::unique_ptr<IPacket> Create(PacketType type) const
+    std::unique_ptr<IPacket> Create(PacketTypeID type) const
     {
         auto it = factories.find(type);
         if (it == factories.end())
@@ -71,12 +74,13 @@ public:
     {
         ByteReader br(bytes);
 
-        PacketType type = br.read_scalar<PacketType>();
+        PacketTypeID type = br.read_scalar<PacketTypeID>();
+        ByteReader br2(bytes);
         auto pkt = Create(type);
         if (!pkt)
             return nullptr;
 
-        pkt->Deserialize(br);
+        pkt->Deserialize(br2);
 
         if (!pkt->Validate())
 		{
@@ -89,28 +93,54 @@ public:
     }
 
 private:
-    std::unordered_map<PacketType, FactoryFn> factories;
+    std::unordered_map<PacketTypeID, FactoryFn> factories;
 };
+template <size_t N>
+struct FixedString
+{
+    char value[N];
 
-template <typename Derived, PacketType Type>
+    constexpr FixedString(const char (&str)[N])
+    {
+        for (size_t i = 0; i < N; ++i)
+            value[i] = str[i];
+    }
+};
+static constexpr uint32_t HashString(const char* str)
+{
+    uint32_t hash = 2166136261u;
+    while (*str)
+    {
+        hash ^= static_cast<uint8_t>(*str++);
+        hash *= 16777619u;
+    }
+    return hash;
+}
+template <typename Derived, FixedString Name>
 class TPacket : public IPacket
 {
+    public:
+    static constexpr PacketTypeID TypeID =
+        HashString(Name.value);
 protected:
-    TPacket() : IPacket(Type) {}
 
-private:
+
+    TPacket() : IPacket(TypeID) {}
+
+public:
     static std::unique_ptr<IPacket> Create()
     {
         return std::make_unique<Derived>();
     }
-
-    struct Registrar
+    const std::string_view GetPacketName() const override 
     {
-        Registrar()
-        {
-            PacketRegistry::Get().Register(Type, &TPacket::Create);
-        }
-    };
-
-    static inline Registrar registrar{};
+        return Name.value;
+    }
 };
+
+#define ATLASNET_REGISTER_PACKET(Type, Name)                     \
+    static const bool Type##_registered = []() -> bool {         \
+        PacketRegistry::Get().Register(HashString(Name),         \
+                                       &Type::Create);           \
+        return true;                                             \
+    }()

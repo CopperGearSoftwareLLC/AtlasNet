@@ -1,4 +1,5 @@
 #pragma once
+#include <boost/stacktrace/stacktrace.hpp>
 #include <filesystem>
 #include "Misc/Singleton.hpp"
 #include <csignal>

@@ -3,9 +3,9 @@
 #include <unordered_map>
 #include "Database/HealthManifest.hpp"
 #include "Telemetry/NetworkManifest.hpp"
-#include "Telemetry/ConnectionTelemetry.hpp"
+#include "Network/ConnectionTelemetry.hpp"
 #include "Serialize/ByteReader.hpp"
-#include "InterlinkIdentifier.hpp"
+#include "Network/NetworkIdentity.hpp"
 
 void NetworkTelemetry::GetLivePingIDs(std::vector<std::string>& out_live_ids, std::vector<std::string>& out_health) {
     std::unordered_map<std::string, double> all_pings;
@@ -16,7 +16,7 @@ void NetworkTelemetry::GetLivePingIDs(std::vector<std::string>& out_live_ids, st
 
         ByteReader br(pair.first);
         //ByteReader br_val(pair.second);
-        InterLinkIdentifier id;
+        NetworkIdentity id;
         id.Deserialize(br);
 
         std::cerr << id.ToString() << std::endl;

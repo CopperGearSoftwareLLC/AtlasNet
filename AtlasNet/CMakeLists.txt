@@ -1,5 +1,5 @@
 
-cmake_minimum_required(VERSION 3.6)
+cmake_minimum_required(VERSION 3.16)
 
 project(AtlasNet LANGUAGES C CXX)
 set(CMAKE_CXX_STANDARD 20)
@@ -55,13 +55,16 @@ endif()
 
 
 add_subdirectory(lib/BuiltInDB)
+add_subdirectory(lib/Client)
 add_subdirectory(lib/Database)
 add_subdirectory(lib/Debug)
 add_subdirectory(lib/Docker)
 add_subdirectory(lib/Entity)
 add_subdirectory(lib/Events)
 add_subdirectory(lib/Global)
+
 add_subdirectory(lib/Heuristic)
+add_subdirectory(lib/Network)
 add_subdirectory(lib/Interlink)
 add_subdirectory(lib/InternalDB)
 if (ATLASNET_INCLUDE_WEB)

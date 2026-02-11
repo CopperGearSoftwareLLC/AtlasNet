@@ -4,18 +4,19 @@
 
 #include "Crash/CrashHandler.hpp"
 #include "Database/HealthManifest.hpp"
-#include "Telemetry/NetworkManifest.hpp"
 #include "Interlink.hpp"
-#include "InterlinkIdentifier.hpp"
+#include "Misc/UUID.hpp"
+#include "Telemetry/NetworkManifest.hpp"
 void Proxy::Run()
 {
-	logger->Debug("Init"); //hello
+	logger->Debug("Init");	// hello
 
 	Init();
 	logger->Debug("Loop Entry");
 	while (!ShouldShutdown)
 	{
-		Interlink::Get().Tick();
+		// Interlink::Get().Tick();
+		// ProxyLink::Get().Update();
 		std::this_thread::sleep_for(std::chrono::milliseconds(10));
 	}
 
@@ -26,20 +27,11 @@ void Proxy::Run()
 void Proxy::Init()
 {
 	CrashHandler::Get().Init();
-	ID = InterLinkIdentifier(InterlinkType::eProxy, DockerIO::Get().GetSelfContainerName());
+	ID = NetworkIdentity(NetworkIdentityType::eProxy, UUIDGen::Gen());
+	Interlink::Get().Init(InterlinkProperties{.ThisID = ID, .logger = logger});
 	NetworkManifest::Get().ScheduleNetworkPings(ID);
 	HealthManifest::Get().ScheduleHealthPings(ID);
-	Interlink::Get().Init(InterlinkProperties{
-		.ThisID = ID,
-		.logger = logger,
-		.callbacks = {
-			.acceptConnectionCallback = [this](const Connection& c)
-			{ return OnAcceptConnection(c); },
-			.OnConnectedCallback = [this](const InterLinkIdentifier& id) { OnConnected(id); },
-			//.OnMessageArrival = [this](const Connection& from, std::span<const std::byte> data)
-			//{ OnMessageReceived(from, data); },
-			.OnDisconnectedCallback = [this](const InterLinkIdentifier& id)
-			{ OnDisconnected(id); }}});
+	
 }
 void Proxy::Shutdown()
 {
@@ -47,12 +39,15 @@ void Proxy::Shutdown()
 }
 void Proxy::CleanUp()
 {
-	Interlink::Get().Shutdown();
+	// Interlink::Get().Shutdown();
 }
 bool Proxy::OnAcceptConnection(const Connection& c)
 {
 	return true;
 }
-void Proxy::OnConnected(const InterLinkIdentifier& id) {}
-void Proxy::OnDisconnected(const InterLinkIdentifier& id) {}
-void Proxy::OnMessageReceived(const Connection& from, std::span<const std::byte> data) {}
+void Proxy::OnConnected(const NetworkIdentity& id) {}
+void Proxy::OnDisconnected(const NetworkIdentity& id) {}
+void Proxy::OnMessageReceived(const Connection& from,
+							  std::span<const std::byte> data)
+{
+}

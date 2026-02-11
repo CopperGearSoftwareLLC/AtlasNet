@@ -1,16 +1,25 @@
 #include "Interlink.hpp"
 
+#include <steam/steamtypes.h>
 
 #include <atomic>
 #include <boost/describe/enum_to_string.hpp>
 #include <chrono>
+#include <stop_token>
 #include <thread>
 
-#include "Database/ProxyRegistry.hpp"
+// #include "Database/ProxyRegistry.hpp"
 #include "Database/ServerRegistry.hpp"
 #include "DockerIO.hpp"
 #include "GameNetworkingSockets.hpp"
-#include "Packet/Packet.hpp"
+#include "InterlinkEnums.hpp"
+#include "Misc/UUID.hpp"
+#include "Network/Connection.hpp"
+#include "Network/NetworkEnums.hpp"
+#include "Network/NetworkIdentity.hpp"
+#include "Network/Packet/Client/ClientIDAssignPacket.hpp"
+#include "Network/Packet/Packet.hpp"
+#include "Serialize/ByteReader.hpp"
 #include "Serialize/ByteWriter.hpp"
 #include "pch.hpp"
 #include "steam/steamclientpublic.h"
@@ -25,7 +34,9 @@ static bool EnsureGNSInitialized()
 	SteamDatagramErrMsg errMsg;
 	if (!GameNetworkingSockets_Init(nullptr, errMsg))
 	{
-		std::cerr << (std::string("GameNetworkingSockets_Init failed: ") + errMsg) << std::endl;
+		std::cerr << (std::string("GameNetworkingSockets_Init failed: ") +
+					  errMsg)
+				  << std::endl;
 		return false;
 	}
 	initialized.store(true, std::memory_order_release);
@@ -33,13 +44,15 @@ static bool EnsureGNSInitialized()
 }
 
 // ===== Static forwarder for GNS connection status callback ===================
-static void SteamNetConnectionStatusChanged(SteamNetConnectionStatusChangedCallback_t *info)
+static void SteamNetConnectionStatusChanged(
+	SteamNetConnectionStatusChangedCallback_t *info)
 {
 	Interlink::Get().OnSteamNetConnectionStatusChanged(info);
 }
 
 // ===== Interlink implementation =============================================
-void Interlink::OnSteamNetConnectionStatusChanged(SteamNetConnectionStatusChangedCallback_t *pInfo)
+void Interlink::OnSteamNetConnectionStatusChanged(
+	SteamNetConnectionStatusChangedCallback_t *pInfo)
 {
 	switch (pInfo->m_info.m_eState)
 	{
@@ -55,10 +68,12 @@ void Interlink::OnSteamNetConnectionStatusChanged(SteamNetConnectionStatusChange
 			break;
 		case k_ESteamNetworkingConnectionState_ProblemDetectedLocally:
 			CallbackOnProblemDetectedLocally(pInfo);
-			logger->Debug("k_ESteamNetworkingConnectionState_ProblemDetectedLocally");
-			logger->ErrorFormatted("[GNS] ProblemDetectedLocally. desc='{}' reason={} debug='{}'",
-								   pInfo->m_info.m_szConnectionDescription,
-								   (int)pInfo->m_info.m_eEndReason, pInfo->m_info.m_szEndDebug);
+			logger->Debug(
+				"k_ESteamNetworkingConnectionState_ProblemDetectedLocally");
+			logger->ErrorFormatted(
+				"[GNS] ProblemDetectedLocally. desc='{}' reason={} debug='{}'",
+				pInfo->m_info.m_szConnectionDescription,
+				(int)pInfo->m_info.m_eEndReason, pInfo->m_info.m_szEndDebug);
 			break;
 		case k_ESteamNetworkingConnectionState_FinWait:
 			logger->Debug("k_ESteamNetworkingConnectionState_FinWait");
@@ -69,40 +84,35 @@ void Interlink::OnSteamNetConnectionStatusChanged(SteamNetConnectionStatusChange
 		case k_ESteamNetworkingConnectionState_None:
 			break;
 		default:
-			logger->ErrorFormatted(std::format("Unknown {}", (int64)pInfo->m_info.m_eState));
+			logger->ErrorFormatted(
+				std::format("Unknown {}", (int64)pInfo->m_info.m_eState));
 			break;
 	}
 }
-template <typename T, std::enable_if_t<std::is_base_of_v<IPacket, T>>>
-void Interlink::SendMessage(const InterLinkIdentifier &who, const T &packet,
-							InterlinkMessageSendFlag sendFlag)
-{
-	std::shared_ptr<IPacket> packet_ptr = std::make_shared(packet);
-	SendMessage(who, packet_ptr, sendFlag);
-}
-void Interlink::SendMessage(const InterLinkIdentifier &who, const std::shared_ptr<IPacket> &packet,
-							InterlinkMessageSendFlag sendFlag)
+
+void Interlink::SendMessage(const NetworkIdentity &who,
+							const std::shared_ptr<IPacket> &packet,
+							NetworkMessageSendFlag sendFlag)
 {
 	ASSERT(packet->Validate(), "Packet did not valite");
 	if (!packet->Validate())
 	{
 		logger->ErrorFormatted(
-			"Interlink::SendMessage: Packet of type {} did not validate successfully",
-			boost::describe::enum_to_string(packet->GetPacketType(), "UNKNOWN"));
+			"Interlink::SendMessage: Packet of type {} did not validate "
+			"successfully",
+			packet->GetPacketName());
 		return;
 	}
-	auto QueueMessageOnConnect = [&]()
-	{
-		auto it = Connections.get<IndexByTarget>().find(who);
-		Connections.get<IndexByTarget>().modify(
-			it, [&](Connection &c)
-			{ c.MessagesToSendOnConnect.push_back(std::make_pair(sendFlag, packet)); });
+
+	auto QueueMessageOnConnect = [&]() {
+		QueuedPacketsOnConnect[who].push_back(std::make_pair(packet, sendFlag));
 	};
 
 	if (!Connections.get<IndexByTarget>().contains(who))
 	{
-		logger->DebugFormatted("Connection to \"{}\" was not established, connecting...",
-							   who.ToString());
+		logger->DebugFormatted(
+			"Connection to \"{}\" was not established, connecting...",
+			who.ToString());
 		EstablishConnectionTo(who);
 		QueueMessageOnConnect();
 	}
@@ -114,16 +124,18 @@ void Interlink::SendMessage(const InterLinkIdentifier &who, const std::shared_pt
 		{
 			logger->DebugFormatted(
 				"Connection to {} is {} , queuing message...", who.ToString(),
-				boost::describe::enum_to_string(Connections.get<IndexByTarget>().find(who)->state,
-												"unknown"));
+				boost::describe::enum_to_string(
+					Connections.get<IndexByTarget>().find(who)->state,
+					"unknown"));
 			QueueMessageOnConnect();
 		}
 		else
 		{
 			logger->DebugFormatted(
 				"Connection to {} state is {} , connecting...", who.ToString(),
-				boost::describe::enum_to_string(Connections.get<IndexByTarget>().find(who)->state,
-												"unknown"));
+				boost::describe::enum_to_string(
+					Connections.get<IndexByTarget>().find(who)->state,
+					"unknown"));
 			EstablishConnectionTo(who);
 			QueueMessageOnConnect();
 		}
@@ -136,19 +148,20 @@ void Interlink::SendMessage(const InterLinkIdentifier &who, const std::shared_pt
 		packet->Serialize(bw);
 		const auto data_span = bw.bytes();
 		const auto SendResult = networkInterface->SendMessageToConnection(
-			conn.SteamConnection, data_span.data(), data_span.size_bytes(), (int)sendFlag, nullptr);
+			conn.SteamConnection, data_span.data(), data_span.size_bytes(),
+			(int)sendFlag, nullptr);
 
 		if (SendResult != k_EResultOK)
 		{
 			logger->ErrorFormatted(
-				"Unable to send message. SteamNetworkingSockets returned result code {}",
+				"Unable to send message. SteamNetworkingSockets returned "
+				"result code {}",
 				(int)SendResult);
-			DispatchDisconnected(who);
 		}
 		else
 		{
-			logger->DebugFormatted("Message of size {} bytes sent to {}", data_span.size_bytes(),
-								   who.ToString());
+			logger->DebugFormatted("Message of size {} bytes sent to {}",
+							   data_span.size_bytes(), who.ToString());
 		}
 	}
 }
@@ -156,20 +169,23 @@ void Interlink::SendMessage(const InterLinkIdentifier &who, const std::shared_pt
 void Interlink::GenerateNewConnections()
 {
 	auto &IndiciesByState = Connections.get<IndexByState>();
-	auto PreConnectingConnections = IndiciesByState.equal_range(ConnectionState::ePreConnecting);
+	auto PreConnectingConnections =
+		IndiciesByState.equal_range(ConnectionState::ePreConnecting);
 
 	SteamNetworkingConfigValue_t opt[1];
 	opt[0].SetPtr(k_ESteamNetworkingConfig_Callback_ConnectionStatusChanged,
 				  (void *)SteamNetConnectionStatusChanged);
 
-	for (auto it = PreConnectingConnections.first; it != PreConnectingConnections.second; ++it)
+	for (auto it = PreConnectingConnections.first;
+		 it != PreConnectingConnections.second; ++it)
 	{
 		const Connection &connection = *it;
-		logger->DebugFormatted("Connecting to {} at {}", connection.target.ToString(),
+		logger->DebugFormatted("Connecting to {} at {}",
+							   connection.target.ToString(),
 							   connection.address.ToString());
 
-		HSteamNetConnection conn =
-			networkInterface->ConnectByIPAddress(connection.address.ToSteamIPAddr(), 1, opt);
+		HSteamNetConnection conn = networkInterface->ConnectByIPAddress(
+			connection.address.ToSteamIPAddr(), 1, opt);
 		if (conn == k_HSteamNetConnection_Invalid)
 		{
 			logger->ErrorFormatted("Failed to Generate New Connection {}",
@@ -177,12 +193,14 @@ void Interlink::GenerateNewConnections()
 		}
 		else
 		{
-			IndiciesByState.modify(it, [conn = conn](Connection &c) { c.SteamConnection = conn; });
+			IndiciesByState.modify(
+				it, [conn = conn](Connection &c) { c.SteamConnection = conn; });
 		}
 	}
 }
 
-void Interlink::OnDebugOutput(ESteamNetworkingSocketsDebugOutputType eType, const char *pszMsg)
+void Interlink::OnDebugOutput(ESteamNetworkingSocketsDebugOutputType eType,
+							  const char *pszMsg)
 {
 	logger->DebugFormatted(std::format("[GNS Debug] {}\n", pszMsg));
 }
@@ -191,69 +209,79 @@ void Interlink::CallbackOnConnecting(SteamCBInfo info)
 {
 	logger->DebugFormatted("On Connecting");
 
-	auto &IndiciesBySteamConnection = Connections.get<IndexByHSteamNetConnection>();
+	auto &IndiciesBySteamConnection =
+		Connections.get<IndexByHSteamNetConnection>();
 	auto ExistingConnection = IndiciesBySteamConnection.find(info->m_hConn);
 
+	// The connection request already exists
 	if (ExistingConnection != IndiciesBySteamConnection.end())
 	{
 		IndiciesBySteamConnection.modify(
-			ExistingConnection, [](Connection &c) { c.SetNewState(ConnectionState::eConnecting); });
+			ExistingConnection,
+			[](Connection &c) { c.SetNewState(ConnectionState::eConnecting); });
 		logger->DebugFormatted(
-			"Existing connection to ({}) started by me transitioning to CONNECTING state",
+			"Existing connection to ({}) started by me transitioning to "
+			"CONNECTING state",
 			ExistingConnection->target.ToString());
 		return;
 	}
 
-	/* ADD CHECK TO CHECK IF THE GIVEN NETWORKING IDENTITY ALREADY EXISTS IN THE CONNECTIONS MAP.
-	IMPLYING THAT THE SAME TARGET TRIED TO CONNECT MULTIPLE TIMES IN A ROW. CAUSES A CRASH*/
+	/* ADD CHECK TO CHECK IF THE GIVEN NETWORKING IDENTITY ALREADY EXISTS IN THE
+	CONNECTIONS MAP. IMPLYING THAT THE SAME TARGET TRIED TO CONNECT MULTIPLE
+	TIMES IN A ROW. CAUSES A CRASH*/
 
 	// ----- New incoming connection path (could be internal or external) -----
 	IPAddress address(info->m_info.m_addrRemote);
 
 	int identityByteStreamSize = 0;
-	const std::byte *identityByteStream =
-		(const std::byte *)info->m_info.m_identityRemote.GetGenericBytes(identityByteStreamSize);
+	const uint8 *identityByteStream =
+		(const uint8 *)info->m_info.m_identityRemote.GetGenericBytes(
+			identityByteStreamSize);
 
 	// If no identity or malformed, treat as EXTERNAL client (Unity, tools)
-	std::optional<InterLinkIdentifier> maybeID;
-	if (identityByteStream &&
-		info->m_info.m_identityRemote.m_eType == k_ESteamNetworkingIdentityType_GenericBytes)
+	NetworkIdentity ID;
+	if (identityByteStream && info->m_info.m_identityRemote.m_eType ==
+								  k_ESteamNetworkingIdentityType_GenericBytes)
 	{
-		maybeID =
-			InterLinkIdentifier::FromEncodedByteStream(identityByteStream, identityByteStreamSize);
+		ByteReader br(std::span(identityByteStream, identityByteStreamSize));
+
+		ID.Deserialize(br);
 	}
 
-	bool known = false;
-	InterLinkIdentifier resolvedID;
-	if (maybeID.has_value())
+	// If connection is internal?
+	if (ID.IsInternal())
 	{
-		resolvedID = maybeID.value();
-		known = ServerRegistry::Get().ExistsInRegistry(resolvedID);
+		bool known = false;
+
+		known = ServerRegistry::Get().ExistsInRegistry(ID);
+
+		logger->DebugFormatted(
+			"Incoming Internal Connection from: {} at {} (In Server Registry? "
+			"{})",
+			ID.ToString(), address.ToString(), known ? "yes" : "no");
 	}
 	else
 	{
-		// Assign a neutral ID for external clients (type GameClient with empty/id-from-ip)
-		resolvedID = InterLinkIdentifier::MakeIDGameClient(address.ToString());
+		logger->DebugFormatted("Incoming External Connection from: {} at {} ",
+							   ID.ToString(), address.ToString());
 	}
-
-	logger->DebugFormatted("Incoming Connection from: {} at {} (known? {})", resolvedID.ToString(),
-						   address.ToString(), known ? "yes" : "no");
-
 	// Accept the connection
-	if (EResult result = networkInterface->AcceptConnection(info->m_hConn); result != k_EResultOK)
+	if (EResult result = networkInterface->AcceptConnection(info->m_hConn);
+		result != k_EResultOK)
 	{
-		logger->ErrorFormatted("Error accepting connection: reason: {}", uint64(result));
+		logger->ErrorFormatted("Error accepting connection: reason: {}",
+							   uint64(result));
 		networkInterface->CloseConnection(info->m_hConn, 0, nullptr, false);
 		return;
 	}
-
 	// Register new connection (mark external if not registry-known)
 	Connection newCon;
 	newCon.SteamConnection = info->m_hConn;
 	newCon.SetNewState(ConnectionState::eConnecting);
 	newCon.address = address;
-	newCon.target = resolvedID;
-	newCon.kind = known ? ConnectionKind::eInternal : ConnectionKind::eExternal;
+	newCon.target = ID;
+	newCon.kind =
+		ID.IsInternal() ? ConnectionKind::eInternal : ConnectionKind::eExternal;
 	Connections.insert(newCon);
 }
 
@@ -264,21 +292,22 @@ void Interlink::CallbackOnClosedByPear(SteamCBInfo info)
 
 	if (it == bySteam.end())
 	{
-		logger->Error("ClosedByPeer received for unknown connection. This should never happen");
+		logger->Error(
+			"ClosedByPeer received for unknown connection. This should never "
+			"happen");
 		return;
 	}
 
-	InterLinkIdentifier closedID = it->target;
+	NetworkIdentity closedID = it->target;
 
-	logger->DebugFormatted("Connection closed by peer: {}", closedID.ToString());
+	logger->DebugFormatted("Connection closed by peer: {}",
+						   closedID.ToString());
 
-	networkInterface->CloseConnection(info->m_hConn, 0, "Connection closed by peer. aka you", true);
+	networkInterface->CloseConnection(
+		info->m_hConn, 0, "Connection closed by peer. aka you", true);
 
 	// Remove from internal table BEFORE notifying callbacks.
 	bySteam.erase(it);
-
-	// Notify game systems (GameCoordinator, Demigod, etc.)
-	DispatchDisconnected(closedID);
 }
 
 void Interlink::CallbackOnProblemDetectedLocally(SteamCBInfo info)
@@ -288,85 +317,81 @@ void Interlink::CallbackOnProblemDetectedLocally(SteamCBInfo info)
 
 	if (it == bySteam.end())
 	{
-		logger->Warning("problem detected locally received for unknown connection.");
+		logger->Warning(
+			"problem detected locally received for unknown connection.");
 		return;
 	}
 
-	InterLinkIdentifier closedID = it->target;
+	NetworkIdentity closedID = it->target;
 
-	logger->DebugFormatted("Connection closed by peer: {}", closedID.ToString());
+	logger->DebugFormatted("Connection closed by peer: {}",
+						   closedID.ToString());
 
 	// Remove from internal table BEFORE notifying callbacks.
 	bySteam.erase(it);
-
-	// Notify game systems (GameCoordinator, Demigod, etc.)
-	DispatchDisconnected(closedID);
 }
 
 void Interlink::CallbackOnConnected(SteamCBInfo info)
 {
 	logger->Debug("OnConnected");
 	auto &indiciesBySteamConn = Connections.get<IndexByHSteamNetConnection>();
-	if (auto v = indiciesBySteamConn.find(info->m_hConn); v != indiciesBySteamConn.end())
-	{
-		std::vector<std::pair<InterlinkMessageSendFlag, std::shared_ptr<IPacket>>> MessagesToSend;
-		indiciesBySteamConn.modify(v,
-								   [&MessagesToSend = MessagesToSend](Connection &c)
-								   {
-									   c.SetNewState(ConnectionState::eConnected);
-									   MessagesToSend = std::move(c.MessagesToSendOnConnect);
-								   });
 
-		bool result =
-			networkInterface->SetConnectionPollGroup(v->SteamConnection, PollGroup.value());
+	if (auto v = indiciesBySteamConn.find(info->m_hConn);
+		v != indiciesBySteamConn.end())
+	{
+		indiciesBySteamConn.modify(
+			v,
+			[](Connection &c) { c.SetNewState(ConnectionState::eConnected); });
+		bool result = networkInterface->SetConnectionPollGroup(
+			v->SteamConnection, PollGroup.value());
 		if (!result)
 		{
-			logger->ErrorFormatted("Failed to assign connection from {} to pollgroup",
-								   v->target.ToString());
+			logger->ErrorFormatted(
+				"Failed to assign connection from {} to pollgroup",
+				v->target.ToString());
 		}
 
-		if (v->IsExternal())
-			logger->DebugFormatted(" - External client Connected from {}", v->address.ToString());
+		if (!v->IsInternal())
+		{
+			logger->DebugFormatted(" - External client Connected from {}",
+								   v->address.ToString());
+			OnClientConnected(*v);
+		}
 		else
 			logger->DebugFormatted(" - {} Connected", v->target.ToString());
 
-		callbacks.OnConnectedCallback(v->target);
-		if (!MessagesToSend.empty())
+		if (QueuedPacketsOnConnect.contains(v->target) && !QueuedPacketsOnConnect.at(v->target).empty())
 		{
-			for (const auto &msg : MessagesToSend)
+			for (const auto &[msg, sendflag] :
+				 QueuedPacketsOnConnect.at(v->target))
 			{
-				const IPacket &packet = *msg.second;
-				SendMessage(v->target, msg.second, msg.first);
+				SendMessage(v->target, msg, sendflag);
 			}
-			logger->DebugFormatted("Sent {} messages on Connect to {}", MessagesToSend.size(),
-								   v->target.ToString());
+			QueuedPacketsOnConnect.erase(v->target);
 		}
 	}
 	else
 	{
 		IPAddress address(info->m_info.m_addrRemote);
-		logger->ErrorFormatted("FUcking idiot. connection not stored internally. {}",
-							   address.ToString(true));
+		logger->ErrorFormatted(
+			"FUcking idiot. connection not stored internally. {}",
+			address.ToString(true));
 		int identityByteStreamSize = 0;
-		const std::byte *identityByteStream =
-			(const std::byte *)info->m_info.m_identityRemote.GetGenericBytes(
+		const uint8_t *identityByteStream =
+			(const uint8_t *)info->m_info.m_identityRemote.GetGenericBytes(
 				identityByteStreamSize);
 		if (identityByteStream)
 		{
+			auto sp = std::span(identityByteStream, identityByteStreamSize);
+			ByteReader br(sp);
+			NetworkIdentity id;
+			id.Deserialize(br);
 			logger->ErrorFormatted("fucking idoit #2. Identity of remote {}",
-								   InterLinkIdentifier::FromEncodedByteStream(
-									   identityByteStream, identityByteStreamSize)
-									   ->ToString());
+								   id.ToString());
 		}
-		ASSERT(false, "Connected? to non existent connection?, HSteamNetConnection was not found");
-	}
-}
-
-void Interlink::DispatchDisconnected(const InterLinkIdentifier &id)
-{
-	if (callbacks.OnDisconnectedCallback)
-	{
-		callbacks.OnDisconnectedCallback(id);
+		ASSERT(false,
+			   "Connected? to non existent connection?, HSteamNetConnection "
+			   "was not found");
 	}
 }
 
@@ -384,7 +409,8 @@ void Interlink::OpenListenSocket(PortType port)
 	if (ListeningSocket.value() == k_HSteamListenSocket_Invalid)
 	{
 		logger->ErrorFormatted("Failed to listen on port {}", port);
-		throw std::runtime_error(std::format("Failed to listen on port {}", port));
+		throw std::runtime_error(
+			std::format("Failed to listen on port {}", port));
 	}
 	logger->DebugFormatted("Opened listen socket on port {}", port);
 }
@@ -392,41 +418,33 @@ void Interlink::OpenListenSocket(PortType port)
 void Interlink::ReceiveMessages()
 {
 	ISteamNetworkingMessage *pIncomingMessages[32];
-	int numMsgs =
-		networkInterface->ReceiveMessagesOnPollGroup(PollGroup.value(), pIncomingMessages, 32);
+	int numMsgs = networkInterface->ReceiveMessagesOnPollGroup(
+		PollGroup.value(), pIncomingMessages, 32);
 
 	for (int i = 0; i < numMsgs; ++i)
 	{
 		ISteamNetworkingMessage *msg = pIncomingMessages[i];
 
-		const Connection &sender = *Connections.get<IndexByHSteamNetConnection>().find(msg->m_conn);
+		const Connection &sender =
+			*Connections.get<IndexByHSteamNetConnection>().find(msg->m_conn);
 
 		const void *data = msg->m_pData;
 		size_t size = msg->m_cbSize;
 
-		// NEW: God can proxy external messages to internal targets.
-		if (MyIdentity.Type == InterlinkType::eWatchDog && sender.IsExternal())
-		{
-			// Temporary rule: forward to the main GameServer
-			// InterLinkIdentifier target = InterLinkIdentifier::MakeIDGameServer("main");
-			// logger->DebugFormatted("[Proxy] Forwarding external {} bytes to {}", size,
-			// target.ToString());
-
-			// SendMessageRaw(target,
-			//                std::span<const std::byte>((const std::byte *)data, size),
-			//                InterlinkMessageSendFlag::eReliableNow);
-		}
 		// Normal internal dispatch
-		std::span<const uint8_t> span = std::span<const uint8_t>((uint8_t *)data, size);
+		std::span<const uint8_t> span =
+			std::span<const uint8_t>((uint8_t *)data, size);
 		const auto packet = PacketRegistry::Get().CreateFromBytes(span);
 		logger->DebugFormatted("Arrived Packet of type {}. Dispatching...",
-							   boost::describe::enum_to_string(packet->GetPacketType(), "UNKNOWN"));
+							   packet->GetPacketName());
 		packet_manager.Dispatch(*packet, packet->GetPacketType());
 
 		std::string text(reinterpret_cast<const char *>(data), size);
-		logger->DebugFormatted(
-			"Message from ({}{}) \"{}\"", sender.IsExternal() ? "External " : "",
-			sender.IsExternal() ? sender.address.ToString() : sender.target.ToString(), text);
+		logger->DebugFormatted("Message from ({}{}) \"{}\"",
+							   !sender.IsInternal() ? "External " : "",
+							   !sender.IsInternal() ? sender.address.ToString()
+													: sender.target.ToString(),
+							   text);
 
 		msg->Release();
 	}
@@ -439,10 +457,9 @@ void Interlink::Init(const InterlinkProperties &Properties)
 	logger = Properties.logger;
 
 	logger->Debug("Interlink init");
-	ASSERT(MyIdentity.Type != InterlinkType::eInvalid, "Invalid Interlink Type");
-	ASSERT(Properties.callbacks.acceptConnectionCallback,
-		   "You must provide a function for accepting connections");
-	callbacks = Properties.callbacks;
+	ASSERT(MyIdentity.Type != NetworkIdentityType::eInvalid,
+		   "Invalid Interlink Type");
+	ASSERT(MyIdentity.IsInternal(), "Interlink is for internal only");
 
 	// Single init per process (no repeated warnings)
 	if (!EnsureGNSInitialized())
@@ -456,11 +473,13 @@ void Interlink::Init(const InterlinkProperties &Properties)
 	networkInterface = SteamNetworkingSockets();
 
 	// Identity setup (unchanged)
-	const auto IdentityByteStream = MyIdentity.ToEncodedByteStream();
+	ByteWriter bw;
+	MyIdentity.Serialize(bw);
+	const auto IdentityByteStream = std::string(bw.as_string_view());
 	logger->Debug("Settings Networking Identity");
 	SteamNetworkingIdentity identity;
-	const bool SetIdentity =
-		identity.SetGenericBytes(IdentityByteStream.data(), IdentityByteStream.size());
+	const bool SetIdentity = identity.SetGenericBytes(
+		IdentityByteStream.data(), IdentityByteStream.size());
 	ASSERT(SetIdentity, "Failed Identity set");
 	networkInterface->ResetIdentity(&identity);
 	// Create poll group
@@ -476,30 +495,30 @@ void Interlink::Init(const InterlinkProperties &Properties)
 	IPAddress ipAddress;
 	switch (MyIdentity.Type)
 	{
-		case InterlinkType::eProxy:
+		case NetworkIdentityType::eProxy:
 			// Register Demigod in ProxyRegistry
 			ListenPort = Type2ListenPort.at(MyIdentity.Type);
 			ipAddress.Parse(DockerIO::Get().GetSelfContainerIP() + ":" +
 							std::to_string(ListenPort));
-			//ProxyRegistry::Get().RegisterSelf(MyIdentity, ipAddress);
+			// ProxyRegistry::Get().RegisterSelf(MyIdentity, ipAddress);
 			ServerRegistry::Get().RegisterSelf(MyIdentity, ipAddress);
 
 			// Register public address
-			//pubIP = DockerIO::Get().GetServiceNodePublicIP(_PROXY_SERVICE_NAME);
-			//pubPort = _PORT_PROXY;
-			//pub.Parse(*pubIP + ":" + std::to_string(*pubPort));
-			//ProxyRegistry::Get().RegisterPublicAddress(MyIdentity, pub);
+			// pubIP =
+			// DockerIO::Get().GetServiceNodePublicIP(_PROXY_SERVICE_NAME);
+			// pubPort = _PORT_PROXY;
+			// pub.Parse(*pubIP + ":" + std::to_string(*pubPort));
+			// ProxyRegistry::Get().RegisterPublicAddress(MyIdentity, pub);
 			ServerRegistry::Get().RegisterPublicAddress(MyIdentity, pub);
 
-			logger->DebugFormatted("[Demigod] Public Swarm address = {}", pub.ToString());
+			logger->DebugFormatted("[Demigod] Public Swarm address = {}",
+								   pub.ToString());
 
 			OpenListenSocket(ListenPort);
-			//logger->DebugFormatted("[Interlink]Registered in ProxyRegistry as {}:{}",
+			// logger->DebugFormatted("[Interlink]Registered in ProxyRegistry as
+			// {}:{}",
 			//					   MyIdentity.ToString(), ipAddress.ToString());
 
-			break;
-		case InterlinkType::eGameClient:
-			b_InDockerNetwork = false;
 			break;
 		default:
 			// Register internal (container) address
@@ -508,118 +527,60 @@ void Interlink::Init(const InterlinkProperties &Properties)
 			ipAddress.Parse(DockerIO::Get().GetSelfContainerIP() + ":" +
 							std::to_string(ListenPort));
 			ServerRegistry::Get().RegisterSelf(MyIdentity, ipAddress);
-			logger->DebugFormatted("[Interlink]Registered in ServerRegistry as {}:{}",
-								   MyIdentity.ToString(), ipAddress.ToString());
+			logger->DebugFormatted(
+				"[Interlink]Registered in ServerRegistry as {}:{}",
+				MyIdentity.ToString(), ipAddress.ToString());
 			// Open internal mesh listener
 			OpenListenSocket(ListenPort);
 			break;
 	}
 
-	logger->Debug("Registered local");
-	/*
-	// Register public address (host ip:published port), if available
-	// seems to never trigger in service containers?
-	if (b_InDockerNetwork&& DockerIO::Get().GetSelfExposedPorts().empty() == false)
-	{
-		// The port we are actually listening on inside the container
-		ListenPort = Type2ListenPort.at(MyIdentity.Type);
-
-		// Find the HOST (public) port that Docker mapped for THIS internal listen port
-		if (auto mappedHostPort = DockerIO::Get().GetSelfExposedPortForInternalBind(ListenPort))
-		{
-		// Get the host's public (or LAN) IP; ignore the outPort here
-		uint32_t ignore = 0;
-		const std::string hostIP = DockerIO::Get().GetSelfPublicIP(ignore);
-
-		IPAddress pubAddr;
-		pubAddr.Parse(hostIP + ":" + std::to_string(*mappedHostPort));
-
-		ServerRegistry::Get().RegisterPublicAddress(MyIdentity, pubAddr);
-
-		if (MyIdentity.Type == InterlinkType::eDemigod)
-		{
-			ProxyRegistry::Get().RegisterPublicAddress(MyIdentity, pubAddr);
-		}
-
-		logger->DebugFormatted("[Interlink] Registered public address: {}", pubAddr.ToString());
-		}
-
-	}
-	else
-	{
-		if (!b_InDockerNetwork)
-		{
-
-		}
-		else
-		{
-		logger->DebugFormatted("[Interlink] No host port published for internal {} ({}).
-	Skipping public registration.", ListenPort, MyIdentity.ToString());
-		}
-
-	}*/
-
-	logger->Debug("Registered public");
-
 	// Existing post-init behavior (unchanged)
 	switch (MyIdentity.Type)
 	{
-		case InterlinkType::eGameServer:
+		case NetworkIdentityType::eGameServer:
 		{
-			InterLinkIdentifier PartitionID = MyIdentity;
-			PartitionID.Type = InterlinkType::eShard;
+			NetworkIdentity PartitionID = MyIdentity;
+			PartitionID.Type = NetworkIdentityType::eShard;
 			EstablishConnectionTo(PartitionID);
 		}
 		break;
 
-		case InterlinkType::eGameClient:
+		case NetworkIdentityType::eShard:
 		{
-			// InterLinkIdentifier targetServer(MyIdentity);
-			// targetServer.Type = InterlinkType::eGameServer;
-			// EstablishConnectionTo(targetServer);
+			EstablishConnectionTo(NetworkIdentity::MakeIDWatchDog());
 		}
 		break;
 
-		case InterlinkType::eShard:
+		case NetworkIdentityType::eProxy:
 		{
-			EstablishConnectionTo(InterLinkIdentifier::MakeIDWatchDog());
+			EstablishConnectionTo(NetworkIdentity::MakeIDWatchDog());
 		}
 		break;
 
-		case InterlinkType::eProxy:
-		{
-			// connect with everything for now to test
-			std::unordered_map<InterLinkIdentifier, ServerRegistryEntry> serverMap =
-				ServerRegistry::Get().GetServers();
-
-			for (auto &server : serverMap)
-			{
-				if (server.first.Type == InterlinkType::eShard ||
-					server.first.Type == InterlinkType::eWatchDog ||
-					server.first.Type == InterlinkType::eGameCoordinator)
-				{
-					EstablishConnectionTo(server.first);
-				}
-			}
-		}
-		break;
-
-		case InterlinkType::eGameCoordinator:
-		{
-			// std::unordered_map<InterLinkIdentifier, ProxyRegistry::ProxyRegistryEntry> proxyMap =
-			//     ProxyRegistry::Get().GetProxies();
-			//
-			// for (auto &proxy : proxyMap)
-			//{
-			//  EstablishConnectionTo(proxy.first);
-			//}
-		}
-		break;
-
-		case InterlinkType::eWatchDog:
+		case NetworkIdentityType::eWatchDog:
 		default:
 			break;
 	}
+
+	TickThread = std::jthread(
+		[this](std::stop_token st)
+		{
+			using clock = std::chrono::steady_clock;
+			auto last = clock::now();
+
+			while (!st.stop_requested())
+			{
+				Tick();
+
+				auto now = clock::now();
+				if (now - last < std::chrono::milliseconds(2))
+				{
+					std::this_thread::sleep_for(std::chrono::milliseconds(50));
+				}
+				last = now;
+			}
+		});
 }
 
 void Interlink::Shutdown()
@@ -627,7 +588,8 @@ void Interlink::Shutdown()
 	logger->Debug("Interlink Shutdown");
 }
 
-bool Interlink::EstablishConnectionAtIP(const InterLinkIdentifier &id, const IPAddress &address)
+bool Interlink::EstablishConnectionAtIP(const NetworkIdentity &id,
+										const IPAddress &address)
 {
 	// return EstablishConnectionTo(InterLinkIdentifier::MakeIDGod());
 	if (Connections.get<IndexByTarget>().contains(id))
@@ -635,7 +597,8 @@ bool Interlink::EstablishConnectionAtIP(const InterLinkIdentifier &id, const IPA
 		const Connection &existing = *Connections.get<IndexByTarget>().find(id);
 		if (existing.state == ConnectionState::eConnected)
 		{
-			logger->WarningFormatted("Connection to {} already established", id.ToString());
+			logger->WarningFormatted("Connection to {} already established",
+									 id.ToString());
 			return true;
 		}
 		else if (existing.state == ConnectionState::eConnecting ||
@@ -647,18 +610,20 @@ bool Interlink::EstablishConnectionAtIP(const InterLinkIdentifier &id, const IPA
 	}
 
 	// Step 1: Build God ID
-	InterLinkIdentifier godID = InterLinkIdentifier::MakeIDWatchDog();
+	NetworkIdentity godID = NetworkIdentity::MakeIDWatchDog();
 
 	// Step 2: Try to get public IP:port from registry
-	// std::optional<IPAddress> publicAddr = ServerRegistry::Get().GetPublicAddress(godID);
-	// if (!publicAddr.has_value())
+	// std::optional<IPAddress> publicAddr =
+	// ServerRegistry::Get().GetPublicAddress(godID); if
+	// (!publicAddr.has_value())
 	//{
-	//  logger->ErrorFormatted("No public address found for {} in Server Registry",
-	//  godID.ToString()); return false;
+	//  logger->ErrorFormatted("No public address found for {} in Server
+	//  Registry", godID.ToString()); return false;
 	//}
 	// else
 	//{
-	//  std::cout << "God is reachable at " << publicAddr->ToString() << std::endl;
+	//  std::cout << "God is reachable at " << publicAddr->ToString() <<
+	//  std::endl;
 	//}
 
 	// auto IP = ServerRegistry::Get().GetIPOfID(id);
@@ -669,24 +634,27 @@ bool Interlink::EstablishConnectionAtIP(const InterLinkIdentifier &id, const IPA
 	// conn.address = *publicAddr;
 	// conn.target = godID;
 	conn.SetNewState(ConnectionState::ePreConnecting);
-	conn.kind = ConnectionKind::eExternal;	// external connection path (direct IP)
+	conn.kind =
+		ConnectionKind::eExternal;	// external connection path (direct IP)
 	Connections.insert(conn);
 
-	logger->DebugFormatted("Establishing direct connection to {} at {}", id.ToString(),
-						   address.ToString());
+	logger->DebugFormatted("Establishing direct connection to {} at {}",
+						   id.ToString(), address.ToString());
 	return true;
 }
 
-bool Interlink::EstablishConnectionTo(const InterLinkIdentifier &id)
+bool Interlink::EstablishConnectionTo(const NetworkIdentity &id)
 {
-	ASSERT(MyIdentity.Type != InterlinkType::eGameClient, "Game client must use the ip one");
+	ASSERT(MyIdentity.Type != NetworkIdentityType::eGameClient,
+		   "Game client must use the ip one");
 	// Prevent duplicate attempts
 	if (Connections.get<IndexByTarget>().contains(id))
 	{
 		const Connection &existing = *Connections.get<IndexByTarget>().find(id);
 		if (existing.state == ConnectionState::eConnected)
 		{
-			logger->WarningFormatted("Connection to {} already established", id.ToString());
+			logger->WarningFormatted("Connection to {} already established",
+									 id.ToString());
 			return true;
 		}
 		if (existing.state == ConnectionState::eConnecting ||
@@ -699,15 +667,16 @@ bool Interlink::EstablishConnectionTo(const InterLinkIdentifier &id)
 	// ---------------------------------------------------------------
 	// INTERNAL: must exist in ServerRegistry
 	// ---------------------------------------------------------------
-	if (id.Type == InterlinkType::eWatchDog || id.Type == InterlinkType::eShard ||
-		id.Type == InterlinkType::eGameServer || id.Type == InterlinkType::eGameCoordinator)
+	if (id.IsInternal())
 	{
 		auto IP = ServerRegistry::Get().GetIPOfID(id);
 
 		for (int i = 0; i < 5 && !IP.has_value(); i++)
 		{
 			logger->ErrorFormatted(
-				"IP not found for {} in Server Registry. Trying again in 1 second", id.ToString());
+				"IP not found for {} in Server Registry. Trying again in 1 "
+				"second",
+				id.ToString());
 			std::this_thread::sleep_for(std::chrono::seconds(1));
 			IP = ServerRegistry::Get().GetIPOfID(id);
 		}
@@ -715,7 +684,8 @@ bool Interlink::EstablishConnectionTo(const InterLinkIdentifier &id)
 		if (!IP.has_value())
 		{
 			logger->ErrorFormatted(
-				"Failed to establish connection after 5 tries. IP not found in Server Registry {}",
+				"Failed to establish connection after 5 tries. IP not found in "
+				"Server Registry {}",
 				id.ToString());
 			return false;  // no assert crash, just graceful fail
 		}
@@ -727,86 +697,55 @@ bool Interlink::EstablishConnectionTo(const InterLinkIdentifier &id)
 		conn.SetNewState(ConnectionState::ePreConnecting);
 		Connections.insert(conn);
 
-		logger->DebugFormatted("Establishing internal connection to {}", id.ToString());
-		return true;
-	}
-	// ---------------------------------------------------------------
-	// INTERNAL: must exist in ProxyRegistry
-	// ---------------------------------------------------------------
-	if (id.Type == InterlinkType::eProxy)
-	{
-		auto IP = ProxyRegistry::Get().GetIPOfID(id);
-
-		for (int i = 0; i < 5 && !IP.has_value(); i++)
-		{
-			logger->ErrorFormatted(
-				"IP not found for {} in ProxyRegistry Registry. Trying again in 1 second",
-				id.ToString());
-			std::this_thread::sleep_for(std::chrono::seconds(1));
-			IP = ProxyRegistry::Get().GetIPOfID(id);
-		}
-
-		if (!IP.has_value())
-		{
-			logger->ErrorFormatted(
-				"Failed to establish connection after 5 tries. IP not found in ProxyRegistry "
-				"Registry {}",
-				id.ToString());
-			return false;  // no assert crash, just graceful fail
-		}
-
-		Connection conn;
-		conn.address = IP.value();
-		conn.target = id;
-		conn.kind = ConnectionKind::eInternal;
-		conn.SetNewState(ConnectionState::ePreConnecting);
-		Connections.insert(conn);
-
-		logger->DebugFormatted("Establishing internal connection to {}", id.ToString());
+		logger->DebugFormatted("Establishing internal connection to {}",
+							   id.ToString());
 		return true;
 	}
 
 	// ---------------------------------------------------------------
 	// EXTERNAL: skip registry (for now, nothing directly connects to clients)
 	// ---------------------------------------------------------------
-	if (id.Type == InterlinkType::eGameClient)
+	if (id.Type == NetworkIdentityType::eGameClient)
 	{
 		// For now, external clients are expected to connect INBOUND to God.
 		// Outbound from inside to a GameClient is not required.
-		logger->WarningFormatted("Skipping registry lookup for external client {}",
-								 MyIdentity.ToString());
+		logger->WarningFormatted(
+			"Skipping registry lookup for external client {}",
+			MyIdentity.ToString());
 		return true;
 	}
 
 	// Default case (unknown type)
-	logger->WarningFormatted("Unknown interlink type for {} - skipping connection",
-							 MyIdentity.ToString());
+	logger->WarningFormatted(
+		"Unknown interlink type for {} - skipping connection",
+		MyIdentity.ToString());
 	return false;
 }
 
-void Interlink::CloseConnectionTo(const InterLinkIdentifier &id, int reason, const char *debug)
+void Interlink::CloseConnectionTo(const NetworkIdentity &id, int reason,
+								  const char *debug)
 {
 	auto &byTarget = Connections.get<IndexByTarget>();
 
 	auto it = byTarget.find(id);
 	if (it == byTarget.end())
 	{
-		logger->WarningFormatted("CloseConnectionTo: No active connection found for {}",
-								 id.ToString());
+		logger->WarningFormatted(
+			"CloseConnectionTo: No active connection found for {}",
+			id.ToString());
 		return;
 	}
 
 	HSteamNetConnection conn = it->SteamConnection;
 
-	logger->DebugFormatted("Closing connection to {} (SteamConn={})", id.ToString(), (uint64)conn);
+	logger->DebugFormatted("Closing connection to {} (SteamConn={})",
+						   id.ToString(), (uint64)conn);
 
 	// Close on the networking side
 	networkInterface->CloseConnection(conn, reason, debug, false);
 
 	// Remove from table
 	byTarget.erase(it);
-
-	DispatchDisconnected(id);
 }
 /*
 void Interlink::DebugPrint()
@@ -824,26 +763,26 @@ void Interlink::Tick()
 	networkInterface->RunCallbacks();  // process events
 }
 
-
-void Interlink::GetConnectionTelemetry(std::vector<ConnectionTelemetry>& out)
+void Interlink::GetConnectionTelemetry(std::vector<ConnectionTelemetry> &out)
 {
-    out.clear();
+	out.clear();
 
-    ISteamNetworkingSockets* sockets = SteamNetworkingSockets();
-    if (!sockets)
-        return;
+	ISteamNetworkingSockets *sockets = SteamNetworkingSockets();
+	if (!sockets)
+		return;
 
-    const auto& byState = Connections.get<IndexByState>();
+	const auto &byState = Connections.get<IndexByState>();
 
-    auto [it, end] = byState.equal_range(ConnectionState::eConnected);
-    for (; it != end; ++it)
-    {
-        const Connection& conn = *it;
+	auto [it, end] = byState.equal_range(ConnectionState::eConnected);
+	for (; it != end; ++it)
+	{
+		const Connection &conn = *it;
 
-        SteamNetConnectionRealTimeStatus_t status{};
-        sockets->GetConnectionRealTimeStatus(conn.SteamConnection, &status, 0, nullptr);
+		SteamNetConnectionRealTimeStatus_t status{};
+		sockets->GetConnectionRealTimeStatus(conn.SteamConnection, &status, 0,
+											 nullptr);
 
-        ConnectionTelemetry t{};
+		ConnectionTelemetry t{};
 		t.pingMs = status.m_nPing;
 		t.inBytesPerSec = status.m_flInBytesPerSec;
 		t.outBytesPerSec = status.m_flOutBytesPerSec;
@@ -862,6 +801,28 @@ void Interlink::GetConnectionTelemetry(std::vector<ConnectionTelemetry>& out)
 		t.IdentityId = MyIdentity.ToString();
 		t.targetId = conn.target.ToString();
 
-        out.push_back(std::move(t));
-    }
+		out.push_back(std::move(t));
+	}
+}
+void Interlink::OnClientConnected(const Connection &c)
+{
+	ASSERT(c.target.Type == NetworkIdentityType::eGameClient, "Invalid Target");
+	if (c.target.ID.is_nil())
+	{
+		NetworkIdentity newIdentity = c.target;
+		newIdentity.ID = UUIDGen::Gen();
+		logger->DebugFormatted("Client Connection with no ID.\n	Assigning {}",
+							   newIdentity.ToString());
+
+		ClientIDAssignPacket IDAssignPacket;
+		IDAssignPacket.AssignedClientID = newIdentity;
+		Connections.get<IndexByHSteamNetConnection>().modify(
+			Connections.get<IndexByHSteamNetConnection>().find(
+				c.SteamConnection),
+			[newIdentity = newIdentity](Connection &C)
+			{ C.target = newIdentity; });
+
+		SendMessage(newIdentity, IDAssignPacket,
+					NetworkMessageSendFlag::eReliableNow);
+	}
 }

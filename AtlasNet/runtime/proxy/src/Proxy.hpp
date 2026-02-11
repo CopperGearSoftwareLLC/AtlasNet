@@ -1,16 +1,18 @@
 #pragma once
 
 #include <atomic>
+#include <optional>
 
-#include "InterlinkIdentifier.hpp"
+#include "Network/NetworkIdentity.hpp"
 #include "Log.hpp"
 #include "Misc/Singleton.hpp"
-#include "Connection.hpp"
+#include "Network/Connection.hpp"
+#include "Interlink.hpp"
 class Proxy : public Singleton<Proxy>
 {
 	std::shared_ptr<Log> logger = std::make_shared<Log>("Proxy");
 	std::atomic_bool ShouldShutdown = false;
-	InterLinkIdentifier ID;
+	NetworkIdentity ID;
 
    public:
 	void Run();
@@ -21,7 +23,7 @@ class Proxy : public Singleton<Proxy>
 	void CleanUp();
 
 	bool OnAcceptConnection(const Connection& c);
-	void OnConnected(const InterLinkIdentifier& id);
-	void OnDisconnected(const InterLinkIdentifier& id);
+	void OnConnected(const NetworkIdentity& id);
+	void OnDisconnected(const NetworkIdentity& id);
 	void OnMessageReceived(const Connection& from, std::span<const std::byte> data);
 };
