@@ -161,7 +161,7 @@ void Interlink::SendMessage(const NetworkIdentity &who,
 		else
 		{
 			logger->DebugFormatted("Message of size {} bytes sent to {}",
-							   data_span.size_bytes(), who.ToString());
+								   data_span.size_bytes(), who.ToString());
 		}
 	}
 }
@@ -360,7 +360,8 @@ void Interlink::CallbackOnConnected(SteamCBInfo info)
 		else
 			logger->DebugFormatted(" - {} Connected", v->target.ToString());
 
-		if (QueuedPacketsOnConnect.contains(v->target) && !QueuedPacketsOnConnect.at(v->target).empty())
+		if (QueuedPacketsOnConnect.contains(v->target) &&
+			!QueuedPacketsOnConnect.at(v->target).empty())
 		{
 			for (const auto &[msg, sendflag] :
 				 QueuedPacketsOnConnect.at(v->target))
