@@ -1,5 +1,8 @@
 #pragma once
 
+// Redis-backed lease coordinator for optional anti-dupe connection initiation
+// and inactivity bookkeeping across shard peer links.
+
 #include <chrono>
 #include <functional>
 #include <memory>

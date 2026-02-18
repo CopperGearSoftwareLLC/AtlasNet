@@ -1,5 +1,8 @@
 #pragma once
 
+// Authority telemetry persistence boundary used by shard runtime and later
+// Cartograph overlays (minimal rows + full entity snapshots).
+
 #include <format>
 #include <sstream>
 #include <string>

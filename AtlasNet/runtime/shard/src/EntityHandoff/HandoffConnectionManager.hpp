@@ -1,5 +1,8 @@
 #pragma once
 
+// Manages handoff transport connection lifecycle and inactivity cleanup, while
+// delegating lease semantics to the lease coordinator.
+
 #include <memory>
 #include <unordered_set>
 

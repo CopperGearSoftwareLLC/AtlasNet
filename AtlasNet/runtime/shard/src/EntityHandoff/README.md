@@ -1,3 +1,5 @@
+> This document captures protocol inspiration, edge cases, and iteration notes for the `EntityHandoff` module.
+
 *** notes for protocol inspiration
 
 entity handoff notes:

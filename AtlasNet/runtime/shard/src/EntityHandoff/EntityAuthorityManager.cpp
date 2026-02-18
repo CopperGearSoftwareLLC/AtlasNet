@@ -1,3 +1,6 @@
+// Implements authority orchestration for debug handoff flow:
+// owner election, heuristic boundary triggers, send/receive handoff transitions.
+
 #include "EntityHandoff/EntityAuthorityManager.hpp"
 
 #include <optional>

@@ -1,5 +1,8 @@
 #pragma once
 
+// Debug-only simulator that spawns/adopts entities and moves them in circular
+// motion to drive repeatable handoff trigger testing.
+
 #include <cstdint>
 #include <memory>
 #include <string_view>

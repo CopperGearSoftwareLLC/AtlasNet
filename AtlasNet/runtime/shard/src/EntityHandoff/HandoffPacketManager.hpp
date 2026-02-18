@@ -1,5 +1,8 @@
 #pragma once
 
+// Packet orchestration for entity handoff messaging: subscribe, send generic
+// entity payloads, and forward received handoffs into authority manager flow.
+
 #include <memory>
 
 #include "Log.hpp"

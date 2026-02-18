@@ -1,5 +1,8 @@
 #pragma once
 
+// Coordinates shard-side authority lifecycle: ownership selection, trigger checks,
+// and delegation to tracker/simulator/packet components.
+
 #include <chrono>
 #include <memory>
 #include <optional>

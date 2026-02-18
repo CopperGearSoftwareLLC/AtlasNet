@@ -1,5 +1,8 @@
 #pragma once
 
+// Stateful authority container for entities currently owned by this shard,
+// including authoritative/passing state and current snapshot data.
+
 #include <cstdint>
 #include <memory>
 #include <optional>

@@ -1,5 +1,7 @@
 #pragma once
 
+// Generic network packet carrying sender identity and full AtlasEntity payload.
+
 #include <cstdint>
 
 #include "Entity.hpp"
