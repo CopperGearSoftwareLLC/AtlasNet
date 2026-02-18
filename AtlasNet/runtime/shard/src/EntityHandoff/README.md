@@ -1,6 +1,13 @@
-Looking at merging shards to game servers to avoid network strain in loopback between partition + game server  
 
- 
+
+entity handoff notes:
+shards only know what it owns, is passing on, and ghosts
+if passing fails for any reason, move passing entity into own again
+
+handoff itself requires servers agreeing on a specific time to switch authority
+while switch is happening, new server takes incoming entity and tracks is as ghost
+after agreed time, servers swap authority
+
 
 Handoff edge case handling v2: Border crossing creates paradoxes 
 
