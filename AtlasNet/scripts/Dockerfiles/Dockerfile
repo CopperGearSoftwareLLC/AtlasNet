@@ -67,7 +67,7 @@ ENV CXX=clang++
 #--mount=type=cache,target=/atlasnet/build/vcpkg_installed
 
 
-RUN --mount=type=cache,target=/atlasnet/build/vcpkg_installed cmake -S . -B /atlasnet/build -G Ninja -DCMAKE_BUILD_TYPE=Debug -DCMAKE_POLICY_VERSION_MINIMUM=3.5 -DCMAKE_C_COMPILER=clang -DCMAKE_CXX_COMPILER=clang++ \
+RUN --mount=type=cache,target=/atlasnet/build/vcpkg_installed cmake -S . -B /atlasnet/build  -DCMAKE_BUILD_TYPE=Debug -DCMAKE_POLICY_VERSION_MINIMUM=3.5 -DCMAKE_C_COMPILER=clang -DCMAKE_CXX_COMPILER=clang++ \
  -DATLASNET_INCLUDE_RUNTIME=ON -DATLASNET_INCLUDE_LIBS=ON -DVCPKG_MANIFEST_MODE=ON \
   -DCMAKE_TOOLCHAIN_FILE=$VCPKG_ROOT/scripts/buildsystems/vcpkg.cmake \
   -DVCPKG_INSTALLED_DIR=/atlasnet/build/vcpkg_installed -DATLASNET_INCLUDE_WEB=OFF -DATLASNET_INCLUDE_WEB=ON -DENABLE_NODE=ON -DATLASNET_INCLUDE_RUNTIME=ON
@@ -216,7 +216,7 @@ ENV CXX=clang++
 #--mount=type=cache,target=/atlasnet/build/vcpkg_installed
 
 
-RUN --mount=type=cache,target=/atlasnet/build/vcpkg_installed cmake -S . -B /atlasnet/build -G Ninja -DCMAKE_BUILD_TYPE=Debug -DCMAKE_POLICY_VERSION_MINIMUM=3.5 -DCMAKE_C_COMPILER=clang -DCMAKE_CXX_COMPILER=clang++ \
+RUN --mount=type=cache,target=/atlasnet/build/vcpkg_installed cmake -S . -B /atlasnet/build  -DCMAKE_BUILD_TYPE=Debug -DCMAKE_POLICY_VERSION_MINIMUM=3.5 -DCMAKE_C_COMPILER=clang -DCMAKE_CXX_COMPILER=clang++ \
  -DATLASNET_INCLUDE_RUNTIME=ON -DATLASNET_INCLUDE_LIBS=ON -DVCPKG_MANIFEST_MODE=ON \
   -DCMAKE_TOOLCHAIN_FILE=$VCPKG_ROOT/scripts/buildsystems/vcpkg.cmake \
   -DVCPKG_INSTALLED_DIR=/atlasnet/build/vcpkg_installed -DATLASNET_INCLUDE_WEB=OFF 
