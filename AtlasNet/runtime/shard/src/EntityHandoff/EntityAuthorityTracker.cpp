@@ -113,6 +113,36 @@ void EntityAuthorityTracker::RemoveEntity(AtlasEntity::EntityID entityId)
 	authorityByEntityId.erase(entityId);
 }
 
+bool EntityAuthorityTracker::MarkPassing(
+	AtlasEntity::EntityID entityId, const NetworkIdentity& passingTarget)
+{
+	auto entityIt = authorityByEntityId.find(entityId);
+	if (entityIt == authorityByEntityId.end())
+	{
+		return false;
+	}
+
+	const bool alreadyPassingToTarget =
+		entityIt->second.authorityState == AuthorityState::ePassing &&
+		entityIt->second.passingTo.has_value() &&
+		entityIt->second.passingTo.value() == passingTarget;
+	entityIt->second.authorityState = AuthorityState::ePassing;
+	entityIt->second.passingTo = passingTarget;
+	return !alreadyPassingToTarget;
+}
+
+void EntityAuthorityTracker::MarkAuthoritative(AtlasEntity::EntityID entityId)
+{
+	auto entityIt = authorityByEntityId.find(entityId);
+	if (entityIt == authorityByEntityId.end())
+	{
+		return;
+	}
+
+	entityIt->second.authorityState = AuthorityState::eAuthoritative;
+	entityIt->second.passingTo.reset();
+}
+
 void EntityAuthorityTracker::DebugLogTrackedEntities() const
 {
 	if (!logger)
@@ -121,7 +151,9 @@ void EntityAuthorityTracker::DebugLogTrackedEntities() const
 	}
 
 	if (authorityByEntityId.size() > 0)
+	{
 		logger->DebugFormatted("[EntityHandoff] AuthorityTracker owns {} entities", authorityByEntityId.size());
+	}
 
 
 	for (const auto& [entityId, entry] : authorityByEntityId)
@@ -137,4 +169,16 @@ void EntityAuthorityTracker::DebugLogTrackedEntities() const
 			"[EntityHandoff]  entity={} pos=({}, {}, {}) state={} passing_to={} world={}",
 			entityId, pos[0], pos[1], pos[2], state, passingTo, entry.entitySnapshot.transform.world);
 	}
+}
+
+std::vector<AtlasEntity> EntityAuthorityTracker::GetOwnedEntitySnapshots() const
+{
+	std::vector<AtlasEntity> entities;
+	entities.reserve(authorityByEntityId.size());
+	for (const auto& [entityId, entry] : authorityByEntityId)
+	{
+		(void)entityId;
+		entities.push_back(entry.entitySnapshot);
+	}
+	return entities;
 }

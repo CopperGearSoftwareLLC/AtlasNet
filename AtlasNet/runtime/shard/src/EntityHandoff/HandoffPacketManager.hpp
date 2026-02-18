@@ -4,6 +4,7 @@
 
 #include "Log.hpp"
 #include "Misc/Singleton.hpp"
+#include "Entity.hpp"
 #include "Network/NetworkIdentity.hpp"
 #include "Network/Packet/PacketManager.hpp"
 
@@ -17,6 +18,8 @@ class HandoffPacketManager : public Singleton<HandoffPacketManager>
 	void Init(const NetworkIdentity& self, std::shared_ptr<Log> inLogger);
 	void Shutdown();
 	void SendEntityProbe(const NetworkIdentity& target) const;
+	void SendEntityHandoff(const NetworkIdentity& target,
+						   const AtlasEntity& entity) const;
 
 	[[nodiscard]] bool IsInitialized() const { return initialized; }
 

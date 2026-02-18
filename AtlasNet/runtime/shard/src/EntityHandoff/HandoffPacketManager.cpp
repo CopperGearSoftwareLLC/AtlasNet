@@ -3,6 +3,7 @@
 #include <chrono>
 #include <span>
 
+#include "EntityHandoff/EntityAuthorityManager.hpp"
 #include "EntityHandoff/HandoffConnectionManager.hpp"
 #include "EntityHandoff/Packet/HandoffEntityPacket.hpp"
 #include "Interlink.hpp"
@@ -84,6 +85,34 @@ void HandoffPacketManager::SendEntityProbe(const NetworkIdentity& target) const
 	}
 }
 
+void HandoffPacketManager::SendEntityHandoff(const NetworkIdentity& target,
+											 const AtlasEntity& entity) const
+{
+	if (!initialized)
+	{
+		return;
+	}
+
+	const auto now = std::chrono::time_point_cast<std::chrono::milliseconds>(
+						 std::chrono::system_clock::now())
+						 .time_since_epoch()
+						 .count();
+
+	HandoffEntityPacket packet;
+	packet.sender = selfIdentity;
+	packet.entity = entity;
+	packet.sentAtMs = static_cast<uint64_t>(now);
+	Interlink::Get().SendMessage(target, packet,
+								 NetworkMessageSendFlag::eReliableNow);
+
+	if (logger)
+	{
+		logger->WarningFormatted(
+			"[EntityHandoff] Sent HANDOFF entity packet to {} (entity_id={})",
+			target.ToString(), packet.entity.Entity_ID);
+	}
+}
+
 void HandoffPacketManager::OnHandoffEntityPacket(
 	const HandoffEntityPacket& packet) const
 {
@@ -122,4 +151,6 @@ void HandoffPacketManager::OnHandoffEntityPacket(
 	}
 
 	HandoffConnectionManager::Get().MarkConnectionActivity(packet.sender);
+	EntityAuthorityManager::Get().OnIncomingHandoffEntity(packet.entity,
+														 packet.sender);
 }

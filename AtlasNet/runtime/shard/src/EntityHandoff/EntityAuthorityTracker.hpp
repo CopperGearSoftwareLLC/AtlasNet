@@ -34,6 +34,10 @@ class EntityAuthorityTracker
 	void SetOwnedEntities(const std::vector<AtlasEntity>& ownedEntities);
 	void StoreAuthorityStateSnapshots(std::string_view hashKey);
 	void DebugLogTrackedEntities() const;
+	[[nodiscard]] std::vector<AtlasEntity> GetOwnedEntitySnapshots() const;
+	bool MarkPassing(AtlasEntity::EntityID entityId,
+					 const NetworkIdentity& passingTarget);
+	void MarkAuthoritative(AtlasEntity::EntityID entityId);
 
 	void SetAuthorityState(AtlasEntity::EntityID entityId, AuthorityState state,
 						   const std::optional<NetworkIdentity>& passingTo = std::nullopt);

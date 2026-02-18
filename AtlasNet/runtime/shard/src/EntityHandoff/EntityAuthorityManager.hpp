@@ -2,6 +2,7 @@
 
 #include <chrono>
 #include <memory>
+#include <optional>
 
 #include "EntityHandoff/DebugEntityOrbitSimulator.hpp"
 #include "EntityHandoff/EntityAuthorityTracker.hpp"
@@ -17,11 +18,14 @@ class EntityAuthorityManager : public Singleton<EntityAuthorityManager>
 	void Init(const NetworkIdentity& self, std::shared_ptr<Log> inLogger);
 	void Tick();
 	void Shutdown();
+	void OnIncomingHandoffEntity(const AtlasEntity& entity,
+								 const NetworkIdentity& sender);
 
 	[[nodiscard]] bool IsInitialized() const { return initialized; }
 
   private:
 	void EvaluateTestEntityOwnership();
+	void EvaluateHeuristicPositionTriggers();
 
 	NetworkIdentity selfIdentity;
 	std::shared_ptr<Log> logger;
@@ -30,6 +34,7 @@ class EntityAuthorityManager : public Singleton<EntityAuthorityManager>
 	bool ownershipEvaluated = false;
 	std::unique_ptr<EntityAuthorityTracker> tracker;
 	std::unique_ptr<DebugEntityOrbitSimulator> debugSimulator;
+	std::optional<AtlasEntity> pendingIncomingEntity;
 	std::chrono::steady_clock::time_point lastTickTime;
 	std::chrono::steady_clock::time_point lastOwnerEvalTime;
 	std::chrono::steady_clock::time_point lastSnapshotTime;

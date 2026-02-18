@@ -1,8 +1,13 @@
 #include "EntityHandoff/EntityAuthorityManager.hpp"
 
+#include <optional>
+
 #include "Database/ServerRegistry.hpp"
+#include "EntityHandoff/HandoffPacketManager.hpp"
 #include "EntityHandoff/HandoffConnectionManager.hpp"
 #include "InternalDB.hpp"
+#include "Database/HeuristicManifest.hpp"
+#include "Heuristic/GridHeuristic/GridHeuristic.hpp"
 
 namespace
 {
@@ -17,6 +22,48 @@ constexpr float kEntityPhaseStepRad = 0.7F;
 constexpr std::string_view kTestOwnerKey = "EntityHandoff:TestOwnerShard";
 constexpr std::string_view kTestEntityStateHash = "EntityHandoff:TestEntityState";
 constexpr std::string_view kAuthorityStateHash = "EntityHandoff:AuthorityState";
+
+std::string SelectTargetClaimKeyForPosition(
+	const std::unordered_map<std::string, GridShape>& claimedBounds,
+	const std::string& selfKey, const vec3& position)
+{
+	for (const auto& [claimKey, bound] : claimedBounds)
+	{
+		if (claimKey == selfKey)
+		{
+			continue;
+		}
+		if (bound.Contains(position))
+		{
+			return claimKey;
+		}
+	}
+
+	for (const auto& [claimKey, _bound] : claimedBounds)
+	{
+		if (claimKey == selfKey)
+		{
+			continue;
+		}
+		return claimKey;
+	}
+
+	return {};
+}
+
+std::optional<NetworkIdentity> ResolveIdentityFromClaimKey(
+	const std::string& claimKey,
+	const std::unordered_map<NetworkIdentity, ServerRegistryEntry>& servers)
+{
+	for (const auto& [id, _entry] : servers)
+	{
+		if (id.ToString() == claimKey)
+		{
+			return id;
+		}
+	}
+	return std::nullopt;
+}
 }  // namespace
 
 void EntityAuthorityManager::Init(const NetworkIdentity& self,
@@ -32,6 +79,7 @@ void EntityAuthorityManager::Init(const NetworkIdentity& self,
 		std::make_unique<DebugEntityOrbitSimulator>(selfIdentity, logger);
 	tracker->Reset();
 	debugSimulator->Reset();
+	pendingIncomingEntity.reset();
 	lastTickTime = std::chrono::steady_clock::now();
 	lastOwnerEvalTime = lastTickTime - kOwnershipEvalInterval;
 	lastSnapshotTime = lastTickTime - kStateSnapshotInterval;
@@ -57,6 +105,11 @@ void EntityAuthorityManager::Tick()
 	EvaluateTestEntityOwnership();
 	if (isTestEntityOwner && tracker && debugSimulator)
 	{
+		if (pendingIncomingEntity.has_value())
+		{
+			debugSimulator->AdoptSingleEntity(*pendingIncomingEntity);
+			pendingIncomingEntity.reset();
+		}
 		debugSimulator->SeedEntities(
 			DebugEntityOrbitSimulator::SeedOptions{
 				.desiredCount = kDefaultTestEntityCount,
@@ -74,6 +127,7 @@ void EntityAuthorityManager::Tick()
 				.radius = kOrbitRadius,
 				.angularSpeedRadPerSec = kOrbitAngularSpeedRadPerSec});
 		tracker->SetOwnedEntities(debugSimulator->GetEntitiesSnapshot());
+		EvaluateHeuristicPositionTriggers();
 		if (now - lastSnapshotTime >= kStateSnapshotInterval)
 		{
 			lastSnapshotTime = now;
@@ -91,6 +145,72 @@ void EntityAuthorityManager::Tick()
 	}
 }
 
+void EntityAuthorityManager::EvaluateHeuristicPositionTriggers()
+{
+	if (!tracker)
+	{
+		return;
+	}
+
+	std::unordered_map<std::string, GridShape> claimedBounds;
+	HeuristicManifest::Get().GetAllClaimedBounds<GridShape, std::string>(
+		claimedBounds);
+	if (claimedBounds.empty())
+	{
+		return;
+	}
+
+	const std::string selfKey = selfIdentity.ToString();
+	const auto selfIt = claimedBounds.find(selfKey);
+	if (selfIt == claimedBounds.end())
+	{
+		return;
+	}
+	const GridShape& selfBounds = selfIt->second;
+
+	const auto entities = tracker->GetOwnedEntitySnapshots();
+	for (const auto& entity : entities)
+	{
+		const vec3 position = entity.transform.position;
+		if (selfBounds.Contains(position))
+		{
+			tracker->MarkAuthoritative(entity.Entity_ID);
+			continue;
+		}
+
+		const std::string targetClaimKey = SelectTargetClaimKeyForPosition(
+			claimedBounds, selfKey, position);
+		if (targetClaimKey.empty())
+		{
+			continue;
+		}
+		const auto targetIdentity =
+			ResolveIdentityFromClaimKey(targetClaimKey, ServerRegistry::Get().GetServers());
+		if (!targetIdentity.has_value() || *targetIdentity == selfIdentity)
+		{
+			continue;
+		}
+
+		const bool shouldSendHandoff =
+			tracker->MarkPassing(entity.Entity_ID, *targetIdentity);
+		if (!shouldSendHandoff)
+		{
+			continue;
+		}
+		HandoffPacketManager::Get().SendEntityHandoff(*targetIdentity, entity);
+		const bool ownerSwitched = InternalDB::Get()->Set(kTestOwnerKey, targetClaimKey);
+		(void)ownerSwitched;
+		if (logger)
+		{
+			logger->WarningFormatted(
+				"[EntityHandoff] Triggered passing state entity={} pos={} "
+				"self_bound_id={} target_claim={} target_id={}",
+				entity.Entity_ID, glm::to_string(position), selfBounds.GetID(),
+				targetClaimKey, targetIdentity->ToString());
+		}
+	}
+}
+
 void EntityAuthorityManager::Shutdown()
 {
 	if (!initialized)
@@ -101,6 +221,7 @@ void EntityAuthorityManager::Shutdown()
 	HandoffConnectionManager::Get().Shutdown();
 	tracker.reset();
 	debugSimulator.reset();
+	pendingIncomingEntity.reset();
 	initialized = false;
 
 	if (logger)
@@ -145,5 +266,17 @@ void EntityAuthorityManager::EvaluateTestEntityOwnership()
 			"[EntityHandoff] Test owner={} self={} owning={}",
 			selectedOwner, selfIdentity.ToString(),
 			isTestEntityOwner ? "yes" : "no");
+	}
+}
+
+void EntityAuthorityManager::OnIncomingHandoffEntity(
+	const AtlasEntity& entity, const NetworkIdentity& sender)
+{
+	pendingIncomingEntity = entity;
+	if (logger)
+	{
+		logger->WarningFormatted(
+			"[EntityHandoff] Received handoff entity={} from {}",
+			entity.Entity_ID, sender.ToString());
 	}
 }

@@ -56,6 +56,15 @@ void DebugEntityOrbitSimulator::SeedEntities(const SeedOptions& options)
 	}
 }
 
+void DebugEntityOrbitSimulator::AdoptSingleEntity(const AtlasEntity& entity)
+{
+	entitiesById.clear();
+	OrbitEntity tracked;
+	tracked.entity = entity;
+	tracked.phaseOffsetRad = 0.0F;
+	entitiesById.emplace(entity.Entity_ID, std::move(tracked));
+}
+
 void DebugEntityOrbitSimulator::TickOrbit(const OrbitOptions& options)
 {
 	orbitAngleRad += options.deltaSeconds * options.angularSpeedRadPerSec;
