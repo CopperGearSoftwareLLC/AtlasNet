@@ -427,8 +427,7 @@ export default function MapPage() {
           entities: {authorityEntities.length} | shards: {networkNodeIds.length}
         </span>
         <span style={{ opacity: 0.8 }}>
-          net edges: {networkEdgeCount} | authority rows: {authorityEntities.length}{' '}
-          | positioned: {projectedShardPositions.size}
+          connections: {networkEdgeCount} | claimed entities: {authorityEntities.length}
         </span>
       </div>
 

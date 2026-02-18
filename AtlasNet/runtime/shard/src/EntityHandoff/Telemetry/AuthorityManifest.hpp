@@ -4,10 +4,11 @@
 // Cartograph overlays (minimal rows + full entity snapshots).
 
 #include <format>
+#include <chrono>
 #include <sstream>
 #include <string>
 #include <string_view>
-#include <unordered_set>
+#include <optional>
 #include <vector>
 
 #include "EntityHandoff/EntityAuthorityTracker.hpp"
@@ -25,11 +26,21 @@ class AuthorityManifest : public Singleton<AuthorityManifest>
 	void TelemetryUpdate(
 		const std::vector<EntityAuthorityTracker::AuthorityTelemetryRow>& rows)
 	{
-		std::unordered_set<std::string> nextPublishedEntityFields;
-		nextPublishedEntityFields.reserve(rows.size());
 		for (const auto& row : rows)
 		{
 			const std::string field = std::to_string(row.entityId);
+			const std::optional<std::string> previousTelemetryValue =
+				InternalDB::Get()->HGet(kAuthorityTelemetryTable, field);
+			std::string lastAuthority = row.owner.ToString();
+			if (previousTelemetryValue.has_value())
+			{
+				const size_t ownerEnd = previousTelemetryValue->find('\t');
+				if (ownerEnd != std::string::npos && ownerEnd > 0)
+				{
+					lastAuthority = previousTelemetryValue->substr(0, ownerEnd);
+				}
+			}
+
 			const std::string value = std::format(
 				"{}\t{}\t{}\t{}\t{}\t{}\t{}", row.owner.ToString(), row.world,
 				row.position[0], row.position[1], row.position[2],
@@ -45,33 +56,17 @@ class AuthorityManifest : public Singleton<AuthorityManifest>
 			const long long wroteSnapshot = InternalDB::Get()->HSet(
 				kAuthorityEntitySnapshotTable, field, snapshotValue);
 			(void)wroteSnapshot;
-			nextPublishedEntityFields.insert(field);
-		}
 
-		std::vector<std::string> staleFields;
-		for (const auto& oldField : lastPublishedEntityFields)
-		{
-			if (!nextPublishedEntityFields.contains(oldField))
-			{
-				staleFields.push_back(oldField);
-			}
+			const auto nowMs =
+				std::chrono::duration_cast<std::chrono::milliseconds>(
+					std::chrono::system_clock::now().time_since_epoch())
+					.count();
+			const std::string entityMetaValue =
+				std::format("{}\t{}", lastAuthority, nowMs);
+			const long long wroteMeta = InternalDB::Get()->HSet(
+				kAuthorityEntityMetaTable, field, entityMetaValue);
+			(void)wroteMeta;
 		}
-		if (!staleFields.empty())
-		{
-			std::vector<std::string_view> staleFieldViews;
-			staleFieldViews.reserve(staleFields.size());
-			for (const auto& field : staleFields)
-			{
-				staleFieldViews.push_back(field);
-			}
-			const long long removed =
-				InternalDB::Get()->HDel(kAuthorityTelemetryTable, staleFieldViews);
-			(void)removed;
-			const long long removedSnapshot = InternalDB::Get()->HDel(
-				kAuthorityEntitySnapshotTable, staleFieldViews);
-			(void)removedSnapshot;
-		}
-		lastPublishedEntityFields = std::move(nextPublishedEntityFields);
 	}
 
 	static void GetAllTelemetry(std::vector<std::vector<std::string>>& outRows)
@@ -106,10 +101,16 @@ class AuthorityManifest : public Singleton<AuthorityManifest>
 		return InternalDB::Get()->HGetAll(kAuthorityEntitySnapshotTable);
 	}
 
+	static std::unordered_map<std::string, std::string> GetAllEntityMetaRaw()
+	{
+		return InternalDB::Get()->HGetAll(kAuthorityEntityMetaTable);
+	}
+
   private:
 	static inline constexpr std::string_view kAuthorityTelemetryTable =
 		"Authority_Telemetry";
 	static inline constexpr std::string_view kAuthorityEntitySnapshotTable =
 		"Authority_EntitySnapshots";
-	std::unordered_set<std::string> lastPublishedEntityFields;
+	static inline constexpr std::string_view kAuthorityEntityMetaTable =
+		"Authority_EntityMeta";
 };
