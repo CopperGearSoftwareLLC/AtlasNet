@@ -9,8 +9,9 @@ namespace
 constexpr auto kProbeInterval = std::chrono::seconds(5);
 }
 
-void HandoffConnectionManager::SelectTestTargetShard()
+void HandoffConnectionManager::RefreshTargetShards()
 {
+	targetShards.clear();
 	const auto& servers = ServerRegistry::Get().GetServers();
 	for (const auto& [id, _entry] : servers)
 	{
@@ -22,21 +23,18 @@ void HandoffConnectionManager::SelectTestTargetShard()
 		{
 			continue;
 		}
-		testTargetIdentity = id;
-		if (logger)
-		{
-			logger->DebugFormatted(
-				"[EntityHandoff] Selected shard target: {}",
-				testTargetIdentity->ToString());
-		}
-		return;
+		targetShards.push_back(id);
 	}
 
-	testTargetIdentity.reset();
-	if (logger)
+	if (logger && !targetShards.empty())
 	{
-		logger->Warning(
-			"[EntityHandoff] No peer shard found in ServerRegistry");
+		logger->DebugFormatted(
+			"[EntityHandoff] Discovered {} shard targets",
+			targetShards.size());
+	}
+	else if (logger)
+	{
+		logger->Warning("[EntityHandoff] No peer shard found in ServerRegistry");
 	}
 }
 
@@ -46,7 +44,8 @@ void HandoffConnectionManager::Init(const NetworkIdentity& self,
 	selfIdentity = self;
 	logger = std::move(inLogger);
 	initialized = true;
-	testConnectionActive = false;
+	targetShards.clear();
+	activeConnections.clear();
 	lastProbeTime = std::chrono::steady_clock::now() - kProbeInterval;
 	leaseCoordinator = std::make_unique<HandoffConnectionLeaseCoordinator>(
 		selfIdentity, logger,
@@ -54,7 +53,7 @@ void HandoffConnectionManager::Init(const NetworkIdentity& self,
 			.leaseEnabled = leaseModeEnabled});
 
 	HandoffPacketManager::Get().Init(selfIdentity, logger);
-	SelectTestTargetShard();
+	RefreshTargetShards();
 
 	if (logger)
 	{
@@ -88,10 +87,7 @@ void HandoffConnectionManager::Tick()
 			{
 				Interlink::Get().CloseConnectionTo(
 					peer, 0, "EntityHandoff inactivity timeout");
-				if (testTargetIdentity.has_value() && peer == *testTargetIdentity)
-				{
-					testConnectionActive = false;
-				}
+				activeConnections.erase(peer);
 				if (logger)
 				{
 					logger->WarningFormatted(
@@ -107,36 +103,38 @@ void HandoffConnectionManager::Tick()
 	}
 
 	lastProbeTime = now;
-	if (!testTargetIdentity.has_value())
+	RefreshTargetShards();
+	if (targetShards.empty())
 	{
-		SelectTestTargetShard();
 		return;
 	}
 
-	if (leaseCoordinator &&
-		!leaseCoordinator->TryAcquireOrRefreshLease(*testTargetIdentity))
+	for (const auto& target : targetShards)
 	{
+		if (leaseCoordinator &&
+			!leaseCoordinator->TryAcquireOrRefreshLease(target))
+		{
+			if (logger)
+			{
+				logger->DebugFormatted(
+					"[EntityHandoff] Lease held by peer, skipping connect to {}",
+					target.ToString());
+			}
+			continue;
+		}
+
+		Interlink::Get().EstablishConnectionTo(target);
+		HandoffPacketManager::Get().SendPing(target);
+		activeConnections.insert(target);
+		if (leaseCoordinator)
+		{
+			leaseCoordinator->MarkConnectionActivity(target);
+		}
 		if (logger)
 		{
-			logger->DebugFormatted(
-				"[EntityHandoff] Lease held by peer, skipping connect to {}",
-				testTargetIdentity->ToString());
+			logger->DebugFormatted("[EntityHandoff] Probe ping sent to {}",
+								   target.ToString());
 		}
-		return;
-	}
-
-	Interlink::Get().EstablishConnectionTo(*testTargetIdentity);
-	HandoffPacketManager::Get().SendPing(*testTargetIdentity);
-	testConnectionActive = true;
-	if (leaseCoordinator)
-	{
-		leaseCoordinator->MarkConnectionActivity(*testTargetIdentity);
-	}
-	if (logger)
-	{
-		logger->DebugFormatted(
-			"[EntityHandoff] Probe ping sent to {}",
-			testTargetIdentity->ToString());
 	}
 }
 
@@ -147,18 +145,18 @@ void HandoffConnectionManager::Shutdown()
 		return;
 	}
 
-	if (testTargetIdentity.has_value() && testConnectionActive)
+	for (const auto& peer : activeConnections)
 	{
-		Interlink::Get().CloseConnectionTo(*testTargetIdentity, 0,
+		Interlink::Get().CloseConnectionTo(peer, 0,
 										   "EntityHandoff shutdown");
 		if (leaseCoordinator)
 		{
-			leaseCoordinator->ReleaseLeaseIfOwned(*testTargetIdentity);
+			leaseCoordinator->ReleaseLeaseIfOwned(peer);
 		}
 	}
 
-	testConnectionActive = false;
-	testTargetIdentity.reset();
+	activeConnections.clear();
+	targetShards.clear();
 	if (leaseCoordinator)
 	{
 		leaseCoordinator->Clear();

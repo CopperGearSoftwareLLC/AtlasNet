@@ -2,7 +2,8 @@
 
 #include <chrono>
 #include <memory>
-#include <optional>
+#include <unordered_set>
+#include <vector>
 
 #include "EntityHandoff/HandoffConnectionLeaseCoordinator.hpp"
 #include "Log.hpp"
@@ -23,13 +24,13 @@ class HandoffConnectionManager : public Singleton<HandoffConnectionManager>
 	[[nodiscard]] bool IsInitialized() const { return initialized; }
 
   private:
-	void SelectTestTargetShard();
+	void RefreshTargetShards();
 
 	NetworkIdentity selfIdentity;
 	std::shared_ptr<Log> logger;
 	bool initialized = false;
-	std::optional<NetworkIdentity> testTargetIdentity;
-	bool testConnectionActive = false;
+	std::vector<NetworkIdentity> targetShards;
+	std::unordered_set<NetworkIdentity> activeConnections;
 	bool leaseModeEnabled = true;
 	std::chrono::steady_clock::time_point lastProbeTime;
 	std::unique_ptr<HandoffConnectionLeaseCoordinator> leaseCoordinator;
