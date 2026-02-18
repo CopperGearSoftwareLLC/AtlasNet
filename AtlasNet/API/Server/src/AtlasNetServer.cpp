@@ -12,19 +12,20 @@ void AtlasNetServer::Initialize(
 {
 	// --- Core setup ---
 	// CrashHandler::Get().Init();
+	CrashHandler::Get().Init();
 	DockerEvents::Get().Init(
 		DockerEventsInit{.OnShutdownRequest = properties.OnShutdownRequest});
 
-	NetworkIdentity myID(NetworkIdentityType::eGameServer, UUIDGen::Gen());
-	logger = std::make_shared<Log>(myID.ToString());
+	NetworkIdentity myID(NetworkIdentityType::eShard, UUIDGen::Gen());
+	logger = std::make_shared<Log>("Shard");
 	logger->Debug("AtlasNet Initialize");
 	// --- Interlink setup ---
-	Interlink::Get().Init(
-		{.ThisID = myID,
-		 .logger = logger,});
+	Interlink::Get().Init({
+		.ThisID = myID,
+		.logger = logger,
+	});
 
-	logger->Debug(
-		"Interlink initialized; waiting for auto-connect to Partition...");
+	logger->Debug("Interlink initialized");
 }
 
 // ============================================================================
@@ -35,5 +36,4 @@ void AtlasNetServer::Update(
 	std::span<AtlasEntity> entities, std::vector<AtlasEntity> &IncomingEntities,
 	std::vector<AtlasEntity::EntityID> &OutgoingEntities)
 {
-	
 }

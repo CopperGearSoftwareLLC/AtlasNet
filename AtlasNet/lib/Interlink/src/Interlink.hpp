@@ -88,7 +88,6 @@ class Interlink : public Singleton<Interlink>
 	const static inline std::unordered_map<NetworkIdentityType, uint32>
 		Type2ListenPort = {{NetworkIdentityType::eWatchDog, _PORT_WATCHDOG},
 						   {NetworkIdentityType::eShard, _PORT_SHARD},
-						   {NetworkIdentityType::eGameServer, _PORT_GAMESERVER},
 						   {NetworkIdentityType::eProxy, _PORT_PROXY}};
 
    public:

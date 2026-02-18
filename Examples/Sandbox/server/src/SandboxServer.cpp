@@ -5,6 +5,7 @@
 
 void SandboxServer::Run()
 {
+    
     AtlasNetServer::InitializeProperties InitProperties;
     InitProperties.OnShutdownRequest = [&](SignalType signal)
     { ShouldShutdown = true; };

@@ -541,14 +541,6 @@ void Interlink::Init(const InterlinkProperties &Properties)
 	// Existing post-init behavior (unchanged)
 	switch (MyIdentity.Type)
 	{
-		case NetworkIdentityType::eGameServer:
-		{
-			NetworkIdentity PartitionID = MyIdentity;
-			PartitionID.Type = NetworkIdentityType::eShard;
-			EstablishConnectionTo(PartitionID);
-		}
-		break;
-
 		case NetworkIdentityType::eShard:
 		{
 			EstablishConnectionTo(NetworkIdentity::MakeIDWatchDog());

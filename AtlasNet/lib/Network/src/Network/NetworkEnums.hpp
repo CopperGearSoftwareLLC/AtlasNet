@@ -13,12 +13,11 @@ enum class NetworkIdentityType
 	eWatchDog = 2,		 // God
 	eCartograph = 3,	 // God Debug Tool
 	eGameClient = 4, // Game Client / Player
-	eGameServer = 5,	 // Game Server
   eProxy = 6,
 
   eAtlasNetInitial = 7, //USED ONLY BY CLIENTLINK ON INITIAL CONNECTION
 };
-BOOST_DESCRIBE_ENUM(NetworkIdentityType, eInvalid, eShard, eWatchDog, eCartograph, eGameClient, eGameServer, eProxy,eAtlasNetInitial)
+BOOST_DESCRIBE_ENUM(NetworkIdentityType, eInvalid, eShard, eWatchDog, eCartograph, eGameClient, eProxy,eAtlasNetInitial)
 enum class ConnectionState
 {
 	eInvalid,		/// Invalid state

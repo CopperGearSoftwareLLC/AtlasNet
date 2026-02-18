@@ -13,6 +13,7 @@ set(ATLASNET_ROOT "${CMAKE_CURRENT_LIST_DIR}" CACHE PATH "Root directory of Atla
 
 include (${CMAKE_CURRENT_LIST_DIR}/cmake/Definitions.cmake)
 include (${CMAKE_CURRENT_LIST_DIR}/cmake/Install.cmake)
+ include (${CMAKE_CURRENT_LIST_DIR}/docker/BuildDockerImages.cmake)  
 option(ATLASNET_VCPKG_MODE       "Use vcpkg for deps" ON)
 
 if(ATLASNET_VCPKG_MODE)

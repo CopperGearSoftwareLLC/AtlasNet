@@ -1,0 +1,21 @@
+# Minimal atlasnetsdk stage
+FROM ubuntu:24.04 AS atlasnetsdk
+WORKDIR /atlasnet
+RUN apt-get update && apt-get install -y libatomic1 binutils
+COPY ./.stage /atlasnet
+
+FROM atlasnetsdk AS shard
+
+ENTRYPOINT [ "/atlasnet/shard" ]
+
+FROM atlasnetsdk AS watchdog
+
+ENTRYPOINT [ "/atlasnet/watchdog" ]
+
+FROM atlasnetsdk AS proxy
+
+ENTRYPOINT [ "/atlasnet/proxy" ]
+
+FROM atlasnetsdk AS cartograph
+
+ENTRYPOINT [ "/atlasnet/watchdog" ]

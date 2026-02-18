@@ -22,13 +22,7 @@ NetworkIdentity NetworkIdentity::MakeIDShard(const UUID &_ID)
     return id;
 }
 
-NetworkIdentity NetworkIdentity::MakeIDGameServer(const UUID &_ID)
-{
-    NetworkIdentity id;
-    id.Type = NetworkIdentityType::eGameServer;
-    id.ID = _ID;
-    return id;
-}
+
 
 NetworkIdentity NetworkIdentity::MakeIDGameClient(const UUID &_ID)
 {
