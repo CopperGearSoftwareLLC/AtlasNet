@@ -124,7 +124,7 @@ void HandoffConnectionManager::Tick()
 		}
 
 		Interlink::Get().EstablishConnectionTo(target);
-		HandoffPacketManager::Get().SendPing(target);
+		HandoffPacketManager::Get().SendEntityProbe(target);
 		activeConnections.insert(target);
 		if (leaseCoordinator)
 		{

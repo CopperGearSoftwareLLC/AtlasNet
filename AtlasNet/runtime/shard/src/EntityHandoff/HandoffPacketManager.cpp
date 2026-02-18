@@ -3,7 +3,7 @@
 #include <chrono>
 
 #include "EntityHandoff/HandoffConnectionManager.hpp"
-#include "EntityHandoff/Packet/HandoffPingPacket.hpp"
+#include "EntityHandoff/Packet/HandoffEntityPacket.hpp"
 #include "Interlink.hpp"
 
 void HandoffPacketManager::Init(const NetworkIdentity& self,
@@ -12,17 +12,17 @@ void HandoffPacketManager::Init(const NetworkIdentity& self,
 	selfIdentity = self;
 	logger = std::move(inLogger);
 	initialized = true;
-	handoffPingSub =
-		Interlink::Get().GetPacketManager().Subscribe<HandoffPingPacket>(
-			[this](const HandoffPingPacket& packet)
-			{ OnHandoffPingPacket(packet); });
+	handoffEntitySub =
+		Interlink::Get().GetPacketManager().Subscribe<HandoffEntityPacket>(
+			[this](const HandoffEntityPacket& packet)
+			{ OnHandoffEntityPacket(packet); });
 
 	if (logger)
 	{
 		logger->DebugFormatted(
 			"[EntityHandoff] HandoffPacketManager initialized for {}",
 			selfIdentity.ToString());
-		logger->Debug("[EntityHandoff] Subscribed to HandoffPingPacket");
+		logger->Debug("[EntityHandoff] Subscribed to HandoffEntityPacket");
 	}
 }
 
@@ -33,7 +33,7 @@ void HandoffPacketManager::Shutdown()
 		return;
 	}
 
-	handoffPingSub.Reset();
+	handoffEntitySub.Reset();
 	initialized = false;
 	if (logger)
 	{
@@ -41,7 +41,7 @@ void HandoffPacketManager::Shutdown()
 	}
 }
 
-void HandoffPacketManager::SendPing(const NetworkIdentity& target) const
+void HandoffPacketManager::SendEntityProbe(const NetworkIdentity& target) const
 {
 	if (!initialized)
 	{
@@ -53,21 +53,28 @@ void HandoffPacketManager::SendPing(const NetworkIdentity& target) const
 						 .time_since_epoch()
 						 .count();
 
-	HandoffPingPacket packet;
+	HandoffEntityPacket packet;
 	packet.sender = selfIdentity;
+	packet.entity.Entity_ID = static_cast<AtlasEntityMinimal::EntityID>(now);
+	packet.entity.transform.world = 0;
+	packet.entity.transform.position = vec3(0.0F, 0.0F, 0.0F);
+	packet.entity.transform.boundingBox = AABB3f(vec3(0.0F), vec3(1.0F));
+	packet.entity.IsClient = false;
+	packet.entity.Client_ID = 0;
 	packet.sentAtMs = static_cast<uint64_t>(now);
 	Interlink::Get().SendMessage(target, packet,
 								 NetworkMessageSendFlag::eReliableNow);
 
 	if (logger)
 	{
-		logger->DebugFormatted("[EntityHandoff] Sent HandoffPingPacket to {}",
-							   target.ToString());
+		logger->DebugFormatted(
+			"[EntityHandoff] Sent HandoffEntityPacket to {} (entity_id={})",
+			target.ToString(), packet.entity.Entity_ID);
 	}
 }
 
-void HandoffPacketManager::OnHandoffPingPacket(
-	const HandoffPingPacket& packet) const
+void HandoffPacketManager::OnHandoffEntityPacket(
+	const HandoffEntityPacket& packet) const
 {
 	if (!initialized || !logger)
 	{
@@ -83,9 +90,10 @@ void HandoffPacketManager::OnHandoffPingPacket(
 		receiveMs >= packet.sentAtMs ? (receiveMs - packet.sentAtMs) : 0;
 
 	logger->DebugFormatted(
-		"[EntityHandoff] Received HandoffPingPacket from {} latency={}ms "
-		"sentAt={} recvAt={}",
-		packet.sender.ToString(), latencyMs, packet.sentAtMs, receiveMs);
+		"[EntityHandoff] Received HandoffEntityPacket from {} "
+		"(entity_id={}) latency={}ms sentAt={} recvAt={}",
+		packet.sender.ToString(), packet.entity.Entity_ID, latencyMs,
+		packet.sentAtMs, receiveMs);
 
 	HandoffConnectionManager::Get().MarkConnectionActivity(packet.sender);
 }

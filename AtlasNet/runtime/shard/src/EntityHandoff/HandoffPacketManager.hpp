@@ -7,7 +7,7 @@
 #include "Network/NetworkIdentity.hpp"
 #include "Network/Packet/PacketManager.hpp"
 
-class HandoffPingPacket;
+class HandoffEntityPacket;
 
 class HandoffPacketManager : public Singleton<HandoffPacketManager>
 {
@@ -16,15 +16,15 @@ class HandoffPacketManager : public Singleton<HandoffPacketManager>
 
 	void Init(const NetworkIdentity& self, std::shared_ptr<Log> inLogger);
 	void Shutdown();
-	void SendPing(const NetworkIdentity& target) const;
+	void SendEntityProbe(const NetworkIdentity& target) const;
 
 	[[nodiscard]] bool IsInitialized() const { return initialized; }
 
   private:
-	void OnHandoffPingPacket(const HandoffPingPacket& packet) const;
+	void OnHandoffEntityPacket(const HandoffEntityPacket& packet) const;
 
 	NetworkIdentity selfIdentity;
 	std::shared_ptr<Log> logger;
 	bool initialized = false;
-	PacketManager::Subscription handoffPingSub;
+	PacketManager::Subscription handoffEntitySub;
 };

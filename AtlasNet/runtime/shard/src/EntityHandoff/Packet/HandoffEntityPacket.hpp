@@ -2,26 +2,30 @@
 
 #include <cstdint>
 
+#include "Entity.hpp"
 #include "Network/NetworkIdentity.hpp"
 #include "Network/Packet/Packet.hpp"
 
-class HandoffPingPacket
-	: public TPacket<HandoffPingPacket, "HandoffPingPacket">
+class HandoffEntityPacket
+	: public TPacket<HandoffEntityPacket, "HandoffEntityPacket">
 {
   public:
 	NetworkIdentity sender;
+	AtlasEntityMinimal entity;
 	uint64_t sentAtMs = 0;
 
   private:
 	void SerializeData(ByteWriter& writer) const override
 	{
 		sender.Serialize(writer);
+		entity.Serialize(writer);
 		writer.write_scalar(sentAtMs);
 	}
 
 	void DeserializeData(ByteReader& reader) override
 	{
 		sender.Deserialize(reader);
+		entity.Deserialize(reader);
 		sentAtMs = reader.read_scalar<uint64_t>();
 	}
 
@@ -31,4 +35,4 @@ class HandoffPingPacket
 	}
 };
 
-ATLASNET_REGISTER_PACKET(HandoffPingPacket, "HandoffPingPacket");
+ATLASNET_REGISTER_PACKET(HandoffEntityPacket, "HandoffEntityPacket");
