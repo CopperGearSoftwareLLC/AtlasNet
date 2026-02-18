@@ -11,7 +11,7 @@ class HandoffEntityPacket
 {
   public:
 	NetworkIdentity sender;
-	AtlasEntityMinimal entity;
+	AtlasEntity entity;
 	uint64_t sentAtMs = 0;
 
   private:

@@ -45,9 +45,8 @@ struct AtlasEntity : AtlasEntityMinimal
 	void Deserialize(ByteReader& br) override
 	{
 		AtlasEntityMinimal::Deserialize(br);
-		Metadata.clear();
-		const auto metadata_blob = br.blob();
-		std::copy(metadata_blob.begin(),metadata_blob.end(),Metadata.begin());
+		const auto metadataBlob = br.blob();
+		Metadata.assign(metadataBlob.begin(), metadataBlob.end());
 
 	}
 };
