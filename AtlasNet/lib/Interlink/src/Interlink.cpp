@@ -696,7 +696,6 @@ bool Interlink::EstablishConnectionTo(const NetworkIdentity &id)
 		Connection conn;
 		conn.address = IP.value();
 		conn.target = id;
-		conn.kind = ConnectionKind::eInternal;
 		conn.SetNewState(ConnectionState::ePreConnecting);
 		Connections.insert(conn);
 

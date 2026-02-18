@@ -37,7 +37,9 @@ class ClientLink : public Singleton<ClientLink>
 	void ReceiveMessages();
 
 	void OnClientIDAssignedPacket(const ClientIDAssignPacket& clientIDPacket);
+
 	PacketManager packet_manager;
+	
 	PacketManager::Subscription ClientIDAssignSub =
 		packet_manager.Subscribe<ClientIDAssignPacket>(
 			[&](const ClientIDAssignPacket& clientIDPacket)
