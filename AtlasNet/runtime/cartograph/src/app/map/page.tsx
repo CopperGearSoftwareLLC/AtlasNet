@@ -73,7 +73,7 @@ export default function MapPage() {
   const [authorityEntities, setAuthorityEntities] = useState<
     AuthorityEntityTelemetry[]
   >([]);
-  const [showGnsConnections, setShowGnsConnections] = useState(false);
+  const [showGnsConnections, setShowGnsConnections] = useState(true);
   const [showAuthorityEntities, setShowAuthorityEntities] = useState(true);
 
   // Fetch static heuristic shapes (base map)
