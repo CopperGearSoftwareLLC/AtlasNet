@@ -43,6 +43,7 @@ class DebugEntityOrbitSimulator
 	void Reset();
 	void SeedEntities(const SeedOptions& options);
 	void AdoptSingleEntity(const AtlasEntity& entity);
+	void RemoveEntity(AtlasEntityID entityId);
 	void TickOrbit(const OrbitOptions& options);
 	void StoreStateSnapshots(std::string_view hashKey) const;
 

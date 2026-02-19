@@ -36,6 +36,7 @@ class SH_ServerAuthorityRuntime
 	NetworkIdentity selfIdentity;
 	std::shared_ptr<Log> logger;
 	bool initialized = false;
+	bool hasSeededInitialEntities = false;
 	uint64_t localAuthorityTick = 0;
 	std::chrono::steady_clock::time_point lastTickTime;
 	std::chrono::steady_clock::time_point lastSnapshotTime;

@@ -54,6 +54,8 @@ class NH_EntityAuthorityTracker
 	bool MarkPassing(AtlasEntityID entityId,
 					 const NetworkIdentity& passingTarget);
 	void MarkAuthoritative(AtlasEntityID entityId);
+	[[nodiscard]] bool IsPassingTo(
+		AtlasEntityID entityId, const NetworkIdentity& passingTarget) const;
 
 	void SetAuthorityState(AtlasEntityID entityId, AuthorityState state,
 						   const std::optional<NetworkIdentity>& passingTo = std::nullopt);

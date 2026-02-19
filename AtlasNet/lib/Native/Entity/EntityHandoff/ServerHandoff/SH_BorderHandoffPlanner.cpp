@@ -5,13 +5,13 @@
 
 #include <optional>
 #include <unordered_map>
+#include <vector>
 
 #include "Debug/Log.hpp"
 #include "Entity/EntityHandoff/NaiveHandoff/NH_EntityAuthorityTracker.hpp"
 #include "Entity/EntityHandoff/NaiveHandoff/NH_HandoffPacketManager.hpp"
 #include "Heuristic/Database/HeuristicManifest.hpp"
 #include "Heuristic/GridHeuristic/GridHeuristic.hpp"
-#include "InternalDB/InternalDB.hpp"
 #include "Interlink/Database/ServerRegistry.hpp"
 
 namespace
@@ -64,22 +64,24 @@ SH_BorderHandoffPlanner::SH_BorderHandoffPlanner(const NetworkIdentity& self,
 {
 }
 
-std::optional<SH_PendingOutgoingHandoff> SH_BorderHandoffPlanner::PlanAndSend(
+std::vector<SH_PendingOutgoingHandoff>
+SH_BorderHandoffPlanner::PlanAndSendAll(
 	NH_EntityAuthorityTracker& tracker, const uint64_t localAuthorityTick) const
 {
+	std::vector<SH_PendingOutgoingHandoff> outgoingHandoffs;
 	std::unordered_map<std::string, GridShape> claimedBounds;
 	HeuristicManifest::Get().GetAllClaimedBounds<GridShape, std::string>(
 		claimedBounds);
 	if (claimedBounds.empty())
 	{
-		return std::nullopt;
+		return outgoingHandoffs;
 	}
 
 	const std::string selfKey = selfIdentity.ToString();
 	const auto selfIt = claimedBounds.find(selfKey);
 	if (selfIt == claimedBounds.end())
 	{
-		return std::nullopt;
+		return outgoingHandoffs;
 	}
 
 	const GridShape& selfBounds = selfIt->second;
@@ -119,10 +121,6 @@ std::optional<SH_PendingOutgoingHandoff> SH_BorderHandoffPlanner::PlanAndSend(
 		NH_HandoffPacketManager::Get().SendEntityHandoff(*targetIdentity, entity,
 														 transferTick);
 
-		const bool ownerSwitched =
-			InternalDB::Get()->Set(options.ownerKey, targetClaimKey);
-		(void)ownerSwitched;
-
 		if (logger)
 		{
 			logger->WarningFormatted(
@@ -132,12 +130,12 @@ std::optional<SH_PendingOutgoingHandoff> SH_BorderHandoffPlanner::PlanAndSend(
 				targetClaimKey, targetIdentity->ToString(), transferTick);
 		}
 
-		return SH_PendingOutgoingHandoff{
+		outgoingHandoffs.push_back(SH_PendingOutgoingHandoff{
 			.entityId = entity.Entity_ID,
 			.targetIdentity = *targetIdentity,
 			.targetClaimKey = targetClaimKey,
-			.transferTick = transferTick};
+			.transferTick = transferTick});
 	}
 
-	return std::nullopt;
+	return outgoingHandoffs;
 }

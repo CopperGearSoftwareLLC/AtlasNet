@@ -1,7 +1,7 @@
 #pragma once
 
 #include <memory>
-#include <optional>
+#include <unordered_map>
 
 #include "SH_HandoffTypes.hpp"
 
@@ -18,22 +18,29 @@ class SH_TransferMailbox
 	void Reset();
 	void QueueIncoming(const AtlasEntity& entity, const NetworkIdentity& sender,
 					   uint64_t transferTick);
-	bool AdoptIncomingIfDue(uint64_t localAuthorityTick,
-							DebugEntityOrbitSimulator& debugSimulator);
-	void SetPendingOutgoing(const SH_PendingOutgoingHandoff& handoff);
-	bool CommitOutgoingIfDue(uint64_t localAuthorityTick,
-							 DebugEntityOrbitSimulator& debugSimulator,
-							 NH_EntityAuthorityTracker& tracker,
-							 const SH_TelemetryPublisher& telemetryPublisher);
+	[[nodiscard]] size_t AdoptIncomingIfDue(
+		uint64_t localAuthorityTick, DebugEntityOrbitSimulator& debugSimulator);
+	void AddPendingOutgoing(const SH_PendingOutgoingHandoff& handoff);
+	[[nodiscard]] size_t CommitOutgoingIfDue(
+		uint64_t localAuthorityTick, DebugEntityOrbitSimulator& debugSimulator,
+		NH_EntityAuthorityTracker& tracker,
+		const SH_TelemetryPublisher& telemetryPublisher);
 	void ClearPendingOutgoing();
+
+	[[nodiscard]] bool HasPendingIncoming() const
+	{
+		return !pendingIncomingByEntityId.empty();
+	}
 
 	[[nodiscard]] bool HasPendingOutgoing() const
 	{
-		return pendingOutgoing.has_value();
+		return !pendingOutgoingByEntityId.empty();
 	}
 
   private:
 	std::shared_ptr<Log> logger;
-	std::optional<SH_PendingIncomingHandoff> pendingIncoming;
-	std::optional<SH_PendingOutgoingHandoff> pendingOutgoing;
+	std::unordered_map<AtlasEntityID, SH_PendingIncomingHandoff>
+		pendingIncomingByEntityId;
+	std::unordered_map<AtlasEntityID, SH_PendingOutgoingHandoff>
+		pendingOutgoingByEntityId;
 };

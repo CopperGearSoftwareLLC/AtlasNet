@@ -2,8 +2,8 @@
 
 #include <cstdint>
 #include <memory>
-#include <optional>
 #include <string>
+#include <vector>
 
 #include "SH_HandoffTypes.hpp"
 #include "Network/NetworkIdentity.hpp"
@@ -17,7 +17,6 @@ class SH_BorderHandoffPlanner
 	struct Options
 	{
 		uint64_t handoffLeadTicks = 6;
-		std::string ownerKey = "EntityHandoff:TestOwnerShard";
 	};
 
 	SH_BorderHandoffPlanner(const NetworkIdentity& self,
@@ -26,7 +25,7 @@ class SH_BorderHandoffPlanner
 							std::shared_ptr<Log> inLogger,
 							Options inOptions);
 
-	std::optional<SH_PendingOutgoingHandoff> PlanAndSend(
+	std::vector<SH_PendingOutgoingHandoff> PlanAndSendAll(
 		NH_EntityAuthorityTracker& tracker,
 		uint64_t localAuthorityTick) const;
 

@@ -138,6 +138,20 @@ void NH_EntityAuthorityTracker::MarkAuthoritative(AtlasEntityID entityId)
 	it->second.passingTo.reset();
 }
 
+bool NH_EntityAuthorityTracker::IsPassingTo(
+	const AtlasEntityID entityId, const NetworkIdentity& passingTarget) const
+{
+	const auto it = authorityByEntityId.find(entityId);
+	if (it == authorityByEntityId.end())
+	{
+		return false;
+	}
+
+	return it->second.authorityState == AuthorityState::ePassing &&
+		   it->second.passingTo.has_value() &&
+		   it->second.passingTo.value() == passingTarget;
+}
+
 void NH_EntityAuthorityTracker::SetAuthorityState(
 	AtlasEntityID entityId, const AuthorityState state,
 	const std::optional<NetworkIdentity>& passingTo)

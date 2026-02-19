@@ -95,6 +95,11 @@ void DebugEntityOrbitSimulator::AdoptSingleEntity(const AtlasEntity& entity)
 	entitiesById[entity.Entity_ID] = orbitEntity;
 }
 
+void DebugEntityOrbitSimulator::RemoveEntity(const AtlasEntityID entityId)
+{
+	entitiesById.erase(entityId);
+}
+
 void DebugEntityOrbitSimulator::TickOrbit(const OrbitOptions& options)
 {
 	const float deltaSeconds = std::clamp(options.deltaSeconds, 0.0F, 0.25F);

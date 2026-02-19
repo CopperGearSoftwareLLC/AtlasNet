@@ -4,6 +4,7 @@
 #include "SH_TransferMailbox.hpp"
 
 #include <utility>
+#include <vector>
 
 #include "Debug/Log.hpp"
 #include "Entity/EntityHandoff/DebugEntities/DebugEntityOrbitSimulator.hpp"
@@ -17,15 +18,15 @@ SH_TransferMailbox::SH_TransferMailbox(std::shared_ptr<Log> inLogger)
 
 void SH_TransferMailbox::Reset()
 {
-	pendingIncoming.reset();
-	pendingOutgoing.reset();
+	pendingIncomingByEntityId.clear();
+	pendingOutgoingByEntityId.clear();
 }
 
 void SH_TransferMailbox::QueueIncoming(const AtlasEntity& entity,
 									 const NetworkIdentity& sender,
 									 const uint64_t transferTick)
 {
-	pendingIncoming = SH_PendingIncomingHandoff{
+	pendingIncomingByEntityId[entity.Entity_ID] = SH_PendingIncomingHandoff{
 		.entity = entity, .sender = sender, .transferTick = transferTick};
 
 	if (logger)
@@ -36,55 +37,97 @@ void SH_TransferMailbox::QueueIncoming(const AtlasEntity& entity,
 	}
 }
 
-bool SH_TransferMailbox::AdoptIncomingIfDue(
+size_t SH_TransferMailbox::AdoptIncomingIfDue(
 	const uint64_t localAuthorityTick, DebugEntityOrbitSimulator& debugSimulator)
 {
-	if (!pendingIncoming.has_value() ||
-		localAuthorityTick < pendingIncoming->transferTick)
+	if (pendingIncomingByEntityId.empty())
 	{
-		return false;
+		return 0;
 	}
 
-	debugSimulator.AdoptSingleEntity(pendingIncoming->entity);
-	pendingIncoming.reset();
-	return true;
+	std::vector<AtlasEntityID> adoptedIds;
+	adoptedIds.reserve(pendingIncomingByEntityId.size());
+	for (const auto& [entityId, handoff] : pendingIncomingByEntityId)
+	{
+		if (localAuthorityTick < handoff.transferTick)
+		{
+			continue;
+		}
+		debugSimulator.AdoptSingleEntity(handoff.entity);
+		adoptedIds.push_back(entityId);
+	}
+
+	for (const auto entityId : adoptedIds)
+	{
+		pendingIncomingByEntityId.erase(entityId);
+	}
+	return adoptedIds.size();
 }
 
-void SH_TransferMailbox::SetPendingOutgoing(
+void SH_TransferMailbox::AddPendingOutgoing(
 	const SH_PendingOutgoingHandoff& handoff)
 {
-	pendingOutgoing = handoff;
+	pendingOutgoingByEntityId[handoff.entityId] = handoff;
 }
 
-bool SH_TransferMailbox::CommitOutgoingIfDue(
+size_t SH_TransferMailbox::CommitOutgoingIfDue(
 	const uint64_t localAuthorityTick, DebugEntityOrbitSimulator& debugSimulator,
 	NH_EntityAuthorityTracker& tracker,
 	const SH_TelemetryPublisher& telemetryPublisher)
 {
-	if (!pendingOutgoing.has_value() ||
-		localAuthorityTick < pendingOutgoing->transferTick)
+	if (pendingOutgoingByEntityId.empty())
 	{
-		return false;
+		return 0;
 	}
 
-	debugSimulator.Reset();
-	tracker.SetOwnedEntities({});
-	telemetryPublisher.PublishFromTracker(tracker);
-
-	if (logger)
+	std::vector<AtlasEntityID> committedIds;
+	committedIds.reserve(pendingOutgoingByEntityId.size());
+	std::vector<AtlasEntityID> canceledIds;
+	canceledIds.reserve(pendingOutgoingByEntityId.size());
+	for (const auto& [entityId, handoff] : pendingOutgoingByEntityId)
 	{
-		logger->WarningFormatted(
-			"[EntityHandoff][SH] Committed outgoing handoff entity={} target={} "
-			"transfer_tick={}",
-			pendingOutgoing->entityId, pendingOutgoing->targetIdentity.ToString(),
-			pendingOutgoing->transferTick);
+		if (localAuthorityTick < handoff.transferTick)
+		{
+			continue;
+		}
+		if (!tracker.IsPassingTo(entityId, handoff.targetIdentity))
+		{
+			canceledIds.push_back(entityId);
+			continue;
+		}
+
+		debugSimulator.RemoveEntity(entityId);
+		tracker.RemoveEntity(entityId);
+		committedIds.push_back(entityId);
+
+		if (logger)
+		{
+			logger->WarningFormatted(
+				"[EntityHandoff][SH] Committed outgoing handoff entity={} target={} "
+				"transfer_tick={}",
+				handoff.entityId, handoff.targetIdentity.ToString(),
+				handoff.transferTick);
+		}
 	}
 
-	pendingOutgoing.reset();
-	return true;
+	for (const auto entityId : committedIds)
+	{
+		pendingOutgoingByEntityId.erase(entityId);
+	}
+	for (const auto entityId : canceledIds)
+	{
+		pendingOutgoingByEntityId.erase(entityId);
+	}
+
+	if (!committedIds.empty())
+	{
+		telemetryPublisher.PublishFromTracker(tracker);
+	}
+
+	return committedIds.size();
 }
 
 void SH_TransferMailbox::ClearPendingOutgoing()
 {
-	pendingOutgoing.reset();
+	pendingOutgoingByEntityId.clear();
 }

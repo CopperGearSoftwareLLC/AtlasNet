@@ -49,6 +49,7 @@ void SH_ServerAuthorityRuntime::Init(const NetworkIdentity& self,
 	selfIdentity = self;
 	logger = std::move(inLogger);
 	initialized = true;
+	hasSeededInitialEntities = false;
 	localAuthorityTick = 0;
 	lastTickTime = std::chrono::steady_clock::now();
 	lastSnapshotTime = lastTickTime - kStateSnapshotInterval;
@@ -89,7 +90,8 @@ void SH_ServerAuthorityRuntime::Init(const NetworkIdentity& self,
 
 void SH_ServerAuthorityRuntime::Tick()
 {
-	if (!initialized)
+	if (!initialized || !tracker || !debugSimulator || !transferMailbox ||
+		!borderPlanner || !telemetryPublisher)
 	{
 		return;
 	}
@@ -97,63 +99,66 @@ void SH_ServerAuthorityRuntime::Tick()
 
 	NH_HandoffConnectionManager::Get().Tick();
 	const auto now = std::chrono::steady_clock::now();
+	const float deltaSeconds =
+		std::chrono::duration<float>(now - lastTickTime).count();
+	lastTickTime = now;
 	const bool isOwner =
 		ownershipElection && ownershipElection->Evaluate(now);
 
-	if (isOwner && tracker && debugSimulator && transferMailbox &&
-		borderPlanner && telemetryPublisher)
-	{
+	const size_t adoptedCount =
 		transferMailbox->AdoptIncomingIfDue(localAuthorityTick, *debugSimulator);
+	if (adoptedCount > 0 && logger)
+	{
+		logger->DebugFormatted(
+			"[EntityHandoff][SH] Adopted {} incoming handoff entities at tick={}",
+			adoptedCount, localAuthorityTick);
+	}
+
+	if (isOwner && !hasSeededInitialEntities)
+	{
 		debugSimulator->SeedEntities(
 			DebugEntityOrbitSimulator::SeedOptions{
 				.desiredCount = kDefaultTestEntityCount,
 				.halfExtent = kTestEntityHalfExtent,
 				.phaseStepRad = kEntityPhaseStepRad});
+		hasSeededInitialEntities = true;
+	}
 
-		const float deltaSeconds =
-			std::chrono::duration<float>(now - lastTickTime).count();
-		lastTickTime = now;
+	if (debugSimulator->Count() > 0)
+	{
 		debugSimulator->TickOrbit(
 			DebugEntityOrbitSimulator::OrbitOptions{
 				.deltaSeconds = deltaSeconds,
 				.radius = kOrbitRadius,
 				.angularSpeedRadPerSec = kOrbitAngularSpeedRadPerSec});
-		tracker->SetOwnedEntities(debugSimulator->GetEntitiesSnapshot());
+	}
+	tracker->SetOwnedEntities(debugSimulator->GetEntitiesSnapshot());
 
-		if (!transferMailbox->HasPendingOutgoing())
-		{
-			const auto outgoing =
-				borderPlanner->PlanAndSend(*tracker, localAuthorityTick);
-			if (outgoing.has_value())
-			{
-				transferMailbox->SetPendingOutgoing(outgoing.value());
-				ownershipElection->Invalidate();
-			}
-		}
-
-		if (transferMailbox->CommitOutgoingIfDue(localAuthorityTick,
-											 *debugSimulator, *tracker,
-											 *telemetryPublisher))
-		{
-			ownershipElection->ForceNotOwner();
-			ownershipElection->Invalidate();
-		}
-
-		if (now - lastSnapshotTime >= kStateSnapshotInterval)
-		{
-			lastSnapshotTime = now;
-			telemetryPublisher->PublishFromTracker(*tracker);
-		}
-		return;
+	const auto outgoingHandoffs =
+		borderPlanner->PlanAndSendAll(*tracker, localAuthorityTick);
+	for (const auto& outgoing : outgoingHandoffs)
+	{
+		transferMailbox->AddPendingOutgoing(outgoing);
 	}
 
-	if (tracker && debugSimulator && transferMailbox && telemetryPublisher)
+	const size_t committedCount = transferMailbox->CommitOutgoingIfDue(
+		localAuthorityTick, *debugSimulator, *tracker, *telemetryPublisher);
+	if ((adoptedCount > 0 || committedCount > 0 || !outgoingHandoffs.empty()) &&
+		ownershipElection)
 	{
-		tracker->SetOwnedEntities({});
+		ownershipElection->Invalidate();
+	}
+
+	if (!isOwner && tracker->Count() == 0 && !transferMailbox->HasPendingIncoming() &&
+		!transferMailbox->HasPendingOutgoing())
+	{
+		hasSeededInitialEntities = false;
+	}
+
+	if (now - lastSnapshotTime >= kStateSnapshotInterval)
+	{
+		lastSnapshotTime = now;
 		telemetryPublisher->PublishFromTracker(*tracker);
-		debugSimulator->Reset();
-		transferMailbox->ClearPendingOutgoing();
-		lastTickTime = now;
 	}
 }
 

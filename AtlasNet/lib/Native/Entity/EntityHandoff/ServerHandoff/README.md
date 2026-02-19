@@ -13,9 +13,11 @@
 - `SH_OwnershipElection`
   - Owns owner election policy/state and owner transitions.
 - `SH_BorderHandoffPlanner`
-  - Detects boundary exits and emits/sends outgoing handoff intents.
+  - Detects boundary exits and emits/sends outgoing handoff intents for all
+    crossing entities in a tick.
 - `SH_TransferMailbox`
-  - Owns pending incoming/outgoing transfer-tick state and commit/adopt behavior.
+  - Owns per-entity pending incoming/outgoing transfer-tick state and
+    commit/adopt behavior.
 - `SH_TelemetryPublisher`
   - Isolated tracker-to-manifest bridge.
 
@@ -24,6 +26,8 @@
 - Runtime depends on components.
 - Components do not depend on runtime.
 - Shared handoff DTOs are isolated in `SH_HandoffTypes.hpp`.
+- Pending transfer state is keyed by `entityId` to avoid single-slot overwrite
+  bugs when many entities hand off concurrently.
 
 ## Notes
 
