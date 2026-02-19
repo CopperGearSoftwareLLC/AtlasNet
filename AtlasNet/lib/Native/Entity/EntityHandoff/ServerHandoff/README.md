@@ -1,3 +1,6 @@
+## implementation considerations:
+sometimes entities seem to be stuck in limbo of no entity claiming. we need to resolve this and find a server for them. perhaps consider watchdog?
+
 ## Goals
 
 - Keep `ServerHandoff` as a separate second iteration from `NaiveHandoff`.

@@ -25,7 +25,7 @@ constexpr float kTestEntityHalfExtent = 0.5F;
 constexpr float kEntityPhaseStepRad = 0.7F;
 
 #ifndef ATLASNET_ENTITY_HANDOFF_TEST_ENTITY_COUNT
-#define ATLASNET_ENTITY_HANDOFF_TEST_ENTITY_COUNT 1
+#define ATLASNET_ENTITY_HANDOFF_TEST_ENTITY_COUNT 1000
 #endif
 constexpr uint32_t kDefaultTestEntityCount =
 	(ATLASNET_ENTITY_HANDOFF_TEST_ENTITY_COUNT > 0)

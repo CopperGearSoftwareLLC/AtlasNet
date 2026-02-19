@@ -1,5 +1,6 @@
 #include "AtlasNetServer.hpp"
 
+#include <chrono>
 #include <stop_token>
 #include <thread>
 
@@ -12,6 +13,12 @@
 #include "Interlink/Database/HealthManifest.hpp"
 #include "Interlink/Telemetry/NetworkManifest.hpp"
 #include "Network/NetworkIdentity.hpp"
+
+namespace
+{
+constexpr std::chrono::seconds kDefaultClaimRetryInterval(1);
+}
+
 // ============================================================================
 // Initialize server and setup Interlink callbacks
 // ============================================================================
@@ -51,6 +58,7 @@ void AtlasNetServer::Update(std::span<AtlasEntity> entities,
 }
 void AtlasNetServer::ShardLogicEntry(std::stop_token st)
 {
+	auto tryClaimBound = [this]() -> bool
 	{
 		GridShape claimedBounds;
 		const bool claimed =
@@ -60,16 +68,43 @@ void AtlasNetServer::ShardLogicEntry(std::stop_token st)
 		{
 			logger->DebugFormatted("Claimed bounds {} for shard",
 								   claimedBounds.GetID());
+			return true;
 		}
-		else
-		{
-			logger->Warning("No pending bounds available to claim");
-		}
+		return false;
+	};
+
+	bool hasClaimedBound = tryClaimBound();
+	auto nextClaimAttemptTime =
+		std::chrono::steady_clock::now() + kDefaultClaimRetryInterval;
+
+	if (!hasClaimedBound && logger)
+	{
+		logger->WarningFormatted(
+			"No pending bounds available to claim for shard={} (pending={} claimed={}). "
+			"Will retry every {}s.",
+			identity.ToString(), HeuristicManifest::Get().GetPendingBoundsCount(),
+			HeuristicManifest::Get().GetClaimedBoundsCount(),
+			kDefaultClaimRetryInterval.count());
 	}
 
 	SH_ServerAuthorityManager::Get().Init(identity, logger);
 	while (!st.stop_requested())
 	{
+		const auto now = std::chrono::steady_clock::now();
+		if (!hasClaimedBound && now >= nextClaimAttemptTime)
+		{
+			hasClaimedBound = tryClaimBound();
+			nextClaimAttemptTime = now + kDefaultClaimRetryInterval;
+			if (!hasClaimedBound && logger)
+			{
+				logger->DebugFormatted(
+					"Retrying bound claim for shard={} (pending={} claimed={})",
+					identity.ToString(),
+					HeuristicManifest::Get().GetPendingBoundsCount(),
+					HeuristicManifest::Get().GetClaimedBoundsCount());
+			}
+		}
+
 		// Interlink::Get().Tick();
 		SH_ServerAuthorityManager::Get().Tick();
 		std::this_thread::sleep_for(std::chrono::milliseconds(10));

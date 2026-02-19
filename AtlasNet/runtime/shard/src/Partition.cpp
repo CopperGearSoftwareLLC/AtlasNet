@@ -16,6 +16,7 @@ Partition::~Partition() {}
 namespace
 {
 constexpr std::chrono::milliseconds kPartitionTickInterval(32);
+constexpr std::chrono::seconds kDefaultClaimRetryInterval(1);
 }
 
 void Partition::Init()
@@ -29,8 +30,8 @@ void Partition::Init()
 	NetworkManifest::Get().ScheduleNetworkPings(partitionIdentifier);
 	Interlink::Get().Init(
 		InterlinkProperties{.ThisID = partitionIdentifier, .logger = logger});
-	
 
+	auto tryClaimBound = [&]() -> bool
 	{
 		GridShape claimedBounds;
 		const bool claimed =
@@ -40,15 +41,42 @@ void Partition::Init()
 		{
 			logger->DebugFormatted("Claimed bounds {} for shard",
 								   claimedBounds.GetID());
+			return true;
 		}
-		else
-		{
-			logger->Warning("No pending bounds available to claim");
-		}
+		return false;
+	};
+
+	bool hasClaimedBound = tryClaimBound();
+	auto nextClaimAttemptTime =
+		std::chrono::steady_clock::now() + kDefaultClaimRetryInterval;
+
+	if (!hasClaimedBound)
+	{
+		logger->WarningFormatted(
+			"No pending bounds available to claim for shard={} (pending={} claimed={}). "
+			"Will retry every {}s.",
+			partitionIdentifier.ToString(),
+			HeuristicManifest::Get().GetPendingBoundsCount(),
+			HeuristicManifest::Get().GetClaimedBoundsCount(),
+			kDefaultClaimRetryInterval.count());
 	}
 	// Clear any existing partition entity data to prevent stale data
 	while (!ShouldShutdown)
 	{
+		const auto now = std::chrono::steady_clock::now();
+		if (!hasClaimedBound && now >= nextClaimAttemptTime)
+		{
+			hasClaimedBound = tryClaimBound();
+			nextClaimAttemptTime = now + kDefaultClaimRetryInterval;
+			if (!hasClaimedBound)
+			{
+				logger->DebugFormatted(
+					"Retrying bound claim for shard={} (pending={} claimed={})",
+					partitionIdentifier.ToString(),
+					HeuristicManifest::Get().GetPendingBoundsCount(),
+					HeuristicManifest::Get().GetClaimedBoundsCount());
+			}
+		}
 		std::this_thread::sleep_for(kPartitionTickInterval);	// ~30 updates/sec
 		NH_EntityAuthorityManager::Get().Tick();
 	}
