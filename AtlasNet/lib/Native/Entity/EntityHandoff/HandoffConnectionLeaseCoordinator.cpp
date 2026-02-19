@@ -1,6 +1,6 @@
 // Implements lease acquire/refresh/release and stale-activity reap callbacks.
 
-#include "EntityHandoff/HandoffConnectionLeaseCoordinator.hpp"
+#include "Entity/EntityHandoff/HandoffConnectionLeaseCoordinator.hpp"
 
 #include <string>
 #include <vector>

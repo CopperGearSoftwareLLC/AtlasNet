@@ -7,8 +7,8 @@
 #include <memory>
 #include <optional>
 
-#include "EntityHandoff/DebugEntityOrbitSimulator.hpp"
-#include "EntityHandoff/EntityAuthorityTracker.hpp"
+#include "Entity/EntityHandoff/DebugEntityOrbitSimulator.hpp"
+#include "Entity/EntityHandoff/EntityAuthorityTracker.hpp"
 #include "Debug/Log.hpp"
 #include "Global/Misc/Singleton.hpp"
 #include "Network/NetworkIdentity.hpp"

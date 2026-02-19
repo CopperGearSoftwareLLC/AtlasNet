@@ -682,6 +682,13 @@ bool Interlink::EstablishConnectionTo(const NetworkIdentity &id)
 				"Failed to establish connection after 5 tries. IP not found in "
 				"Server Registry {}",
 				id.ToString());
+				logger->DebugFormatted(
+				"All entries in Server Registry:");
+				for (const auto& [SID,Entry]: ServerRegistry::Get().GetServers())
+				{
+					logger->DebugFormatted(" - {} at {}", Entry.identifier.ToString(),Entry.address.ToString());
+				}
+
 			return false;  // no assert crash, just graceful fail
 		}
 

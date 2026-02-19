@@ -8,6 +8,8 @@ class AtlasEntityHandle
 {
 	AtlasEntityID id;
 	std::variant<AtlasEntityMinimal, AtlasEntity> EntityData;
+
+   public:
 	std::future<const AtlasEntityMinimal&> Get()
 	{
 		return std::async(

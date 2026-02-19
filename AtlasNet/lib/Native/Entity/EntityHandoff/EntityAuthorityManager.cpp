@@ -1,14 +1,14 @@
 // Implements authority orchestration for debug handoff flow:
 // owner election, heuristic boundary triggers, send/receive handoff transitions.
 
-#include "EntityHandoff/EntityAuthorityManager.hpp"
+#include "Entity/EntityHandoff/EntityAuthorityManager.hpp"
 
 #include <optional>
 
 #include "Interlink/Database/ServerRegistry.hpp"
-#include "EntityHandoff/HandoffPacketManager.hpp"
-#include "EntityHandoff/HandoffConnectionManager.hpp"
-#include "EntityHandoff/Telemetry/AuthorityManifest.hpp"
+#include "Entity/EntityHandoff/HandoffPacketManager.hpp"
+#include "Entity/EntityHandoff/HandoffConnectionManager.hpp"
+#include "Entity/EntityHandoff/Telemetry/AuthorityManifest.hpp"
 #include "InternalDB/InternalDB.hpp"
 #include "Heuristic/Database/HeuristicManifest.hpp"
 #include "Heuristic/GridHeuristic/GridHeuristic.hpp"

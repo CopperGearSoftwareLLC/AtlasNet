@@ -6,7 +6,7 @@
 #include <memory>
 #include <unordered_set>
 
-#include "EntityHandoff/HandoffConnectionLeaseCoordinator.hpp"
+#include "Entity/EntityHandoff/HandoffConnectionLeaseCoordinator.hpp"
 #include "Debug/Log.hpp"
 #include "Global/Misc/Singleton.hpp"
 #include "Network/NetworkIdentity.hpp"

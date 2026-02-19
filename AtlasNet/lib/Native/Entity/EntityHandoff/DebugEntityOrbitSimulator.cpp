@@ -1,6 +1,6 @@
 // Implements deterministic debug entity spawning, orbit updates, and snapshot writes.
 
-#include "EntityHandoff/DebugEntityOrbitSimulator.hpp"
+#include "Entity/EntityHandoff/DebugEntityOrbitSimulator.hpp"
 
 #include <cmath>
 #include "Entity/Entity.hpp"

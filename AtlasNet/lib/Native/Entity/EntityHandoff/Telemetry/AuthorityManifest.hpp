@@ -11,7 +11,7 @@
 #include <optional>
 #include <vector>
 
-#include "EntityHandoff/EntityAuthorityTracker.hpp"
+#include "Entity/EntityHandoff/EntityAuthorityTracker.hpp"
 #include "Global/Misc/UUID.hpp"
 #include "InternalDB/InternalDB.hpp"
 #include "Global/Misc/Singleton.hpp"

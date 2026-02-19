@@ -1,8 +1,8 @@
 // Implements handoff connection init/tick/shutdown and activity-driven pruning.
 
-#include "EntityHandoff/HandoffConnectionManager.hpp"
+#include "Entity/EntityHandoff/HandoffConnectionManager.hpp"
 
-#include "EntityHandoff/HandoffPacketManager.hpp"
+#include "Entity/EntityHandoff/HandoffPacketManager.hpp"
 #include "Interlink/Interlink.hpp"
 
 void HandoffConnectionManager::Init(const NetworkIdentity& self,

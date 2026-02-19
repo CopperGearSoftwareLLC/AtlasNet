@@ -19,9 +19,14 @@ FROM runner AS proxy
 COPY --from=atlasnetsdk /atlasnet/proxy /atlasnet/proxy
 ENTRYPOINT [ "/atlasnet/proxy" ]
 
-FROM node:20-alpine AS cartograph
-RUN apk add npm nodejs
+FROM ubuntu:24.04 AS cartograph
 
+RUN apt-get update && apt-get install -y curl ca-certificates gnupg
+RUN curl -fsSL https://deb.nodesource.com/setup_20.x | bash -
+RUN apt-get install -y nodejs
+RUN node -v
 COPY --from=atlasnetsdk /atlasnet/cartograph /atlasnet/
-WORKDIR /atlasnet/cartograph
-ENTRYPOINT ["sh", "-c", "npm install && npm run dev:all"]
+WORKDIR /atlasnet
+RUN npm install
+COPY --from=atlasnetsdk /atlasnet/Web.node /atlasnet/nextjs/native/Web.node
+ENTRYPOINT ["npm", "run", "dev:all"]

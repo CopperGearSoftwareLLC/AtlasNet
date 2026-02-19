@@ -5,7 +5,7 @@
 
 #include "Interlink/Database/HealthManifest.hpp"
 #include "Heuristic/Database/HeuristicManifest.hpp"
-#include "EntityHandoff/EntityAuthorityManager.hpp"
+#include "Entity/EntityHandoff/EntityAuthorityManager.hpp"
 #include "Heuristic/GridHeuristic/GridHeuristic.hpp"
 #include "Interlink/Interlink.hpp"
 #include "Global/Misc/UUID.hpp"
@@ -29,7 +29,7 @@ void Partition::Init()
 	NetworkManifest::Get().ScheduleNetworkPings(partitionIdentifier);
 	Interlink::Get().Init(
 		InterlinkProperties{.ThisID = partitionIdentifier, .logger = logger});
-	EntityAuthorityManager::Get().Init(partitionIdentifier, logger);
+	
 
 	{
 		GridShape claimedBounds;

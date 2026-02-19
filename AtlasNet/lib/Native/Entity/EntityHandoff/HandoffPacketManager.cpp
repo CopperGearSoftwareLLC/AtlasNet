@@ -1,12 +1,12 @@
 // Implements entity packet send/receive handling for handoff and adoption paths.
 
-#include "EntityHandoff/HandoffPacketManager.hpp"
+#include "Entity/EntityHandoff/HandoffPacketManager.hpp"
 
 #include <chrono>
 
-#include "EntityHandoff/EntityAuthorityManager.hpp"
-#include "EntityHandoff/HandoffConnectionManager.hpp"
-#include "EntityHandoff/Packet/GenericEntityPacket.hpp"
+#include "Entity/EntityHandoff/EntityAuthorityManager.hpp"
+#include "Entity/EntityHandoff/HandoffConnectionManager.hpp"
+#include "Entity/EntityHandoff/Packet/GenericEntityPacket.hpp"
 #include "Interlink/Interlink.hpp"
 
 namespace
