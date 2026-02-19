@@ -22,7 +22,8 @@ class HandoffPacketManager : public Singleton<HandoffPacketManager>
 	void Shutdown();
 	void SendEntityProbe(const NetworkIdentity& target) const;
 	void SendEntityHandoff(const NetworkIdentity& target,
-						   const AtlasEntity& entity) const;
+						   const AtlasEntity& entity,
+						   uint64_t transferTick) const;
 
 	[[nodiscard]] bool IsInitialized() const { return initialized; }
 

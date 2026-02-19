@@ -49,12 +49,15 @@ void HandoffPacketManager::SendEntityProbe(const NetworkIdentity& target) const
 	packet.entity.transform.position = vec3(0.0F, 0.0F, 0.0F);
 	packet.entity.IsClient = false;
 	packet.entity.Client_ID = UUID();
+	packet.protocolVersion = GenericEntityPacket::kProtocolVersion;
+	packet.transferTick = 0;
 	packet.sentAtMs = NowMs();
 	Interlink::Get().SendMessage(target, packet, NetworkMessageSendFlag::eReliableBatched);
 }
 
 void HandoffPacketManager::SendEntityHandoff(const NetworkIdentity& target,
-											 const AtlasEntity& entity) const
+											 const AtlasEntity& entity,
+											 const uint64_t transferTick) const
 {
 	if (!initialized)
 	{
@@ -64,14 +67,17 @@ void HandoffPacketManager::SendEntityHandoff(const NetworkIdentity& target,
 	GenericEntityPacket packet;
 	packet.sender = selfIdentity;
 	packet.entity = entity;
+	packet.protocolVersion = GenericEntityPacket::kProtocolVersion;
+	packet.transferTick = transferTick;
 	packet.sentAtMs = NowMs();
 	Interlink::Get().SendMessage(target, packet, NetworkMessageSendFlag::eReliableBatched);
 
 	if (logger)
 	{
 		logger->WarningFormatted(
-			"[EntityHandoff] HANDOFF tx entity={} from={} to={}", entity.Entity_ID,
-			selfIdentity.ToString(), target.ToString());
+			"[EntityHandoff] HANDOFF tx entity={} from={} to={} transfer_tick={}",
+			entity.Entity_ID, selfIdentity.ToString(), target.ToString(),
+			transferTick);
 	}
 }
 
@@ -89,15 +95,18 @@ void HandoffPacketManager::OnGenericEntityPacket(
 	}
 
 	HandoffConnectionManager::Get().MarkConnectionActivity(packet.sender);
-	EntityAuthorityManager::Get().OnIncomingHandoffEntity(packet.entity, packet.sender);
+	EntityAuthorityManager::Get().OnIncomingHandoffEntityAtTick(
+		packet.entity, packet.sender, packet.transferTick);
 
 	if (logger)
 	{
 		const uint64_t nowMs = NowMs();
 		const uint64_t latencyMs = nowMs > packet.sentAtMs ? nowMs - packet.sentAtMs : 0;
 		logger->WarningFormatted(
-			"[EntityHandoff] HANDOFF rx entity={} from={} latency={}ms metadata={}B",
+			"[EntityHandoff] HANDOFF rx entity={} from={} latency={}ms metadata={}B "
+			"transfer_tick={} protocol_v={}",
 			packet.entity.Entity_ID, packet.sender.ToString(), latencyMs,
-			packet.entity.Metadata.size());
+			packet.entity.Metadata.size(), packet.transferTick,
+			static_cast<uint32_t>(packet.protocolVersion));
 	}
 }
