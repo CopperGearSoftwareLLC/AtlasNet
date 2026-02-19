@@ -23,6 +23,7 @@ constexpr float kTestEntityHalfExtent = 0.5F;
 constexpr uint32_t kDefaultTestEntityCount = 1;
 constexpr float kEntityPhaseStepRad = 0.7F;
 constexpr uint64_t kHandoffLeadTicks = 6;
+constexpr uint64_t kPostAdoptHandoffCooldownTicks = 12;
 
 constexpr std::string_view kTestOwnerKey = "EntityHandoff:TestOwnerShard";
 
@@ -40,15 +41,6 @@ std::string SelectTargetClaimKeyForPosition(
 		{
 			return claimKey;
 		}
-	}
-
-	for (const auto& [claimKey, _bound] : claimedBounds)
-	{
-		if (claimKey == selfKey)
-		{
-			continue;
-		}
-		return claimKey;
 	}
 
 	return {};
@@ -105,6 +97,7 @@ void EntityAuthorityManager::Init(const NetworkIdentity& self,
 	debugSimulator->Reset();
 	pendingIncomingEntity.reset();
 	pendingOutgoingHandoff.reset();
+	adoptionHandoffCooldownUntilTick.clear();
 	localAuthorityTick = 0;
 	lastTickTime = std::chrono::steady_clock::now();
 	lastOwnerEvalTime = lastTickTime - kOwnershipEvalInterval;
@@ -135,7 +128,10 @@ void EntityAuthorityManager::Tick()
 		if (pendingIncomingEntity.has_value() &&
 			localAuthorityTick >= pendingIncomingEntity->transferTick)
 		{
-			debugSimulator->AdoptSingleEntity(pendingIncomingEntity->entity);
+			const AtlasEntity adopted = pendingIncomingEntity->entity;
+			debugSimulator->AdoptSingleEntity(adopted);
+			adoptionHandoffCooldownUntilTick[adopted.Entity_ID] =
+				localAuthorityTick + kPostAdoptHandoffCooldownTicks;
 			pendingIncomingEntity.reset();
 		}
 		debugSimulator->SeedEntities(
@@ -203,6 +199,17 @@ void EntityAuthorityManager::EvaluateHeuristicPositionTriggers()
 	for (const auto& entity : entities)
 	{
 		const vec3 position = entity.transform.position;
+		if (const auto cooldownIt =
+				adoptionHandoffCooldownUntilTick.find(entity.Entity_ID);
+			cooldownIt != adoptionHandoffCooldownUntilTick.end())
+		{
+			if (localAuthorityTick < cooldownIt->second)
+			{
+				continue;
+			}
+			adoptionHandoffCooldownUntilTick.erase(cooldownIt);
+		}
+
 		if (selfBounds.Contains(position))
 		{
 			tracker->MarkAuthoritative(entity.Entity_ID);
@@ -263,6 +270,7 @@ void EntityAuthorityManager::Shutdown()
 	debugSimulator.reset();
 	pendingIncomingEntity.reset();
 	pendingOutgoingHandoff.reset();
+	adoptionHandoffCooldownUntilTick.clear();
 	initialized = false;
 
 	if (logger)
@@ -377,6 +385,7 @@ void EntityAuthorityManager::ProcessOutgoingHandoffCommit()
 
 	debugSimulator->Reset();
 	tracker->SetOwnedEntities({});
+	adoptionHandoffCooldownUntilTick.clear();
 	std::vector<EntityAuthorityTracker::AuthorityTelemetryRow> rows;
 	tracker->CollectTelemetryRows(rows);
 	AuthorityManifest::Get().TelemetryUpdate(rows);
