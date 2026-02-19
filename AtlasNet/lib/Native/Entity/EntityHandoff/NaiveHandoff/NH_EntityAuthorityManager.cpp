@@ -1,5 +1,6 @@
-// Implements authority orchestration for debug handoff flow:
-// owner election, heuristic boundary triggers, send/receive handoff transitions.
+// NH naive handoff coordinator runtime.
+// Responsibilities: ownership election, simulator tick, boundary-triggered
+// handoff send, incoming adoption, and transfer-tick commit.
 
 #include "NH_EntityAuthorityManager.hpp"
 

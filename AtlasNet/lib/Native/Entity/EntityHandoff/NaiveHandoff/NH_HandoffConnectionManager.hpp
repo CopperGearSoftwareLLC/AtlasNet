@@ -1,7 +1,8 @@
 #pragma once
 
-// Manages handoff transport connection lifecycle and inactivity cleanup, while
-// delegating lease semantics to the lease coordinator.
+// NH naive handoff transport connection manager.
+// Owns peer-connection lifecycle and delegates lease semantics to the lease
+// coordinator component.
 
 #include <memory>
 #include <unordered_set>

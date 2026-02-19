@@ -1,4 +1,5 @@
-// Implements in-memory entity authority state tracking and telemetry row export.
+// NH naive handoff authority tracker implementation.
+// Maintains per-entity authority state and exports telemetry snapshots.
 
 #include "NH_EntityAuthorityTracker.hpp"
 

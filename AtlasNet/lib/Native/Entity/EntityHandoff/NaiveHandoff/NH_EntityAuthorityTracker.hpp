@@ -1,7 +1,8 @@
 #pragma once
 
-// Stateful authority container for entities currently owned by this shard,
-// including authoritative/passing state and current snapshot data.
+// NH naive handoff authority state container.
+// Tracks authoritative/passing state and current entity snapshots owned by
+// the local shard runtime.
 
 #include <cstdint>
 #include <memory>

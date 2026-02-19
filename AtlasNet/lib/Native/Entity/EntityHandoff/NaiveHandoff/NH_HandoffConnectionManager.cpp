@@ -1,4 +1,5 @@
-// Implements handoff connection init/tick/shutdown and activity-driven pruning.
+// NH naive handoff connection manager implementation.
+// Manages peer connection lifecycle and activity-driven pruning/reap behavior.
 
 #include "NH_HandoffConnectionManager.hpp"
 

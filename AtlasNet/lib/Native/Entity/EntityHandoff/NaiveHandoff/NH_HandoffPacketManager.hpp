@@ -1,7 +1,8 @@
 #pragma once
 
-// Packet orchestration for entity handoff messaging: subscribe, send generic
-// entity payloads, and forward received handoffs into authority manager flow.
+// NH naive handoff packet orchestration.
+// Subscribes to handoff packets, sends entity payloads, and forwards inbound
+// handoffs via configured callbacks.
 
 #include <functional>
 #include <memory>

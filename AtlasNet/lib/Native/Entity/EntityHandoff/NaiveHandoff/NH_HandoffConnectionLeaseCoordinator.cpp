@@ -1,4 +1,5 @@
-// Implements lease acquire/refresh/release and stale-activity reap callbacks.
+// NH naive handoff lease coordinator implementation.
+// Handles lease acquire/refresh/release and stale-activity reaping callbacks.
 
 #include "NH_HandoffConnectionLeaseCoordinator.hpp"
 

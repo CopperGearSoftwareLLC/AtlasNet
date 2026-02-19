@@ -1,7 +1,7 @@
 #pragma once
 
-// Redis-backed lease coordinator for optional anti-dupe connection initiation
-// and inactivity bookkeeping across shard peer links.
+// NH naive handoff Redis-backed lease coordinator.
+// Provides optional anti-dupe peer-link leasing and inactivity bookkeeping.
 
 #include <chrono>
 #include <functional>

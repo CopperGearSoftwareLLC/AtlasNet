@@ -1,4 +1,5 @@
-// Implements entity packet send/receive handling for handoff and adoption paths.
+// NH naive handoff packet manager implementation.
+// Handles packet subscribe/send and dispatches inbound handoff payloads.
 
 #include "NH_HandoffPacketManager.hpp"
 

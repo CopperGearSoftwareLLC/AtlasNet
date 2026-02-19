@@ -1,7 +1,8 @@
 #pragma once
 
-// Thin facade for shard-side authority lifecycle. Runtime details are delegated
-// to an internal component so this manager only forwards init/tick/shutdown.
+// NH naive handoff facade.
+// Exposes lifecycle and inbound handoff hooks while delegating implementation
+// details to an internal runtime component.
 
 #include <cstdint>
 #include <memory>
