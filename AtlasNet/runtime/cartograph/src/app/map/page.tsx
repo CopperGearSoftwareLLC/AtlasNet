@@ -26,8 +26,6 @@ const MIN_ENTITY_DETAIL_POLL_INTERVAL_MS = 250;
 const MAX_ENTITY_DETAIL_POLL_INTERVAL_MS = 5000;
 const ENTITY_DETAIL_POLL_DISABLED_AT_MS = MAX_ENTITY_DETAIL_POLL_INTERVAL_MS;
 const DEFAULT_INTERACTION_SENSITIVITY = 1;
-const MIN_INTERACTION_SENSITIVITY = 0;
-const MAX_INTERACTION_SENSITIVITY = 2;
 
 export default function MapPage() {
   const containerRef = useRef<HTMLDivElement>(null);
@@ -286,8 +284,6 @@ export default function MapPage() {
         onSetViewMode={setViewMode}
         onSetProjectionMode={setProjectionMode}
         interactionSensitivity={interactionSensitivity}
-        minInteractionSensitivity={MIN_INTERACTION_SENSITIVITY}
-        maxInteractionSensitivity={MAX_INTERACTION_SENSITIVITY}
         onSetInteractionSensitivity={setInteractionSensitivity}
         pollIntervalMs={pollIntervalMs}
         minPollIntervalMs={MIN_POLL_INTERVAL_MS}

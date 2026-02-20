@@ -22,8 +22,6 @@ interface MapHudProps {
   onSetViewMode: (mode: MapViewMode) => void;
   onSetProjectionMode: (mode: MapProjectionMode) => void;
   interactionSensitivity: number;
-  minInteractionSensitivity: number;
-  maxInteractionSensitivity: number;
   onSetInteractionSensitivity: (value: number) => void;
   pollIntervalMs: number;
   minPollIntervalMs: number;
@@ -39,6 +37,8 @@ const HUD_BUTTON_BASE_STYLE: CSSProperties = {
   border: '1px solid rgba(148, 163, 184, 0.45)',
   color: '#e2e8f0',
 };
+const MIN_INTERACTION_SENSITIVITY = 0;
+const INTERACTION_SENSITIVITY_SLIDER_HEADROOM = 10;
 
 function hudButtonStyle(active = false): CSSProperties {
   return {
@@ -68,9 +68,7 @@ export function MapHud({
   claimedEntityCount,
   entityCount,
   interactionSensitivity,
-  maxInteractionSensitivity,
   maxPollIntervalMs,
-  minInteractionSensitivity,
   minPollIntervalMs,
   networkEdgeCount,
   onSetInteractionSensitivity,
@@ -88,6 +86,11 @@ export function MapHud({
   showShardHoverDetails,
   viewMode,
 }: MapHudProps) {
+  const maxInteractionSensitivity = Math.max(
+    2,
+    Math.ceil(interactionSensitivity + INTERACTION_SENSITIVITY_SLIDER_HEADROOM)
+  );
+
   return (
     <div
       style={{
@@ -199,7 +202,7 @@ export function MapHud({
         sensitivity
         <input
           type="range"
-          min={minInteractionSensitivity}
+          min={MIN_INTERACTION_SENSITIVITY}
           max={maxInteractionSensitivity}
           step={0.1}
           value={interactionSensitivity}
@@ -207,9 +210,9 @@ export function MapHud({
             onSetInteractionSensitivity(
               parseBoundedNumber(
                 event.target.value,
-                minInteractionSensitivity,
+                MIN_INTERACTION_SENSITIVITY,
                 maxInteractionSensitivity,
-                minInteractionSensitivity
+                MIN_INTERACTION_SENSITIVITY
               )
             )
           }
