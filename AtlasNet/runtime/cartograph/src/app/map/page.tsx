@@ -113,7 +113,11 @@ export default function MapPage() {
     DEFAULT_INTERACTION_SENSITIVITY
   );
   const [pollIntervalMs, setPollIntervalMs] = useState(DEFAULT_POLL_INTERVAL_MS);
-  const baseShapes = useHeuristicShapes();
+  const baseShapes = useHeuristicShapes({
+    intervalMs: pollIntervalMs,
+    resetOnException: true,
+    resetOnHttpError: false,
+  });
   const networkTelemetry = useNetworkTelemetry({
     intervalMs: pollIntervalMs,
     resetOnException: true,
@@ -177,14 +181,50 @@ export default function MapPage() {
     return out;
   }, [baseShapes]);
 
+  const mapBoundsCenter = useMemo(() => {
+    let minX = Infinity;
+    let maxX = -Infinity;
+    let minY = Infinity;
+    let maxY = -Infinity;
+    let hasPoint = false;
+
+    for (const shape of baseShapes) {
+      const points = getShapeAnchorPoints(shape);
+      for (const point of points) {
+        if (!Number.isFinite(point.x) || !Number.isFinite(point.y)) {
+          continue;
+        }
+        hasPoint = true;
+        if (point.x < minX) minX = point.x;
+        if (point.x > maxX) maxX = point.x;
+        if (point.y < minY) minY = point.y;
+        if (point.y > maxY) maxY = point.y;
+      }
+    }
+
+    if (!hasPoint) {
+      return { x: 0, y: 0 };
+    }
+    return {
+      x: (minX + maxX) / 2,
+      y: (minY + maxY) / 2,
+    };
+  }, [baseShapes]);
+
   const networkNodeIds = useMemo(() => {
-    // Authoritative shard ids come from telemetry rows, not connection targets.
-    // This avoids rendering nodes for malformed/stale target ids.
+    // Include both telemetry rows and valid connection targets so shard nodes
+    // track live GNS topology updates.
     const ids = new Set<string>();
     for (const shard of networkTelemetry) {
       const shardId = normalizeShardId(shard.shardId);
       if (shardId.length > 0 && isShardIdentity(shardId)) {
         ids.add(shardId);
+      }
+      for (const connection of shard.connections) {
+        const targetId = normalizeShardId(connection.targetId);
+        if (targetId.length > 0 && isShardIdentity(targetId)) {
+          ids.add(targetId);
+        }
       }
     }
     return Array.from(ids.values()).sort();
@@ -225,6 +265,9 @@ export default function MapPage() {
     if (centerCount > 0) {
       centerX /= centerCount;
       centerY /= centerCount;
+    } else {
+      centerX = mapBoundsCenter.x;
+      centerY = mapBoundsCenter.y;
     }
 
     for (const unresolvedId of unresolvedIds) {
@@ -236,7 +279,7 @@ export default function MapPage() {
     }
 
     return out;
-  }, [networkNodeIds, shardAnchorPositions]);
+  }, [mapBoundsCenter, networkNodeIds, shardAnchorPositions]);
 
   const networkEdgeCount = useMemo(() => {
     const seen = new Set<string>();

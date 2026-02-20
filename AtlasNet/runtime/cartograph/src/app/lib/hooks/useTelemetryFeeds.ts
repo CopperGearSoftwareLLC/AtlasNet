@@ -126,14 +126,24 @@ interface TelemetryPollingOptions {
   onHttpError?: (statusCode: number) => void;
 }
 
-export function useHeuristicShapes(): ShapeJS[] {
+export function useHeuristicShapes({
+  intervalMs = 0,
+  enabled = true,
+  resetOnException = false,
+  resetOnHttpError = false,
+  onException,
+  onHttpError,
+}: Partial<TelemetryPollingOptions> = {}): ShapeJS[] {
   return usePolledResource<ShapeJS[]>({
     url: '/api/heuristicfetch',
-    intervalMs: 0,
+    intervalMs,
+    enabled,
     createInitialValue: () => [],
     mapResponse: toShapeArray,
-    resetOnException: false,
-    resetOnHttpError: false,
+    resetOnException,
+    resetOnHttpError,
+    onException,
+    onHttpError,
   });
 }
 
