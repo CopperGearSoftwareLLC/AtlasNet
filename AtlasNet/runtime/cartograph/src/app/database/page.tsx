@@ -24,6 +24,7 @@ import {
 const DEFAULT_POLL_INTERVAL_MS = 1000;
 const MIN_POLL_INTERVAL_MS = 250;
 const MAX_POLL_INTERVAL_MS = 5000;
+const POLL_DISABLED_AT_MS = MAX_POLL_INTERVAL_MS;
 const REDIS_TYPE_OPTIONS = [
   'all',
   'string',
@@ -303,10 +304,15 @@ export default function DatabasePage() {
     }
 
     poll();
-    const intervalId = setInterval(poll, pollIntervalMs);
+    const intervalId =
+      pollIntervalMs >= POLL_DISABLED_AT_MS
+        ? null
+        : setInterval(poll, pollIntervalMs);
     return () => {
       alive = false;
-      clearInterval(intervalId);
+      if (intervalId != null) {
+        clearInterval(intervalId);
+      }
     };
   }, [pollIntervalMs, refreshToken, selectedSource]);
 
@@ -501,7 +507,9 @@ export default function DatabasePage() {
           </div>
           <div className="rounded-2xl border border-slate-800 bg-slate-900/70 p-3">
             <div className="text-xs text-slate-400">Poll Interval</div>
-            <div className="font-mono text-xl text-slate-100">{pollIntervalMs}ms</div>
+            <div className="font-mono text-xl text-slate-100">
+              {pollIntervalMs >= POLL_DISABLED_AT_MS ? 'off' : `${pollIntervalMs}ms`}
+            </div>
           </div>
         </div>
 
@@ -571,7 +579,10 @@ export default function DatabasePage() {
                   )
                 }
               />
-              poll: {pollIntervalMs}ms
+              poll interval:{' '}
+              {pollIntervalMs >= POLL_DISABLED_AT_MS
+                ? 'off'
+                : `${pollIntervalMs}ms`}
             </label>
           </div>
         </div>
