@@ -29,7 +29,7 @@ constexpr float kEntityPhaseStepRad = 0.7F;
 constexpr std::chrono::milliseconds kLinearPerimeterRefreshInterval(1000);
 
 #ifndef ATLASNET_ENTITY_HANDOFF_USE_LINEAR_DEBUG_SIM
-#define ATLASNET_ENTITY_HANDOFF_USE_LINEAR_DEBUG_SIM 1
+#define ATLASNET_ENTITY_HANDOFF_USE_LINEAR_DEBUG_SIM 0
 #endif
 
 #ifndef ATLASNET_ENTITY_HANDOFF_TRANSFER_DELAY_US

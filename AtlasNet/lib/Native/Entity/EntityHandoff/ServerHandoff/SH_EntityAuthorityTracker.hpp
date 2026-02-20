@@ -59,6 +59,9 @@ class SH_EntityAuthorityTracker
 	bool MarkPassing(AtlasEntityID entityId,
 					 const NetworkIdentity& passingTarget);
 	void MarkAuthoritative(AtlasEntityID entityId);
+	[[nodiscard]] bool IsPassing(AtlasEntityID entityId) const;
+	[[nodiscard]] std::optional<NetworkIdentity> GetPassingTarget(
+		AtlasEntityID entityId) const;
 	[[nodiscard]] bool IsPassingTo(
 		AtlasEntityID entityId, const NetworkIdentity& passingTarget) const;
 

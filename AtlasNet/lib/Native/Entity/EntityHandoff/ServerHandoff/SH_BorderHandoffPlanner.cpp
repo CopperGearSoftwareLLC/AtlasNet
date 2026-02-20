@@ -89,6 +89,13 @@ SH_BorderHandoffPlanner::PlanAndSendAll(
 	const auto entities = tracker.GetOwnedEntitySnapshots();
 	for (const auto& entity : entities)
 	{
+		// Keep handoff one-way once initiated. Mailbox commit/cancel is the
+		// only place that resolves a passing transfer.
+		if (tracker.IsPassing(entity.Entity_ID))
+		{
+			continue;
+		}
+
 		const vec3 position = entity.transform.position;
 		if (selfBounds.Contains(position))
 		{
