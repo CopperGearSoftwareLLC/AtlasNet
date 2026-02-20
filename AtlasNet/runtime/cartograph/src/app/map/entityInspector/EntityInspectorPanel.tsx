@@ -1,9 +1,14 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
+import type { MouseEvent as ReactMouseEvent } from 'react';
 import type { AuthorityEntityTelemetry } from '../../lib/cartographTypes';
 import { DatabaseExplorerInspector } from '../../database/components/DatabaseExplorerInspector';
 import { useEntityDatabaseDetails } from './useEntityDatabaseDetails';
+
+const ENTITY_INSPECTOR_DESKTOP_GRID_COLUMNS_CLASS =
+  'lg:grid-cols-[minmax(0,1fr)_minmax(0,2fr)]';
+const PANEL_MIN_WIDTH_PX = 520;
 
 interface EntityInspectorPanelProps {
   selectedEntities: AuthorityEntityTelemetry[];
@@ -40,95 +45,95 @@ export function EntityInspectorPanel({
   selectedEntities,
 }: EntityInspectorPanelProps) {
   const panelRef = useRef<HTMLDivElement | null>(null);
-  const [maxPanelWidthPx, setMaxPanelWidthPx] = useState(0);
+  const resizeSessionRef = useRef<{
+    startX: number;
+    startWidth: number;
+  } | null>(null);
   const [panelWidthPx, setPanelWidthPx] = useState<number | null>(null);
 
-  useEffect(() => {
-    const panel = panelRef.current;
-    const parent = panel?.parentElement;
+  function getMaxPanelWidthPx(): number {
+    const parent = panelRef.current?.parentElement;
     if (!parent) {
-      return;
+      return Number.POSITIVE_INFINITY;
     }
-
-    const updateMaxWidth = () => {
-      setMaxPanelWidthPx(Math.max(520, parent.clientWidth - 24));
-    };
-
-    updateMaxWidth();
-
-    const observer = new ResizeObserver(updateMaxWidth);
-    observer.observe(parent);
-    return () => observer.disconnect();
-  }, []);
+    return Math.max(PANEL_MIN_WIDTH_PX, parent.clientWidth - 24);
+  }
 
   useEffect(() => {
-    if (panelWidthPx == null || maxPanelWidthPx <= 0) {
-      return;
-    }
-    if (panelWidthPx > maxPanelWidthPx) {
-      setPanelWidthPx(maxPanelWidthPx);
-    }
-  }, [maxPanelWidthPx, panelWidthPx]);
-
-  useEffect(() => {
-    if (!panelRef.current) {
-      return;
-    }
-
-    const panel = panelRef.current;
-    let dragStartX = 0;
-    let dragStartWidth = 0;
-    let activePointerId: number | null = null;
-
-    const handlePointerMove = (event: PointerEvent) => {
-      if (activePointerId == null || event.pointerId !== activePointerId) {
+    const handleMouseMove = (event: MouseEvent) => {
+      const session = resizeSessionRef.current;
+      if (!session) {
         return;
       }
 
-      const dragDelta = dragStartX - event.clientX;
-      const nextWidth = dragStartWidth + dragDelta;
-      const clampedWidth = Math.min(maxPanelWidthPx, Math.max(520, nextWidth));
+      const dragDelta = session.startX - event.clientX;
+      const nextWidth = session.startWidth + dragDelta;
+      const clampedWidth = Math.min(
+        getMaxPanelWidthPx(),
+        Math.max(PANEL_MIN_WIDTH_PX, nextWidth)
+      );
       setPanelWidthPx(clampedWidth);
     };
 
-    const finishResize = (event: PointerEvent) => {
-      if (activePointerId == null || event.pointerId !== activePointerId) {
+    const handleMouseUp = () => {
+      if (!resizeSessionRef.current) {
         return;
       }
-      activePointerId = null;
-      try {
-        panel.releasePointerCapture(event.pointerId);
-      } catch {}
+      resizeSessionRef.current = null;
+      document.body.style.cursor = '';
+      document.body.style.userSelect = '';
     };
 
-    const handlePointerDown = (event: PointerEvent) => {
-      const target = event.target as HTMLElement | null;
-      if (!target?.dataset?.resizeHandle) {
-        return;
-      }
-      event.preventDefault();
-      event.stopPropagation();
-
-      activePointerId = event.pointerId;
-      dragStartX = event.clientX;
-      dragStartWidth = panel.getBoundingClientRect().width;
-      try {
-        panel.setPointerCapture(event.pointerId);
-      } catch {}
+    const clampWidthToContainer = () => {
+      setPanelWidthPx((previous) => {
+        if (previous == null) {
+          return previous;
+        }
+        return Math.min(
+          getMaxPanelWidthPx(),
+          Math.max(PANEL_MIN_WIDTH_PX, previous)
+        );
+      });
     };
 
-    panel.addEventListener('pointerdown', handlePointerDown);
-    panel.addEventListener('pointermove', handlePointerMove);
-    panel.addEventListener('pointerup', finishResize);
-    panel.addEventListener('pointercancel', finishResize);
+    window.addEventListener('mousemove', handleMouseMove);
+    window.addEventListener('mouseup', handleMouseUp);
+    window.addEventListener('resize', clampWidthToContainer);
+    clampWidthToContainer();
+
+    let observer: ResizeObserver | null = null;
+    const parent = panelRef.current?.parentElement;
+    if (parent && typeof ResizeObserver !== 'undefined') {
+      observer = new ResizeObserver(clampWidthToContainer);
+      observer.observe(parent);
+    }
 
     return () => {
-      panel.removeEventListener('pointerdown', handlePointerDown);
-      panel.removeEventListener('pointermove', handlePointerMove);
-      panel.removeEventListener('pointerup', finishResize);
-      panel.removeEventListener('pointercancel', finishResize);
+      document.body.style.cursor = '';
+      document.body.style.userSelect = '';
+      window.removeEventListener('mousemove', handleMouseMove);
+      window.removeEventListener('mouseup', handleMouseUp);
+      window.removeEventListener('resize', clampWidthToContainer);
+      observer?.disconnect();
     };
-  }, [maxPanelWidthPx]);
+  }, []);
+
+  function startResizeDrag(
+    event: ReactMouseEvent<HTMLDivElement>
+  ): void {
+    if (event.button !== 0 || !panelRef.current) {
+      return;
+    }
+
+    event.preventDefault();
+    event.stopPropagation();
+    resizeSessionRef.current = {
+      startX: event.clientX,
+      startWidth: panelRef.current.getBoundingClientRect().width,
+    };
+    document.body.style.cursor = 'ew-resize';
+    document.body.style.userSelect = 'none';
+  }
 
   const activeEntity =
     selectedEntities.find((entity) => entity.entityId === activeEntityId) ?? null;
@@ -148,7 +153,7 @@ export function EntityInspectorPanel({
         right: 12,
         bottom: 12,
         width: panelWidthPx == null ? '50%' : `${panelWidthPx}px`,
-        minWidth: 520,
+        minWidth: PANEL_MIN_WIDTH_PX,
         maxWidth: 'calc(100% - 24px)',
         display: 'flex',
         flexDirection: 'column',
@@ -159,21 +164,22 @@ export function EntityInspectorPanel({
         backdropFilter: 'blur(4px)',
         pointerEvents: 'auto',
         overflow: 'hidden',
+        zIndex: 30,
       }}
     >
       <div
-        data-resize-handle="true"
         title="Drag to resize panel. Double-click to reset width."
+        onMouseDown={startResizeDrag}
         onDoubleClick={() => setPanelWidthPx(null)}
         style={{
           position: 'absolute',
           left: 0,
           top: 0,
           bottom: 0,
-          width: 8,
+          width: 10,
           cursor: 'ew-resize',
           zIndex: 10,
-          background: 'transparent',
+          background: 'rgba(148, 163, 184, 0.12)',
         }}
       />
 
@@ -329,7 +335,7 @@ export function EntityInspectorPanel({
           style={{
             height: '100%',
             minHeight: 0,
-            overflow: 'auto',
+            overflow: 'hidden',
             padding: activeEntity ? 14 : 0,
             display: 'flex',
             flexDirection: 'column',
@@ -390,10 +396,14 @@ export function EntityInspectorPanel({
                 records={details.data.records}
                 loading={false}
                 selectionScopeKey={activeEntity.entityId}
-                containerClassName="pb-2"
+                fillHeight
+                containerClassName="pb-2 flex-1 min-h-0 flex flex-col"
                 controlsClassName="!mb-2"
-                explorerViewportClassName="max-h-[32vh] overflow-auto p-2"
-                inspectorViewportClassName="max-h-[32vh] overflow-auto p-3"
+                explorerViewportClassName="h-full min-h-0 overflow-auto p-2"
+                inspectorViewportClassName="h-full min-h-0 overflow-auto p-3"
+                desktopGridColumnsClassName={
+                  ENTITY_INSPECTOR_DESKTOP_GRID_COLUMNS_CLASS
+                }
               />
             </>
           )}

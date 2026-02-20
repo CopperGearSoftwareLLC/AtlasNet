@@ -194,6 +194,7 @@ export default function MapPage() {
         display: 'flex',
         flexDirection: 'column',
         overflow: 'hidden',
+        position: 'relative',
       }}
     >
       <div
@@ -259,21 +260,6 @@ export default function MapPage() {
           />
         )}
 
-        <EntityInspectorPanel
-          selectedEntities={selectedEntities}
-          activeEntityId={activeEntityId}
-          hoveredEntityId={hoveredSelectedEntityId}
-          pollIntervalMs={entityDetailPollIntervalMs}
-          minPollIntervalMs={MIN_ENTITY_DETAIL_POLL_INTERVAL_MS}
-          maxPollIntervalMs={MAX_ENTITY_DETAIL_POLL_INTERVAL_MS}
-          pollDisabledAtMs={ENTITY_DETAIL_POLL_DISABLED_AT_MS}
-          onSetPollIntervalMs={setEntityDetailPollIntervalMs}
-          onSelectEntity={(entityId) =>
-            setActiveEntityId(activeEntityId === entityId ? null : entityId)
-          }
-          onHoverEntity={setHoveredEntityId}
-          onClearSelection={clearSelection}
-        />
       </div>
 
       <MapHud
@@ -299,6 +285,22 @@ export default function MapPage() {
         minPollIntervalMs={MIN_POLL_INTERVAL_MS}
         maxPollIntervalMs={MAX_POLL_INTERVAL_MS}
         onSetPollIntervalMs={setPollIntervalMs}
+      />
+
+      <EntityInspectorPanel
+        selectedEntities={selectedEntities}
+        activeEntityId={activeEntityId}
+        hoveredEntityId={hoveredSelectedEntityId}
+        pollIntervalMs={entityDetailPollIntervalMs}
+        minPollIntervalMs={MIN_ENTITY_DETAIL_POLL_INTERVAL_MS}
+        maxPollIntervalMs={MAX_ENTITY_DETAIL_POLL_INTERVAL_MS}
+        pollDisabledAtMs={ENTITY_DETAIL_POLL_DISABLED_AT_MS}
+        onSetPollIntervalMs={setEntityDetailPollIntervalMs}
+        onSelectEntity={(entityId) =>
+          setActiveEntityId(activeEntityId === entityId ? null : entityId)
+        }
+        onHoverEntity={setHoveredEntityId}
+        onClearSelection={clearSelection}
       />
     </div>
   );

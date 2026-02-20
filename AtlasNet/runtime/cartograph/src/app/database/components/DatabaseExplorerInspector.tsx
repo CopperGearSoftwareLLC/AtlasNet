@@ -39,6 +39,8 @@ const GROUP_MODE_OPTIONS = [
   { value: 'flat', label: 'Flat' },
 ] as const;
 const NAMESPACE_DELIMITER = ':';
+const DEFAULT_DESKTOP_GRID_COLUMNS_CLASS =
+  'lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]';
 
 type GroupMode = (typeof GROUP_MODE_OPTIONS)[number]['value'];
 type ExplorerNode = ExplorerFolderNode | ExplorerKeyNode;
@@ -75,6 +77,8 @@ interface DatabaseExplorerInspectorProps {
   containerClassName?: string;
   explorerViewportClassName?: string;
   inspectorViewportClassName?: string;
+  desktopGridColumnsClassName?: string;
+  fillHeight?: boolean;
 }
 
 function formatTtl(ttlSeconds: number): string {
@@ -117,6 +121,10 @@ function splitNamespaceFolders(key: string): string[] {
   return parts.slice(0, -1);
 }
 
+function getRecordIdentity(record: DatabaseRecord): string {
+  return `${record.source}\u001f${record.key}`;
+}
+
 function folderPartsForRecord(record: DatabaseRecord, groupMode: GroupMode): string[] {
   if (groupMode === 'flat') {
     return [];
@@ -133,10 +141,16 @@ function folderPartsForRecord(record: DatabaseRecord, groupMode: GroupMode): str
 function buildExplorerNodes(records: DatabaseRecord[], groupMode: GroupMode): ExplorerNode[] {
   if (groupMode === 'flat') {
     return [...records]
-      .sort((a, b) => a.key.localeCompare(b.key))
+      .sort((a, b) => {
+        const keyOrder = a.key.localeCompare(b.key);
+        if (keyOrder !== 0) {
+          return keyOrder;
+        }
+        return a.source.localeCompare(b.source);
+      })
       .map((record) => ({
         kind: 'key',
-        id: record.key,
+        id: getRecordIdentity(record),
         record,
       }));
   }
@@ -176,10 +190,16 @@ function buildExplorerNodes(records: DatabaseRecord[], groupMode: GroupMode): Ex
       .sort((a, b) => a.name.localeCompare(b.name))
       .map(finalizeFolder);
     const keyChildren: ExplorerKeyNode[] = [...folder.keys]
-      .sort((a, b) => a.key.localeCompare(b.key))
+      .sort((a, b) => {
+        const keyOrder = a.key.localeCompare(b.key);
+        if (keyOrder !== 0) {
+          return keyOrder;
+        }
+        return a.source.localeCompare(b.source);
+      })
       .map((record) => ({
         kind: 'key',
-        id: record.key,
+        id: getRecordIdentity(record),
         record,
       }));
 
@@ -197,10 +217,16 @@ function buildExplorerNodes(records: DatabaseRecord[], groupMode: GroupMode): Ex
     .sort((a, b) => a.name.localeCompare(b.name))
     .map(finalizeFolder);
   const topKeys: ExplorerKeyNode[] = [...root.keys]
-    .sort((a, b) => a.key.localeCompare(b.key))
+    .sort((a, b) => {
+      const keyOrder = a.key.localeCompare(b.key);
+      if (keyOrder !== 0) {
+        return keyOrder;
+      }
+      return a.source.localeCompare(b.source);
+    })
     .map((record) => ({
       kind: 'key',
-      id: record.key,
+      id: getRecordIdentity(record),
       record,
     }));
 
@@ -240,11 +266,13 @@ export function DatabaseExplorerInspector({
   containerClassName = '',
   explorerViewportClassName = 'max-h-[70vh] overflow-auto p-2',
   inspectorViewportClassName = 'max-h-[70vh] overflow-auto p-3',
+  desktopGridColumnsClassName = DEFAULT_DESKTOP_GRID_COLUMNS_CLASS,
+  fillHeight = false,
 }: DatabaseExplorerInspectorProps) {
   const [search, setSearch] = useState('');
   const [typeFilter, setTypeFilter] = useState('all');
   const [groupMode, setGroupMode] = useState<GroupMode>('namespace');
-  const [selectedKey, setSelectedKey] = useState<string | null>(null);
+  const [selectedRecordId, setSelectedRecordId] = useState<string | null>(null);
   const [expandedFolderIds, setExpandedFolderIds] = useState<Set<string>>(new Set());
   const [hasInitializedExpansion, setHasInitializedExpansion] = useState(false);
 
@@ -265,7 +293,13 @@ export function DatabaseExplorerInspector({
           record.payload.toLowerCase().includes(query)
         );
       })
-      .sort((a, b) => a.key.localeCompare(b.key));
+      .sort((a, b) => {
+        const keyOrder = a.key.localeCompare(b.key);
+        if (keyOrder !== 0) {
+          return keyOrder;
+        }
+        return a.source.localeCompare(b.source);
+      });
   }, [records, search, typeFilter]);
 
   const explorerNodes = useMemo(
@@ -288,18 +322,23 @@ export function DatabaseExplorerInspector({
   }, [explorerNodes, hasInitializedExpansion]);
 
   useEffect(() => {
-    if (selectedKey && !records.some((record) => record.key === selectedKey)) {
-      setSelectedKey(null);
+    if (
+      selectedRecordId &&
+      !records.some((record) => getRecordIdentity(record) === selectedRecordId)
+    ) {
+      setSelectedRecordId(null);
     }
-  }, [records, selectedKey]);
+  }, [records, selectedRecordId]);
 
   const selectedRecord = useMemo(
-    () => records.find((record) => record.key === selectedKey) ?? null,
-    [records, selectedKey]
+    () =>
+      records.find((record) => getRecordIdentity(record) === selectedRecordId) ??
+      null,
+    [records, selectedRecordId]
   );
 
   useEffect(() => {
-    setSelectedKey(null);
+    setSelectedRecordId(null);
     setExpandedFolderIds(new Set());
     setHasInitializedExpansion(false);
   }, [selectionScopeKey]);
@@ -349,12 +388,12 @@ export function DatabaseExplorerInspector({
       );
     }
 
-    const selected = selectedKey === node.record.key;
+    const selected = selectedRecordId === node.id;
     return (
       <button
         key={node.id}
         type="button"
-        onClick={() => setSelectedKey(node.record.key)}
+        onClick={() => setSelectedRecordId(node.id)}
         className={
           'flex w-full items-center gap-2 rounded px-2 py-1 text-left text-sm hover:bg-slate-900 ' +
           (selected ? 'bg-sky-900/30 ring-1 ring-sky-700/70' : '')
@@ -369,7 +408,11 @@ export function DatabaseExplorerInspector({
   }
 
   return (
-    <div className={containerClassName}>
+    <div
+      className={
+        (fillHeight ? 'h-full min-h-0 flex flex-col ' : '') + containerClassName
+      }
+    >
       {showControls && (
         <div
           className={
@@ -414,12 +457,25 @@ export function DatabaseExplorerInspector({
         </div>
       )}
 
-      <div className="grid grid-cols-1 gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
-        <div className="overflow-hidden rounded-2xl border border-slate-800 bg-slate-900/70">
+      <div
+        className={`grid grid-cols-1 gap-4 ${desktopGridColumnsClassName} ${
+          fillHeight ? 'min-h-0 flex-1' : ''
+        }`}
+      >
+        <div
+          className={
+            'overflow-hidden rounded-2xl border border-slate-800 bg-slate-900/70 ' +
+            (fillHeight ? 'min-h-0 flex flex-col' : '')
+          }
+        >
           <div className="border-b border-slate-800 px-3 py-2 text-xs uppercase tracking-wide text-slate-400">
             Explorer
           </div>
-          <div className={explorerViewportClassName}>
+          <div
+            className={
+              (fillHeight ? 'min-h-0 flex-1 ' : '') + explorerViewportClassName
+            }
+          >
             {loading && (
               <div className="px-2 py-4 text-sm text-slate-400">{loadingText}</div>
             )}
@@ -432,11 +488,20 @@ export function DatabaseExplorerInspector({
           </div>
         </div>
 
-        <div className="overflow-hidden rounded-2xl border border-slate-800 bg-slate-900/70">
+        <div
+          className={
+            'overflow-hidden rounded-2xl border border-slate-800 bg-slate-900/70 ' +
+            (fillHeight ? 'min-h-0 flex flex-col' : '')
+          }
+        >
           <div className="border-b border-slate-800 px-3 py-2 text-xs uppercase tracking-wide text-slate-400">
             Inspector
           </div>
-          <div className={inspectorViewportClassName}>
+          <div
+            className={
+              (fillHeight ? 'min-h-0 flex-1 ' : '') + inspectorViewportClassName
+            }
+          >
             {!selectedRecord && (
               <div className="py-6 text-sm text-slate-400">
                 Select a key from the explorer to inspect its value.

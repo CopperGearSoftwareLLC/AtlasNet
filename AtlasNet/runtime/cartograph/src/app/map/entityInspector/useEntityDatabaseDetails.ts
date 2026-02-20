@@ -10,6 +10,13 @@ interface EntityDatabaseDetailsState {
   data: EntityInspectorLookupResponse | null;
 }
 
+interface LookupContext {
+  entityId: string;
+  ownerId: string;
+  clientId: string;
+  world: number;
+}
+
 const POLL_DISABLED_AT_MS = 5000;
 
 const EMPTY_DETAILS_STATE: EntityDatabaseDetailsState = {
@@ -93,29 +100,78 @@ export function useEntityDatabaseDetails(
   pollIntervalMs = 0
 ): EntityDatabaseDetailsState {
   const [state, setState] = useState<EntityDatabaseDetailsState>(EMPTY_DETAILS_STATE);
+  const [frozenLookupContext, setFrozenLookupContext] = useState<LookupContext | null>(
+    null
+  );
   const entityId = entity?.entityId ?? '';
   const ownerId = entity?.ownerId ?? '';
   const clientId = entity?.clientId ?? '';
   const world = entity?.world ?? 0;
+  const pollingEnabled = pollIntervalMs > 0 && pollIntervalMs < POLL_DISABLED_AT_MS;
 
   useEffect(() => {
     if (!entityId) {
+      setFrozenLookupContext(null);
+      return;
+    }
+
+    setFrozenLookupContext((previous) => {
+      if (!previous || previous.entityId !== entityId) {
+        return { entityId, ownerId, clientId, world };
+      }
+
+      if (
+        pollingEnabled &&
+        (previous.ownerId !== ownerId ||
+          previous.clientId !== clientId ||
+          previous.world !== world)
+      ) {
+        return { entityId, ownerId, clientId, world };
+      }
+
+      return previous;
+    });
+  }, [clientId, entityId, ownerId, pollingEnabled, world]);
+
+  const lookupEntityId = entityId
+    ? pollingEnabled
+      ? entityId
+      : (frozenLookupContext?.entityId ?? entityId)
+    : '';
+  const lookupOwnerId = entityId
+    ? pollingEnabled
+      ? ownerId
+      : (frozenLookupContext?.ownerId ?? ownerId)
+    : '';
+  const lookupClientId = entityId
+    ? pollingEnabled
+      ? clientId
+      : (frozenLookupContext?.clientId ?? clientId)
+    : '';
+  const lookupWorld = entityId
+    ? pollingEnabled
+      ? world
+      : (frozenLookupContext?.world ?? world)
+    : 0;
+
+  useEffect(() => {
+    if (!lookupEntityId) {
       setState(EMPTY_DETAILS_STATE);
       return;
     }
 
     const params = new URLSearchParams();
-    params.set('entityId', entityId);
-    params.set('ownerId', ownerId);
-    params.set('clientId', clientId);
-    params.set('world', String(world));
+    params.set('entityId', lookupEntityId);
+    params.set('ownerId', lookupOwnerId);
+    params.set('clientId', lookupClientId);
+    params.set('world', String(lookupWorld));
 
     const ac = new AbortController();
     setState((previous) => ({
-      loading: previous.data?.entity.entityId !== entityId,
+      loading: previous.data?.entity.entityId !== lookupEntityId,
       error: null,
       data:
-        previous.data?.entity.entityId === entityId ? previous.data : null,
+        previous.data?.entity.entityId === lookupEntityId ? previous.data : null,
     }));
 
     let inFlight = false;
@@ -175,12 +231,11 @@ export function useEntityDatabaseDetails(
 
     void loadDetails();
 
-    const intervalId =
-      pollIntervalMs > 0 && pollIntervalMs < POLL_DISABLED_AT_MS
-        ? setInterval(() => {
-            void loadDetails();
-          }, pollIntervalMs)
-        : null;
+    const intervalId = pollingEnabled
+      ? setInterval(() => {
+          void loadDetails();
+        }, pollIntervalMs)
+      : null;
 
     return () => {
       ac.abort();
@@ -188,7 +243,14 @@ export function useEntityDatabaseDetails(
         clearInterval(intervalId);
       }
     };
-  }, [clientId, entityId, ownerId, pollIntervalMs, world]);
+  }, [
+    lookupClientId,
+    lookupEntityId,
+    lookupOwnerId,
+    lookupWorld,
+    pollIntervalMs,
+    pollingEnabled,
+  ]);
 
   return state;
 }

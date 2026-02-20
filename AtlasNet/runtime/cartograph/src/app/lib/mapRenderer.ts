@@ -367,10 +367,10 @@ export function createMapRenderer({
     const innerRadius = isHovered ? 3.2 : 2.3;
     const strokeColor = isHovered
       ? 'rgba(59, 130, 246, 0.95)'
-      : 'rgba(34, 197, 94, 0.95)';
+      : 'rgba(251, 191, 36, 0.95)';
     const fillColor = isHovered
       ? 'rgba(59, 130, 246, 0.36)'
-      : 'rgba(34, 197, 94, 0.3)';
+      : 'rgba(251, 191, 36, 0.3)';
 
     ctx.save();
     ctx.beginPath();
