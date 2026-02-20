@@ -47,7 +47,7 @@ const GROUP_MODE_OPTIONS = [
   { value: 'type_namespace', label: 'Type + Namespace' },
   { value: 'flat', label: 'Flat' },
 ] as const;
-const DELIMITER_OPTIONS = [':', '/', '.', '|'] as const;
+const NAMESPACE_DELIMITER = ':';
 
 type GroupMode = (typeof GROUP_MODE_OPTIONS)[number]['value'];
 
@@ -106,19 +106,15 @@ function formatPayload(record: DatabaseRecord): string {
   }
 }
 
-function splitNamespaceFolders(key: string, delimiter: string): string[] {
-  const parts = key.split(delimiter).filter((p) => p.length > 0);
+function splitNamespaceFolders(key: string): string[] {
+  const parts = key.split(NAMESPACE_DELIMITER).filter((p) => p.length > 0);
   if (parts.length <= 1) {
     return [];
   }
   return parts.slice(0, -1);
 }
 
-function folderPartsForRecord(
-  record: DatabaseRecord,
-  groupMode: GroupMode,
-  delimiter: string
-): string[] {
+function folderPartsForRecord(record: DatabaseRecord, groupMode: GroupMode): string[] {
   if (groupMode === 'flat') {
     return [];
   }
@@ -126,16 +122,12 @@ function folderPartsForRecord(
     return [record.type || 'unknown'];
   }
   if (groupMode === 'type_namespace') {
-    return [record.type || 'unknown', ...splitNamespaceFolders(record.key, delimiter)];
+    return [record.type || 'unknown', ...splitNamespaceFolders(record.key)];
   }
-  return splitNamespaceFolders(record.key, delimiter);
+  return splitNamespaceFolders(record.key);
 }
 
-function buildExplorerNodes(
-  records: DatabaseRecord[],
-  groupMode: GroupMode,
-  delimiter: string
-): ExplorerNode[] {
+function buildExplorerNodes(records: DatabaseRecord[], groupMode: GroupMode): ExplorerNode[] {
   if (groupMode === 'flat') {
     return [...records]
       .sort((a, b) => a.key.localeCompare(b.key))
@@ -154,7 +146,7 @@ function buildExplorerNodes(
   };
 
   for (const record of records) {
-    const parts = folderPartsForRecord(record, groupMode, delimiter);
+    const parts = folderPartsForRecord(record, groupMode);
     let current = root;
     let folderPath = root.id;
 
@@ -241,7 +233,6 @@ export default function DatabasePage() {
   const [search, setSearch] = useState('');
   const [typeFilter, setTypeFilter] = useState('all');
   const [groupMode, setGroupMode] = useState<GroupMode>('namespace');
-  const [namespaceDelimiter, setNamespaceDelimiter] = useState(':');
   const [decodeSerialized, setDecodeSerialized] = useState(true);
   const [selectedKey, setSelectedKey] = useState<string | null>(null);
   const [expandedFolderIds, setExpandedFolderIds] = useState<Set<string>>(new Set());
@@ -346,8 +337,8 @@ export default function DatabasePage() {
   }, [records, search, typeFilter]);
 
   const explorerNodes = useMemo(
-    () => buildExplorerNodes(filteredRecords, groupMode, namespaceDelimiter),
-    [filteredRecords, groupMode, namespaceDelimiter]
+    () => buildExplorerNodes(filteredRecords, groupMode),
+    [filteredRecords, groupMode]
   );
 
   useEffect(() => {
@@ -547,22 +538,6 @@ export default function DatabasePage() {
               {GROUP_MODE_OPTIONS.map((option) => (
                 <option key={option.value} value={option.value}>
                   group: {option.label}
-                </option>
-              ))}
-            </select>
-            <select
-              value={namespaceDelimiter}
-              disabled={groupMode === 'flat' || groupMode === 'type'}
-              onChange={(e) => {
-                setNamespaceDelimiter(e.target.value);
-                setExpandedFolderIds(new Set());
-                setHasInitializedExpansion(false);
-              }}
-              className="rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-sm text-slate-100 outline-none disabled:opacity-50"
-            >
-              {DELIMITER_OPTIONS.map((delimiter) => (
-                <option key={delimiter} value={delimiter}>
-                  delim: {delimiter}
                 </option>
               ))}
             </select>

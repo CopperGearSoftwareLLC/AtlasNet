@@ -5,8 +5,6 @@ const {
   formatBinaryPreview,
   formatUuid,
   formatVec3,
-  isLikelyText,
-  tryDecodeUtf8,
 } = require('./format');
 
 const AUTHORITY_ENTITY_SNAPSHOTS_KEY = 'Authority_EntitySnapshots';
@@ -27,6 +25,10 @@ const NETWORK_IDENTITY_TYPE_NAME_BY_CODE = {
   6: 'proxy',
   7: 'atlasNetInitial',
 };
+
+function isBinaryPreviewText(value) {
+  return typeof value === 'string' && value.startsWith('<binary ');
+}
 
 function decodeUuidValue(raw) {
   const value = asBuffer(raw);
@@ -55,9 +57,8 @@ function decodeNetworkIdentityValue(raw) {
     const typeName =
       NETWORK_IDENTITY_TYPE_NAME_BY_CODE[typeCode] ?? `unknown(${typeCode})`;
     return `${typeName}:${id}`;
-  } catch (err) {
-    const message = err instanceof Error ? err.message : 'unknown';
-    return `<decode error: ${message}> ${formatBinaryPreview(value)}`;
+  } catch {
+    return decodeRedisDisplayValue(value);
   }
 }
 
@@ -88,9 +89,8 @@ function decodeIpAddressValue(raw) {
       out += ` trailingBytes=${cursor.remaining()}`;
     }
     return out;
-  } catch (err) {
-    const message = err instanceof Error ? err.message : 'unknown';
-    return `<decode error: ${message}> ${formatBinaryPreview(value)}`;
+  } catch {
+    return decodeRedisDisplayValue(value);
   }
 }
 
@@ -107,16 +107,16 @@ function summarizeBlob(blob) {
     return 'empty';
   }
 
-  const decoded = tryDecodeUtf8(blob);
-  if (decoded != null && isLikelyText(decoded)) {
-    const compact = decoded.replace(/\s+/g, ' ').trim();
+  const decodedValue = decodeRedisDisplayValue(blob);
+  if (!isBinaryPreviewText(decodedValue)) {
+    const compact = String(decodedValue).replace(/\s+/g, ' ').trim();
     if (!compact) {
       return `utf8(${blob.length}b)`;
     }
     if (compact.length <= 80) {
-      return `utf8:${compact}`;
+      return compact;
     }
-    return `utf8:${compact.slice(0, 80)}...`;
+    return `${compact.slice(0, 80)}...`;
   }
 
   return formatBinaryPreview(blob);
@@ -160,9 +160,8 @@ function decodeAuthorityEntitySnapshotValue(raw) {
       output += ` trailingBytes=${cursor.remaining()}`;
     }
     return output;
-  } catch (err) {
-    const message = err instanceof Error ? err.message : 'unknown';
-    return `<decode error: ${message}> ${formatBinaryPreview(value)}`;
+  } catch {
+    return decodeRedisDisplayValue(value);
   }
 }
 
@@ -229,10 +228,149 @@ function decodeBase64BlobSummary(base64Value) {
   }
   try {
     const raw = Buffer.from(base64Value, 'base64');
+    const decoded = decodeRedisDisplayValue(raw);
+    if (!isBinaryPreviewText(decoded)) {
+      return decoded;
+    }
     return `decodedBytes=${raw.length} preview=${formatBinaryPreview(raw)}`;
   } catch (err) {
     const message = err instanceof Error ? err.message : 'unknown';
     return `<base64 decode error: ${message}>`;
+  }
+}
+
+function tryDecodeGridShapeBoundsRaw(raw) {
+  try {
+    const cursor = new ByteCursor(raw);
+    const id = cursor.readU32();
+    const min = readVec3(cursor);
+    const max = readVec3(cursor);
+    if (cursor.remaining() !== 0) {
+      return null;
+    }
+    return {
+      kind: 'GridShape',
+      ID: id,
+      aabb: { min, max },
+    };
+  } catch {
+    return null;
+  }
+}
+
+function tryDecodeVec3Raw(raw) {
+  if (raw.length !== 12) {
+    return null;
+  }
+  try {
+    const cursor = new ByteCursor(raw);
+    return {
+      x: cursor.readF32(),
+      y: cursor.readF32(),
+      z: cursor.readF32(),
+    };
+  } catch {
+    return null;
+  }
+}
+
+function decodeBoundsDataBase64(base64Value) {
+  if (typeof base64Value !== 'string' || base64Value.length === 0) {
+    return decodeRedisDisplayValue(base64Value);
+  }
+  try {
+    const raw = Buffer.from(base64Value, 'base64');
+
+    const grid = tryDecodeGridShapeBoundsRaw(raw);
+    if (grid) {
+      return grid;
+    }
+
+    const vec3 = tryDecodeVec3Raw(raw);
+    if (vec3) {
+      return {
+        kind: 'vec3',
+        value: vec3,
+      };
+    }
+
+    const decoded = decodeRedisDisplayValue(raw);
+    if (!isBinaryPreviewText(decoded)) {
+      return decoded;
+    }
+
+    return {
+      kind: 'unknown',
+      decodedBytes: raw.length,
+      preview: formatBinaryPreview(raw),
+    };
+  } catch (err) {
+    const message = err instanceof Error ? err.message : 'unknown';
+    return `<base64 decode error: ${message}>`;
+  }
+}
+
+function decodeHeuristicDataBase64(base64Value) {
+  if (typeof base64Value !== 'string' || base64Value.length === 0) {
+    return decodeRedisDisplayValue(base64Value);
+  }
+
+  try {
+    const raw = Buffer.from(base64Value, 'base64');
+    const cursor = new ByteCursor(raw);
+    const countBig = cursor.readU64();
+    const count = Number(countBig);
+
+    const gridShapeSerializedBytes = 4 + 12 + 12;
+    if (
+      !Number.isFinite(count) ||
+      count < 0 ||
+      count > 100000 ||
+      count * gridShapeSerializedBytes > cursor.remaining()
+    ) {
+      const decoded = decodeRedisDisplayValue(raw);
+      if (!isBinaryPreviewText(decoded)) {
+        return decoded;
+      }
+      return {
+        kind: 'unknown',
+        decodedBytes: raw.length,
+        preview: formatBinaryPreview(raw),
+      };
+    }
+
+    const bounds = [];
+    for (let i = 0; i < count; i += 1) {
+      const shapeId = cursor.readU32();
+      const min = readVec3(cursor);
+      const max = readVec3(cursor);
+      bounds.push({
+        kind: 'GridShape',
+        ID: shapeId,
+        aabb: { min, max },
+      });
+    }
+
+    if (cursor.remaining() !== 0) {
+      const decoded = decodeRedisDisplayValue(raw);
+      if (!isBinaryPreviewText(decoded)) {
+        return decoded;
+      }
+      return {
+        kind: 'unknown',
+        decodedBytes: raw.length,
+        preview: formatBinaryPreview(raw),
+        trailingBytes: cursor.remaining(),
+      };
+    }
+
+    return {
+      kind: 'GridHeuristic',
+      boundsCount: count,
+      bounds,
+    };
+  } catch {
+    return decodeBase64BlobSummary(base64Value);
   }
 }
 
@@ -261,7 +399,7 @@ function decodeHeuristicManifestJsonPayload(payload, decodeEnabled) {
     }
 
     if (typeof parsed.HeuristicData64 === 'string') {
-      parsed.HeuristicData64_Decoded = decodeBase64BlobSummary(parsed.HeuristicData64);
+      parsed.HeuristicData64 = decodeHeuristicDataBase64(parsed.HeuristicData64);
     }
 
     if (parsed.Pending && typeof parsed.Pending === 'object') {
@@ -270,7 +408,7 @@ function decodeHeuristicManifestJsonPayload(payload, decodeEnabled) {
           continue;
         }
         if (typeof item.BoundsData64 === 'string') {
-          item.BoundsData64_Decoded = decodeBase64BlobSummary(item.BoundsData64);
+          item.BoundsData64 = decodeBoundsDataBase64(item.BoundsData64);
         }
       }
     }
@@ -281,10 +419,10 @@ function decodeHeuristicManifestJsonPayload(payload, decodeEnabled) {
           continue;
         }
         if (typeof item.Owner64 === 'string') {
-          item.Owner64_Decoded = decodeBase64NetworkIdentity(item.Owner64);
+          item.Owner64 = decodeBase64NetworkIdentity(item.Owner64);
         }
         if (typeof item.BoundsData64 === 'string') {
-          item.BoundsData64_Decoded = decodeBase64BlobSummary(item.BoundsData64);
+          item.BoundsData64 = decodeBoundsDataBase64(item.BoundsData64);
         }
       }
     }
