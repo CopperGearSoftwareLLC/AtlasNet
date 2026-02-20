@@ -1,15 +1,22 @@
 'use client';
 
 import { useEffect, useState, useMemo } from 'react';
+import { ServerBoundsMinimapSection } from '../components/ServerBoundsMinimapSection';
 import { CircularNodeGraphPanel } from '../components/CircularNodeGraphPanel';
 import { ShardTelemetryRow } from '../components/ShardTelemetryRow';
 import { TelemetryPanel } from '../components/TelemetryPanel';
-import { useNetworkTelemetry } from '../lib/hooks/useTelemetryFeeds';
+import {
+  useAuthorityEntities,
+  useHeuristicShapes,
+  useNetworkTelemetry,
+} from '../lib/hooks/useTelemetryFeeds';
+import { useServerBoundsMinimapData } from '../lib/hooks/useServerBoundsMinimapData';
 
 const ENABLE_NETWORK_TELEMETRY = true;
 const DEFAULT_POLL_INTERVAL_MS = 200;
 const MIN_POLL_INTERVAL_MS = 50;
 const MAX_POLL_INTERVAL_MS = 1000;
+const SERVER_BOUNDS_POLL_INTERVAL_MS = 1000;
 
 type ShardState = {
   shardId: string;
@@ -33,6 +40,7 @@ export default function NetworkTelemetryPage() {
   const [shards, setShards] = useState<ShardState[]>([]);
   const [selectedShardId, setSelectedShardId] = useState<string | null>(null);
   const [pollIntervalMs, setPollIntervalMs] = useState(DEFAULT_POLL_INTERVAL_MS);
+  const [showServerBoundsMinimap, setShowServerBoundsMinimap] = useState(true);
   const latestTelemetry = useNetworkTelemetry({
     intervalMs: pollIntervalMs,
     enabled: ENABLE_NETWORK_TELEMETRY,
@@ -44,6 +52,27 @@ export default function NetworkTelemetryPage() {
     onException: (err) => {
       console.error(err);
     },
+  });
+  const heuristicShapes = useHeuristicShapes({
+    intervalMs: SERVER_BOUNDS_POLL_INTERVAL_MS,
+    enabled: showServerBoundsMinimap,
+    resetOnException: true,
+    resetOnHttpError: false,
+  });
+  const authorityEntities = useAuthorityEntities({
+    intervalMs: SERVER_BOUNDS_POLL_INTERVAL_MS,
+    enabled: showServerBoundsMinimap,
+    resetOnException: true,
+    resetOnHttpError: false,
+  });
+  const {
+    shardSummaries,
+    shardBoundsByIdWithNetworkFallback,
+    claimedBoundShardIds,
+  } = useServerBoundsMinimapData({
+    heuristicShapes,
+    authorityEntities,
+    networkTelemetry: latestTelemetry,
   });
 
   const latestById = useMemo(() => {
@@ -102,6 +131,22 @@ export default function NetworkTelemetryPage() {
             )
           }
         />
+        <label
+          style={{
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: 6,
+            marginLeft: 6,
+            cursor: 'pointer',
+          }}
+        >
+          <input
+            type="checkbox"
+            checked={showServerBoundsMinimap}
+            onChange={(event) => setShowServerBoundsMinimap(event.target.checked)}
+          />
+          <span>server bounds minimap</span>
+        </label>
       </div>
       <div style={{ margin: '12px 0 16px' }}>
         <CircularNodeGraphPanel telemetry={latestTelemetry} />
@@ -139,6 +184,18 @@ export default function NetworkTelemetryPage() {
       </table>
       {selectedShard && (
         <TelemetryPanel shard={selectedShard} onClose={() => setSelectedShardId(null)} />
+      )}
+
+      {showServerBoundsMinimap && (
+        <div style={{ marginTop: 16 }}>
+          <ServerBoundsMinimapSection
+            shardSummaries={shardSummaries}
+            boundsByShardId={shardBoundsByIdWithNetworkFallback}
+            claimedBoundShardIds={claimedBoundShardIds}
+            title="Server Bounds Minimap"
+            emptyMessage="Waiting for shard telemetry and map bounds..."
+          />
+        </div>
       )}
     </div>
   );
