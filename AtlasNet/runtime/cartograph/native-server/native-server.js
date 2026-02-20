@@ -1,6 +1,7 @@
 // native-server.js
 const express = require('express');
 const cors = require('cors');
+const Redis = require('ioredis');
 const addon = require('../nextjs/native/Web.node');
 const { HeuristicDraw, IBoundsDrawShape, std_vector_IBoundsDrawShape_ } = addon; // your .node file
 
@@ -44,14 +45,6 @@ function computeShardAverages(connections) {
   };
 }
 
-function toInteger(value, fallback = 0) {
-  const n = Number(value);
-  if (!Number.isFinite(n)) {
-    return fallback;
-  }
-  return Math.trunc(n);
-}
-
 const app = express();
 app.use(cors()); // allow your frontend to call it
 
@@ -59,9 +52,223 @@ const nt = new addon.NetworkTelemetry();
 const authorityTelemetry = addon.AuthorityTelemetry
   ? new addon.AuthorityTelemetry()
   : null;
-const databaseSnapshot = addon.DatabaseSnapshot
-  ? new addon.DatabaseSnapshot()
-  : null;
+const dbTargets = [
+  {
+    id: 'internal',
+    name: 'InternalDB',
+    host: process.env.INTERNAL_REDIS_SERVICE_NAME || 'InternalDB',
+    port: Number(process.env.INTERNAL_REDIS_PORT || 6379),
+  },
+  {
+    id: 'builtin',
+    name: 'BuiltInDB_Redis',
+    host: process.env.BUILTINDB_REDIS_SERVICE_NAME || 'BuiltInDB_Redis',
+    port: Number(process.env.BUILTINDB_REDIS_PORT || 2380),
+  },
+];
+
+const MAX_PAYLOAD_CHARS = 32 * 1024;
+const MAX_KEYS_PER_DB = 2000;
+const SCAN_COUNT = 200;
+
+function truncatePayload(payload) {
+  if (typeof payload !== 'string') {
+    return '';
+  }
+  if (payload.length <= MAX_PAYLOAD_CHARS) {
+    return payload;
+  }
+  return `${payload.slice(0, MAX_PAYLOAD_CHARS)}\n...[truncated ${payload.length - MAX_PAYLOAD_CHARS} bytes]`;
+}
+
+function formatHashPayload(fields) {
+  return Object.entries(fields)
+    .sort(([a], [b]) => String(a).localeCompare(String(b)))
+    .map(([k, v]) => `${k}\t${v}`)
+    .join('\n');
+}
+
+function formatSetPayload(values) {
+  return [...values].sort((a, b) => String(a).localeCompare(String(b))).join('\n');
+}
+
+function formatListPayload(values) {
+  return values.map((v, i) => `${i}\t${v}`).join('\n');
+}
+
+function formatZSetPayload(valuesWithScores) {
+  const lines = [];
+  for (let i = 0; i + 1 < valuesWithScores.length; i += 2) {
+    lines.push(`${valuesWithScores[i + 1]}\t${valuesWithScores[i]}`);
+  }
+  return lines.join('\n');
+}
+
+async function probeDatabase(target) {
+  const startedAt = Date.now();
+  const client = new Redis({
+    host: target.host,
+    port: target.port,
+    lazyConnect: true,
+    connectTimeout: 500,
+    maxRetriesPerRequest: 0,
+    enableOfflineQueue: false,
+    retryStrategy: null,
+  });
+
+  try {
+    await client.connect();
+    const pong = await client.ping();
+    return {
+      id: target.id,
+      name: target.name,
+      host: target.host,
+      port: target.port,
+      running: pong === 'PONG',
+      latencyMs: Date.now() - startedAt,
+    };
+  } catch {
+    return {
+      id: target.id,
+      name: target.name,
+      host: target.host,
+      port: target.port,
+      running: false,
+      latencyMs: null,
+    };
+  } finally {
+    try {
+      client.disconnect();
+    } catch {}
+  }
+}
+
+async function scanAllKeys(client) {
+  const keys = [];
+  let cursor = '0';
+
+  do {
+    const [nextCursor, page] = await client.scan(cursor, 'COUNT', SCAN_COUNT);
+    cursor = String(nextCursor);
+    for (const key of page) {
+      keys.push(String(key));
+      if (keys.length >= MAX_KEYS_PER_DB) {
+        return keys.sort((a, b) => a.localeCompare(b));
+      }
+    }
+  } while (cursor !== '0');
+
+  return keys.sort((a, b) => a.localeCompare(b));
+}
+
+async function readKeyRecord(client, sourceName, key) {
+  const type = String(await client.type(key));
+  const ttlSeconds = Number(await client.ttl(key));
+
+  let entryCount = 0;
+  let payload = '';
+  let finalType = type;
+
+  if (type === 'none') {
+    payload = '<key expired>';
+  } else if (type === 'string') {
+    const value = await client.get(key);
+    payload = value ?? '';
+    entryCount = value == null ? 0 : 1;
+  } else if (type === 'hash') {
+    const fields = await client.hgetall(key);
+    payload = formatHashPayload(fields);
+    entryCount = Object.keys(fields).length;
+  } else if (type === 'set') {
+    const members = await client.smembers(key);
+    payload = formatSetPayload(members);
+    entryCount = members.length;
+  } else if (type === 'zset') {
+    const membersWithScores = await client.zrange(key, 0, -1, 'WITHSCORES');
+    payload = formatZSetPayload(membersWithScores);
+    entryCount = Math.floor(membersWithScores.length / 2);
+  } else if (type === 'list') {
+    const values = await client.lrange(key, 0, -1);
+    payload = formatListPayload(values);
+    entryCount = values.length;
+  } else if (type === 'stream') {
+    payload = '<stream preview not implemented>';
+  } else if (type === 'vectorset') {
+    payload = '<vectorset preview not implemented>';
+  } else {
+    try {
+      const jsonValue = await client.call('JSON.GET', key, '.');
+      if (jsonValue != null) {
+        finalType = 'json';
+        payload = String(jsonValue);
+        entryCount = payload === 'null' || payload.length === 0 ? 0 : 1;
+      } else {
+        payload = '<unsupported type>';
+      }
+    } catch {
+      payload = '<unsupported type>';
+    }
+  }
+
+  return {
+    source: sourceName,
+    key,
+    type: finalType,
+    entryCount,
+    ttlSeconds,
+    payload: truncatePayload(payload),
+  };
+}
+
+async function readDatabaseRecords(target) {
+  const client = new Redis({
+    host: target.host,
+    port: target.port,
+    lazyConnect: true,
+    connectTimeout: 700,
+    maxRetriesPerRequest: 0,
+    enableOfflineQueue: false,
+    retryStrategy: null,
+  });
+
+  try {
+    await client.connect();
+    const keys = await scanAllKeys(client);
+    const records = [];
+    for (const key of keys) {
+      try {
+        const record = await readKeyRecord(client, target.name, key);
+        records.push(record);
+      } catch (err) {
+        records.push({
+          source: target.name,
+          key,
+          type: 'unknown',
+          entryCount: 0,
+          ttlSeconds: -2,
+          payload: `<read error: ${err instanceof Error ? err.message : 'unknown'}>`,
+        });
+      }
+    }
+    return records;
+  } finally {
+    try {
+      client.disconnect();
+    } catch {}
+  }
+}
+
+function resolveSelectedSource(runningSources, requestedSource) {
+  if (requestedSource) {
+    const match = runningSources.find(
+      (source) => source.id === requestedSource || source.name === requestedSource
+    );
+    if (match) {
+      return match;
+    }
+  }
+  return runningSources.length > 0 ? runningSources[0] : null;
+}
 app.get('/networktelemetry', (req, res) => {
   try {
     const { NetworkTelemetry, std_vector_std_string_, std_vector_std_vector_std_string__ } = addon;
@@ -218,41 +425,24 @@ app.get('/heuristic', (req, res) => {
 });
 
 app.get('/databases', (req, res) => {
-  try {
-    if (!databaseSnapshot || !addon.std_vector_std_vector_std_string__) {
-      res.json([]);
-      return;
-    }
+  Promise.all(dbTargets.map(probeDatabase))
+    .then(async (probeResults) => {
+      const runningSources = probeResults.filter((source) => source.running);
+      const requestedSource =
+        typeof req.query.source === 'string' ? req.query.source.trim() : '';
+      const selectedSource = resolveSelectedSource(runningSources, requestedSource);
+      const records = selectedSource ? await readDatabaseRecords(selectedSource) : [];
 
-    const rowsVec = new addon.std_vector_std_vector_std_string__();
-    databaseSnapshot.GetAllRows(rowsVec);
-
-    const rows = [];
-    for (let i = 0; i < rowsVec.size(); i++) {
-      const rowVec = rowsVec.get(i);
-      const row = [];
-      for (let j = 0; j < rowVec.size(); j++) {
-        row.push(String(rowVec.get(j)));
-      }
-      rows.push(row);
-    }
-
-    const records = rows
-      .filter((row) => row.length >= 6)
-      .map((row) => ({
-        source: row[0],
-        key: row[1],
-        type: row[2],
-        entryCount: toInteger(row[3], 0),
-        ttlSeconds: toInteger(row[4], -2),
-        payload: row[5] ?? '',
-      }));
-
-    res.json(records);
-  } catch (err) {
-    console.error(err);
-    res.status(500).json({ error: 'Database snapshot failed' });
-  }
+      res.json({
+        sources: runningSources,
+        selectedSource: selectedSource ? selectedSource.id : null,
+        records,
+      });
+    })
+    .catch((err) => {
+      console.error(err);
+      res.status(500).json({ error: 'Database snapshot failed' });
+    });
 });
 
 const PORT = 4000;
