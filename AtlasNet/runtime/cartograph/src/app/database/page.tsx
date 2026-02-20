@@ -20,6 +20,7 @@ import {
   KeyRound,
   List,
 } from 'lucide-react';
+import { HardcodedDecodeToggle } from './readOnlyDecode/HardcodedDecodeToggle';
 
 const DEFAULT_POLL_INTERVAL_MS = 1000;
 const MIN_POLL_INTERVAL_MS = 250;
@@ -241,6 +242,7 @@ export default function DatabasePage() {
   const [typeFilter, setTypeFilter] = useState('all');
   const [groupMode, setGroupMode] = useState<GroupMode>('namespace');
   const [namespaceDelimiter, setNamespaceDelimiter] = useState(':');
+  const [decodeSerialized, setDecodeSerialized] = useState(true);
   const [selectedKey, setSelectedKey] = useState<string | null>(null);
   const [expandedFolderIds, setExpandedFolderIds] = useState<Set<string>>(new Set());
   const [hasInitializedExpansion, setHasInitializedExpansion] = useState(false);
@@ -259,6 +261,7 @@ export default function DatabasePage() {
         if (selectedSource) {
           params.set('source', selectedSource);
         }
+        params.set('decodeSerialized', decodeSerialized ? '1' : '0');
         const response = await fetch(`/api/databases?${params.toString()}`, {
           cache: 'no-store',
         });
@@ -314,7 +317,7 @@ export default function DatabasePage() {
         clearInterval(intervalId);
       }
     };
-  }, [pollIntervalMs, refreshToken, selectedSource]);
+  }, [decodeSerialized, pollIntervalMs, refreshToken, selectedSource]);
 
   useEffect(() => {
     if (selectedKey && !records.some((record) => record.key === selectedKey)) {
@@ -563,6 +566,10 @@ export default function DatabasePage() {
                 </option>
               ))}
             </select>
+            <HardcodedDecodeToggle
+              enabled={decodeSerialized}
+              onChange={setDecodeSerialized}
+            />
             <label className="flex min-w-60 items-center gap-2 text-xs text-slate-400">
               <input
                 type="range"

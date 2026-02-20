@@ -20,6 +20,33 @@ const authorityTelemetry = addon.AuthorityTelemetry
   ? new addon.AuthorityTelemetry()
   : null;
 
+function parseBooleanQueryFlag(value, defaultValue) {
+  if (value == null) {
+    return defaultValue;
+  }
+  const normalized = String(value).trim().toLowerCase();
+  if (normalized.length === 0) {
+    return defaultValue;
+  }
+  if (
+    normalized === '0' ||
+    normalized === 'false' ||
+    normalized === 'off' ||
+    normalized === 'no'
+  ) {
+    return false;
+  }
+  if (
+    normalized === '1' ||
+    normalized === 'true' ||
+    normalized === 'on' ||
+    normalized === 'yes'
+  ) {
+    return true;
+  }
+  return defaultValue;
+}
+
 app.get('/networktelemetry', (_req, res) => {
   try {
     const telemetry = readNetworkTelemetry(addon, networkTelemetry);
@@ -58,8 +85,14 @@ app.get('/databases', async (req, res) => {
     const runningSources = probeResults.filter((source) => source.running);
     const requestedSource =
       typeof req.query.source === 'string' ? req.query.source.trim() : '';
+    const decodeSerialized = parseBooleanQueryFlag(
+      req.query.decodeSerialized ?? req.query.decodeEntitySnapshots,
+      true
+    );
     const selectedSource = resolveSelectedSource(runningSources, requestedSource);
-    const records = selectedSource ? await readDatabaseRecords(selectedSource) : [];
+    const records = selectedSource
+      ? await readDatabaseRecords(selectedSource, { decodeSerialized })
+      : [];
 
     res.json({
       sources: runningSources,

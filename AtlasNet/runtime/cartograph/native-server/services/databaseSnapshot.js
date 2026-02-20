@@ -6,6 +6,14 @@ const {
   PROBE_CONNECT_TIMEOUT_MS,
   SNAPSHOT_CONNECT_TIMEOUT_MS,
 } = require('../config');
+const {
+  decodeRedisDisplayValue,
+  formatHashPayloadPairs,
+  hasHardcodedHashDecoder,
+  readHardcodedHashPayload,
+  readHardcodedSetPayload,
+  shouldDecodeSetKey,
+} = require('./databaseReadOnlyView');
 
 function truncatePayload(payload) {
   if (typeof payload !== 'string') {
@@ -15,13 +23,6 @@ function truncatePayload(payload) {
     return payload;
   }
   return `${payload.slice(0, MAX_PAYLOAD_CHARS)}\n...[truncated ${payload.length - MAX_PAYLOAD_CHARS} bytes]`;
-}
-
-function formatHashPayload(fields) {
-  return Object.entries(fields)
-    .sort(([a], [b]) => String(a).localeCompare(String(b)))
-    .map(([k, v]) => `${k}\t${v}`)
-    .join('\n');
 }
 
 function formatSetPayload(values) {
@@ -189,10 +190,63 @@ async function applyPipelineByKeySafely(
   }
 }
 
-async function populateRecordPayloads(client, metadata, recordsByKey) {
+async function populateHardcodedHashPayloads(
+  client,
+  keys,
+  recordsByKey,
+  decodeSerialized
+) {
+  for (const key of keys) {
+    const record = recordsByKey.get(key);
+    if (!record) {
+      continue;
+    }
+
+    try {
+      const { payload, entryCount } = await readHardcodedHashPayload(
+        client,
+        key,
+        decodeSerialized
+      );
+      setRecordPayload(record, payload, entryCount);
+    } catch (err) {
+      setRecordReadError(record, err);
+    }
+  }
+}
+
+async function populateHardcodedSetPayloads(
+  client,
+  keys,
+  recordsByKey,
+  decodeSerialized
+) {
+  for (const key of keys) {
+    const record = recordsByKey.get(key);
+    if (!record) {
+      continue;
+    }
+
+    try {
+      const { payload, entryCount } = await readHardcodedSetPayload(
+        client,
+        key,
+        decodeSerialized
+      );
+      setRecordPayload(record, payload, entryCount);
+    } catch (err) {
+      setRecordReadError(record, err);
+    }
+  }
+}
+
+async function populateRecordPayloads(client, metadata, recordsByKey, options = {}) {
+  const decodeSerialized = options.decodeSerialized !== false;
   const stringKeys = [];
   const hashKeys = [];
+  const hardcodedHashKeys = [];
   const setKeys = [];
+  const hardcodedSetKeys = [];
   const zsetKeys = [];
   const listKeys = [];
   const jsonFallbackKeys = [];
@@ -211,10 +265,18 @@ async function populateRecordPayloads(client, metadata, recordsByKey) {
         stringKeys.push(item.key);
         break;
       case 'hash':
-        hashKeys.push(item.key);
+        if (hasHardcodedHashDecoder(item.key)) {
+          hardcodedHashKeys.push(item.key);
+        } else {
+          hashKeys.push(item.key);
+        }
         break;
       case 'set':
-        setKeys.push(item.key);
+        if (shouldDecodeSetKey(item.key)) {
+          hardcodedSetKeys.push(item.key);
+        } else {
+          setKeys.push(item.key);
+        }
         break;
       case 'zset':
         zsetKeys.push(item.key);
@@ -236,14 +298,23 @@ async function populateRecordPayloads(client, metadata, recordsByKey) {
 
   if (stringKeys.length > 0) {
     try {
-      const values = await client.mget(...stringKeys);
+      const values =
+        typeof client.mgetBuffer === 'function'
+          ? await client.mgetBuffer(...stringKeys)
+          : await client.mget(...stringKeys);
+
       for (let i = 0; i < stringKeys.length; i += 1) {
         const record = recordsByKey.get(stringKeys[i]);
         if (!record) {
           continue;
         }
+
         const value = values[i];
-        setRecordPayload(record, value == null ? '' : String(value), value == null ? 0 : 1);
+        setRecordPayload(
+          record,
+          value == null ? '' : decodeRedisDisplayValue(value),
+          value == null ? 0 : 1
+        );
       }
     } catch (err) {
       for (const key of stringKeys) {
@@ -269,9 +340,21 @@ async function populateRecordPayloads(client, metadata, recordsByKey) {
         setRecordReadError(record, err);
         return;
       }
+
       const fields = value && typeof value === 'object' ? value : {};
-      setRecordPayload(record, formatHashPayload(fields), Object.keys(fields).length);
+      const pairs = Object.entries(fields).map(([field, fieldValue]) => [
+        decodeRedisDisplayValue(field),
+        decodeRedisDisplayValue(fieldValue),
+      ]);
+      setRecordPayload(record, formatHashPayloadPairs(pairs), pairs.length);
     }
+  );
+
+  await populateHardcodedHashPayloads(
+    client,
+    hardcodedHashKeys,
+    recordsByKey,
+    decodeSerialized
   );
 
   await applyPipelineByKeySafely(
@@ -288,9 +371,17 @@ async function populateRecordPayloads(client, metadata, recordsByKey) {
         setRecordReadError(record, err);
         return;
       }
-      const members = Array.isArray(value) ? value.map(String) : [];
+
+      const members = Array.isArray(value) ? value.map(decodeRedisDisplayValue) : [];
       setRecordPayload(record, formatSetPayload(members), members.length);
     }
+  );
+
+  await populateHardcodedSetPayloads(
+    client,
+    hardcodedSetKeys,
+    recordsByKey,
+    decodeSerialized
   );
 
   await applyPipelineByKeySafely(
@@ -307,7 +398,10 @@ async function populateRecordPayloads(client, metadata, recordsByKey) {
         setRecordReadError(record, err);
         return;
       }
-      const membersWithScores = Array.isArray(value) ? value.map(String) : [];
+
+      const membersWithScores = Array.isArray(value)
+        ? value.map((v, i) => (i % 2 === 0 ? decodeRedisDisplayValue(v) : String(v)))
+        : [];
       setRecordPayload(
         record,
         formatZSetPayload(membersWithScores),
@@ -330,7 +424,8 @@ async function populateRecordPayloads(client, metadata, recordsByKey) {
         setRecordReadError(record, err);
         return;
       }
-      const members = Array.isArray(value) ? value.map(String) : [];
+
+      const members = Array.isArray(value) ? value.map(decodeRedisDisplayValue) : [];
       setRecordPayload(record, formatListPayload(members), members.length);
     }
   );
@@ -345,11 +440,7 @@ async function populateRecordPayloads(client, metadata, recordsByKey) {
       if (!record) {
         return;
       }
-      if (err) {
-        setRecordPayload(record, '<unsupported type>', 0);
-        return;
-      }
-      if (value == null) {
+      if (err || value == null) {
         setRecordPayload(record, '<unsupported type>', 0);
         return;
       }
@@ -365,7 +456,7 @@ async function populateRecordPayloads(client, metadata, recordsByKey) {
   );
 }
 
-async function readDatabaseRecords(target) {
+async function readDatabaseRecords(target, options = {}) {
   const client = createRedisClient(target, SNAPSHOT_CONNECT_TIMEOUT_MS);
 
   try {
@@ -381,7 +472,7 @@ async function readDatabaseRecords(target) {
       );
     }
 
-    await populateRecordPayloads(client, metadata, recordsByKey);
+    await populateRecordPayloads(client, metadata, recordsByKey, options);
 
     return metadata
       .map((item) => recordsByKey.get(item.key))
