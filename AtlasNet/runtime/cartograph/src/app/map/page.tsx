@@ -17,7 +17,7 @@ import {
 import { MapHud } from './components/MapHud';
 import { ShardHoverTooltip } from './components/ShardHoverTooltip';
 
-const DEFAULT_POLL_INTERVAL_MS = 200;
+const DEFAULT_POLL_INTERVAL_MS = 50;
 const MIN_POLL_INTERVAL_MS = 50;
 const MAX_POLL_INTERVAL_MS = 1000;
 const DEFAULT_INTERACTION_SENSITIVITY = 1;
