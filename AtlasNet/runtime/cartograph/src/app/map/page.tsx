@@ -7,7 +7,11 @@ import {
   useHeuristicShapes,
   useNetworkTelemetry,
 } from '../lib/hooks/useTelemetryFeeds';
-import { createMapRenderer } from '../lib/mapRenderer';
+import {
+  createMapRenderer,
+  type MapProjectionMode,
+  type MapViewMode,
+} from '../lib/mapRenderer';
 
 const DEFAULT_POLL_INTERVAL_MS = 200;
 const MIN_POLL_INTERVAL_MS = 50;
@@ -74,6 +78,9 @@ export default function MapPage() {
   const rendererRef = useRef<ReturnType<typeof createMapRenderer> | null>(null);
   const [showGnsConnections, setShowGnsConnections] = useState(true);
   const [showAuthorityEntities, setShowAuthorityEntities] = useState(true);
+  const [viewMode, setViewMode] = useState<MapViewMode>('2d');
+  const [projectionMode, setProjectionMode] =
+    useState<MapProjectionMode>('orthographic');
   const [pollIntervalMs, setPollIntervalMs] = useState(DEFAULT_POLL_INTERVAL_MS);
   const baseShapes = useHeuristicShapes();
   const networkTelemetry = useNetworkTelemetry({
@@ -326,10 +333,15 @@ export default function MapPage() {
     if (!container || rendererRef.current) {
       return;
     }
-    rendererRef.current = createMapRenderer({ container, shapes: [] });
+    rendererRef.current = createMapRenderer({
+      container,
+      shapes: [],
+      viewMode,
+      projectionMode,
+    });
     return () => {
+      rendererRef.current?.destroy();
       rendererRef.current = null;
-      container.innerHTML = '';
     };
   }, []);
 
@@ -337,6 +349,12 @@ export default function MapPage() {
   useEffect(() => {
     rendererRef.current?.setShapes(combinedShapes);
   }, [combinedShapes]);
+  useEffect(() => {
+    rendererRef.current?.setViewMode(viewMode);
+  }, [viewMode]);
+  useEffect(() => {
+    rendererRef.current?.setProjectionMode(projectionMode);
+  }, [projectionMode]);
 
   return (
     <div style={{ width: '100%', height: '100%', position: 'relative' }}>
@@ -379,6 +397,94 @@ export default function MapPage() {
         </span>
         <span style={{ opacity: 0.8 }}>
           connections: {networkEdgeCount} | claimed entities: {authorityEntities.length}
+        </span>
+        <div
+          style={{
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: 6,
+            padding: '4px',
+            borderRadius: 8,
+            border: '1px solid rgba(148, 163, 184, 0.45)',
+            background: 'rgba(2, 6, 23, 0.5)',
+          }}
+        >
+          <button
+            type="button"
+            onClick={() => setViewMode('2d')}
+            style={{
+              padding: '4px 8px',
+              borderRadius: 6,
+              border: '1px solid rgba(148, 163, 184, 0.45)',
+              background:
+                viewMode === '2d'
+                  ? 'rgba(56, 189, 248, 0.3)'
+                  : 'rgba(15, 23, 42, 0.65)',
+              color: '#e2e8f0',
+            }}
+            title="2D mode: drag to pan, mouse wheel to zoom"
+          >
+            2D
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              setViewMode('3d');
+              setProjectionMode('orthographic');
+            }}
+            style={{
+              padding: '4px 8px',
+              borderRadius: 6,
+              border: '1px solid rgba(148, 163, 184, 0.45)',
+              background:
+                viewMode === '3d' && projectionMode === 'orthographic'
+                  ? 'rgba(56, 189, 248, 0.3)'
+                  : 'rgba(15, 23, 42, 0.65)',
+              color: '#e2e8f0',
+            }}
+            title="3D Orthographic mode"
+          >
+            3D Ortho
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              setViewMode('3d');
+              setProjectionMode('perspective');
+            }}
+            style={{
+              padding: '4px 8px',
+              borderRadius: 6,
+              border: '1px solid rgba(148, 163, 184, 0.45)',
+              background:
+                viewMode === '3d' && projectionMode === 'perspective'
+                  ? 'rgba(56, 189, 248, 0.3)'
+                  : 'rgba(15, 23, 42, 0.65)',
+              color: '#e2e8f0',
+            }}
+            title="3D Perspective mode"
+          >
+            3D Persp
+          </button>
+          <button
+            type="button"
+            onClick={() => rendererRef.current?.resetCamera()}
+            style={{
+              padding: '4px 8px',
+              borderRadius: 6,
+              border: '1px solid rgba(148, 163, 184, 0.45)',
+              background: 'rgba(15, 23, 42, 0.65)',
+              color: '#e2e8f0',
+            }}
+            title="Frame scene (Unity-style F)"
+          >
+            Frame
+          </button>
+        </div>
+        <span style={{ opacity: 0.85, fontSize: 12 }}>
+          {viewMode === '2d'
+            ? '2D controls: drag pan, wheel zoom, F frame'
+            : '3D controls: RMB or Alt+LMB orbit, MMB pan, wheel zoom, F frame'}
         </span>
         <label
           style={{
