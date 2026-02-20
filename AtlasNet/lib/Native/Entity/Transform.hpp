@@ -2,9 +2,9 @@
 #include "Global/AtlasObject.hpp"
 #include "Global/Serialize/ByteReader.hpp"
 #include "Global/Serialize/ByteWriter.hpp"
-#include "Transform.hpp"
 #include "Global/Types/AABB.hpp"
 #include "Global/pch.hpp"
+#include "Transform.hpp"
 
 struct Transform : AtlasObject
 {
@@ -24,5 +24,11 @@ struct Transform : AtlasObject
 		world = br.u16();
 		position = br.vec3();
 		boundingBox.Deserialize(br);
+	}
+	std::string ToString() const
+	{
+		return std::format("Pos: {}, World: {}, AABB: [{}]",
+						   glm::to_string(position), world,
+						   boundingBox.ToString());
 	}
 };

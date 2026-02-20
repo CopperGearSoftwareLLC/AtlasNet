@@ -1,14 +1,17 @@
 #pragma once
+#include <bit>
+#include <boost/beast/core/detail/base64.hpp>
 #include <boost/container/small_vector.hpp>
 #include <cstddef>
 #include <cstdint>
+#include <iostream>
+#include <span>
 #include <string_view>
 
 #include "ByteStream.hpp"
 #include "Global/Misc/UUID.hpp"
 #include "Global/pch.hpp"
-#include <span>
-#include <bit>
+
 class ByteWriter
 {
    public:
@@ -21,8 +24,25 @@ class ByteWriter
 	std::string_view as_string_view() const
 	{
 		const auto data = bytes();
-		std::string_view value_view(reinterpret_cast<const char*>(data.data()), data.size());
+		std::string_view value_view(reinterpret_cast<const char*>(data.data()),
+									data.size());
 		return value_view;
+	}
+	std::string as_string_base_64() const
+	{
+		std::size_t encoded_len =
+			boost::beast::detail::base64::encoded_size(buf.size());
+
+		std::string out;
+		out.resize(encoded_len);
+		
+		boost::beast::detail::base64::encode(out.data(),  // destination buffer
+		buf.data(),  // source raw bytes
+		buf.size()	  // source length
+	);
+	std::cout << std::format("Encoded base64 final size {}, output {} \n",buf.size(),out);
+
+		return out;
 	}
 
 	void clear() { buf.clear(); }
@@ -144,9 +164,7 @@ class ByteWriter
 		var_u32(uint32_t(s.size()));
 		write(s.data(), s.size());
 	}
-	 void uuid(const UUID& id) {
-        write(id.data(), id.size());
-    }
+	void uuid(const UUID& id) { write(id.data(), id.size()); }
 	void blob(std::span<const uint8_t> b)
 	{
 		var_u32(uint32_t(b.size()));
@@ -214,11 +232,12 @@ class ByteWriter
 	template <typename T>
 	void push_be(T v)
 	{
-		for (int i = sizeof(T) - 1; i >= 0; --i) buf.push_back(uint8_t(v >> (i * 8)));
+		for (int i = sizeof(T) - 1; i >= 0; --i)
+			buf.push_back(uint8_t(v >> (i * 8)));
 	}
 
 	boost::container::small_vector<uint8_t, 128> buf;
-	//std::vector<uint8_t> buf;
+	// std::vector<uint8_t> buf;
 
 	uint64_t bitBuffer = 0;
 	uint8_t bitPos = 0;

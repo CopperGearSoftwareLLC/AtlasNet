@@ -10,6 +10,8 @@
 #include "Events/EventSystem.hpp"
 #include "Events/Events/Debug/LogEvent.hpp"
 #include "Global/Misc/UUID.hpp"
+#include "Heuristic/Database/HeuristicManifest.hpp"
+#include "Heuristic/GridHeuristic/GridHeuristic.hpp"
 #include "Interlink/Database/HealthManifest.hpp"
 #include "Interlink/Telemetry/NetworkManifest.hpp"
 #include "Network/NetworkIdentity.hpp"
@@ -53,6 +55,20 @@ void AtlasNetServer::Update(std::span<AtlasEntity> entities,
 }
 void AtlasNetServer::ShardLogicEntry(std::stop_token st)
 {
+	GridShape claimedBounds;
+		const bool claimed =
+			HeuristicManifest::Get().ClaimNextPendingBound<GridShape>(
+				identity, claimedBounds);
+		if (claimed)
+		{
+			logger->DebugFormatted("Claimed bounds {} for shard",
+								   claimedBounds.GetID());
+		}
+		else
+		{
+			logger->Warning("No pending bounds available to claim");
+		}
+		
 	EntityAuthorityManager::Get().Init(identity, logger);
 	while (!st.stop_requested())
 	{

@@ -20,6 +20,7 @@
 #include "Global/Serialize/ByteReader.hpp"
 #include "Global/Serialize/ByteWriter.hpp"
 #include "Global/pch.hpp"
+#include "Handshake/HandshakeService.hpp"
 #include "InterlinkEnums.hpp"
 #include "Network/Connection.hpp"
 #include "Network/NetworkEnums.hpp"
@@ -838,5 +839,8 @@ void Interlink::OnClientConnected(const Connection &c)
 		cce.client = client;
 		cce.ConnectedProxy = MyIdentity;
 		EventSystem::Get().Dispatch(cce);
+
+		HandshakeService::Get().OnClientConnect(client);
+		
 	}
 }

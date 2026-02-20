@@ -12,6 +12,7 @@
 #include "InternalDB/InternalDB.hpp"
 #include "Heuristic/Database/HeuristicManifest.hpp"
 #include "Heuristic/GridHeuristic/GridHeuristic.hpp"
+#include "Network/NetworkIdentity.hpp"
 
 namespace
 {
@@ -26,28 +27,28 @@ constexpr float kEntityPhaseStepRad = 0.7F;
 constexpr std::string_view kTestOwnerKey = "EntityHandoff:TestOwnerShard";
 
 std::string SelectTargetClaimKeyForPosition(
-	const std::unordered_map<std::string, GridShape>& claimedBounds,
+	const std::unordered_map<NetworkIdentity, GridShape>& claimedBounds,
 	const std::string& selfKey, const vec3& position)
 {
 	for (const auto& [claimKey, bound] : claimedBounds)
 	{
-		if (claimKey == selfKey)
+		if (claimKey.ToString() == selfKey)
 		{
 			continue;
 		}
 		if (bound.Contains(position))
 		{
-			return claimKey;
+			return claimKey.ToString();
 		}
 	}
 
 	for (const auto& [claimKey, _bound] : claimedBounds)
 	{
-		if (claimKey == selfKey)
+		if (claimKey.ToString() == selfKey)
 		{
 			continue;
 		}
-		return claimKey;
+		return claimKey.ToString();
 	}
 
 	return {};
@@ -176,16 +177,15 @@ void EntityAuthorityManager::EvaluateHeuristicPositionTriggers()
 		return;
 	}
 
-	std::unordered_map<std::string, GridShape> claimedBounds;
-	HeuristicManifest::Get().GetAllClaimedBounds<GridShape, std::string>(
+	std::unordered_map<NetworkIdentity, GridShape> claimedBounds;
+	HeuristicManifest::Get().GetAllClaimedBounds<GridShape>(
 		claimedBounds);
 	if (claimedBounds.empty())
 	{
 		return;
 	}
 
-	const std::string selfKey = selfIdentity.ToString();
-	const auto selfIt = claimedBounds.find(selfKey);
+	const auto selfIt = claimedBounds.find(selfIdentity);
 	if (selfIt == claimedBounds.end())
 	{
 		return;
@@ -203,7 +203,7 @@ void EntityAuthorityManager::EvaluateHeuristicPositionTriggers()
 		}
 
 		const std::string targetClaimKey = SelectTargetClaimKeyForPosition(
-			claimedBounds, selfKey, position);
+			claimedBounds, selfIdentity.ToString(), position);
 		if (targetClaimKey.empty())
 		{
 			continue;

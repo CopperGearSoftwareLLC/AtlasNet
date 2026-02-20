@@ -71,8 +71,9 @@ void WatchDog::Init()
 	EventSystem::Get().Init(ID);
 
 	SwitchHeuristic(IHeuristic::Type::eGridCell);
-	HeuristicThread = std::jthread([this](std::stop_token st)
-								   { this->HeuristicThreadEntry(st); });
+	ComputeHeuristic();	 // compute once
+	// HeuristicThread = std::jthread([this](std::stop_token st)
+	//							   { this->HeurristicThreadEntry(st); });
 }
 
 void WatchDog::Cleanup()
@@ -146,17 +147,23 @@ void WatchDog::ComputeHeuristic()
 						   IHeuristic::TypeToString(ActiveHeuristic));
 
 	HeuristicManifest::Get().SetActiveHeuristicType(ActiveHeuristic);
+	logger->Debug("IHeuristic::Compute");
 	Heuristic->Compute(entities.span());
 	std::unordered_map<IBounds::BoundsID, ByteWriter> bws;
+	logger->Debug("IHeuristic::SerializeBounds");
 	Heuristic->SerializeBounds(bws);
+	HeuristicManifest::Get().PushHeuristic(*Heuristic);
+	logger->Debug("HeuristicManifest::GetPendingBoundsCount");
 	const long long pending_count =
 		HeuristicManifest::Get().GetPendingBoundsCount();
+	logger->Debug("HeuristicManifest::GetClaimedBoundsCount");
 	const long long claimed_count =
 		HeuristicManifest::Get().GetClaimedBoundsCount();
 	const long long total_known = pending_count + claimed_count;
 	const long long expected = static_cast<long long>(bws.size());
 	if (total_known < expected)
 	{
+		logger->Debug("HeuristicManifest::StorePendingBoundsFromByteWriters");
 		HeuristicManifest::Get().StorePendingBoundsFromByteWriters(bws);
 	}
 	else
@@ -168,6 +175,7 @@ void WatchDog::ComputeHeuristic()
 
 	std::vector<std::string> data;
 	std::unordered_map<IBounds::BoundsID, ByteReader> brs;
+	logger->Debug("HeuristicManifest::GetPendingBoundsAsByteReaders");
 	HeuristicManifest::Get().GetPendingBoundsAsByteReaders(data, brs);
 
 	for (auto &[boundID, bound_reader] : brs)
@@ -175,7 +183,8 @@ void WatchDog::ComputeHeuristic()
 		GridShape s;
 		s.Deserialize(bound_reader);
 		logger->DebugFormatted("Retreived ID {}, min:{}, max:{}", boundID,
-							   glm::to_string(s.min), glm::to_string(s.max));
+							   glm::to_string(s.aabb.min),
+							   glm::to_string(s.aabb.max));
 	}
 	SetShardCount(bws.size());
 }
@@ -188,8 +197,7 @@ void WatchDog::SwitchHeuristic(IHeuristic::Type newHeuristic)
 			Heuristic = nullptr;
 		case IHeuristic::Type::eGridCell:
 		{
-			Heuristic =
-				std::make_shared<GridHeuristic>(GridHeuristic::Options{});
+			Heuristic = std::make_shared<GridHeuristic>();
 		}
 		case IHeuristic::Type::eOctree:
 		case IHeuristic::Type::eQuadtree:

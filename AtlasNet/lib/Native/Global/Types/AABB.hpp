@@ -3,6 +3,7 @@
 #include "Global/AtlasObject.hpp"
 #include "Global/Serialize/ByteReader.hpp"
 #include "Global/Serialize/ByteWriter.hpp"
+#include "Global/pch.hpp"
 
 #include <algorithm>
 #include <glm/glm.hpp>
@@ -21,8 +22,8 @@ struct AABB : public AtlasObject
 	using value_type = Type;
 	using vectype = glm::vec<Dim, Type, Q>;
 
-	vectype min;
-	vectype max;
+	vectype min = vectype(0);
+	vectype max = vectype(0);
 
 	// -------------------------------------------------
 	// Constructors
@@ -30,13 +31,17 @@ struct AABB : public AtlasObject
 
 	// Invalid / empty box
 	AABB()
-		: min(vectype(std::numeric_limits<Type>::max())),
-		  max(vectype(std::numeric_limits<Type>::lowest()))
+		: min(vectype(0)),
+		  max(vectype(0))
 	{
 	}
 
 	AABB(const vectype& min_, const vectype& max_) : min(min_), max(max_) {}
 
+	std::string ToString() const
+	{
+		return std::format("Min: {}, Max: {}",glm::to_string(max),glm::to_string(min));
+	}
 	// From center + half extents
 	static AABB FromCenterExtents(const vectype& center, const vectype& halfExtents)
 	{

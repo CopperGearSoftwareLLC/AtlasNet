@@ -18,18 +18,6 @@ file(GLOB NODE_ADDONS
     "${NATIVE_JS_OUT}/*.node"
 )
 
-add_custom_target(cartograph_web_native_deps ALL
-    DEPENDS
-        Web_swig
-)
-
-add_custom_command(
-    TARGET cartograph_web_native_deps
-    COMMAND ${CMAKE_COMMAND} -E copy_directory_if_different
-            ${NATIVE_JS_OUT}
-            ${NEXTJS_NATIVE_DIR}
-    VERBATIM
-)
 
 add_custom_target(Cartograph_web_dev
   COMMAND ${CMAKE_COMMAND} -E chdir "${CARTOGRAPH_WEB_ROOT}" ${NPM_EXECUTABLE} run dev:all 
@@ -38,5 +26,5 @@ add_custom_target(Cartograph_web_dev
   COMMENT "[web] Running Next.js dev server (hot reload on :3000)"
 )
 #add_dependencies(Cartograph_web_dev Cartograph_web_npm_install)
-add_dependencies(Cartograph_web_dev cartograph_web_native_deps)
+#add_dependencies(Cartograph_web_dev cartograph_web_native_deps)
 #add_dependencies(Cartograph_web_npm_install ${CARTOGRAPH_TARGET})

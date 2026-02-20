@@ -1,17 +1,42 @@
 #pragma once
 #include <bit>
+#include <boost/beast/core/detail/base64.hpp>
+#include <iostream>
 #include <span>
 
 #include "ByteStream.hpp"
+#include "Global/Misc/String_utils.hpp"
 #include "Global/Misc/UUID.hpp"
 #include "Global/pch.hpp"
 class ByteReader
 {
+   private:
    public:
-	ByteReader(std::span<const uint8_t> data) : p(data.data()), n(data.size()) {}
-	explicit ByteReader(const std::string& s)
+	ByteReader(std::span<const uint8_t> data, bool IsEncodedBase64 = false)
+		: p(data.data()), n(data.size())
+	{
+		if (IsEncodedBase64)
+			DecodeBase64();
+	}
+	explicit ByteReader(const std::string& s, bool IsEncodedBase64 = false)
 		: p(reinterpret_cast<const uint8_t*>(s.data())), n(s.size())
 	{
+		if (IsEncodedBase64)
+			DecodeBase64();
+	}
+	void DecodeBase64()
+	{
+		size_t real_len = std::strlen(reinterpret_cast<const char*>(p));
+		std::size_t decoded_size =
+			boost::beast::detail::base64::decoded_size(real_len);
+		DecodedBase64Data.resize(decoded_size);
+
+		const auto result = boost::beast::detail::base64::decode(
+			DecodedBase64Data.data(), reinterpret_cast<const char*>(p),
+			real_len);
+		DecodedBase64Data.resize(result.first);
+		p = DecodedBase64Data.data();
+		n = DecodedBase64Data.size();
 	}
 
 	size_t remaining() const { return n - i; }
@@ -75,7 +100,8 @@ class ByteReader
 	T read_vector()
 	{
 		T out;
-		for (uint32_t d = 0; d < Dim; ++d) out[d] = read_scalar<typename T::value_type>();
+		for (uint32_t d = 0; d < Dim; ++d)
+			out[d] = read_scalar<typename T::value_type>();
 		return out;
 	}
 	// ---------------- glm -----------------------------------------
@@ -207,6 +233,8 @@ class ByteReader
 		return true;
 	}
 
+	std::span<const uint8_t> GetReadSource() const { return {p, n}; }
+
    private:
 	template <typename T>
 	T read_int()
@@ -229,6 +257,7 @@ class ByteReader
 		return v;
 	}
 
+	std::vector<uint8_t> DecodedBase64Data;
 	const uint8_t* p;
 	size_t n;
 	size_t i = 0;
