@@ -10,6 +10,16 @@ interface DrawOptions {
   viewMode?: MapViewMode;
   projectionMode?: MapProjectionMode;
   interactionSensitivity?: number;
+  onPointerWorldPosition?: (
+    point: { x: number; y: number } | null,
+    screen: { x: number; y: number } | null
+  ) => void;
+}
+
+interface EdgeLabelOverlay {
+  from: { x: number; y: number };
+  to: { x: number; y: number };
+  text: string;
 }
 
 interface Vec3 {
@@ -154,6 +164,7 @@ export function createMapRenderer({
   viewMode: initialViewMode = '2d',
   projectionMode: initialProjectionMode = 'orthographic',
   interactionSensitivity: initialInteractionSensitivity = 1,
+  onPointerWorldPosition: initialOnPointerWorldPosition,
 }: DrawOptions) {
   const canvas = document.createElement('canvas');
   const ctx = canvas.getContext('2d');
@@ -196,6 +207,9 @@ export function createMapRenderer({
     MIN_INTERACTION_SENSITIVITY,
     MAX_INTERACTION_SENSITIVITY
   );
+  let onPointerWorldPosition = initialOnPointerWorldPosition;
+  let hoverEdgeLabels: EdgeLabelOverlay[] = [];
+  let lastPointerScreen: { x: number; y: number } | null = null;
 
   function canvasWidth(): number {
     return canvas.width || 1;
@@ -203,6 +217,167 @@ export function createMapRenderer({
 
   function canvasHeight(): number {
     return canvas.height || 1;
+  }
+
+  function worldToScreen2D(worldX: number, worldY: number): { x: number; y: number } {
+    const baseX = worldX * scale2D + offsetX;
+    const baseY = worldY * scale2D + offsetY;
+    const centerX = canvasWidth() / 2;
+    const centerY = canvasHeight() / 2;
+    const dx = baseX - centerX;
+    const dy = baseY - centerY;
+    const rollCos = Math.cos(cameraRoll);
+    const rollSin = Math.sin(cameraRoll);
+    const rotatedX = centerX + dx * rollCos - dy * rollSin;
+    const rotatedY = centerY + dx * rollSin + dy * rollCos;
+    return {
+      x: rotatedX,
+      y: canvasHeight() - rotatedY,
+    };
+  }
+
+  function screenToWorld2D(screenX: number, screenY: number): { x: number; y: number } {
+    const centerX = canvasWidth() / 2;
+    const centerY = canvasHeight() / 2;
+    const rotatedX = screenX;
+    const rotatedY = canvasHeight() - screenY;
+    const dxRot = rotatedX - centerX;
+    const dyRot = rotatedY - centerY;
+    const rollCos = Math.cos(cameraRoll);
+    const rollSin = Math.sin(cameraRoll);
+    const dx = dxRot * rollCos + dyRot * rollSin;
+    const dy = -dxRot * rollSin + dyRot * rollCos;
+    const baseX = centerX + dx;
+    const baseY = centerY + dy;
+    return {
+      x: (baseX - offsetX) / Math.max(scale2D, 1e-6),
+      y: (baseY - offsetY) / Math.max(scale2D, 1e-6),
+    };
+  }
+
+  function screenToWorld3D(screenX: number, screenY: number): { x: number; y: number } | null {
+    const width = canvasWidth();
+    const height = canvasHeight();
+    const ndcX = (screenX / width) * 2 - 1;
+    const ndcY = 1 - (screenY / height) * 2;
+    const aspect = width / height;
+    const basis = getCameraBasis();
+
+    let rayOrigin = basis.position;
+    let rayDirection = basis.forward;
+
+    if (projectionMode === 'perspective') {
+      const f = 1 / Math.tan(fovRad / 2);
+      const dirCamera = vecNormalize({
+        x: (ndcX * aspect) / f,
+        y: ndcY / f,
+        z: 1,
+      });
+      rayDirection = vecNormalize(
+        vecAdd(
+          vecAdd(
+            vecScale(basis.right, dirCamera.x),
+            vecScale(basis.up, dirCamera.y)
+          ),
+          vecScale(basis.forward, dirCamera.z)
+        )
+      );
+    } else {
+      const halfHeight = Math.max(MIN_ORTHO_HEIGHT, orthoHeight);
+      const halfWidth = halfHeight * aspect;
+      const orthoOffset = vecAdd(
+        vecScale(basis.right, ndcX * halfWidth),
+        vecScale(basis.up, ndcY * halfHeight)
+      );
+      rayOrigin = vecAdd(basis.position, orthoOffset);
+      rayDirection = basis.forward;
+    }
+
+    if (Math.abs(rayDirection.y) < 1e-6) {
+      return null;
+    }
+
+    const t = -rayOrigin.y / rayDirection.y;
+    if (!Number.isFinite(t) || t < 0) {
+      return null;
+    }
+
+    const hitPoint = vecAdd(rayOrigin, vecScale(rayDirection, t));
+    return { x: hitPoint.x, y: hitPoint.z };
+  }
+
+  function screenToWorldMap(screenX: number, screenY: number): { x: number; y: number } | null {
+    if (viewMode === '2d') {
+      return screenToWorld2D(screenX, screenY);
+    }
+    return screenToWorld3D(screenX, screenY);
+  }
+
+  function projectMapPoint3D(
+    point: { x: number; y: number },
+    basis: CameraBasis
+  ): ProjectedPoint | null {
+    const cameraPoint = worldToCamera(
+      mapPointToWorld({ x: point.x, y: point.y }),
+      basis
+    );
+    if (projectionMode === 'perspective' && cameraPoint.z <= NEAR_PLANE) {
+      return null;
+    }
+    return projectCameraPoint(cameraPoint);
+  }
+
+  function drawEdgeLabel(screenX: number, screenY: number, text: string): void {
+    if (!text) {
+      return;
+    }
+
+    ctx.save();
+    ctx.font = '11px sans-serif';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    const textWidth = ctx.measureText(text).width;
+    const padX = 6;
+    const boxHeight = 16;
+    const boxWidth = textWidth + padX * 2;
+    const boxX = screenX - boxWidth / 2;
+    const boxY = screenY - boxHeight / 2;
+    ctx.fillStyle = 'rgba(15, 23, 42, 0.86)';
+    ctx.strokeStyle = 'rgba(148, 163, 184, 0.35)';
+    ctx.lineWidth = 1;
+    ctx.fillRect(boxX, boxY, boxWidth, boxHeight);
+    ctx.strokeRect(boxX, boxY, boxWidth, boxHeight);
+    ctx.fillStyle = '#cbd5e1';
+    ctx.fillText(text, screenX, screenY + 0.5);
+    ctx.restore();
+  }
+
+  function drawHoverEdgeLabels2D(): void {
+    if (hoverEdgeLabels.length === 0) {
+      return;
+    }
+
+    for (const label of hoverEdgeLabels) {
+      const from = worldToScreen2D(label.from.x, label.from.y);
+      const to = worldToScreen2D(label.to.x, label.to.y);
+      drawEdgeLabel((from.x + to.x) / 2, (from.y + to.y) / 2 - 10, label.text);
+    }
+  }
+
+  function drawHoverEdgeLabels3D(): void {
+    if (hoverEdgeLabels.length === 0) {
+      return;
+    }
+
+    const basis = getCameraBasis();
+    for (const label of hoverEdgeLabels) {
+      const from = projectMapPoint3D(label.from, basis);
+      const to = projectMapPoint3D(label.to, basis);
+      if (!from || !to) {
+        continue;
+      }
+      drawEdgeLabel((from.x + to.x) / 2, (from.y + to.y) / 2 - 10, label.text);
+    }
   }
 
   function getCameraBasis(): {
@@ -606,8 +781,9 @@ export function createMapRenderer({
 
       switch (shape.type) {
         case 'circle': {
+          const radius = shape.radius ?? 10;
           ctx.beginPath();
-          ctx.arc(0, 0, shape.radius ?? 10, 0, Math.PI * 2);
+          ctx.arc(0, 0, radius, 0, Math.PI * 2);
           ctx.strokeStyle = color;
           ctx.stroke();
           break;
@@ -745,12 +921,27 @@ export function createMapRenderer({
       drawShapes2D();
       ctx.restore();
       drawAxisGizmo2D();
+      drawHoverEdgeLabels2D();
+      if (lastPointerScreen) {
+        onPointerWorldPosition?.(
+          screenToWorldMap(lastPointerScreen.x, lastPointerScreen.y),
+          lastPointerScreen
+        );
+      }
       return;
     }
 
     // 3D
     drawAxes3D();
     drawShapes3D();
+    drawHoverEdgeLabels3D();
+
+    if (lastPointerScreen) {
+      onPointerWorldPosition?.(
+        screenToWorldMap(lastPointerScreen.x, lastPointerScreen.y),
+        lastPointerScreen
+      );
+    }
   }
 
   function computeBoundsFromShapes(): {
@@ -1029,6 +1220,17 @@ export function createMapRenderer({
   }
 
   function onPointerMove(event: PointerEvent): void {
+    const rect = canvas.getBoundingClientRect();
+    const pointerScreen = {
+      x: event.clientX - rect.left,
+      y: event.clientY - rect.top,
+    };
+    lastPointerScreen = pointerScreen;
+    onPointerWorldPosition?.(
+      screenToWorldMap(pointerScreen.x, pointerScreen.y),
+      pointerScreen
+    );
+
     if (activePointerId !== event.pointerId || pointerDragMode === 'none') {
       return;
     }
@@ -1070,6 +1272,11 @@ export function createMapRenderer({
       cameraTarget = vecAdd(cameraTarget, vecAdd(panRight, panUp));
       draw();
     }
+  }
+
+  function onPointerLeave(): void {
+    lastPointerScreen = null;
+    onPointerWorldPosition?.(null, null);
   }
 
   function endPointerDrag(event: PointerEvent): void {
@@ -1170,6 +1377,8 @@ export function createMapRenderer({
   function onBlur(): void {
     flyKeys.clear();
     stopFlyLoop();
+    lastPointerScreen = null;
+    onPointerWorldPosition?.(null, null);
   }
 
   window.addEventListener('resize', resizeCanvas);
@@ -1178,6 +1387,7 @@ export function createMapRenderer({
   window.addEventListener('blur', onBlur);
   canvas.addEventListener('pointerdown', onPointerDown);
   canvas.addEventListener('pointermove', onPointerMove);
+  canvas.addEventListener('pointerleave', onPointerLeave);
   canvas.addEventListener('pointerup', endPointerDrag);
   canvas.addEventListener('pointercancel', endPointerDrag);
   canvas.addEventListener('wheel', onWheel, { passive: false });
@@ -1219,6 +1429,10 @@ export function createMapRenderer({
       projectionMode = nextProjectionMode;
       draw();
     },
+    setHoverEdgeLabels(nextLabels: EdgeLabelOverlay[]) {
+      hoverEdgeLabels = nextLabels;
+      draw();
+    },
     resetCamera,
     destroy() {
       window.removeEventListener('resize', resizeCanvas);
@@ -1227,6 +1441,7 @@ export function createMapRenderer({
       window.removeEventListener('blur', onBlur);
       canvas.removeEventListener('pointerdown', onPointerDown);
       canvas.removeEventListener('pointermove', onPointerMove);
+      canvas.removeEventListener('pointerleave', onPointerLeave);
       canvas.removeEventListener('pointerup', endPointerDrag);
       canvas.removeEventListener('pointercancel', endPointerDrag);
       canvas.removeEventListener('wheel', onWheel);

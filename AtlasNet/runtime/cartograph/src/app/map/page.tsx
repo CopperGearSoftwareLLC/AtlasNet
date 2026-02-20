@@ -1,6 +1,13 @@
 'use client';
 
-import { useEffect, useMemo, useRef, useState, type CSSProperties } from 'react';
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type CSSProperties,
+} from 'react';
 import type { ShapeJS } from '../lib/cartographTypes';
 import {
   useAuthorityEntities,
@@ -37,6 +44,21 @@ const MAP_VIEW_PRESET_BUTTONS: Array<{
   { label: 'Front', title: 'Front view', preset: 'front' },
   { label: 'Side', title: 'Right side view', preset: 'right' },
 ];
+
+function formatRate(value: number): string {
+  if (!Number.isFinite(value)) {
+    return '0.0';
+  }
+  return value.toFixed(1);
+}
+
+interface ShardHoverBounds {
+  minX: number;
+  maxX: number;
+  minY: number;
+  maxY: number;
+  area: number;
+}
 
 function hudButtonStyle(active = false): CSSProperties {
   return {
@@ -106,6 +128,14 @@ export default function MapPage() {
   const rendererRef = useRef<ReturnType<typeof createMapRenderer> | null>(null);
   const [showGnsConnections, setShowGnsConnections] = useState(true);
   const [showAuthorityEntities, setShowAuthorityEntities] = useState(true);
+  const [showShardHoverDetails, setShowShardHoverDetails] = useState(true);
+  const [hoveredShardId, setHoveredShardId] = useState<string | null>(null);
+  const [hoveredShardAnchor, setHoveredShardAnchor] = useState<{
+    x: number;
+    y: number;
+  } | null>(null);
+  const showShardHoverDetailsRef = useRef(showShardHoverDetails);
+  const showGnsConnectionsRef = useRef(showGnsConnections);
   const [viewMode, setViewMode] = useState<MapViewMode>('2d');
   const [projectionMode, setProjectionMode] =
     useState<MapProjectionMode>('orthographic');
@@ -211,6 +241,62 @@ export default function MapPage() {
     };
   }, [baseShapes]);
 
+  const shardBoundsById = useMemo(() => {
+    const raw = new Map<
+      string,
+      { minX: number; maxX: number; minY: number; maxY: number; hasPoint: boolean }
+    >();
+
+    for (const shape of baseShapes) {
+      const ownerId = normalizeShardId(shape.ownerId ?? '');
+      if (!isShardIdentity(ownerId)) {
+        continue;
+      }
+      const points = getShapeAnchorPoints(shape);
+      if (points.length === 0) {
+        continue;
+      }
+      const current = raw.get(ownerId) ?? {
+        minX: Infinity,
+        maxX: -Infinity,
+        minY: Infinity,
+        maxY: -Infinity,
+        hasPoint: false,
+      };
+      for (const point of points) {
+        if (!Number.isFinite(point.x) || !Number.isFinite(point.y)) {
+          continue;
+        }
+        current.hasPoint = true;
+        if (point.x < current.minX) current.minX = point.x;
+        if (point.x > current.maxX) current.maxX = point.x;
+        if (point.y < current.minY) current.minY = point.y;
+        if (point.y > current.maxY) current.maxY = point.y;
+      }
+      raw.set(ownerId, current);
+    }
+
+    const out = new Map<string, ShardHoverBounds>();
+    for (const [shardId, bounds] of raw) {
+      if (!bounds.hasPoint) {
+        continue;
+      }
+      const padding = 2;
+      const minX = bounds.minX - padding;
+      const maxX = bounds.maxX + padding;
+      const minY = bounds.minY - padding;
+      const maxY = bounds.maxY + padding;
+      out.set(shardId, {
+        minX,
+        maxX,
+        minY,
+        maxY,
+        area: Math.max(1, (maxX - minX) * (maxY - minY)),
+      });
+    }
+    return out;
+  }, [baseShapes]);
+
   const networkNodeIds = useMemo(() => {
     // Include both telemetry rows and valid connection targets so shard nodes
     // track live GNS topology updates.
@@ -281,6 +367,32 @@ export default function MapPage() {
     return out;
   }, [mapBoundsCenter, networkNodeIds, shardAnchorPositions]);
 
+  const shardHoverBoundsById = useMemo(() => {
+    const out = new Map<string, ShardHoverBounds>(shardBoundsById);
+    const fallbackHalfSize = 8;
+    for (const shardId of networkNodeIds) {
+      if (out.has(shardId)) {
+        continue;
+      }
+      const anchor = projectedShardPositions.get(shardId);
+      if (!anchor) {
+        continue;
+      }
+      const minX = anchor.x - fallbackHalfSize;
+      const maxX = anchor.x + fallbackHalfSize;
+      const minY = anchor.y - fallbackHalfSize;
+      const maxY = anchor.y + fallbackHalfSize;
+      out.set(shardId, {
+        minX,
+        maxX,
+        minY,
+        maxY,
+        area: (maxX - minX) * (maxY - minY),
+      });
+    }
+    return out;
+  }, [networkNodeIds, projectedShardPositions, shardBoundsById]);
+
   const networkEdgeCount = useMemo(() => {
     const seen = new Set<string>();
     for (const shard of networkTelemetry) {
@@ -299,6 +411,170 @@ export default function MapPage() {
     }
     return seen.size;
   }, [networkTelemetry, networkNodeIdSet]);
+
+  const shardTelemetryById = useMemo(() => {
+    const out = new Map<string, (typeof networkTelemetry)[number]>();
+    for (const shard of networkTelemetry) {
+      const shardId = normalizeShardId(shard.shardId);
+      if (!isShardIdentity(shardId)) {
+        continue;
+      }
+      out.set(shardId, shard);
+    }
+    return out;
+  }, [networkTelemetry]);
+
+  const hoveredShardEdgeLabels = useMemo(
+    () =>
+      hoveredShardId == null
+        ? []
+        : (() => {
+            const shard = shardTelemetryById.get(hoveredShardId);
+            const fromPos = projectedShardPositions.get(hoveredShardId);
+            if (!shard || !fromPos) {
+              return [];
+            }
+            const edgeRates = new Map<
+              string,
+              { inBytesPerSec: number; outBytesPerSec: number }
+            >();
+            for (const connection of shard.connections) {
+              const targetId = normalizeShardId(connection.targetId);
+              if (!networkNodeIdSet.has(targetId)) {
+                continue;
+              }
+              const existing = edgeRates.get(targetId) ?? {
+                inBytesPerSec: 0,
+                outBytesPerSec: 0,
+              };
+              existing.inBytesPerSec += Number.isFinite(connection.inBytesPerSec)
+                ? connection.inBytesPerSec
+                : 0;
+              existing.outBytesPerSec += Number.isFinite(connection.outBytesPerSec)
+                ? connection.outBytesPerSec
+                : 0;
+              edgeRates.set(targetId, existing);
+            }
+            return Array.from(edgeRates.entries())
+              .map(([targetId, rates]) => {
+                const toPos = projectedShardPositions.get(targetId);
+                if (!toPos) {
+                  return null;
+                }
+                return {
+                  targetId,
+                  from: fromPos,
+                  to: toPos,
+                  text: `In ${formatRate(rates.inBytesPerSec)} B/s • Out ${formatRate(
+                    rates.outBytesPerSec
+                  )} B/s`,
+                };
+              })
+              .filter((value): value is NonNullable<typeof value> => value != null)
+              .sort((a, b) => a.targetId.localeCompare(b.targetId));
+          })(),
+    [hoveredShardId, networkNodeIdSet, projectedShardPositions, shardTelemetryById]
+  );
+
+  useEffect(() => {
+    showShardHoverDetailsRef.current = showShardHoverDetails;
+    if (!showShardHoverDetails) {
+      setHoveredShardId(null);
+      setHoveredShardAnchor(null);
+      return;
+    }
+    rendererRef.current?.draw();
+  }, [showShardHoverDetails]);
+
+  const shardHoverBoundsByIdRef = useRef<Map<string, ShardHoverBounds>>(new Map());
+  const networkNodeIdSetRef = useRef<Set<string>>(new Set());
+
+  useEffect(() => {
+    showGnsConnectionsRef.current = showGnsConnections;
+  }, [showGnsConnections]);
+
+  useEffect(() => {
+    networkNodeIdSetRef.current = networkNodeIdSet;
+  }, [networkNodeIdSet]);
+
+  useEffect(() => {
+    shardHoverBoundsByIdRef.current = shardHoverBoundsById;
+  }, [shardHoverBoundsById]);
+
+  useEffect(() => {
+    if (!showGnsConnections) {
+      setHoveredShardId(null);
+      setHoveredShardAnchor(null);
+      return;
+    }
+    if (hoveredShardId && !networkNodeIdSet.has(hoveredShardId)) {
+      setHoveredShardId(null);
+      setHoveredShardAnchor(null);
+    }
+  }, [hoveredShardId, networkNodeIdSet, showGnsConnections]);
+
+  useEffect(() => {
+    rendererRef.current?.setHoverEdgeLabels(
+      showShardHoverDetails && showGnsConnections ? hoveredShardEdgeLabels : []
+    );
+  }, [hoveredShardEdgeLabels, showGnsConnections, showShardHoverDetails]);
+
+  const handleMapPointerWorld = useCallback(
+    (
+      point: { x: number; y: number } | null,
+      screen: { x: number; y: number } | null
+    ) => {
+      if (
+        !showShardHoverDetailsRef.current ||
+        !showGnsConnectionsRef.current ||
+        !point ||
+        !screen
+      ) {
+        setHoveredShardId(null);
+        setHoveredShardAnchor(null);
+        return;
+      }
+
+      let hoveredId: string | null = null;
+      let smallestArea = Infinity;
+      for (const [shardId, bounds] of shardHoverBoundsByIdRef.current) {
+        if (!networkNodeIdSetRef.current.has(shardId)) {
+          continue;
+        }
+        if (
+          point.x < bounds.minX ||
+          point.x > bounds.maxX ||
+          point.y < bounds.minY ||
+          point.y > bounds.maxY
+        ) {
+          continue;
+        }
+        if (bounds.area < smallestArea) {
+          smallestArea = bounds.area;
+          hoveredId = shardId;
+        }
+      }
+
+      if (!hoveredId) {
+        setHoveredShardId(null);
+        setHoveredShardAnchor(null);
+        return;
+      }
+
+      setHoveredShardId((prev) => (prev === hoveredId ? prev : hoveredId));
+      setHoveredShardAnchor((prev) => {
+        if (
+          !prev ||
+          Math.abs(prev.x - screen.x) > 0.5 ||
+          Math.abs(prev.y - screen.y) > 0.5
+        ) {
+          return screen;
+        }
+        return prev;
+      });
+    },
+    []
+  );
 
   const overlayShapes = useMemo<ShapeJS[]>(() => {
     const overlays: ShapeJS[] = [];
@@ -413,12 +689,13 @@ export default function MapPage() {
       viewMode,
       projectionMode,
       interactionSensitivity,
+      onPointerWorldPosition: handleMapPointerWorld,
     });
     return () => {
       rendererRef.current?.destroy();
       rendererRef.current = null;
     };
-  }, []);
+  }, [handleMapPointerWorld]);
 
   // Push shape updates to renderer
   useEffect(() => {
@@ -456,12 +733,57 @@ export default function MapPage() {
           width: '100%',
           flex: '1 1 auto',
           minHeight: 0,
+          position: 'relative',
           overflow: 'hidden',
           touchAction: 'none',
           border: '1px solid #ccc',
           boxSizing: 'border-box',
         }}
-      />
+      >
+        {showShardHoverDetails && hoveredShardId && hoveredShardAnchor && (
+          <div
+            style={{
+              position: 'absolute',
+              left: hoveredShardAnchor.x + 12,
+              top: hoveredShardAnchor.y - 8,
+              transform: 'translateY(-50%)',
+              maxWidth: 280,
+              padding: '8px 10px',
+              borderRadius: 8,
+              border: '1px solid rgba(148, 163, 184, 0.4)',
+              background: 'rgba(15, 23, 42, 0.9)',
+              color: '#e2e8f0',
+              fontSize: 11,
+              lineHeight: 1.35,
+              pointerEvents: 'none',
+              zIndex: 20,
+              boxShadow: '0 8px 24px rgba(2, 6, 23, 0.35)',
+            }}
+          >
+            <div
+              style={{
+                fontSize: 12,
+                color: '#f8fafc',
+                marginBottom: 4,
+                whiteSpace: 'nowrap',
+                overflow: 'hidden',
+                textOverflow: 'ellipsis',
+              }}
+              title={hoveredShardId}
+            >
+              {hoveredShardId}
+            </div>
+            <div style={{ color: '#cbd5e1', marginBottom: 4 }}>
+              Down {formatRate(shardTelemetryById.get(hoveredShardId)?.downloadKbps ?? 0)} B/s
+              {' • '}
+              Up {formatRate(shardTelemetryById.get(hoveredShardId)?.uploadKbps ?? 0)} B/s
+            </div>
+            <div style={{ color: '#94a3b8' }}>
+              {hoveredShardEdgeLabels.length} outgoing connections
+            </div>
+          </div>
+        )}
+      </div>
 
       <div
         style={{
@@ -493,6 +815,14 @@ export default function MapPage() {
             onChange={() => setShowAuthorityEntities(!showAuthorityEntities)}
           />
           entities + owner links
+        </label>
+        <label style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+          <input
+            type="checkbox"
+            checked={showShardHoverDetails}
+            onChange={() => setShowShardHoverDetails(!showShardHoverDetails)}
+          />
+          shard hover details
         </label>
         <span style={{ opacity: 0.8 }}>
           entities: {authorityEntities.length} | shards: {networkNodeIds.length}
