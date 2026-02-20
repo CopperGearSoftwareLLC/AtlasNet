@@ -64,6 +64,21 @@ function formatBinaryPreview(buffer) {
   return `<binary ${buffer.length} bytes> ${hex}${suffix}`;
 }
 
+function decodeRedisRawValue(value) {
+  if (value == null) {
+    return '';
+  }
+  if (typeof value === 'string') {
+    return value;
+  }
+
+  const buffer = asBuffer(value);
+  if (!buffer) {
+    return String(value);
+  }
+  return buffer.toString('utf8');
+}
+
 function tryDecodeUtf8HumanText(buffer) {
   const decoded = tryDecodeUtf8(buffer);
   if (decoded == null) {
@@ -226,17 +241,20 @@ function tryDecodeKnownStructured(buffer) {
   return null;
 }
 
-function decodeRedisDisplayValue(value) {
-  if (value == null) {
-    return '';
+function decodeRedisDisplayValue(value, options = {}) {
+  const interpretTypes = options.interpretTypes !== false;
+  if (!interpretTypes) {
+    return decodeRedisRawValue(value);
   }
+
+  const rawValue = decodeRedisRawValue(value);
   if (typeof value === 'string') {
-    return value;
+    return rawValue;
   }
 
   const buffer = asBuffer(value);
   if (!buffer || buffer.length === 0) {
-    return '';
+    return rawValue;
   }
 
   const utf8HumanText = tryDecodeUtf8HumanText(buffer);
@@ -288,6 +306,7 @@ function formatVec3(value) {
 module.exports = {
   asBuffer,
   decodeRedisDisplayValue,
+  decodeRedisRawValue,
   formatBinaryPreview,
   formatNumber,
   formatUuid,

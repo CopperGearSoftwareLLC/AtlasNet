@@ -2,6 +2,7 @@ const { ByteCursor } = require('./byteCursor');
 const {
   asBuffer,
   decodeRedisDisplayValue,
+  decodeRedisRawValue,
   formatBinaryPreview,
   formatUuid,
   formatVec3,
@@ -174,7 +175,7 @@ function shouldDecodeSetKey(key) {
 
 function decodeSetMemberForKey(key, member, decodeEnabled) {
   if (!decodeEnabled) {
-    return decodeRedisDisplayValue(member);
+    return decodeRedisRawValue(member);
   }
   if (shouldDecodeSetKey(key)) {
     return decodeUuidValue(member);
@@ -216,7 +217,7 @@ function hasHardcodedHashDecoder(key) {
 function decodeHardcodedHashEntry(key, field, value, decodeEnabled) {
   const decoder = HARDCODED_HASH_DECODERS[key];
   if (!decoder || !decodeEnabled) {
-    return [decodeRedisDisplayValue(field), decodeRedisDisplayValue(value)];
+    return [decodeRedisRawValue(field), decodeRedisRawValue(value)];
   }
 
   return [decoder.decodeField(field), decoder.decodeValue(value)];

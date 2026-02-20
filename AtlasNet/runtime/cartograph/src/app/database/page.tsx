@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import type {
   DatabaseRecord,
   DatabaseSnapshotResponse,
@@ -242,6 +242,11 @@ export default function DatabasePage() {
   const [loading, setLoading] = useState(true);
   const [errorText, setErrorText] = useState<string | null>(null);
   const [lastUpdatedMs, setLastUpdatedMs] = useState<number | null>(null);
+  const decodeSerializedRef = useRef(decodeSerialized);
+
+  useEffect(() => {
+    decodeSerializedRef.current = decodeSerialized;
+  }, [decodeSerialized]);
 
   useEffect(() => {
     let alive = true;
@@ -252,7 +257,10 @@ export default function DatabasePage() {
         if (selectedSource) {
           params.set('source', selectedSource);
         }
-        params.set('decodeSerialized', decodeSerialized ? '1' : '0');
+        params.set(
+          'decodeSerialized',
+          decodeSerializedRef.current ? '1' : '0'
+        );
         const response = await fetch(`/api/databases?${params.toString()}`, {
           cache: 'no-store',
         });
@@ -308,7 +316,7 @@ export default function DatabasePage() {
         clearInterval(intervalId);
       }
     };
-  }, [decodeSerialized, pollIntervalMs, refreshToken, selectedSource]);
+  }, [pollIntervalMs, refreshToken, selectedSource]);
 
   useEffect(() => {
     if (selectedKey && !records.some((record) => record.key === selectedKey)) {
@@ -492,7 +500,7 @@ export default function DatabasePage() {
 
         <div className="grid grid-cols-2 gap-3 md:grid-cols-3">
           <div className="rounded-2xl border border-slate-800 bg-slate-900/70 p-3">
-            <div className="text-xs text-slate-400">Filtered Keys</div>
+            <div className="text-xs text-slate-400">Total Keys</div>
             <div className="font-mono text-xl text-slate-100">{records.length}</div>
           </div>
           <div className="rounded-2xl border border-slate-800 bg-slate-900/70 p-3">

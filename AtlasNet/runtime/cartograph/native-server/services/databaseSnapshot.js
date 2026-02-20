@@ -8,6 +8,7 @@ const {
 } = require('../config');
 const {
   decodeRedisDisplayValue,
+  decodeRedisRawValue,
   decodeJsonPayloadForKey,
   formatHashPayloadPairs,
   hasHardcodedHashDecoder,
@@ -243,6 +244,9 @@ async function populateHardcodedSetPayloads(
 
 async function populateRecordPayloads(client, metadata, recordsByKey, options = {}) {
   const decodeSerialized = options.decodeSerialized !== false;
+  const decodeValue = decodeSerialized
+    ? decodeRedisDisplayValue
+    : decodeRedisRawValue;
   const stringKeys = [];
   const hashKeys = [];
   const hardcodedHashKeys = [];
@@ -313,7 +317,7 @@ async function populateRecordPayloads(client, metadata, recordsByKey, options = 
         const value = values[i];
         setRecordPayload(
           record,
-          value == null ? '' : decodeRedisDisplayValue(value),
+          value == null ? '' : decodeValue(value),
           value == null ? 0 : 1
         );
       }
@@ -344,8 +348,8 @@ async function populateRecordPayloads(client, metadata, recordsByKey, options = 
 
       const fields = value && typeof value === 'object' ? value : {};
       const pairs = Object.entries(fields).map(([field, fieldValue]) => [
-        decodeRedisDisplayValue(field),
-        decodeRedisDisplayValue(fieldValue),
+        decodeValue(field),
+        decodeValue(fieldValue),
       ]);
       setRecordPayload(record, formatHashPayloadPairs(pairs), pairs.length);
     }
@@ -373,7 +377,7 @@ async function populateRecordPayloads(client, metadata, recordsByKey, options = 
         return;
       }
 
-      const members = Array.isArray(value) ? value.map(decodeRedisDisplayValue) : [];
+      const members = Array.isArray(value) ? value.map(decodeValue) : [];
       setRecordPayload(record, formatSetPayload(members), members.length);
     }
   );
@@ -401,7 +405,7 @@ async function populateRecordPayloads(client, metadata, recordsByKey, options = 
       }
 
       const membersWithScores = Array.isArray(value)
-        ? value.map((v, i) => (i % 2 === 0 ? decodeRedisDisplayValue(v) : String(v)))
+        ? value.map((v, i) => (i % 2 === 0 ? decodeValue(v) : String(v)))
         : [];
       setRecordPayload(
         record,
@@ -426,7 +430,7 @@ async function populateRecordPayloads(client, metadata, recordsByKey, options = 
         return;
       }
 
-      const members = Array.isArray(value) ? value.map(decodeRedisDisplayValue) : [];
+      const members = Array.isArray(value) ? value.map(decodeValue) : [];
       setRecordPayload(record, formatListPayload(members), members.length);
     }
   );

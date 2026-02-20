@@ -16,7 +16,7 @@ export function HardcodedDecodeToggle({
         checked={enabled}
         onChange={(e) => onChange(e.target.checked)}
       />
-      revert byte optimization [experimental]
+      decode byte optimization [experimental]
     </label>
   );
 }
