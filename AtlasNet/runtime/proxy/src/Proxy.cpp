@@ -3,6 +3,7 @@
 #include <thread>
 
 #include "Debug/Crash/CrashHandler.hpp"
+#include "Events/EventSystem.hpp"
 #include "Interlink/Database/HealthManifest.hpp"
 #include "Interlink/Interlink.hpp"
 #include "Global/Misc/UUID.hpp"
@@ -31,7 +32,7 @@ void Proxy::Init()
 	Interlink::Get().Init(InterlinkProperties{.ThisID = ID, .logger = logger});
 	NetworkManifest::Get().ScheduleNetworkPings(ID);
 	HealthManifest::Get().ScheduleHealthPings(ID);
-	
+	EventSystem::Get().Init(ID);
 }
 void Proxy::Shutdown()
 {

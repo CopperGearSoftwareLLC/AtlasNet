@@ -31,80 +31,8 @@ std::future<std::optional<std::string>> RedisConnection::HGetAsync(
 					 { return r.hget(key, field); });
 }
 
-std::optional<std::string> RedisConnection::HClaimAtomic(
-	const std::string_view& pending_key, const std::string_view& claimed_key,
-	const std::string_view& claim_field) const
-{
-	static const char* kLuaScript = R"lua(
-local pending = KEYS[1]
-local claimed = KEYS[2]
-local claim_field = ARGV[1]
 
-local existing = redis.call('HGET', claimed, claim_field)
-if existing then
-  return existing
-end
 
-local cursor = '0'
-repeat
-  local scan = redis.call('HSCAN', pending, cursor, 'COUNT', 1)
-  cursor = scan[1]
-  local entries = scan[2]
-  if #entries > 0 then
-    local field = entries[1]
-    local value = entries[2]
-    redis.call('HDEL', pending, field)
-    redis.call('HSET', claimed, claim_field, value)
-    return value
-  end
-until cursor == '0'
-
-return false
-)lua";
-
-	return WithSync(
-		[&](auto& r) -> std::optional<std::string>
-		{
-			auto res = r.template command<sw::redis::OptionalString>(
-				"EVAL", kLuaScript, "2", pending_key, claimed_key, claim_field);
-			if (!res)
-				return std::nullopt;
-			return std::string(*res);
-		});
-}
-
-bool RedisConnection::HRequeueClaimedAtomic(
-	const std::string_view& claimed_key, const std::string_view& pending_key,
-	const std::string_view& claim_field) const
-{
-	static const char* kLuaScript = R"lua(
-local claimed = KEYS[1]
-local pending = KEYS[2]
-local claim_field = ARGV[1]
-
-local value = redis.call('HGET', claimed, claim_field)
-if not value then
-  return 0
-end
-if #value < 4 then
-  return 0
-end
-
-local b1, b2, b3, b4 = string.byte(value, 1, 4)
-local field = string.char(b1, b2, b3, b4)
-redis.call('HSET', pending, field, value)
-redis.call('HDEL', claimed, claim_field)
-return 1
-)lua";
-
-	return WithSync(
-		[&](auto& r) -> bool
-		{
-			const auto result = r.template command<long long>(
-				"EVAL", kLuaScript, "2", claimed_key, pending_key, claim_field);
-			return result != 0;
-		});
-}
 
 bool RedisConnection::HExists(const std::string_view& key, const std::string_view& field) const
 {

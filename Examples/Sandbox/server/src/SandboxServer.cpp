@@ -1,33 +1,35 @@
 #include "SandboxServer.hpp"
-#include "AtlasNetServer.hpp"
-#include <thread>
+
 #include <chrono>
+#include <thread>
+
+#include "AtlasNetServer.hpp"
+#include "Events/EventSystem.hpp"
+#include "Events/Events/Client/ClientEvents.hpp"
+#include "Global/Misc/UUID.hpp"
 
 void SandboxServer::Run()
 {
-    
-    AtlasNetServer::InitializeProperties InitProperties;
-    InitProperties.OnShutdownRequest = [&](SignalType signal)
-    { ShouldShutdown = true; };
-    AtlasNetServer::Get().Initialize(InitProperties);
-//
-    //using clock = std::chrono::high_resolution_clock;
-    //auto previous = clock::now();
+	AtlasNetServer::InitializeProperties InitProperties;
+	InitProperties.OnShutdownRequest = [&](SignalType signal)
+	{ ShouldShutdown = true; };
+	AtlasNetServer::Get().Initialize(InitProperties);
 
-    while (!ShouldShutdown)
-    {
-    
-        std::span<AtlasEntity> myspan;
-        std::vector<AtlasEntity> Incoming;
-        std::vector<AtlasEntityID> Outgoing;
-        AtlasNetServer::Get().Update(myspan, Incoming, Outgoing);
-//
-        // Print positions every second
-        // scene.printPositions();
-//
-        // Sleep a bit to avoid burning CPU (simulate frame time)
-        // std::this_thread::sleep_for(std::chrono::milliseconds(16));
-        // ~60 updates per second
-        std::this_thread::sleep_for(std::chrono::milliseconds(10));
-    }
+	EventSystem::Get().Subscribe<ClientConnectEvent>(
+		[&](const ClientConnectEvent& e)
+		{
+			logger.DebugFormatted(
+				"Client Connected event!\n - ID: {}\n - IP: {}\n - Proxy: {}",
+				UUIDGen::ToString(e.client.ID), e.client.ip.ToString(),
+				e.ConnectedProxy.ToString());
+		});
+	while (!ShouldShutdown)
+	{
+		std::span<AtlasEntity> myspan;
+		std::vector<AtlasEntity> Incoming;
+		std::vector<AtlasEntityID> Outgoing;
+		AtlasNetServer::Get().Update(myspan, Incoming, Outgoing);
+
+		std::this_thread::sleep_for(std::chrono::milliseconds(10));
+	}
 }

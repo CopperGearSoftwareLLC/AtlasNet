@@ -1,17 +1,16 @@
 #pragma once
-#include "pch.hpp"
+#include "Global/pch.hpp"
 #include <memory>
 #include <mutex>
 
-#include "Misc/Singleton.hpp"
-#include "Entity.hpp"
-#include "Entity.hpp"
+#include "Global/Misc/Singleton.hpp"
+#include "Entity/Entity.hpp"
 
-#include "Crash/CrashHandler.hpp"
-#include "DockerIO.hpp"
-#include "AtlasNet.hpp"
+#include "Debug/Crash/CrashHandler.hpp"
+#include "Docker/DockerIO.hpp"
+#include "Global/AtlasNet.hpp"
 #include "Network/IPAddress.hpp"
-#include "Log.hpp"
+#include "Debug/Log.hpp"
 class AtlasNetClient: public Singleton<AtlasNetClient>
 {
 public:
@@ -33,7 +32,7 @@ private:
 //    void HandleEntityMessage(const std::span<const std::byte>& data);
 private:
     std::shared_ptr<Log> logger = std::make_shared<Log>("AtlasNetClient");
-    std::unordered_map<AtlasEntity::EntityID, AtlasEntity> RemoteEntities;
+    std::unordered_map<AtlasEntityID, AtlasEntity> RemoteEntities;
     std::mutex Mutex;
     bool IsConnectedToProxy = false;
 };

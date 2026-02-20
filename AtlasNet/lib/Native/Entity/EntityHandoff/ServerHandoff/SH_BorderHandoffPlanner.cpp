@@ -12,14 +12,15 @@
 #include "Heuristic/Database/HeuristicManifest.hpp"
 #include "Heuristic/GridHeuristic/GridHeuristic.hpp"
 #include "Interlink/Database/ServerRegistry.hpp"
+#include "Network/NetworkIdentity.hpp"
 #include "SH_EntityAuthorityTracker.hpp"
 #include "SH_HandoffPacketManager.hpp"
 
 namespace
 {
-std::string SelectTargetClaimKeyForPosition(
-	const std::unordered_map<std::string, GridShape>& claimedBounds,
-	const std::string& selfKey, const vec3& position)
+NetworkIdentity SelectTargetClaimKeyForPosition(
+	const std::unordered_map<NetworkIdentity, GridShape>& claimedBounds,
+	const NetworkIdentity& selfKey, const vec3& position)
 {
 	for (const auto& [claimKey, bound] : claimedBounds)
 	{
@@ -36,12 +37,12 @@ std::string SelectTargetClaimKeyForPosition(
 }
 
 std::optional<NetworkIdentity> ResolveIdentityFromClaimKey(
-	const std::string& claimKey,
+	const NetworkIdentity& claimKey,
 	const std::unordered_map<NetworkIdentity, ServerRegistryEntry>& servers)
 {
 	for (const auto& [id, _entry] : servers)
 	{
-		if (id.ToString() == claimKey)
+		if (id == claimKey)
 		{
 			return id;
 		}
@@ -70,8 +71,8 @@ SH_BorderHandoffPlanner::PlanAndSendAll(
 	SH_EntityAuthorityTracker& tracker, const uint64_t nowUnixTimeUs) const
 {
 	std::vector<SH_PendingOutgoingHandoff> outgoingHandoffs;
-	std::unordered_map<std::string, GridShape> claimedBounds;
-	HeuristicManifest::Get().GetAllClaimedBounds<GridShape, std::string>(
+	std::unordered_map<NetworkIdentity, GridShape> claimedBounds;
+	HeuristicManifest::Get().GetAllClaimedBounds<GridShape>(
 		claimedBounds);
 	if (claimedBounds.empty())
 	{
@@ -79,7 +80,7 @@ SH_BorderHandoffPlanner::PlanAndSendAll(
 	}
 
 	const std::string selfKey = selfIdentity.ToString();
-	const auto selfIt = claimedBounds.find(selfKey);
+	const auto selfIt = claimedBounds.find(selfIdentity);
 	if (selfIt == claimedBounds.end())
 	{
 		return outgoingHandoffs;
@@ -103,12 +104,8 @@ SH_BorderHandoffPlanner::PlanAndSendAll(
 			continue;
 		}
 
-		const std::string targetClaimKey = SelectTargetClaimKeyForPosition(
-			claimedBounds, selfKey, position);
-		if (targetClaimKey.empty())
-		{
-			continue;
-		}
+		const NetworkIdentity targetClaimKey = SelectTargetClaimKeyForPosition(
+			claimedBounds, selfIdentity, position);
 
 		const auto targetIdentity = ResolveIdentityFromClaimKey(
 			targetClaimKey, ServerRegistry::Get().GetServers());
@@ -140,14 +137,13 @@ SH_BorderHandoffPlanner::PlanAndSendAll(
 				"self_bound_id={} target_claim={} target_id={} transfer_time_us={} "
 				"handoff_delay_us={}",
 				entity.Entity_ID, glm::to_string(position), selfBounds.GetID(),
-				targetClaimKey, targetIdentity->ToString(), transferTimeUs,
+				targetClaimKey.ToString(), targetIdentity->ToString(), transferTimeUs,
 				delayUs);
 		}
 
 		outgoingHandoffs.push_back(SH_PendingOutgoingHandoff{
 			.entityId = entity.Entity_ID,
 			.targetIdentity = *targetIdentity,
-			.targetClaimKey = targetClaimKey,
 			.transferTimeUs = transferTimeUs});
 	}
 

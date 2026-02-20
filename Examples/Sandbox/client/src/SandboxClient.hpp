@@ -1,13 +1,13 @@
 #pragma once
-#include "Entity.hpp"
-#include "pch.hpp"
+#include "Entity/Entity.hpp"
+#include "Global/pch.hpp"
 #include "AtlasNetClient.hpp"
 #include <GL/glew.h>
 #include <GLFW/glfw3.h>
 class SandboxClient
 {
     mutable Log logger = Log("SandboxClient");
-    std::optional<AtlasEntity::EntityID> MyID;
+    std::optional<AtlasEntityID> MyID;
 
     std::optional<GLFWwindow *> window;
     vec2 CameraPos = {0,0};

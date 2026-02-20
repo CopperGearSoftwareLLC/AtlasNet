@@ -13,17 +13,20 @@
 #include "Client/ClientManifest.hpp"
 #include "Database/ServerRegistry.hpp"
 #include "Docker/DockerIO.hpp"
+#include "Events/EventSystem.hpp"
+#include "Events/Events/Client/ClientEvents.hpp"
 #include "GameNetworkingSockets.hpp"
-#include "InterlinkEnums.hpp"
 #include "Global/Misc/UUID.hpp"
+#include "Global/Serialize/ByteReader.hpp"
+#include "Global/Serialize/ByteWriter.hpp"
+#include "Global/pch.hpp"
+#include "Handshake/HandshakeService.hpp"
+#include "InterlinkEnums.hpp"
 #include "Network/Connection.hpp"
 #include "Network/NetworkEnums.hpp"
 #include "Network/NetworkIdentity.hpp"
 #include "Network/Packet/Client/ClientIDAssignPacket.hpp"
 #include "Network/Packet/Packet.hpp"
-#include "Global/Serialize/ByteReader.hpp"
-#include "Global/Serialize/ByteWriter.hpp"
-#include "Global/pch.hpp"
 #include "steam/steamclientpublic.h"
 
 // ===== Safe, single-process guard for GNS init ===============================
@@ -682,12 +685,13 @@ bool Interlink::EstablishConnectionTo(const NetworkIdentity &id)
 				"Failed to establish connection after 5 tries. IP not found in "
 				"Server Registry {}",
 				id.ToString());
-				logger->DebugFormatted(
-				"All entries in Server Registry:");
-				for (const auto& [SID,Entry]: ServerRegistry::Get().GetServers())
-				{
-					logger->DebugFormatted(" - {} at {}", Entry.identifier.ToString(),Entry.address.ToString());
-				}
+			logger->DebugFormatted("All entries in Server Registry:");
+			for (const auto &[SID, Entry] : ServerRegistry::Get().GetServers())
+			{
+				logger->DebugFormatted(" - {} at {}",
+									   Entry.identifier.ToString(),
+									   Entry.address.ToString());
+			}
 
 			return false;  // no assert crash, just graceful fail
 		}
@@ -830,5 +834,13 @@ void Interlink::OnClientConnected(const Connection &c)
 		client.ip = c.address;
 		ClientManifest::Get().RegisterClient(client);
 		ClientManifest::Get().AssignProxyClient(client.ID, MyIdentity);
+
+		ClientConnectEvent cce;
+		cce.client = client;
+		cce.ConnectedProxy = MyIdentity;
+		EventSystem::Get().Dispatch(cce);
+
+		HandshakeService::Get().OnClientConnect(client);
+		
 	}
 }

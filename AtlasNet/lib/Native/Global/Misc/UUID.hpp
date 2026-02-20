@@ -22,6 +22,11 @@ class UUIDGen
 	}
 	static const char inline BASE20_ALPHABET[21] = "0123456789ABCDEFGHJK";	// 20 chars, no I,L,O
 
+	static std::string ToString(const UUID& uuid)
+	{
+		return boost::uuids::to_string(uuid);
+	}
+	/*
 	static std::string encode_base20(const UUID &uuid)
 	{
 		uint8_t data[16];
@@ -61,6 +66,6 @@ class UUIDGen
 		}
 
 		return id;
-	}
+	}*/
 
 };

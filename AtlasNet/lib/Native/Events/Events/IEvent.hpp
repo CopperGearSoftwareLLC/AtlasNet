@@ -7,9 +7,9 @@
 #include "Network/NetworkIdentity.hpp"
 
 using EventTypeID = uint64;
-class IEvent
+struct IEvent
 {
-	NetworkIdentity dispatcher;
-	virtual void Serialize(ByteWriter& bw) = 0;
+    virtual ~IEvent() = default;
+	virtual void Serialize(ByteWriter& bw) const = 0;
 	virtual void Deserialize(ByteReader& br) = 0;
 };

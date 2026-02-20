@@ -36,7 +36,7 @@ void Partition::Init()
 		GridShape claimedBounds;
 		const bool claimed =
 			HeuristicManifest::Get().ClaimNextPendingBound<GridShape>(
-				partitionIdentifier.ToString(), claimedBounds);
+				partitionIdentifier, claimedBounds);
 		if (claimed)
 		{
 			logger->DebugFormatted("Claimed bounds {} for shard",

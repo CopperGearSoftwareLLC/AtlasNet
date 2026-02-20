@@ -55,7 +55,7 @@ class AuthorityManifest : public Singleton<AuthorityManifest>
 			const std::string value = std::format(
 				"{}\t{}\t{}\t{}\t{}\t{}\t{}", row.owner.ToString(), row.world,
 				row.position[0], row.position[1], row.position[2],
-				row.isClient ? 1 : 0,  UUIDGen::encode_base20(row.clientId) );
+				row.isClient ? 1 : 0,  UUIDGen::ToString(row.clientId) );
 			const long long wrote =
 				InternalDB::Get()->HSet(kAuthorityTelemetryTable, field, value);
 			(void)wrote;

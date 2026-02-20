@@ -3,3 +3,4 @@ docs
 flake.lock
 temp
 .cache
+imgui.ini

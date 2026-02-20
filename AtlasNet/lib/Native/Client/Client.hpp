@@ -18,7 +18,7 @@ struct Client
 		return c;
 	}
 
-	void Serialize(ByteWriter& bw)
+	void Serialize(ByteWriter& bw) const
 	{
 		ip.Serialize(bw);
 		bw.uuid(ID);

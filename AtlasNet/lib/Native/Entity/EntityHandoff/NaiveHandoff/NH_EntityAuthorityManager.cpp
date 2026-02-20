@@ -17,6 +17,7 @@
 #include "Heuristic/GridHeuristic/GridHeuristic.hpp"
 #include "InternalDB/InternalDB.hpp"
 #include "Interlink/Database/ServerRegistry.hpp"
+#include "Network/NetworkIdentity.hpp"
 
 namespace
 {
@@ -38,9 +39,9 @@ constexpr uint32_t kDefaultTestEntityCount =
 
 constexpr std::string_view kTestOwnerKey = "EntityHandoff:TestOwnerShard";
 
-std::string SelectTargetClaimKeyForPosition(
-	const std::unordered_map<std::string, GridShape>& claimedBounds,
-	const std::string& selfKey, const vec3& position)
+NetworkIdentity SelectTargetClaimKeyForPosition(
+	const std::unordered_map<NetworkIdentity, GridShape>& claimedBounds,
+	const NetworkIdentity& selfKey, const vec3& position)
 {
 	for (const auto& [claimKey, bound] : claimedBounds)
 	{
@@ -58,12 +59,12 @@ std::string SelectTargetClaimKeyForPosition(
 }
 
 std::optional<NetworkIdentity> ResolveIdentityFromClaimKey(
-	const std::string& claimKey,
+	const NetworkIdentity& claimKey,
 	const std::unordered_map<NetworkIdentity, ServerRegistryEntry>& servers)
 {
 	for (const auto& [id, _entry] : servers)
 	{
-		if (id.ToString() == claimKey)
+		if (id == claimKey)
 		{
 			return id;
 		}
@@ -273,8 +274,8 @@ class NH_EntityAuthorityManager::Runtime
 			return;
 		}
 
-		std::unordered_map<std::string, GridShape> claimedBounds;
-		HeuristicManifest::Get().GetAllClaimedBounds<GridShape, std::string>(
+		std::unordered_map<NetworkIdentity, GridShape> claimedBounds;
+		HeuristicManifest::Get().GetAllClaimedBounds<GridShape>(
 			claimedBounds);
 		if (claimedBounds.empty())
 		{
@@ -282,7 +283,7 @@ class NH_EntityAuthorityManager::Runtime
 		}
 
 		const std::string selfKey = selfIdentity.ToString();
-		const auto selfIt = claimedBounds.find(selfKey);
+		const auto selfIt = claimedBounds.find(selfIdentity);
 		if (selfIt == claimedBounds.end())
 		{
 			return;
@@ -299,12 +300,9 @@ class NH_EntityAuthorityManager::Runtime
 				continue;
 			}
 
-			const std::string targetClaimKey = SelectTargetClaimKeyForPosition(
-				claimedBounds, selfKey, position);
-			if (targetClaimKey.empty())
-			{
-				continue;
-			}
+			const NetworkIdentity targetClaimKey = SelectTargetClaimKeyForPosition(
+				claimedBounds, selfIdentity, position);
+
 			const auto targetIdentity = ResolveIdentityFromClaimKey(
 				targetClaimKey, ServerRegistry::Get().GetServers());
 			if (!targetIdentity.has_value() || *targetIdentity == selfIdentity)
@@ -322,12 +320,11 @@ class NH_EntityAuthorityManager::Runtime
 			NH_HandoffPacketManager::Get().SendEntityHandoff(*targetIdentity, entity,
 													  transferTick);
 			const bool ownerSwitched =
-				InternalDB::Get()->Set(kTestOwnerKey, targetClaimKey);
+				InternalDB::Get()->Set(kTestOwnerKey, targetClaimKey.ToString());
 			(void)ownerSwitched;
 			pendingOutgoingHandoff = NH_EntityAuthorityManager::PendingOutgoingHandoff{
 				.entityId = entity.Entity_ID,
 				.targetIdentity = *targetIdentity,
-				.targetClaimKey = targetClaimKey,
 				.transferTick = transferTick};
 			ownershipEvaluated = false;
 
@@ -337,7 +334,7 @@ class NH_EntityAuthorityManager::Runtime
 					"[EntityHandoff] Triggered passing state entity={} pos={} "
 					"self_bound_id={} target_claim={} target_id={} transfer_tick={}",
 					entity.Entity_ID, glm::to_string(position), selfBounds.GetID(),
-					targetClaimKey, targetIdentity->ToString(), transferTick);
+					targetClaimKey.ToString(), targetIdentity->ToString(), transferTick);
 			}
 		}
 	}

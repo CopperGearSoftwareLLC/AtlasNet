@@ -30,7 +30,7 @@ class NH_EntityAuthorityManager : public Singleton<NH_EntityAuthorityManager>
 	{
 		AtlasEntityID entityId = 0;
 		NetworkIdentity targetIdentity;
-		std::string targetClaimKey;
+		//std::string targetClaimKey;
 		uint64_t transferTick = 0;
 	};
 

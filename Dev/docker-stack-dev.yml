@@ -33,7 +33,7 @@ services:
        condition: on-failure
 
   InternalDB:
-    image: valkey/valkey:latest
+    image: valkey/valkey-bundle:latest
     command: ["valkey-server", "--appendonly", "yes", "--port", "6379"]
     networks: [AtlasNet]
     ports:
@@ -61,8 +61,11 @@ services:
       restart_policy:
         condition: on-failure
   Proxy:
-    image: ${REGISTRY_ADDR_OPT}proxy:latest
+    image: proxy:latest
     networks: [AtlasNet]
+    environment:
+      HANDSHAKE_SERVICE_ENABLE: 1
+      HANDSHAKE_SERVICE_IP: "postgres"
     ports:
       - target: 25568
         published: 2555
@@ -77,6 +80,7 @@ services:
       replicas: 1
       restart_policy:
         condition: on-failure
+    
 #  BuiltInDB_Redis:
 #    image: valkey/valkey:latest
 #    command: ["valkey-server", "--appendonly", "yes", "--port", "2380"]

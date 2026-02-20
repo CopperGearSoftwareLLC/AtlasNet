@@ -1,16 +1,18 @@
 #pragma once
+#include <Global/pch.hpp>
 #include <boost/describe/enum.hpp>
 #include <cstdint>
 #include <optional>
-#include <Global/pch.hpp>
 #include <unordered_map>
 #include <vector>
 
+#include "Debug/Log.hpp"
 #include "Entity/Entity.hpp"
 #include "Entity/EntityList.hpp"
-#include "IBounds.hpp"
+#include "Global/Serialize/ByteReader.hpp"
 #include "Global/Serialize/ByteWriter.hpp"
 #include "Global/pch.hpp"
+#include "IBounds.hpp"
 class IHeuristic
 {
    public:
@@ -37,7 +39,8 @@ class IHeuristic
 				return "Unknown";
 		}
 	}
-	static inline bool TypeFromString(std::string_view str, Type& outType) noexcept
+	static inline bool TypeFromString(std::string_view str,
+									  Type& outType) noexcept
 	{
 		if (str == "None")
 		{
@@ -67,29 +70,35 @@ class IHeuristic
 	//	//BOOST_DESCRIBE_NESTED_ENUM(Type, eNone, eGridCell, eOctree, eQuadtree)
 	// #endif
 
-
-   private:
+   protected:
+   Log logger = Log("Heuristic");
    public:
+	virtual ~IHeuristic() = default;
 	[[nodiscard]] virtual Type GetType() const = 0;
 
-	virtual void Compute(const AtlasEntitySpan<const AtlasEntityMinimal>& span) = 0;
+	virtual void Compute(
+		const AtlasEntitySpan<const AtlasEntityMinimal>& span) = 0;
 
 	virtual uint32_t GetBoundsCount() const = 0;
-
-	virtual void SerializeBounds(std::unordered_map<IBounds::BoundsID, ByteWriter>& bws) = 0;
+	/** */
+	virtual void SerializeBounds(
+		std::unordered_map<IBounds::BoundsID, ByteWriter>& bws) = 0;
+	virtual void Serialize(ByteWriter& bw) const = 0;
+	virtual void Deserialize(ByteReader& br) = 0;
+	[[nodiscard]] virtual std::unique_ptr<IBounds> QueryPosition(vec3 p) = 0;
 };
 template <typename BoundType>
 struct TBoundDelta
 {
-    BoundType OldShape;
-    std::optional<BoundType> NewShape;
+	BoundType OldShape;
+	std::optional<BoundType> NewShape;
 };
 
 template <typename BoundType>
 class THeuristic : public IHeuristic
 {
-public:
-
-    virtual void GetBounds(std::vector<BoundType>& out_bounds) const = 0;
-    virtual void GetBoundDeltas(std::vector<TBoundDelta<BoundType>>& out_deltas) const = 0;
+   public:
+	virtual void GetBounds(std::vector<BoundType>& out_bounds) const = 0;
+	virtual void GetBoundDeltas(
+		std::vector<TBoundDelta<BoundType>>& out_deltas) const = 0;
 };

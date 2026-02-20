@@ -1,9 +1,9 @@
 #include "AtlasNetClient.hpp"
 
-#include "ClientLink.hpp"
-#include "DockerIO.hpp"
-#include "Interlink.hpp"
-#include "Misc/UUID.hpp"
+#include "Client/ClientLink.hpp"
+#include "Docker/DockerIO.hpp"
+#include "Interlink/Interlink.hpp"
+#include "Global/Misc/UUID.hpp"
 #include "Network/NetworkEnums.hpp"
 #include "Network/NetworkIdentity.hpp"
 void AtlasNetClient::Initialize(AtlasNetClient::InitializeProperties &props)

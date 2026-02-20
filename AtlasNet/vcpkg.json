@@ -10,10 +10,12 @@
     "boost-describe",
     "boost-stacktrace",
     "boost-static-string",
+    "boost-beast",
     "gamenetworkingsockets",
     "node-addon-api",
     "curl",
     "zlib",
+    "gperftools",
     {
       "name": "redis-plus-plus",
       "features": [

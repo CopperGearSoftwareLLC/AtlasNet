@@ -9,6 +9,7 @@
 
 #include "Heuristic/Database/HeuristicManifest.hpp"
 #include "Heuristic/GridHeuristic/GridHeuristic.hpp"
+#include "Network/NetworkIdentity.hpp"
 
 namespace
 {
@@ -179,8 +180,8 @@ bool DebugEntityLinearBounceSimulator::RebuildPerimeterBounds()
 	const bool haveConfiguredWorld =
 		RebuildConfiguredWorldPerimeter(configuredWorldBounds);
 
-	std::unordered_map<std::string, GridShape> claimedBounds;
-	HeuristicManifest::Get().GetAllClaimedBounds<GridShape, std::string>(
+	std::unordered_map<NetworkIdentity, GridShape> claimedBounds;
+	HeuristicManifest::Get().GetAllClaimedBounds<GridShape>(
 		claimedBounds);
 
 	std::vector<GridShape> pendingBounds;
@@ -193,23 +194,23 @@ bool DebugEntityLinearBounceSimulator::RebuildPerimeterBounds()
 	{
 		if (!haveAny)
 		{
-			combined.min = bound.min;
-			combined.max = bound.max;
+			combined.min = bound.aabb.min;
+			combined.max = bound.aabb.max;
 			haveAny = true;
 			continue;
 		}
-		combined.expand(bound);
+		combined.expand(bound.aabb);
 	}
 	for (const auto& bound : pendingBounds)
 	{
 		if (!haveAny)
 		{
-			combined.min = bound.min;
-			combined.max = bound.max;
+			combined.min = bound.aabb.min;
+			combined.max = bound.aabb.max;
 			haveAny = true;
 			continue;
 		}
-		combined.expand(bound);
+		combined.expand(bound.aabb);
 	}
 	if (haveConfiguredWorld)
 	{
@@ -268,7 +269,7 @@ bool DebugEntityLinearBounceSimulator::RebuildConfiguredWorldPerimeter(
 	}
 
 	std::unordered_map<IBounds::BoundsID, ByteWriter> serializedBounds;
-	GridHeuristic(GridHeuristic::Options{}).SerializeBounds(serializedBounds);
+	GridHeuristic().SerializeBounds(serializedBounds);
 	if (serializedBounds.empty())
 	{
 		return false;
@@ -283,12 +284,12 @@ bool DebugEntityLinearBounceSimulator::RebuildConfiguredWorldPerimeter(
 		bound.Deserialize(reader);
 		if (!haveAny)
 		{
-			outBounds.min = bound.min;
-			outBounds.max = bound.max;
+			outBounds.min = bound.aabb.min;
+			outBounds.max = bound.aabb.max;
 			haveAny = true;
 			continue;
 		}
-		outBounds.expand(bound);
+		outBounds.expand(bound.aabb);
 	}
 	return haveAny && outBounds.valid();
 }

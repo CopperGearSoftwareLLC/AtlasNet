@@ -44,6 +44,9 @@ class EventRegistry : public Singleton<EventRegistry>
 	struct EventsByTypeID
 	{
 	};
+	struct EventsByName
+	{
+	};
 	boost::multi_index_container<
 		EventTypeEntry,
 		boost::multi_index::indexed_by<
@@ -56,7 +59,11 @@ class EventRegistry : public Singleton<EventRegistry>
 			boost::multi_index::hashed_unique<
 				boost::multi_index::tag<EventsByTypeIndex>,
 				boost::multi_index::member<EventTypeEntry, std::type_index,
-										   &EventTypeEntry::type_index>>>>
+										   &EventTypeEntry::type_index>>,
+			boost::multi_index::hashed_unique<
+				boost::multi_index::tag<EventsByName>,
+				boost::multi_index::member<EventTypeEntry, std::string,
+										   &EventTypeEntry::Name>>>>
 		EventFactories;
 	// std::unordered_map<EventTypeID, EventTypeEntry> eventFactories;
 
@@ -74,8 +81,22 @@ class EventRegistry : public Singleton<EventRegistry>
 	template <typename T>
 	EventTypeID GetEventTypeID()
 	{
-		return EventFactories.get<EventsByTypeID>().find(typeid(T))->ID;
+		return EventFactories.get<EventsByTypeIndex>().find(typeid(T))->ID;
 	}
+	template <typename T>
+	const std::string_view GetEventName()
+	{
+		return EventFactories.get<EventsByTypeIndex>().find(typeid(T))->Name;
+	}
+
+	EventTypeID GetEventTypeID(const std::string_view name)
+	{
+		return EventFactories.get<EventsByName>().find(std::string(name))->ID;
+	}
+    std::unique_ptr<IEvent> CreateFromTypeID(EventTypeID id)
+    {
+        return EventFactories.get<EventsByTypeID>().find(id)->factory();
+    }
 };
 
 #define ATLASNET_REGISTER_EVENT(Type, Name)                  \

@@ -19,6 +19,5 @@ struct SH_PendingOutgoingHandoff
 {
 	AtlasEntityID entityId = 0;
 	NetworkIdentity targetIdentity;
-	std::string targetClaimKey;
 	uint64_t transferTimeUs = 0;
 };

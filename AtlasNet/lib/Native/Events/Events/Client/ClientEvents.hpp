@@ -1,9 +1,21 @@
 #pragma once
+#include "Client/Client.hpp"
 #include "Events/EventRegistry.hpp"
 #include "Events/Events/IEvent.hpp"
-class ClientConnectEvent : public IEvent
+#include "Network/NetworkIdentity.hpp"
+struct ClientConnectEvent : public IEvent
 {
-	void Serialize(ByteWriter& bw) override {};
-	void Deserialize(ByteReader& br) override {}  
+	Client client;
+	NetworkIdentity ConnectedProxy;
+	void Serialize(ByteWriter& bw) const override
+	{
+		client.Serialize(bw);
+		ConnectedProxy.Serialize(bw);
+	};
+	void Deserialize(ByteReader& br) override
+	{
+		client.Deserialize(br);
+		ConnectedProxy.Deserialize(br);
+	}
 };
 ATLASNET_REGISTER_EVENT(ClientConnectEvent, "ClientConnectEvent");
