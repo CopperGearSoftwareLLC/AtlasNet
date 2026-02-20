@@ -44,15 +44,12 @@ function computeShardAverages(connections) {
   };
 }
 
-function inspectObject(name, obj) {
-    console.log(`${name} keys:`, Object.keys(obj));
-    if (obj.prototype) {
-        console.log(`${name} prototype functions:`, Object.getOwnPropertyNames(obj.prototype));
-    }
-}
-for (const [key, value] of Object.entries(addon)) {
-    console.log(`\n--- Inspecting ${key} ---`);
-    inspectObject(key, value);
+function toInteger(value, fallback = 0) {
+  const n = Number(value);
+  if (!Number.isFinite(n)) {
+    return fallback;
+  }
+  return Math.trunc(n);
 }
 
 const app = express();
@@ -61,6 +58,9 @@ app.use(cors()); // allow your frontend to call it
 const nt = new addon.NetworkTelemetry();
 const authorityTelemetry = addon.AuthorityTelemetry
   ? new addon.AuthorityTelemetry()
+  : null;
+const databaseSnapshot = addon.DatabaseSnapshot
+  ? new addon.DatabaseSnapshot()
   : null;
 app.get('/networktelemetry', (req, res) => {
   try {
@@ -215,6 +215,44 @@ app.get('/heuristic', (req, res) => {
         console.error(err);
         res.status(500).json({ error: 'Native addon failed' });
     }
+});
+
+app.get('/databases', (req, res) => {
+  try {
+    if (!databaseSnapshot || !addon.std_vector_std_vector_std_string__) {
+      res.json([]);
+      return;
+    }
+
+    const rowsVec = new addon.std_vector_std_vector_std_string__();
+    databaseSnapshot.GetAllRows(rowsVec);
+
+    const rows = [];
+    for (let i = 0; i < rowsVec.size(); i++) {
+      const rowVec = rowsVec.get(i);
+      const row = [];
+      for (let j = 0; j < rowVec.size(); j++) {
+        row.push(String(rowVec.get(j)));
+      }
+      rows.push(row);
+    }
+
+    const records = rows
+      .filter((row) => row.length >= 6)
+      .map((row) => ({
+        source: row[0],
+        key: row[1],
+        type: row[2],
+        entryCount: toInteger(row[3], 0),
+        ttlSeconds: toInteger(row[4], -2),
+        payload: row[5] ?? '',
+      }));
+
+    res.json(records);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Database snapshot failed' });
+  }
 });
 
 const PORT = 4000;
