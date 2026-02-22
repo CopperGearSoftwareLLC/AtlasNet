@@ -1,4 +1,4 @@
-# AtlasNet
+# 🗺️ AtlasNet
 
 
 Scalable, universal distributed backend for Massively Multiplayer Onlines (MMO) games.
