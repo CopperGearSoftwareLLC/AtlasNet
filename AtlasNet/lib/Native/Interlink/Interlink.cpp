@@ -408,10 +408,9 @@ void Interlink::ReceiveMessages()
 		packet_manager.Dispatch(*packet, packet->GetPacketType(),
 								PacketManager::PacketInfo{.sender = sender.target});
 
-		std::string text(reinterpret_cast<const char *>(data), size);
 		logger.DebugFormatted(
-			"Message from ({}{}) \"{}\"", !sender.IsInternal() ? "External " : "",
-			!sender.IsInternal() ? sender.address.ToString() : sender.target.ToString(), text);
+			"Message from ({}{}) of {} bytes", !sender.IsInternal() ? "External " : "",
+			!sender.IsInternal() ? sender.address.ToString() : sender.target.ToString(),span.size());
 
 		msg->Release();
 	}

@@ -1,4 +1,5 @@
 #pragma once
+#include "Debug/Log.hpp"
 #include "Heuristic/IBounds.hpp"
 #include <vector>
 #include <array>
@@ -34,6 +35,7 @@ struct IBoundsDrawShape
 
 class HeuristicDraw
 {
+	Log logger = Log("HeuristicDraw");
    public:
 	HeuristicDraw() = default;
 	void DrawCurrentHeuristic(std::vector<IBoundsDrawShape>& shapes);

@@ -1,21 +1,15 @@
 #pragma once
 
-#include "Heuristic/IBounds.hpp"
-#include "Heuristic/IHeuristic.hpp"
 #include "Global/Types/AABB.hpp"
 #include "Global/pch.hpp"
+#include "Heuristic/IBounds.hpp"
+#include "Heuristic/IHeuristic.hpp"
 
 struct GridShape : public IBounds
 {
 	AABB3f aabb;
-	void Internal_SerializeData(ByteWriter& bw) const override
-	{
-		aabb.Serialize(bw);
-	}
-	void Internal_DeserializeData(ByteReader& br) override
-	{
-		aabb.Deserialize(br);
-	}
+	void Internal_SerializeData(ByteWriter& bw) const override { aabb.Serialize(bw); }
+	void Internal_DeserializeData(ByteReader& br) override { aabb.Deserialize(br); }
 	bool Contains(vec3 p) const override { return aabb.contains(p); }
 };
 class GridHeuristic : public THeuristic<GridShape>
@@ -39,4 +33,5 @@ class GridHeuristic : public THeuristic<GridShape>
 	void Deserialize(ByteReader& br) override;
 
 	std::unique_ptr<IBounds> QueryPosition(vec3 p) override;
+	std::span<const GridShape> GetGrids() const { return quads; }
 };

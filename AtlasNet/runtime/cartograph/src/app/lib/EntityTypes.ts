@@ -2,7 +2,7 @@ export interface AtlasEntity {
   entityId: string;
   ownerId: string;
   world: number;
-    position: {
+  position: {
     x: number;
     y: number;
     z: number;
@@ -15,9 +15,16 @@ export function parseEntityView(
   raw: Record<string, any[]>
 ): Map<number, AtlasEntity[]> {
   const result = new Map<number, AtlasEntity[]>();
-
   for (const [boundIdStr, entries] of Object.entries(raw)) {
     const boundId = Number(boundIdStr);
+    console.log(
+      "ParseEntityView parse ID",
+      boundId,
+      "-",
+      entries?.length ?? 0,
+      "entries"
+    );
+
     if (!Array.isArray(entries)) continue;
 
     const parsed: AtlasEntity[] = entries.map((entry) => ({
@@ -32,13 +39,15 @@ export function parseEntityView(
       isClient: entry.ISClient,
       clientId: entry.ClientID,
     }));
-
+    if (parsed.length > 0) {
+      const firstPos = parsed[0].position;
+      console.log(
+        `Bound ${boundId} first entity position -> x:${firstPos.x} y:${firstPos.y} z:${firstPos.z}`
+      );
+    } else {
+      console.log(`Bound ${boundId} has no entities`);
+    }
     result.set(boundId, parsed);
   }
-
-  console.log(
-    "parseEntityView result:",
-    JSON.stringify(Array.from(result.entries()), null, 2)
-  );
   return result;
 }

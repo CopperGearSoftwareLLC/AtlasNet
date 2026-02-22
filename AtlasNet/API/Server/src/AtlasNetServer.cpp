@@ -132,13 +132,6 @@ AtlasEntity AtlasNetServer::Internal_CreateEntity(const Transform &t,
 	AtlasEntity e;
 	e.Entity_ID = AtlasEntity::CreateUniqueID();
 	e.data.transform = t;
-	std::random_device rd;
-	std::mt19937 gen(rd());
-	std::uniform_real_distribution<float> dist(-100.0f, 100.0f);
-
-	e.data.transform.position.x = dist(gen);
-	e.data.transform.position.y = dist(gen);
-	e.data.transform.position.z = 0.0f;
 	e.Metadata.assign(metadata.begin(), metadata.end());
 	return e;
 }

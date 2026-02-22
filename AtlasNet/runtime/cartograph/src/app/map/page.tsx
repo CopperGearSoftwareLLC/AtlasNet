@@ -123,10 +123,15 @@ export default function MapPage() {
     async function poll() {
       try {
         const res = await fetch('/api/entityview', { cache: 'no-store' });
-        console.log('ENTITYVIEW returned ', res);
+        //console.log('ENTITYVIEW returned ', res);
+        console.log('ENTITYVIEW returned something ');
+
         if (!res.ok) return;
         const raw = await res.json();
+        console.log('ENTITYVIEW the json is ok ');
         if (!alive) return;
+        console.log('ENTITYVIEW is alive, parsing...');
+
         setEntityView(parseEntityView(raw));
       } catch {
         console.log('ENTITYVIEW FAILED ');
@@ -157,11 +162,11 @@ export default function MapPage() {
     console.log('Entity count ', flatEntities.length);
 
     for (const entity of flatEntities) {
-      console.log('Entity ', entity);
+      //console.log('Entity ', entity);
       const ownerId = normalizeShardId(entity.ownerId);
       const current = acc.get(ownerId) ?? { sumX: 0, sumY: 0, count: 0 };
-      current.sumX += entity.x;
-      current.sumY += entity.y;
+      current.sumX += entity.position.x;
+      current.sumY += entity.position.y;
       current.count += 1;
       acc.set(ownerId, current);
     }
@@ -268,7 +273,10 @@ export default function MapPage() {
       for (const entity of flatEntities) {
         overlays.push({
           type: 'circle',
-          position: { x: entity.x, y: entity.y },
+          position: {
+            x: entity.position.x,
+            y: entity.position.y
+          },
           radius: 1.8,
           color: 'rgba(255, 240, 80, 1)',
         });
@@ -279,7 +287,10 @@ export default function MapPage() {
             type: 'line',
             position: { x: 0, y: 0 },
             points: [
-              { x: entity.x, y: entity.y },
+              {
+                x: entity.position.x,
+                y: entity.position.y
+              },
               { x: ownerPos.x, y: ownerPos.y },
             ],
             color: 'rgba(255, 255, 0, 0.9)',

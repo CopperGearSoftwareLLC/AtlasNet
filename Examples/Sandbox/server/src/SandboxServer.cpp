@@ -25,15 +25,24 @@ void SandboxServer::Run()
 								  e.ConnectedProxy.ToString());
 		});
 
-	Transform t;
-	t.position = {0, 0, 0};
-	AtlasEntityHandle e = AtlasNetServer::Get().CreateEntity(t);
-		
+	std::random_device rd;
+	std::mt19937 gen(rd());
+	std::uniform_real_distribution<float> dist(-100.0f, 100.0f);
+
+	for (int i = 0; i < 100; i++)
+	{
+		Transform t;
+		t.position.x = dist(gen);
+		t.position.y = dist(gen);
+		t.position.z = 0.0f;
+		AtlasEntityHandle e = AtlasNetServer::Get().CreateEntity(t);
+	}
+
 	while (!ShouldShutdown)
 	{
 		const auto LocalEntities = AtlasNetServer::Get().ViewLocalEntities();
 
-		//logger.DebugFormatted("Processing {} entities", LocalEntities.size());
+		// logger.DebugFormatted("Processing {} entities", LocalEntities.size());
 		for (AtlasEntity& e : LocalEntities)
 		{
 		}

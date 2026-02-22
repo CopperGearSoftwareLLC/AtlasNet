@@ -143,9 +143,9 @@ IHeuristic::Type HeuristicManifest::GetActiveHeuristicType() const
 
 	if (!HeuristicTypeString.has_value())
 		return IHeuristic::Type::eInvalid;
-	//logger.DebugFormatted("GetActiveHeuristicType returned: [{}]", *HeuristicTypeString);
+	// logger.DebugFormatted("GetActiveHeuristicType returned: [{}]", *HeuristicTypeString);
 	const auto stripped_string = StripQuotes(*HeuristicTypeString);
-	//logger.DebugFormatted("GetActiveHeuristicType stripped: [{}]", stripped_string);
+	// logger.DebugFormatted("GetActiveHeuristicType stripped: [{}]", stripped_string);
 	IHeuristic::Type t;
 	IHeuristic::TypeFromString(stripped_string, t);
 	return t;
@@ -162,8 +162,12 @@ std::optional<NetworkIdentity> HeuristicManifest::ShardFromPosition(const Transf
 }
 std::optional<NetworkIdentity> HeuristicManifest::ShardFromBoundID(const IBounds::BoundsID id)
 {
-	const ClaimedBoundStruct claimedBound = Internal_PullClaimedBound(id);
-	return claimedBound.identity;
+	const std::optional<ClaimedBoundStruct> claimedBound = Internal_PullClaimedBound(id);
+	if (claimedBound.has_value())
+	{
+		return claimedBound->identity;
+	}
+	return std::nullopt;
 }
 void HeuristicManifest::GetClaimedBoundsAsByteReaders(
 	std::vector<std::string>& data_for_readers,
@@ -319,25 +323,30 @@ std::unique_ptr<IHeuristic> HeuristicManifest::PullHeuristic()
 
 	return heuristic;
 }
-HeuristicManifest::ClaimedBoundStruct HeuristicManifest::Internal_PullClaimedBound(
+std::optional<HeuristicManifest::ClaimedBoundStruct> HeuristicManifest::Internal_PullClaimedBound(
 	IBounds::BoundsID id)
 {
-	std::optional<std::string> claimedBound = InternalDB::Get()->WithSync(
-		[&](auto& r) -> std::optional<std::string>
+	const auto result = InternalDB::Get()->WithSync(
+		[&](auto& r)
 		{
-			// JSON.GET key .Claimed.<ID>
-			std::array<std::string, 3> get_cmd = {
-				"JSON.GET",
-				JSONDataTable,					// the Redis key
-				std::format(".Claimed.{}", id)	// targetID is an int
-			};
+			std::array<std::string, 3> get_id_cmd = {
+				"JSON.GET", JSONDataTable, std::format("$.{}.[?(@.ID=={})]", JSONClaimedEntry, id)};
+			std::optional<std::string> response = r.template command<std::optional<std::string>>(
+				get_id_cmd.begin(), get_id_cmd.end());
 
-			return r.template command<std::optional<std::string>>(get_cmd.begin(), get_cmd.end());
+			return response;
 		});
-	ASSERT(claimedBound.has_value(), "ID not found!");
-	Json json = Json::parse(claimedBound.value());
+	const Json json = result.has_value() ? Json::parse(*result) : Json();
+
+	if (json.is_null() || !json.is_array() || (json.size() == 0) || json.front().is_null())
+	{
+		return std::nullopt;
+	}
+	ASSERT(json.is_array(), "Invalid response");
+	ASSERT(json.size() <= 1, "This should never occur");
 	ClaimedBoundStruct c;
-	c.from_json(json);
+	c.from_json(json.front());
+
 	return c;
 }
 std::unique_ptr<IBounds> HeuristicManifest::ClaimNextPendingBound(const NetworkIdentity& claim_key)
@@ -449,7 +458,7 @@ std::optional<HeuristicManifest::ClaimedBoundStruct> HeuristicManifest::GetClaim
 
 	ClaimedBoundStruct c;
 	Json json = Json::parse(HeuristicTypeString.value());
-	//logger.DebugFormatted("GetClaimedBound returned {}", json.dump(4));
+	// logger.DebugFormatted("GetClaimedBound returned {}", json.dump(4));
 	c.from_json(json.front());
 	return c;
 }

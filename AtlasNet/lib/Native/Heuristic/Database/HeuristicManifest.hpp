@@ -113,19 +113,19 @@ class HeuristicManifest : public Singleton<HeuristicManifest>
 		}
 		return result;
 	}
-	template <typename BoundType, typename KeyType = std::string>
-	void GetAllPendingBounds(std::vector<BoundType>& out_bounds);
+	/* template <typename BoundType, typename KeyType = std::string> */
+	/* void GetAllPendingBounds(std::vector<BoundType>& out_bounds); */
 
-	template <typename BoundType, typename KeyType = std::string>
-	void StorePendingBounds(const std::vector<BoundType>& in_bounds);
+	/* template <typename BoundType, typename KeyType = std::string> */
+	/* void StorePendingBounds(const std::vector<BoundType>& in_bounds); */
 
 	[[nodiscard]] std::unique_ptr<IBounds> ClaimNextPendingBound(const NetworkIdentity& claim_key);
 
-	void StorePendingBoundsFromByteWriters(
+	 void StorePendingBoundsFromByteWriters(
 		const std::unordered_map<IBounds::BoundsID, ByteWriter>& in_writers);
 
 	void GetPendingBoundsAsByteReaders(std::vector<std::string>& data_for_readers,
-									   std::unordered_map<IBounds::BoundsID, ByteReader>& brs);
+									   std::unordered_map<IBounds::BoundsID, ByteReader>& brs); 
 
 	void GetClaimedBoundsAsByteReaders(
 		std::vector<std::string>& data_for_readers,
@@ -178,9 +178,9 @@ class HeuristicManifest : public Singleton<HeuristicManifest>
 	void Internal_InsertClaimedBound(const ClaimedBoundStruct& p);
 	void Internal_EnsureJsonTable();
 	std::unique_ptr<IBounds> Internal_CreateIBoundInst();
-	ClaimedBoundStruct Internal_PullClaimedBound(IBounds::BoundsID id);
+	std::optional<ClaimedBoundStruct> Internal_PullClaimedBound(IBounds::BoundsID id);
 };
-template <typename BoundType, typename KeyType>
+/* template <typename BoundType, typename KeyType>
 inline void HeuristicManifest::GetAllPendingBounds(std::vector<BoundType>& out_bounds)
 {
 	out_bounds.clear();
@@ -233,4 +233,4 @@ void HeuristicManifest::GetAllClaimedBounds(
 		ByteReader br(boundsString);
 		b.Deserialize(br);
 	}
-}
+} */

@@ -114,6 +114,7 @@ class EntityLedgersView
 			std::chrono::duration_cast<std::chrono::milliseconds>(endTime - startTime).count();
 
 		entities = std::move(EntityListResponses);
-		logger.DebugFormatted("GetEntityLists completed in {}ms", std::to_string(elapsedMs));
+		logger.DebugFormatted("GetEntityLists completed in {}ms. returned {} entries",
+							  std::to_string(elapsedMs), entities.size());
 	}
 };

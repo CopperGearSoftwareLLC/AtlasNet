@@ -187,8 +187,6 @@ app.get('/authoritytelemetry', (req, res) => {
       }
       result[boundID].push(entityData); // append entity to its BoundID list
     }
-
-    console.log('AUTHORITYTELEMETRY RESULT ', result);
     res.json(result);
 
   } catch (err) {

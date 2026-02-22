@@ -28,6 +28,7 @@ add_custom_target(AtlasnetDockerBuild_Fast_Stage
 add_custom_target(AtlasnetDockerBuild_Fast
     COMMAND ${ATLASNET_ROOT}/docker/BuildDockerImages.sh
             -f ${ATLASNET_ROOT}/docker/dockerfiles/docker-bake.copy.json
+    COMMAND ${CMAKE_COMMAND} -E rm -rf ${ATLASNET_ROOT}/.stage
     WORKING_DIRECTORY ${ATLASNET_ROOT}
     USES_TERMINAL
 )
