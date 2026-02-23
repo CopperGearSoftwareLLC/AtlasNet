@@ -2,7 +2,7 @@
 #include <thread>
 
 #include "Proxy.hpp"
-#include "pch.hpp"
+#include "Global/pch.hpp"
 
 int main()
 {

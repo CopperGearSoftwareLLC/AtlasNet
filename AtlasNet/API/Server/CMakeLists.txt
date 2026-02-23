@@ -11,8 +11,8 @@ file(GLOB_RECURSE _sources CONFIGURE_DEPENDS
 
 add_library(AtlasNetServer_Static STATIC ${_sources})
 add_library(AtlasNetServer_Shared SHARED ${_sources})
-target_link_libraries(AtlasNetServer_Static PUBLIC AtlasNetGlobal BuiltInDB Debug Docker Entity Interlink)
-target_link_libraries(AtlasNetServer_Shared PUBLIC AtlasNetGlobal BuiltInDB Debug Docker Entity Interlink)
+target_link_libraries(AtlasNetServer_Static PUBLIC Native)
+target_link_libraries(AtlasNetServer_Shared PUBLIC Native)
 # Optional, but common: local includes
 target_include_directories(AtlasNetServer_Static
   PUBLIC

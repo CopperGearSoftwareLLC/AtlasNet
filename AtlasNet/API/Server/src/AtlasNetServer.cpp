@@ -1,197 +1,143 @@
 #include "AtlasNetServer.hpp"
 
-#include "Crash/CrashHandler.hpp"
+#include <chrono>
+#include <stop_token>
+#include <thread>
 
-#include "DockerIO.hpp"
-#include "BuiltInDB.hpp"
+#include "Client/Client.hpp"
+#include "Debug/Crash/CrashHandler.hpp"
+#include "Docker/DockerIO.hpp"
+// #include "Entity/EntityHandoff/ServerHandoff/SH_ServerAuthorityManager.hpp"
+#include "Entity/Entity.hpp"
+#include "Entity/EntityHandle.hpp"
+#include "Entity/EntityLedger.hpp"
+#include "Entity/Transform.hpp"
+#include "Events/EventEnums.hpp"
+#include "Events/EventSystem.hpp"
+#include "Events/Events/Debug/LogEvent.hpp"
+#include "Global/Misc/UUID.hpp"
+#include "Heuristic/BoundLeaser.hpp"
+#include "Heuristic/Database/HeuristicManifest.hpp"
+#include "Heuristic/GridHeuristic/GridHeuristic.hpp"
+#include "Interlink/Database/HealthManifest.hpp"
+#include "Interlink/Telemetry/NetworkManifest.hpp"
+#include "Network/NetworkCredentials.hpp"
+#include "Network/NetworkIdentity.hpp"
+
+// namespace
+//{
+// constexpr std::chrono::seconds kDefaultClaimRetryInterval(1);
+// }
+
 // ============================================================================
 // Initialize server and setup Interlink callbacks
 // ============================================================================
 void AtlasNetServer::Initialize(AtlasNetServer::InitializeProperties &properties)
 {
+	CrashHandler::Get().Init();
+	NetworkCredentials::Make(NetworkIdentity(NetworkIdentityType::eShard, UUIDGen::Gen()));
+	Interlink::Get().Init();
+	NetworkManifest::Get().ScheduleNetworkPings();
+	HealthManifest::Get().ScheduleHealthPings();
+	EventSystem::Get().Init();
+	DockerEvents::Get().Init(DockerEventsInit{.OnShutdownRequest = properties.OnShutdownRequest});
+	EventSystem::Get().Subscribe<LogEvent>(
+		[&](const LogEvent &e) { logger->DebugFormatted("Received LogEvent: {}", e.message); });
 
-    // --- Core setup ---
-    //CrashHandler::Get().Init();
-    DockerEvents::Get().Init(DockerEventsInit{.OnShutdownRequest = properties.OnShutdownRequest});
+	BoundLeaser::Get().Init();
+	// --- Interlink setup ---
 
-    InterLinkIdentifier myID(InterlinkType::eGameServer,
-#ifdef _LOCAL
-        std::string("LocalGameServer")
-#else
-        DockerIO::Get().GetSelfContainerName()
-#endif
-    );
-    logger = std::make_shared<Log>(myID.ToString());
-    logger->Debug("AtlasNet Initialize");
-    // --- Interlink setup ---
-    Interlink::Check();
-    Interlink::Get().Init({
-        .ThisID = myID,
-        .logger = logger,
-        .callbacks = {
-            .acceptConnectionCallback = [](const Connection &c) { return true; },
-            .OnConnectedCallback = [this](const InterLinkIdentifier &id) {
-                if (id.Type == InterlinkType::eGameClient)
-                {
-                    ConnectedClients.insert(id);
-                    logger->DebugFormatted("[Server] Client connected: {}", id.ToString());
-                }
-                else
-                {
-                    printf("[AtlasNet] Connected to %s\n", id.ToString().c_str());
-                }
-            }//,
-            //.OnMessageArrival = [this](const Connection &fromWhom, std::span<const std::byte> data) {
-            //    HandleMessage(fromWhom, data);
-            //}
-        }
-    });
+	EntityLedger::Get().Init();
+	logger->Debug("AtlasNet Initialize");
 
-    logger->Debug("Interlink initialized; waiting for auto-connect to Partition...");
+	ShardLogicThread = std::jthread([&](std::stop_token st) { ShardLogicEntry(st); });
 }
 
-// ============================================================================
-// Update: Called every tick
-// Sends entity updates, incoming, and outgoing data to Partition
-// ============================================================================
-void AtlasNetServer::Update(std::span<AtlasEntity> entities,
-                            std::vector<AtlasEntity> &IncomingEntities,
-                            std::vector<AtlasEntity::EntityID> &OutgoingEntities)
+void AtlasNetServer::ShardLogicEntry(std::stop_token st)
 {
-    Interlink::Get().Tick();
-    /*
-    // ------------------------------------------------------------
-    // Step 1: Send regular entity updates (EntityUpdate)
-    // ------------------------------------------------------------
-    if (!entities.empty())
-    {
-        std::vector<std::byte> buffer;
-        buffer.reserve(1 + entities.size() * sizeof(AtlasEntity));
+	/*
+	auto tryClaimBound = [this]() -> bool
+	{
+		GridShape claimedBounds;
+		const bool claimed =
+			HeuristicManifest::Get().ClaimNextPendingBound<GridShape>(
+				identity, claimedBounds);
+		if (claimed)
+		{
+			logger->DebugFormatted("Claimed bounds {} for shard",
+								   claimedBounds.GetID());
+			return true;
+		}
+		return false;
+	};
 
-        buffer.push_back(static_cast<std::byte>(AtlasNetMessageHeader::EntityUpdate));
-        for (const auto &entity : entities)
-        {
-            const std::byte *ptr = reinterpret_cast<const std::byte *>(&entity);
-            buffer.insert(buffer.end(), ptr, ptr + sizeof(AtlasEntity));
-            CachedEntities[entity.Client_ID] = entity;
-        }
+	bool hasClaimedBound = tryClaimBound();
+	auto nextClaimAttemptTime =
+		std::chrono::steady_clock::now() + kDefaultClaimRetryInterval;
 
-        InterLinkIdentifier partitionID(InterlinkType::eShard, DockerIO::Get().GetSelfContainerName());
-        Interlink::Get().SendMessageRaw(partitionID, std::span(buffer), InterlinkMessageSendFlag::eReliableNow);
+	if (!hasClaimedBound && logger)
+	{
+		logger->WarningFormatted(
+			"No pending bounds available to claim for shard={} (pending={} claimed={}). "
+			"Will retry every {}s.",
+			identity.ToString(), HeuristicManifest::Get().GetPendingBoundsCount(),
+			HeuristicManifest::Get().GetClaimedBoundsCount(),
+			kDefaultClaimRetryInterval.count());
+	}
 
-        logger->DebugFormatted("[Server] Sent EntityUpdate ({} entities) to partition", entities.size());
-    }
+	SH_ServerAuthorityManager::Get().Init(identity, logger);*/
+	while (!st.stop_requested())
+	{
+		/* const auto now = std::chrono::steady_clock::now();
+		if (!hasClaimedBound && now >= nextClaimAttemptTime)
+		{
+			hasClaimedBound = tryClaimBound();
+			nextClaimAttemptTime = now + kDefaultClaimRetryInterval;
+			if (!hasClaimedBound && logger)
+			{
+				logger->DebugFormatted(
+					"Retrying bound claim for shard={} (pending={} claimed={})",
+					identity.ToString(),
+					HeuristicManifest::Get().GetPendingBoundsCount(),
+					HeuristicManifest::Get().GetClaimedBoundsCount());
+			}
+		}
 
-    // ------------------------------------------------------------
-    // Step 2: Send cached incoming entities (EntityIncoming)
-    // ------------------------------------------------------------
-    if (!IncomingCache.empty())
-    {
-        IncomingEntities = std::move(IncomingCache);
-        logger->DebugFormatted("[Server] Sent EntityIncoming ({} entities) to game", IncomingEntities.size());
-        IncomingCache.clear();
-    }
-
-    // ------------------------------------------------------------
-    // Step 3: Send cached outgoing entities (EntityOutgoing)
-    // ------------------------------------------------------------
-    if (!OutgoingCache.empty())
-    {
-        OutgoingEntities = std::move(OutgoingCache);
-        logger->DebugFormatted("[Server] Sent EntityOutgoing ({} entities) to game", OutgoingEntities.size());
-        OutgoingCache.clear();
-    }*/
+		// Interlink::Get().Tick();
+		SH_ServerAuthorityManager::Get().Tick(); */
+		std::this_thread::sleep_for(std::chrono::milliseconds(10));
+	}
+	// SH_ServerAuthorityManager::Get().Shutdown();
 }
-
-// ============================================================================
-// HandleMessage: interpret headers and cache appropriately
-// ============================================================================
-void AtlasNetServer::HandleMessage(const Connection &fromWhom, std::span<const std::byte> data)
+AtlasEntityHandle AtlasNetServer::CreateEntity(const Transform &t,
+											   std::span<const uint8_t> metadata)
 {
-    /*
-    if (data.size() < 1)
-    {
-        logger->ErrorFormatted("[Server] Received empty message from {}, ABORT", fromWhom.target.ToString());
-        return;
-    }
-
-    const AtlasNetMessageHeader header = static_cast<AtlasNetMessageHeader>(data[0]);
-    const std::byte *payload = data.data() + 1;
-    const size_t payloadSize = data.size() - 1;
-
-    if (payloadSize % sizeof(AtlasEntity) != 0)
-    {
-        logger->ErrorFormatted("[Server] Invalid payload size {} from {}, ABORT", payloadSize, fromWhom.target.ToString());
-        return;
-    }
-
-    const size_t entityCount = payloadSize / sizeof(AtlasEntity);
-    std::vector<AtlasEntity> entities(entityCount);
-    std::memcpy(entities.data(), payload, payloadSize);
-
-    switch (header)
-    {
-        // --------------------------------------------------------
-        // Regular EntityUpdate
-        // --------------------------------------------------------
-        case AtlasNetMessageHeader::EntityUpdate:
-        {
-            for (const auto &entity : entities)
-                CachedEntities[entity.Client_ID] = entity;
-
-            logger->DebugFormatted("[Server] EntityUpdate: {} entities from {}", entities.size(), fromWhom.target.ToString());
-            break;
-        }
-
-        // --------------------------------------------------------
-        // Cache incoming entities for next update
-        // --------------------------------------------------------
-        case AtlasNetMessageHeader::EntityIncoming:
-        {
-            for (const auto &entity : entities)
-            {
-                CachedEntities[entity.Client_ID] = entity;
-                IncomingCache.push_back(entity);
-            }
-            logger->DebugFormatted("[Server] Cached EntityIncoming: {} entities", entities.size());
-            break;
-        }
-
-        // --------------------------------------------------------
-        // Cache outgoing entities for next update
-        // --------------------------------------------------------
-        case AtlasNetMessageHeader::EntityOutgoing:
-        {
-            for (const auto &entity : entities)
-            {
-                CachedEntities.erase(entity.Client_ID);
-                OutgoingCache.push_back(entity.Client_ID);
-            }
-            logger->DebugFormatted("[Server] Cached EntityOutgoing: {} entities", entities.size());
-            break;
-        }
-
-        default:
-            logger->ErrorFormatted("[Server] Unknown AtlasNetMessageHeader {} from {}",
-                                   static_cast<int>(header), fromWhom.target.ToString());
-            return;
-    }
-
-    return;
-    // --------------------------------------------------------
-    // Rebroadcast to clients as before
-    // --------------------------------------------------------
-    if (fromWhom.target.Type == InterlinkType::eGameClient)
-    {
-        for (const auto &id : ConnectedClients)
-        {
-            if (id != fromWhom.target)
-                Interlink::Get().SendMessageRaw(id, data);
-        }
-    }
-    else if (fromWhom.target.Type == InterlinkType::eShard)
-    {
-        for (const auto &id : ConnectedClients)
-            Interlink::Get().SendMessageRaw(id, data);
-    }*/
+	AtlasEntity e = Internal_CreateEntity(t, metadata);
+	EntityLedger::Get().RegisterNewEntity(e);
+	AtlasEntityHandle H;
+	return H;
+}
+AtlasEntityHandle AtlasNetServer::CreateClientEntity(ClientID c_id, const Transform &t,
+													 std::span<const uint8_t> metadata)
+{
+	AtlasEntity e = Internal_CreateEntity(t, metadata);
+	e.Client_ID = c_id;
+	e.IsClient = true;
+	EntityLedger::Get().RegisterNewEntity(e);
+	AtlasEntityHandle H;
+	return H;
+}
+AtlasEntity AtlasNetServer::Internal_CreateEntity(const Transform &t,
+												  std::span<const uint8_t> metadata)
+{
+	AtlasEntity e;
+	e.Entity_ID = AtlasEntity::CreateUniqueID();
+	e.data.transform = t;
+	e.Metadata.assign(metadata.begin(), metadata.end());
+	return e;
+}
+void AtlasNetServer::SyncEntities(std::span<const AtlasEntityID> ActiveEntities,
+								  std::span<const AtlasEntityID> &ReleasedEntities,
+								  std::span<const AtlasEntityHandle> &AcquiredEntities)
+{
 }

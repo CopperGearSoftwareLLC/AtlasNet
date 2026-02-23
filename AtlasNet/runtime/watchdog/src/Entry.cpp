@@ -1,7 +1,7 @@
-#include "Crash/CrashHandler.hpp"
-#include "DockerEvents.hpp"
+#include "Debug/Crash/CrashHandler.hpp"
+#include "Docker/DockerEvents.hpp"
 #include "WatchDog.hpp"
-#include "pch.hpp"
+#include "Global/pch.hpp"
 
 int main(int argc, char **argv)
 {

@@ -12,7 +12,7 @@ file(GLOB_RECURSE _sources CONFIGURE_DEPENDS
 )
 
 add_executable(${_target_name} ${_sources})
-target_link_libraries(${_target_name} AtlasNetGlobal Interlink Docker Debug Heuristic Entity)
+target_link_libraries(${_target_name} Native)
 # Optional, but common: local includes
 target_include_directories(${_target_name}
   PRIVATE

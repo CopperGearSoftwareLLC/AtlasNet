@@ -28,18 +28,8 @@
 
         message(STATUS "installing npm to ${CARTOGRAPH_WEB_ROOT}")
     message(STATUS "npm install")
-    execute_process(
-        COMMAND "npm install"
-        WORKING_DIRECTORY ${CARTOGRAPH_WEB_ROOT}
-    )
-    execute_process(
-        COMMAND node -p "require('node-addon-api').include"
-        WORKING_DIRECTORY ${CARTOGRAPH_WEB_ROOT}
-        OUTPUT_VARIABLE NODE_ADDON_API_INCLUDE
-        OUTPUT_STRIP_TRAILING_WHITESPACE
-    )
-    if(NOT NODE_ADDON_API_INCLUDE)
-    message(FATAL_ERROR "❌ node-addon-api include path is empty. Make sure 'node-addon-api' is installed in ${NODE_PROJECT_DIR}.")
-endif()
+
+
+
     string(REPLACE "\"" "" NODE_ADDON_API_INCLUDE "${NODE_ADDON_API_INCLUDE}")
     include(cmake/AddSwigLibrary.cmake)

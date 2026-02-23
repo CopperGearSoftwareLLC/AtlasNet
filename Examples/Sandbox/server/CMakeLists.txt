@@ -22,3 +22,26 @@ install(TARGETS SandboxServer
     COMPONENT SandboxServer
 )
 
+
+set(SANDBOX_SERVER_IMAGE_NAME "sandbox-server:latest" CACHE PATH "Image name of sandbox server")
+add_custom_target(SandboxServerStage
+    COMMAND ${CMAKE_COMMAND} -E make_directory ${SANDBOX_ROOT}/.stage
+    #COMMAND ${CMAKE_COMMAND} -E copy
+    #        $<TARGET_FILE:AtlasNetServer_Shared>
+    #        ${SANDBOX_ROOT}/.stage/
+    COMMAND ${CMAKE_COMMAND} -E copy
+            $<TARGET_FILE:SandboxServer>
+            ${SANDBOX_ROOT}/.stage/
+    DEPENDS AtlasNetServer_Static
+    COMMENT "Staging AtlasNetServer"
+)
+add_custom_target(SandboxServerDockerBuild
+    COMMAND ${CMAKE_COMMAND} -E chdir ${SANDBOX_ROOT}
+        docker build
+        -f SandboxServer.dockerfile
+        -t ${SANDBOX_SERVER_IMAGE_NAME}
+        .
+    COMMAND ${CMAKE_COMMAND} -E rm -rf {SANDBOX_ROOT}/.stage
+    COMMENT "Staging AtlasNetServer"
+)
+add_dependencies(SandboxServerDockerBuild SandboxServerStage)

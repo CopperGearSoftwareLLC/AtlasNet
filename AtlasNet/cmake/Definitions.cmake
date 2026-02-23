@@ -1,10 +1,9 @@
 add_library(atlasnet_defs INTERFACE)
 
 target_compile_definitions(atlasnet_defs INTERFACE
-    _PORT_WATCHDOG=25564
-    _PORT_SHARD=25565
-    _PORT_GAMESERVER=25566
-    _PORT_PROXY=25568
+    _PORT_INTERLINK=25555
+    _PORT_GAMECLIENT=25566
+    _PORT_PROXY_PUBLISHED=2555
     _DOCKER_OS_="ubuntu:24.04"
     _DOCKER_WORKDIR_="/atlasnet"
     _ATLASNET_STACK_NAME="atlasnet"
@@ -23,7 +22,7 @@ target_compile_definitions(atlasnet_defs INTERFACE
     _BUILTINDB_REDIS_PORT=2380
     _BUILTINDB_POSTGRES_SERVICE_NAME="BuiltInDB_PostGres"
     _BUILTINDB_POSTGRES_PORT=5432
-    _SHARD_SERVICE_NAME="Shard"
+    _SHARD_SERVICE_NAME="atlasnet_dev_Shard"
     _SHARD_IMAGE_NAME="shard"
     _WATCHDOG_IMAGE_NAME="watchdog"
     _WATCHDOG_SERVICE_NAME="WatchDog"

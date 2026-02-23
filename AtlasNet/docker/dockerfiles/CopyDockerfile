@@ -1,0 +1,32 @@
+# Minimal atlasnetsdk stage
+FROM ubuntu:24.04 AS runner
+WORKDIR /atlasnet
+RUN apt-get update && apt-get install -y libatomic1 binutils
+COPY ./.stage /atlasnet
+
+FROM scratch AS atlasnetsdk
+COPY ./.stage /atlasnet
+
+FROM runner AS shard
+COPY --from=atlasnetsdk /atlasnet/shard /atlasnet/shard
+ENTRYPOINT [ "/atlasnet/shard" ]
+
+FROM runner AS watchdog
+COPY --from=atlasnetsdk /atlasnet/watchdog /atlasnet/watchdog
+ENTRYPOINT [ "/atlasnet/watchdog" ]
+
+FROM runner AS proxy
+COPY --from=atlasnetsdk /atlasnet/proxy /atlasnet/proxy
+ENTRYPOINT [ "/atlasnet/proxy" ]
+
+FROM ubuntu:24.04 AS cartograph
+
+RUN apt-get update && apt-get install -y curl ca-certificates gnupg
+RUN curl -fsSL https://deb.nodesource.com/setup_20.x | bash -
+RUN apt-get install -y nodejs
+RUN node -v
+COPY --from=atlasnetsdk /atlasnet/cartograph /atlasnet/
+WORKDIR /atlasnet
+RUN npm install
+COPY --from=atlasnetsdk /atlasnet/Web.node /atlasnet/nextjs/native/Web.node
+ENTRYPOINT ["npm", "run", "dev:all"]

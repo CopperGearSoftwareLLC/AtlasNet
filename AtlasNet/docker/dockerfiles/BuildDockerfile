@@ -1,0 +1,281 @@
+# Minimal atlasnetsdk stage
+FROM scratch AS atlasnetsdk
+COPY . /
+
+# syntax=docker/dockerfile:1.4
+
+
+FROM ubuntu:24.04 AS builder_node
+WORKDIR /atlasnet
+
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    # Init / quality-of-life
+    tini less coreutils tree zip unzip\
+    # Networking / server debugging
+    curl libcurl4-openssl-dev wget jq openssh-client libssl-dev \
+    # Build toolchain (general)
+    g++ binutils \
+    clang clangd git\
+    ninja-build pkg-config ccache \
+    autoconf automake libtool m4 \
+    # Dev headers / misc
+    uuid-dev libuv1-dev\
+    protobuf-compiler \
+    libprotobuf-dev \
+    # DinD
+    docker.io iptables uidmap \
+    # Needed for Kitware CMake install
+    ca-certificates gnupg lsb-release \
+    && rm -rf /var/lib/apt/lists/*
+
+# Install latest CMake from Kitware (suitable for vcpkg)
+RUN wget -qO - https://apt.kitware.com/keys/kitware-archive-latest.asc \
+        | gpg --dearmor -o /usr/share/keyrings/kitware-archive-keyring.gpg \
+    && echo "deb [signed-by=/usr/share/keyrings/kitware-archive-keyring.gpg] https://apt.kitware.com/ubuntu/ $(lsb_release -cs) main" \
+        > /etc/apt/sources.list.d/kitware.list \
+    && apt-get update \
+    && apt-get install -y --no-install-recommends cmake \
+    && rm -rf /var/lib/apt/lists/*
+
+# COPY ./cmake/AtlasNetSetup.sh  /atlasnet/AtlasNetSetup.sh
+# RUN chmod +x ./AtlasNetSetup.sh
+# RUN ./AtlasNetSetup.sh
+
+COPY --from=atlasnetsdk ./vcpkg.json ./vcpkg.json
+
+ENV VCPKG_ROOT=/opt/vcpkg/
+# Create the directory
+RUN mkdir -p $VCPKG_ROOT
+
+# Download the compressed release, extract to /opt/vcpkg, and remove the tar to save space
+RUN curl -L https://github.com/microsoft/vcpkg/archive/refs/tags/2026.01.16.tar.gz \
+| tar -xz --strip-components=1 -C ${VCPKG_ROOT}
+RUN  /opt/vcpkg/bootstrap-vcpkg.sh 
+RUN apt-get update && apt-get install binutils build-essential -y
+RUN --mount=type=cache,target=/atlasnet/build/vcpkg_installed VCPKG_MANIFEST_MODE=ON ${VCPKG_ROOT}/vcpkg install \
+       --x-install-root=/atlasnet/build/vcpkg_installed
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    swig npm nodejs libnode-dev \
+    && rm -rf /var/lib/apt/lists/*
+
+COPY --from=atlasnetsdk . ./.
+
+#--mount=type=cache,target=/atlasnet/build \
+ENV CC=clang
+ENV CXX=clang++
+#--mount=type=cache,target=/atlasnet/build/vcpkg_installed
+
+
+RUN --mount=type=cache,target=/atlasnet/build/vcpkg_installed cmake -S . -B /atlasnet/build -G Ninja -DCMAKE_MAKE_PROGRAM=/usr/bin/ninja -DCMAKE_BUILD_TYPE=Debug -DCMAKE_POLICY_VERSION_MINIMUM=3.5 -DCMAKE_C_COMPILER=clang -DCMAKE_CXX_COMPILER=clang++ \
+ -DATLASNET_INCLUDE_RUNTIME=ON -DATLASNET_INCLUDE_LIBS=ON -DVCPKG_MANIFEST_MODE=OFF \
+  -DCMAKE_TOOLCHAIN_FILE=$VCPKG_ROOT/scripts/buildsystems/vcpkg.cmake \
+  -DVCPKG_INSTALLED_DIR=/atlasnet/build/vcpkg_installed -DATLASNET_INCLUDE_WEB=OFF -DATLASNET_INCLUDE_WEB=ON -DENABLE_NODE=ON -DATLASNET_INCLUDE_RUNTIME=ON
+RUN  --mount=type=cache,target=/atlasnet/build/vcpkg_installed cmake --build /atlasnet/build --parallel --target BuiltInDB Database Debug Docker Entity Events Heuristic Interlink InternalDB
+
+RUN --mount=type=cache,target=/atlasnet/build/vcpkg_installed  cmake --build /atlasnet/build --parallel --target cartograph_web_native_deps
+
+
+RUN --mount=type=cache,target=/atlasnet/build/vcpkg_installed cmake --install /atlasnet/build --component cartograph_web_native_deps --prefix /atlasnet/bin
+
+
+# 8RUN mkdir -p /usr/local/lib && \
+# 8    find /deps -maxdepth 4 -type f -name '*.so*' | while read -r f; do \
+# 8        cp "$f" /usr/local/lib/; \
+# 8    done && \
+# 8    # Update the dynamic linker cache
+# 8    ldconfig
+
+
+FROM ubuntu:24.04 AS cartograph
+WORKDIR /atlasnet
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    # Init / quality-of-life
+    binutils supervisor tini \
+    # for debugging
+    ca-certificates \
+    libc6 \
+    libstdc++6 \
+    libgcc-s1 \
+    libatomic1 \
+    libgomp1 \
+    libcurl4 \
+    libuv1 \
+    libprotobuf32 \
+    && rm -rf /var/lib/apt/lists/*
+WORKDIR /atlasnet/web
+ENV NODE_ENV=development
+RUN apt update \
+ && apt install -y curl ca-certificates \
+ && curl -fsSL https://deb.nodesource.com/setup_20.x | bash - \
+ && apt install -y nodejs \
+ && node -v \
+ && npm -v
+# Copy built app + node_modules
+COPY --from=atlasnetsdk runtime/cartograph/web/. ./
+RUN  npm install
+COPY --from=builder_node /atlasnet/runtime/cartograph/web/nextjs ./nextjs/
+#COPY --from=builder /atlasnet/runtime/cartograph/web ./
+#RUN rm -rf ./node_modules ./.next ./native-server/node_modules
+# RUN npm run build
+# Next.js default port
+EXPOSE 3000
+#EXPOSE 9229  # optional if you want debugging
+
+# Start your Next.js app using npm run dev
+
+CMD ["npm", "run", "dev:all"]
+
+FROM ubuntu:24.04 AS vcpkg_get
+
+# Install latest CMake from Kitware (suitable for vcpkg)
+RUN wget -qO - https://apt.kitware.com/keys/kitware-archive-latest.asc \
+        | gpg --dearmor -o /usr/share/keyrings/kitware-archive-keyring.gpg \
+    && echo "deb [signed-by=/usr/share/keyrings/kitware-archive-keyring.gpg] https://apt.kitware.com/ubuntu/ $(lsb_release -cs) main" \
+        > /etc/apt/sources.list.d/kitware.list \
+    && apt-get update \
+    && apt-get install -y --no-install-recommends cmake \
+    && rm -rf /var/lib/apt/lists/*
+
+# COPY ./cmake/AtlasNetSetup.sh  /atlasnet/AtlasNetSetup.sh
+# RUN chmod +x ./AtlasNetSetup.sh
+# RUN ./AtlasNetSetup.sh
+
+COPY --from=atlasnetsdk ./vcpkg.json ./vcpkg.json
+
+ENV VCPKG_ROOT=/opt/vcpkg/
+# Create the directory
+RUN mkdir -p $VCPKG_ROOT
+
+# Download the compressed release, extract to /opt/vcpkg, and remove the tar to save space
+RUN curl -L https://github.com/microsoft/vcpkg/archive/refs/tags/2026.01.16.tar.gz \
+| tar -xz --strip-components=1 -C ${VCPKG_ROOT}
+RUN  /opt/vcpkg/bootstrap-vcpkg.sh 
+RUN apt-get update && apt-get install binutils build-essential -y
+RUN --mount=type=cache,target=/atlasnet/build/vcpkg_installed VCPKG_MANIFEST_MODE=ON ${VCPKG_ROOT}/vcpkg install \
+       --x-install-root=/atlasnet/build/vcpkg_installed
+       
+FROM ubuntu:24.04 AS builder
+WORKDIR /atlasnet
+
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    # Init / quality-of-life
+    tini less coreutils tree zip unzip\
+    # Networking / server debugging
+    curl libcurl4-openssl-dev wget jq openssh-client libssl-dev \
+    # Build toolchain (general)
+    g++ binutils \
+    clang clangd git\
+    ninja-build pkg-config ccache \
+    autoconf automake libtool m4 \
+    # Dev headers / misc
+    uuid-dev libuv1-dev\
+    protobuf-compiler \
+    libprotobuf-dev \
+    # DinD
+    docker.io iptables uidmap \
+    # Needed for Kitware CMake install
+    ca-certificates gnupg lsb-release \
+    && rm -rf /var/lib/apt/lists/*
+
+# Install latest CMake from Kitware (suitable for vcpkg)
+RUN wget -qO - https://apt.kitware.com/keys/kitware-archive-latest.asc \
+        | gpg --dearmor -o /usr/share/keyrings/kitware-archive-keyring.gpg \
+    && echo "deb [signed-by=/usr/share/keyrings/kitware-archive-keyring.gpg] https://apt.kitware.com/ubuntu/ $(lsb_release -cs) main" \
+        > /etc/apt/sources.list.d/kitware.list \
+    && apt-get update \
+    && apt-get install -y --no-install-recommends cmake \
+    && rm -rf /var/lib/apt/lists/*
+
+# COPY ./cmake/AtlasNetSetup.sh  /atlasnet/AtlasNetSetup.sh
+# RUN chmod +x ./AtlasNetSetup.sh
+# RUN ./AtlasNetSetup.sh
+
+COPY --from=atlasnetsdk ./vcpkg.json ./vcpkg.json
+
+ENV VCPKG_ROOT=/opt/vcpkg/
+# Create the directory
+RUN mkdir -p $VCPKG_ROOT
+
+# Download the compressed release, extract to /opt/vcpkg, and remove the tar to save space
+RUN curl -L https://github.com/microsoft/vcpkg/archive/refs/tags/2026.01.16.tar.gz \
+| tar -xz --strip-components=1 -C ${VCPKG_ROOT}
+RUN  /opt/vcpkg/bootstrap-vcpkg.sh 
+RUN apt-get update && apt-get install binutils build-essential -y
+RUN --mount=type=cache,target=/atlasnet/build/vcpkg_installed VCPKG_MANIFEST_MODE=ON ${VCPKG_ROOT}/vcpkg install \
+       --x-install-root=/atlasnet/build/vcpkg_installed
+
+
+COPY --from=atlasnetsdk . ./.
+
+#--mount=type=cache,target=/atlasnet/build \
+ENV CC=clang
+ENV CXX=clang++
+#--mount=type=cache,target=/atlasnet/build/vcpkg_installed
+
+
+RUN --mount=type=cache,target=/atlasnet/build/vcpkg_installed cmake -S . -B /atlasnet/build -G Ninja -DCMAKE_MAKE_PROGRAM=/usr/bin/ninja -DCMAKE_BUILD_TYPE=Debug -DCMAKE_POLICY_VERSION_MINIMUM=3.5 -DCMAKE_C_COMPILER=clang -DCMAKE_CXX_COMPILER=clang++ \
+ -DATLASNET_INCLUDE_RUNTIME=ON -DATLASNET_INCLUDE_LIBS=ON -DVCPKG_MANIFEST_MODE=OFF \
+  -DCMAKE_TOOLCHAIN_FILE=$VCPKG_ROOT/scripts/buildsystems/vcpkg.cmake \
+  -DVCPKG_INSTALLED_DIR=/atlasnet/build/vcpkg_installed -DATLASNET_INCLUDE_WEB=OFF 
+RUN  --mount=type=cache,target=/atlasnet/build/vcpkg_installed cmake --build /atlasnet/build --parallel --target BuiltInDB Database Debug Docker Entity Events Heuristic Interlink InternalDB
+
+RUN --mount=type=cache,target=/atlasnet/build/vcpkg_installed  cmake --build /atlasnet/build --parallel --target proxy shard watchdog
+
+
+RUN --mount=type=cache,target=/atlasnet/build/vcpkg_installed cmake --install /atlasnet/build --component proxy --prefix /atlasnet/bin
+RUN --mount=type=cache,target=/atlasnet/build/vcpkg_installed cmake --install /atlasnet/build --component watchdog --prefix /atlasnet/bin
+RUN --mount=type=cache,target=/atlasnet/build/vcpkg_installed cmake --install /atlasnet/build --component shard --prefix /atlasnet/bin
+
+
+# 8RUN mkdir -p /usr/local/lib && \
+# 8    find /deps -maxdepth 4 -type f -name '*.so*' | while read -r f; do \
+# 8        cp "$f" /usr/local/lib/; \
+# 8    done && \
+# 8    # Update the dynamic linker cache
+# 8    ldconfig
+
+FROM ubuntu:24.04 AS runner
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    # Init / quality-of-life
+    binutils supervisor tini \
+    # for debugging
+    ca-certificates \
+    libc6 \
+    libstdc++6 \
+    libgcc-s1 \
+    libatomic1 \
+    libgomp1 \
+    libcurl4 \
+    libuv1 \
+    libprotobuf32 \
+    && rm -rf /var/lib/apt/lists/*
+
+FROM runner AS proxy
+WORKDIR /atlasnet
+
+
+
+COPY --from=builder /atlasnet/bin/ .
+#COPY --from=builder /atlasnet/deps/ /atlasnet/deps/
+#ENV LD_LIBRARY_PATH="/atlasnet/deps:${LD_LIBRARY_PATH}"
+ENTRYPOINT ["/atlasnet/bin/proxy"]
+
+FROM runner AS watchdog
+WORKDIR /atlasnet
+
+COPY --from=builder /atlasnet/bin/ .
+#COPY --from=builder /atlasnet/deps/ /atlasnet/deps/
+#ENV LD_LIBRARY_PATH="/atlasnet/deps:${LD_LIBRARY_PATH}"
+ENTRYPOINT ["/atlasnet/bin/watchdog"]
+
+FROM runner AS shard
+WORKDIR /atlasnet
+
+COPY --from=builder /atlasnet/bin/ .
+#COPY --from=builder /atlasnet/deps/ /atlasnet/deps/
+#ENV LD_LIBRARY_PATH="/atlasnet/deps:${LD_LIBRARY_PATH}"
+ENTRYPOINT ["/atlasnet/bin/shard"]

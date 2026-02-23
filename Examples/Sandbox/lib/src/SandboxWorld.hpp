@@ -1,5 +1,5 @@
 #pragma once
-#include "pch.hpp"
+
 #include "SandboxEntity.hpp"
 #include "boost/container/small_vector.hpp"
 

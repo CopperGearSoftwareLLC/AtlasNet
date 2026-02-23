@@ -1,14 +1,21 @@
 #pragma once
-#include "Entity.hpp"
-#include "AtlasNet.hpp"
-#include "AtlasNetInterface.hpp"
-#include "Log.hpp"
-#include "DockerEvents.hpp"
-#include "Interlink.hpp"
-#include "Misc/Singleton.hpp"
-#include "pch.hpp"
-#include "AtlasNetApi.hpp"
+#include <stop_token>
+#include <thread>
 #include <unordered_set>
+
+#include "Client/Client.hpp"
+#include "Debug/Log.hpp"
+#include "Docker/DockerEvents.hpp"
+#include "Entity/Entity.hpp"
+#include "Entity/EntityHandle.hpp"
+#include "Entity/EntityLedger.hpp"
+#include "Global/AtlasNet.hpp"
+#include "Global/AtlasNetApi.hpp"
+#include "Global/AtlasNetInterface.hpp"
+#include "Global/Misc/Singleton.hpp"
+#include "Global/pch.hpp"
+#include "Interlink/Interlink.hpp"
+#include "Network/NetworkIdentity.hpp"
 enum KDServerRequestType
 {
 	Raycast,
@@ -21,14 +28,16 @@ struct KDServerRequest
 };
 using KDServerResponseType = std::vector<std::byte>;
 
-
 class ATLASNET_API AtlasNetServer : public AtlasNetInterface, public Singleton<AtlasNetServer>
 {
 	std::shared_ptr<Log> logger = std::make_shared<Log>("AtlasNetServer");
-	std::unordered_map<AtlasEntity::EntityID, AtlasEntity> CachedEntities;
-	std::unordered_set<InterLinkIdentifier> ConnectedClients;
+	std::unordered_map<AtlasEntityID, AtlasEntity> CachedEntities;
+	std::unordered_set<NetworkIdentity> ConnectedClients;
 	std::vector<AtlasEntity> IncomingCache;
-	std::vector<AtlasEntity::EntityID> OutgoingCache;
+	std::vector<AtlasEntityID> OutgoingCache;
+	NetworkIdentity identity;
+
+	std::jthread ShardLogicThread;
 
    public:
 	AtlasNetServer(){};
@@ -49,20 +58,27 @@ class ATLASNET_API AtlasNetServer : public AtlasNetInterface, public Singleton<A
 	void Initialize(InitializeProperties& properties);
 
 	/**
-	 * @brief Update tick for AtlasNet.
+	 * @brief Syncronise entity lists with your own fuck you
 	 *
 	 * @param entities Your current Entity information.
-	 * @param IncomingEntities Entities incoming that you must store and keep track of.
+	 * @param IncomingEntities Entities incoming that you must store and keep
+	 * track of.
 	 * @param OutgoingEntities Entity IDs of entities you should get rid of.
 	 */
-	void Update(std::span<AtlasEntity> entities, std::vector<AtlasEntity>& IncomingEntities,
-				std::vector<AtlasEntity::EntityID>& OutgoingEntities);
-
+	void SyncEntities(std::span<const AtlasEntityID> ActiveEntities,
+					  std::span<const AtlasEntityID>& ReleasedEntities,
+					  std::span<const AtlasEntityHandle>& AcquiredEntities);
 	/**
-	 * @brief Handles incoming messages from Interlink.
-	 *
-	 * @param fromWhom
-	 * @param data
-	 */
-	void HandleMessage(const Connection& fromWhom, std::span<const std::byte> data);
+	Simple get local entities
+	*/
+	auto ViewLocalEntities() { return EntityLedger::Get().ViewLocalEntities(); }
+
+	[[nodiscard]] AtlasEntityHandle CreateEntity(const Transform& t,
+												 std::span<const uint8_t> metadata = {});
+	[[nodiscard]] AtlasEntityHandle CreateClientEntity(ClientID c_id, const Transform& t,
+													   std::span<const uint8_t> metadata = {});
+
+   private:
+	AtlasEntity Internal_CreateEntity(const Transform& t, std::span<const uint8_t> metadata = {});
+	void ShardLogicEntry(std::stop_token st);
 };

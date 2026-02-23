@@ -2,9 +2,9 @@
 #include <sys/socket.h>
 #include <unistd.h>
 
-#include <Crash/CrashHandler.hpp>
-#include <DockerEvents.hpp>
-#include <DockerIO.hpp>
+#include <Debug/Crash/CrashHandler.hpp>
+#include <Docker/DockerEvents.hpp>
+#include <Docker/DockerIO.hpp>
 #include "Partition.hpp"
 
 int main(int argc, char **argv)

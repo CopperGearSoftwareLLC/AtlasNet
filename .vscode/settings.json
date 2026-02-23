@@ -9,7 +9,8 @@
   },
   "cmake.configureArgs": [
     "-DCMAKE_TOOLCHAIN_FILE=$env{VCPKG_ROOT}/scripts/buildsystems/vcpkg.cmake",
-    "-DVCPKG_MANIFEST_DIR=${workspaceFolder}/AtlasNet"
+    "-DVCPKG_MANIFEST_DIR=${workspaceFolder}/AtlasNet",
+    "-DSANDBOX_ADD_CLIENT=ON"
   //  "-DVCPKG_TARGET_TRIPLET=wasm32-emscripten",
   //  "-DVCPKG_CHAINLOAD_TOOLCHAIN_FILE=$env{EMSDK}/upstream/emscripten/cmake/Modules/Platform/Emscripten.cmake",
   //  "-DCMAKE_C_COMPILER=$env{EMSDK}/upstream/emscripten/emcc",

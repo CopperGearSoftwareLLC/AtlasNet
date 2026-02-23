@@ -1,7 +1,9 @@
 #pragma once
+#include "Debug/Log.hpp"
 #include "Heuristic/IBounds.hpp"
 #include <vector>
 #include <array>
+#include <string>
 /*
 SWIG cannot use glm stuff or any complex containers
 */
@@ -17,8 +19,10 @@ struct IBoundsDrawShape
 		eRectImage = 4
 	};
 	IBounds::BoundsID id;
+	std::string owner_id;			 // Claimed shard identity (if claimed)
 	Type type = Type::eInvalid;	 // "circle", "rectangle", "line", "polygon", etc.
 	float pos_x,pos_y;				 // Position
+	std::string color;				 // Stroke color override (optional)
 
 	/*Type specific */
 
@@ -31,6 +35,7 @@ struct IBoundsDrawShape
 
 class HeuristicDraw
 {
+	Log logger = Log("HeuristicDraw");
    public:
 	HeuristicDraw() = default;
 	void DrawCurrentHeuristic(std::vector<IBoundsDrawShape>& shapes);

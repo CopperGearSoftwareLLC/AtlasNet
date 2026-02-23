@@ -1,0 +1,48 @@
+{
+  "group": {
+    "default": {
+      "targets": ["atlasnetsdk", "watchdog", "proxy", "shard", "cartograph"]
+    }
+  },
+  "target": {
+    "atlasnetsdk": {
+      "context": ".",
+      "dockerfile": "scripts/Dockerfiles/BuildDockerfile",
+      "target": "atlasnetsdk",
+      "load": true,
+      "tags": ["atlasnetsdk:latest"]
+    },
+    "watchdog": {
+      "context": ".",
+      "dockerfile": "scripts/Dockerfiles/BuildDockerfile",
+      "target": "watchdog",
+      "depends-on": ["atlasnetsdk"],
+      "load": true,
+      "tags": ["watchdog:latest"]
+    },
+    "proxy": {
+      "context": ".",
+      "dockerfile": "scripts/Dockerfiles/BuildDockerfile",
+      "target": "proxy",
+      "depends-on": ["atlasnetsdk"],
+      "load": true,
+      "tags": ["proxy:latest"]
+    },
+    "shard": {
+      "context": ".",
+      "dockerfile": "scripts/Dockerfiles/BuildDockerfile",
+      "target": "shard",
+      "depends-on": ["atlasnetsdk"],
+      "load": true,
+      "tags": ["shard:latest"]
+    },
+    "cartograph": {
+      "context": ".",
+      "dockerfile": "scripts/Dockerfiles/BuildDockerfile",
+      "target": "cartograph",
+      "depends-on": ["atlasnetsdk"],
+      "load": true,
+      "tags": ["cartograph:latest"]
+    }
+  }
+}

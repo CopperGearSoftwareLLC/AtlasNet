@@ -1,7 +1,9 @@
 #pragma once
-#include "pch.hpp"
+#include "Entity/Entity.hpp"
+#include "Global/pch.hpp"
 #include "AtlasNetClient.hpp"
-
+#include <GL/glew.h>
+#include <GLFW/glfw3.h>
 class SandboxClient
 {
     mutable Log logger = Log("SandboxClient");
@@ -16,11 +18,7 @@ class SandboxClient
     void SetImGui();
     void RenderView();
 public:
-    struct RunArgs
-    {
-        IPAddress GameCoordinatorIP;
-    };
-    RunArgs _run_args;
-    void Run(const RunArgs &args);
+
+    void Run();
     Log &GetLogger() const { return logger; }
 };

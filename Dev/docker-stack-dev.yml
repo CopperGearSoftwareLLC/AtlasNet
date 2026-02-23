@@ -1,0 +1,118 @@
+version: "3.8"
+
+services:
+  WatchDog:
+    image: watchdog
+    networks: [AtlasNet]
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock # REQUIRED
+    deploy:
+      labels:
+        atlasnet.role: watchdog # REQUIRED
+      placement:
+          constraints:
+            - 'node.role == manager'
+      mode: replicated
+      replicas: 1
+      restart_policy:
+        condition: on-failure
+
+  Shard:
+    image: SHARD_IMAGE_NAME
+    networks: [AtlasNet]
+    deploy:
+     labels:
+        atlasnet.role: shard # REQUIRED
+     resources:
+        limits:
+          cpus: "1.0"      # 1 core
+          memory: 1G       # 1 GiB
+     mode: replicated
+     replicas: 0   # 0 replicas as requested (exists, but wont run)
+     restart_policy:
+       condition: on-failure
+
+  InternalDB:
+    image: valkey/valkey-bundle:latest
+    command: ["valkey-server", "--appendonly", "yes", "--port", "6379"]
+    networks: [AtlasNet]
+    ports:
+      - target: 6379
+        published: 6379
+        protocol: tcp
+        mode: ingress
+    deploy:
+      mode: replicated
+      replicas: 1
+      restart_policy:
+        condition: on-failure
+  Cartograph:
+    image: cartograph
+    networks: [AtlasNet]
+    ports:
+      - "3000:3000"   # Next.js default
+      - "9229:9229"   # Node inspector
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock # REQUIRED
+    deploy:
+      placement:
+          constraints:
+            - 'node.role == manager'
+      mode: replicated
+      replicas: 1
+      restart_policy:
+        condition: on-failure
+  Proxy:
+    image: proxy:latest
+    networks: [AtlasNet]
+    environment:
+      HANDSHAKE_SERVICE_ENABLE: 1
+      HANDSHAKE_SERVICE_IP: "postgres"
+    ports:
+      - target: 25568
+        published: 2555
+        protocol: tcp
+        mode: ingress
+      - target: 25568
+        published: 2555
+        protocol: udp
+        mode: ingress
+    deploy:
+      mode: replicated
+      replicas: 1
+      restart_policy:
+        condition: on-failure
+    
+#  BuiltInDB_Redis:
+#    image: valkey/valkey:latest
+#    command: ["valkey-server", "--appendonly", "yes", "--port", "2380"]
+#    networks: [AtlasNet]
+#    ports:
+#      - target: 2380
+#        published: 2380
+#        protocol: tcp
+#        mode: ingress
+#      - target: 2380
+#        published: 2380
+#        protocol: udp
+#        mode: ingress
+#    deploy:
+#      mode: replicated
+#      replicas: 1
+#      restart_policy:
+#        condition: on-failure
+#  BuiltInDB_PostGres:
+#    image: postgres:16-alpine
+#    command: ["postgres", "-c", "port=5432"]
+#    environment:
+#      POSTGRES_PASSWORD: postgres
+#    volumes:
+#      - pgdata:/var/lib/postgresql/data
+#    networks: [AtlasNet]
+volumes:
+  pgdata:
+    driver: local
+
+networks:
+  AtlasNet:
+      external: true

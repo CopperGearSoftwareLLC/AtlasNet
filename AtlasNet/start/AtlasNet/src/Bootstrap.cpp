@@ -653,7 +653,7 @@ COPY . /)";
 
 	// 1️⃣ First, build atlasnetsdk as a regular docker image
 	std::string atlasBuildCmd =
-		std::format("docker build -f {} -t atlasnetsdk {}", atlasDockerfilePath.string(),
+		std::format("docker build --load -f {} -t atlasnetsdk {}", atlasDockerfilePath.string(),
 					GetAtlasNetPath().string());
 	logger.DebugFormatted("🏗️ Building atlasnetsdk first: {}", atlasBuildCmd);
 
@@ -666,7 +666,7 @@ COPY . /)";
 	// 2️⃣ Now generate docker-bake.json for the rest of the images
 	nlohmann::json bakeJson;
 	nlohmann::json targetsArray = nlohmann::json::array();
-
+	targetsArray.push_back("atlasnetsdk");
 	std::unordered_set<std::string> ReadDirs;
 	for (const auto &img : images_to_build)
 	{

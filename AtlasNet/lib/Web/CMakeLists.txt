@@ -28,9 +28,7 @@ target_include_directories(${TARGET_NAME}
 
 
 target_link_libraries(${TARGET_NAME}
-    Heuristic
-    Interlink
-    AtlasNetGlobal
+    Native
 )
 
 add_swig_library_for_target(${TARGET_NAME}
@@ -45,6 +43,8 @@ add_swig_library_for_target(${TARGET_NAME}
         "std::pair<float,float>"
         "std::vector<std::string>"
         "std::vector<std::vector<std::string>>"
+        "std::vector<EntityLedgerEntry>"
+
     #   "std::unordered_map<IBounds::BoundsID, ByteReader>"
 )
 

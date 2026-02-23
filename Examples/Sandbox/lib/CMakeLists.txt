@@ -10,7 +10,7 @@ file(GLOB_RECURSE _sources CONFIGURE_DEPENDS
 )
 
 add_library(SandboxLib ${_sources})
-target_link_libraries(SandboxLib PRIVATE AtlasNetGlobal)
+target_link_libraries(SandboxLib PRIVATE Native)
 # Optional, but common: local includes
 target_include_directories(SandboxLib
   PUBLIC
