@@ -12,6 +12,7 @@ struct GridShape : public IBounds
 	void Internal_DeserializeData(ByteReader& br) override { aabb.Deserialize(br); }
 	bool Contains(vec3 p) const override { return aabb.contains(p); }
 	vec3 GetCenter() const override { return aabb.center(); }
+	std::string ToDebugString() const override { return aabb.ToString(); }
 };
 class GridHeuristic : public THeuristic<GridShape>
 {
@@ -33,6 +34,8 @@ class GridHeuristic : public THeuristic<GridShape>
 	void Serialize(ByteWriter& bw) const override;
 	void Deserialize(ByteReader& br) override;
 
-	std::unique_ptr<IBounds> QueryPosition(vec3 p) override;
+	// std::unique_ptr<IBounds> QueryPosition(vec3 p) override;
+	std::optional<IBounds::BoundsID> QueryPosition(vec3 p) override;
+	std::unique_ptr<IBounds> GetBound(IBounds::BoundsID id) override;
 	std::span<const GridShape> GetGrids() const { return quads; }
 };

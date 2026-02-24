@@ -71,7 +71,6 @@ class ATLASNET_API AtlasNetServer : public AtlasNetInterface, public Singleton<A
 	/**
 	Simple get local entities
 	*/
-	auto ViewLocalEntities() { return EntityLedger::Get().ViewLocalEntities(); }
 
 	[[nodiscard]] AtlasEntityHandle CreateEntity(const Transform& t,
 												 std::span<const uint8_t> metadata = {});

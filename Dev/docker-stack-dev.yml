@@ -23,10 +23,6 @@ services:
     deploy:
      labels:
         atlasnet.role: shard # REQUIRED
-     resources:
-        limits:
-          cpus: "1.0"      # 1 core
-          memory: 1G       # 1 GiB
      mode: replicated
      replicas: 0   # 0 replicas as requested (exists, but wont run)
      restart_policy:

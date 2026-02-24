@@ -36,11 +36,11 @@ struct AABB : public AtlasObject
 	{
 	}
 
-	AABB(const vectype& min_, const vectype& max_) : min(min_), max(max_) {}
+	AABB(const vectype& min_, const vectype& max_) : min(glm::min(min_,max_)), max(glm::max(min_,max_)) {}
 
 	std::string ToString() const
 	{
-		return std::format("Min: {}, Max: {}",glm::to_string(max),glm::to_string(min));
+		return std::format("Min: {}, Max: {}",glm::to_string(min),glm::to_string(max));
 	}
 	// From center + half extents
 	static AABB FromCenterExtents(const vectype& center, const vectype& halfExtents)
@@ -59,7 +59,7 @@ struct AABB : public AtlasObject
 	void Deserialize(ByteReader& br) override
 	{
 		min = br.read_vector<Dim, decltype(min)>();
-		max = br.read_vector<Dim, decltype(min)>();
+		max = br.read_vector<Dim, decltype(max)>();
 	}
 
 	// -------------------------------------------------

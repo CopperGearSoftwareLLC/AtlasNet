@@ -3,10 +3,13 @@
 #include <atomic>
 #include <unordered_map>
 
+#include "Debug/Log.hpp"
 #include "Network/NetworkIdentity.hpp"
 #include "Packet.hpp"
 class PacketManager
 {
+	Log logger = Log("PacketManager");
+
    public:
 	struct PacketInfo
 	{
@@ -31,6 +34,9 @@ class PacketManager
 
 	struct Subscription
 	{
+		private:
+		Log logger = Log("Subscription");
+		public:
 		PacketManager* owner = nullptr;
 		PacketTypeID type{};
 		uint64_t id = 0;
@@ -62,6 +68,7 @@ class PacketManager
 		{
 			if (owner)
 			{
+				logger.DebugFormatted("Deactivated subscription ID {}",id);
 				owner->Deactivate(type, id);
 				owner = nullptr;
 			}
@@ -84,6 +91,7 @@ class PacketManager
 			std::lock_guard lock(m_mutex);
 			m_callbacks[TPacket::TypeID].push_back(std::move(entry));
 		}
+				logger.DebugFormatted("New subscription to {}, ID {}",TPacket::GetPacketNameStatic(),id);
 
 		return Subscription{this, TPacket::TypeID, id};
 	}
@@ -96,12 +104,17 @@ class PacketManager
 			std::lock_guard lock(m_mutex);
 			auto it = m_callbacks.find(type);
 			if (it == m_callbacks.end())
+			{
+				//logger.DebugFormatted("Dispatching 0 callbacks to {}",
+				//			  pkt.GetPacketName());
 				return;
+			}
 
 			snapshot.reserve(it->second.size());
 			for (auto& e : it->second) snapshot.push_back(e.get());
 		}
-
+		//logger.DebugFormatted("Dispatching {} callbacks to {}", snapshot.size(),
+		//					  pkt.GetPacketName());
 		// Hot path: no locks held
 		for (auto* e : snapshot)
 		{

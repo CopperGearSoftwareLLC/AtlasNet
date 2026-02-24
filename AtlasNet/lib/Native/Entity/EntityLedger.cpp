@@ -8,7 +8,8 @@
 #include "Entity/Entity.hpp"
 #include "Entity/Packet/EntityTransferPacket.hpp"
 #include "Entity/Packet/LocalEntityListRequestPacket.hpp"
-#include "Entity/TransferCoordinator.hpp"
+#include "Entity/Transfer/TransferCoordinator.hpp"
+#include "Global/Misc/UUID.hpp"
 #include "Heuristic/BoundLeaser.hpp"
 #include "Heuristic/Database/HeuristicManifest.hpp"
 #include "Interlink/Interlink.hpp"
@@ -28,19 +29,14 @@ void EntityLedger::Init()
 				{
 				}
 			});
-	sub_ClientTransferPacket = Interlink::Get().GetPacketManager().Subscribe<ClientTransferPacket>(
-		[this](const ClientTransferPacket& p, const PacketManager::PacketInfo& info)
-		{ onClientTransferPacket(p, info); });
-
-	sub_EntityTransferPacket = Interlink::Get().GetPacketManager().Subscribe<EntityTransferPacket>(
-		[this](const EntityTransferPacket& p, const PacketManager::PacketInfo& info)
-		{ onEntityTransferPacket(p, info); });
+	TransferCoordinator::Get();
 	LoopThread = std::jthread([this](std::stop_token st) { LoopThreadEntry(st); });
 };
 void EntityLedger::OnLocalEntityListRequest(const LocalEntityListRequestPacket& p,
 											const PacketManager::PacketInfo& info)
 {
-	logger.DebugFormatted("received a EntityList request from {}", info.sender.ToString());
+			std::lock_guard<std::mutex> lock(EntityListMutex);
+	// logger.DebugFormatted("received a EntityList request from {}", info.sender.ToString());
 	LocalEntityListRequestPacket response;
 	response.status = LocalEntityListRequestPacket::MsgStatus::eResponse;
 
@@ -61,40 +57,50 @@ void EntityLedger::OnLocalEntityListRequest(const LocalEntityListRequestPacket& 
 		}
 	}
 	response.Request_IncludeMetadata = p.Request_IncludeMetadata;
-	logger.DebugFormatted("responding:", info.sender.ToString());
-	Interlink::Get().SendMessage(info.sender, response, NetworkMessageSendFlag::eReliableNow);
+	// logger.DebugFormatted("responding:", info.sender.ToString());
+	Interlink::Get().SendMessage(info.sender, response, NetworkMessageSendFlag::eUnreliableNow);
 }
 void EntityLedger::LoopThreadEntry(std::stop_token st)
 {
-	while (!st.stop_requested())
-	{
-		boost::container::small_vector<AtlasEntityID, 32> EntitiesNewlyOutOfBounds;
-		if (!BoundLeaser::Get().HasBound())
-			continue;
-		for (const auto& [ID, entity] : entities)
-		{
-			if (entitiesMarkedForTransfer.contains(ID))
-				continue;
-			if (!BoundLeaser::Get().GetBound().Contains(entity.data.transform.position))
-			{
-				EntitiesNewlyOutOfBounds.push_back(ID);
-				entitiesMarkedForTransfer.insert(ID);
-			}
-		}
-		if (!EntitiesNewlyOutOfBounds.empty())
-		{
-			TransferCoordinator::Get().MarkEntitiesForTransfer(std::span(EntitiesNewlyOutOfBounds));
-		}
+    while (!st.stop_requested())
+    {
+        boost::container::small_vector<AtlasEntityID, 32> EntitiesNewlyOutOfBounds;
+        if (!BoundLeaser::Get().HasBound())
+        {
+            std::this_thread::sleep_for(std::chrono::milliseconds(50));
+            continue;
+        }
 
-		std::this_thread::sleep_for(std::chrono::milliseconds(50));
-	}
-}
+        // copy entity IDs + positions under lock, then release
+        std::vector<std::pair<AtlasEntityID, glm::vec3>> snapshot;
+        {
+            std::lock_guard<std::mutex> lock(EntityListMutex);
+            snapshot.reserve(entities.size());
+            for (const auto& [ID, entity] : entities)
+                snapshot.emplace_back(ID, entity.data.transform.position);
+        }
 
-void EntityLedger::onClientTransferPacket(const ClientTransferPacket& packet,
-										  const PacketManager::PacketInfo& info)
-{
-}
-void EntityLedger::onEntityTransferPacket(const EntityTransferPacket& packet,
-										  const PacketManager::PacketInfo& info)
-{
+        const auto& Bound = BoundLeaser::Get().GetBound();
+        for (const auto& [ID, pos] : snapshot)
+        {
+            if (!Bound.Contains(pos))
+            {
+                // we call IsEntityInTransfer *without* holding EntityListMutex
+                if (TransferCoordinator::Get().IsEntityInTransfer(ID))
+                    continue;
+
+                EntitiesNewlyOutOfBounds.push_back(ID);
+                logger.DebugFormatted(
+                    "Entity out of bounds:\n - ID {}\n - EntityPos: {}\n - bounds {}",
+                    UUIDGen::ToString(ID), glm::to_string(pos), Bound.ToDebugString());
+            }
+        }
+
+        if (!EntitiesNewlyOutOfBounds.empty())
+        {
+            TransferCoordinator::Get().MarkEntitiesForTransfer(std::span(EntitiesNewlyOutOfBounds));
+        }
+
+        std::this_thread::sleep_for(std::chrono::milliseconds(50));
+    }
 }

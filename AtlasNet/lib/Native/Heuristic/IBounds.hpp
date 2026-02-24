@@ -27,6 +27,7 @@ struct IBounds
 	auto GetID() const { return ID; }
 	[[nodiscard]] virtual vec3 GetCenter() const = 0;
 
+	virtual std::string ToDebugString() const = 0;
    protected:
 	virtual void Internal_SerializeData(ByteWriter& bw) const = 0;
 	virtual void Internal_DeserializeData(ByteReader& br) = 0;

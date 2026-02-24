@@ -155,8 +155,7 @@ void Interlink::SendMessage(const NetworkIdentity &who, const std::shared_ptr<IP
 		}
 		else
 		{
-			logger.DebugFormatted("Message of size {} bytes sent to {}", data_span.size_bytes(),
-								  who.ToString());
+			//logger.DebugFormatted("{} Packet sent to {}", packet->GetPacketName(), who.ToString());
 		}
 	}
 }
@@ -375,7 +374,7 @@ void Interlink::OpenListenSocket(PortType port)
 			   (void *)SteamNetConnectionStatusChanged);
 
 	SteamNetworkingIPAddr addr;
-	addr.ParseString("0.0.0.0");
+	addr.SetIPv4(0, 0);
 	addr.m_port = port;
 
 	ListeningSocket = networkInterface->CreateListenSocketIP(addr, 1, &opt);
@@ -405,14 +404,10 @@ void Interlink::ReceiveMessages()
 		// Normal internal dispatch
 		std::span<const uint8_t> span = std::span<const uint8_t>((uint8_t *)data, size);
 		const auto packet = PacketRegistry::Get().CreateFromBytes(span);
-		logger.DebugFormatted("Arrived Packet of type {}. Dispatching...", packet->GetPacketName());
+		//logger.DebugFormatted("Arrived Packet of type {} from {}",
+		//					  packet->GetPacketName(), sender.target.ToString());
 		packet_manager.Dispatch(*packet, packet->GetPacketType(),
 								PacketManager::PacketInfo{.sender = sender.target});
-
-		logger.DebugFormatted(
-			"Message from ({}{}) of {} bytes", !sender.IsInternal() ? "External " : "",
-			!sender.IsInternal() ? sender.address.ToString() : sender.target.ToString(),
-			span.size());
 
 		msg->Release();
 	}
@@ -421,7 +416,8 @@ void Interlink::ReceiveMessages()
 void Interlink::Init()
 {
 	logger.Debug("Interlink init");
-	ASSERT(NetworkCredentials::Get().GetID().Type != NetworkIdentityType::eInvalid, "Invalid Interlink Type");
+	ASSERT(NetworkCredentials::Get().GetID().Type != NetworkIdentityType::eInvalid,
+		   "Invalid Interlink Type");
 	ASSERT(NetworkCredentials::Get().GetID().IsInternal(), "Interlink is for internal only");
 
 	// Single init per process (no repeated warnings)
@@ -495,6 +491,13 @@ void Interlink::Init()
 		case NetworkIdentityType::eShard:
 		{
 			EstablishConnectionTo(NetworkIdentity::MakeIDWatchDog());
+			for (const auto &server : ServerRegistry::Get().GetServers())
+			{
+				if (server.first.Type == NetworkIdentityType::eShard)
+				{
+					EstablishConnectionTo(server.first);
+				}
+			}
 		}
 		break;
 
@@ -597,7 +600,8 @@ bool Interlink::EstablishConnectionAtIP(const NetworkIdentity &id, const IPAddre
 
 bool Interlink::EstablishConnectionTo(const NetworkIdentity &id)
 {
-	ASSERT(NetworkCredentials::Get().GetID().Type != NetworkIdentityType::eGameClient, "Game client must use the ip one");
+	ASSERT(NetworkCredentials::Get().GetID().Type != NetworkIdentityType::eGameClient,
+		   "Game client must use the ip one");
 	// Prevent duplicate attempts
 	if (Connections.get<IndexByTarget>().contains(id))
 	{

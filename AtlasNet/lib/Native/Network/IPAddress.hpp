@@ -16,7 +16,7 @@ public:
 	IPAddress(SteamNetworkingIPAddr addr);
 
 	static IPAddress MakeLocalHost(PortType port);
-	static IPAddress FromString(const std::string_view str);
+	//static IPAddress FromString(const std::string_view str);
 	void SetLocalHost(PortType port);
 	void SetIPv4(uint8_t a, uint8_t b, uint8_t c, uint8_t d, PortType port);
 	void SetIPv4(std::pair<std::array<uint8_t, 4>, PortType> IP);

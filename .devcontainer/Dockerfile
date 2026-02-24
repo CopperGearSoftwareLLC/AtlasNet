@@ -63,5 +63,5 @@ COPY startup.sh /usr/local/bin/startup.sh
 RUN chmod +x /usr/local/bin/startup.sh
 
 EXPOSE 3000 5000 8000 8080 8443 9443 5901 6080
-
+RUN mkdir /tmp/atlasnet-perf
 CMD ["/usr/bin/supervisord", "-n"]

@@ -4,19 +4,12 @@
 #include <cstdint>
 
 #include "Entity/Entity.hpp"
+#include "Entity/EntityEnums.hpp"
 #include "Global/Misc/UUID.hpp"
 #include "Network/Packet/Packet.hpp"
 class EntityTransferPacket : public TPacket<EntityTransferPacket, "EntityTransferPacket">
 {
-    public:
-	enum class TransferStage
-	{
-		ePrepare,	// A -> B notify to prepare to receive certain entities
-		eReady,		// B -> A acknowledged
-		eCommit,	// A -> B //Freeze simulation and remote calls, sends last snapshot to B
-		eComplete,	// B -> A acknowledged, transfer complete
-
-	};
+   public:
 	struct StageData
 	{
 		virtual ~StageData() = default;
@@ -43,6 +36,8 @@ class EntityTransferPacket : public TPacket<EntityTransferPacket, "EntityTransfe
 			}
 		}
 	};
+	const PrepareStageData& GetAsPrepareStage() const { return std::get<PrepareStageData>(Data); }
+	PrepareStageData& SetAsPrepareStage() { return Data.emplace<PrepareStageData>(); }
 	struct ReadyStageData : StageData
 	{
 		// boost::container::small_vector<AtlasEntityID, 10> entityIDs;
@@ -63,6 +58,9 @@ class EntityTransferPacket : public TPacket<EntityTransferPacket, "EntityTransfe
 			// }
 		}
 	};
+	const ReadyStageData& GetAsReadyStage() const { return std::get<ReadyStageData>(Data); }
+	ReadyStageData& SetAsReadyStage() { return Data.emplace<ReadyStageData>(); }
+
 	struct CommitStageData : StageData
 	{
 		struct Data
@@ -92,6 +90,9 @@ class EntityTransferPacket : public TPacket<EntityTransferPacket, "EntityTransfe
 			}
 		}
 	};
+	const CommitStageData& GetAsCommitStage() const { return std::get<CommitStageData>(Data); }
+	CommitStageData& SetAsCommitStage() { return Data.emplace<CommitStageData>(); }
+
 	struct CompleteStageData : StageData
 	{
 		// boost::container::small_vector<AtlasEntityID, 10> entityIDs;
@@ -112,36 +113,41 @@ class EntityTransferPacket : public TPacket<EntityTransferPacket, "EntityTransfe
 			// }
 		}
 	};
+	const CompleteStageData& GetAsCompleteStage() const
+	{
+		return std::get<CompleteStageData>(Data);
+	}
+	CompleteStageData& SetAsCompleteStage() { return Data.emplace<CompleteStageData>(); }
+
 	UUID TransferID;
-	TransferStage stage;
+	EntityTransferStage stage;
 	std::variant<PrepareStageData, ReadyStageData, CommitStageData, CompleteStageData> Data;
 
-   
 	void SerializeData(ByteWriter& bw) const override
 	{
 		bw.uuid(TransferID);
-		bw.write_scalar<TransferStage>(stage);
+		bw.write_scalar<EntityTransferStage>(stage);
 		std::visit([&bw](auto const& stageData) { stageData.Serialize(bw); }, Data);
 	};
 	void DeserializeData(ByteReader& br) override
 	{
 		TransferID = br.uuid();
-		stage = br.read_scalar<TransferStage>();
+		stage = br.read_scalar<EntityTransferStage>();
 		switch (stage)
 		{
-			case TransferStage::ePrepare:
+			case EntityTransferStage::ePrepare:
 				Data.emplace<PrepareStageData>();
 				break;
 
-			case TransferStage::eReady:
+			case EntityTransferStage::eReady:
 				Data.emplace<ReadyStageData>();
 				break;
 
-			case TransferStage::eCommit:
+			case EntityTransferStage::eCommit:
 				Data.emplace<CommitStageData>();
 				break;
 
-			case TransferStage::eComplete:
+			case EntityTransferStage::eComplete:
 				Data.emplace<CompleteStageData>();
 				break;
 

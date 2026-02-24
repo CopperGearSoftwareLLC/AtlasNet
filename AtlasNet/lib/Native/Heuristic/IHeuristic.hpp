@@ -92,7 +92,8 @@ class IHeuristic
 		std::unordered_map<IBounds::BoundsID, ByteWriter>& bws) = 0;
 	virtual void Serialize(ByteWriter& bw) const = 0;
 	virtual void Deserialize(ByteReader& br) = 0;
-	[[nodiscard]] virtual std::unique_ptr<IBounds> QueryPosition(vec3 p) = 0;
+	[[nodiscard]] virtual std::optional<IBounds::BoundsID> QueryPosition(vec3 p) = 0;
+	[[nodiscard]] virtual std::unique_ptr<IBounds> GetBound(IBounds::BoundsID id) = 0;
 };
 template <typename BoundType>
 struct TBoundDelta

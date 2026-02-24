@@ -1,6 +1,8 @@
 #pragma once
 
 #include <chrono>
+#include <condition_variable>
+#include <mutex>
 #include <stop_token>
 #include <thread>
 #include <type_traits>
@@ -32,22 +34,25 @@ class EntityLedgersView
 {
 	Log logger = Log("EntityLedgersView");
 	PacketManager::Subscription subToLocalEntityListRequestPacket;
-	std::atomic_uint32_t RequestsUnanswered = 0;
-	std::vector<EntityLedgerEntry> EntityListResponses;
+	std::mutex mtx;
+	std::condition_variable cv;
 
+	uint32_t RequestsUnanswered = 0;  // no longer atomic
+	std::vector<EntityLedgerEntry> EntityListResponses;
 	void OnLocalEntityListRequestPacket(const LocalEntityListRequestPacket& p,
 										const PacketManager::PacketInfo& info)
 	{
 		if (p.status != LocalEntityListRequestPacket::MsgStatus::eResponse)
+		{
 			return;
+		}
+
+		std::unique_lock<std::mutex> lock(mtx);
 
 		auto BoundID = HeuristicManifest::Get().BoundIDFromShard(info.sender);
+
 		if (BoundID.has_value())
 		{
-			logger.DebugFormatted(
-				"LocalEntityListRequestPacket arrived from {} with {} entities",
-				info.sender.ToString(),
-				std::get<std::vector<AtlasEntityMinimal>>(p.Response_Entities).size());
 			for (const auto& ae : std::get<std::vector<AtlasEntityMinimal>>(p.Response_Entities))
 			{
 				EntityLedgerEntry e;
@@ -59,18 +64,21 @@ class EntityLedgersView
 				e.positiony = ae.data.transform.position.y;
 				e.positionz = ae.data.transform.position.z;
 				e.WorldID = 0;
+
 				EntityListResponses.push_back(e);
 			}
 		}
 		else
 		{
 			logger.ErrorFormatted(
-				"LocalEntityListRequestPacket arrived but the sender's bound ID could not be "
-				"determined. {}",
+				"LocalEntityListRequestPacket arrived but bound ID could not be determined. {}",
 				info.sender.ToString());
 		}
 
-		RequestsUnanswered.fetch_sub(1, std::memory_order_release);
+		if (--RequestsUnanswered == 0)
+		{
+			cv.notify_one();  // wake waiting thread
+		}
 	}
 
    public:
@@ -83,12 +91,18 @@ class EntityLedgersView
 				{ OnLocalEntityListRequestPacket(p, info); });
 	}
 	~EntityLedgersView() {}
-	void GetEntityLists(std::vector<EntityLedgerEntry>& entities)
+	void GetEntityLists(std::vector<EntityLedgerEntry>& entities,
+						std::chrono::milliseconds timeout = std::chrono::milliseconds(2000))
 	{
+		std::unique_lock<std::mutex> lock(mtx);
+
 		EntityListResponses.clear();
 		entities.clear();
+		RequestsUnanswered = 0;
+
 		auto startTime = std::chrono::high_resolution_clock::now();
 		const auto server_list = ServerRegistry::Get().GetServers();
+
 		for (const auto& [netID, Entry] : server_list)
 		{
 			if (netID.Type == NetworkIdentityType::eShard)
@@ -96,24 +110,32 @@ class EntityLedgersView
 				LocalEntityListRequestPacket p;
 				p.status = LocalEntityListRequestPacket::MsgStatus::eQuery;
 				p.Request_IncludeMetadata = false;
-				Interlink::Get().SendMessage(netID, p, NetworkMessageSendFlag::eReliableNow);
 
-				RequestsUnanswered.fetch_add(1, std::memory_order_relaxed);
+				Interlink::Get().SendMessage(netID, p, NetworkMessageSendFlag::eUnreliableNow);
+
+				++RequestsUnanswered;
 			}
 		}
-		// Wait until all responses decrement RequestsUnanswered to 0
-		while (RequestsUnanswered.load(std::memory_order_acquire) > 0)
+
+		if (RequestsUnanswered > 0)
 		{
-			logger.DebugFormatted("Waiting on {} Unanswered responses",
-								  RequestsUnanswered.load(std::memory_order_acquire));
-			std::this_thread::sleep_for(std::chrono::milliseconds(50));
+			const bool completed =
+				cv.wait_for(lock, timeout, [this] { return RequestsUnanswered == 0; });
+
+			if (!completed)
+			{
+				logger.WarningFormatted("Timeout reached. {} shard(s) did not respond.",
+										RequestsUnanswered);
+			}
 		}
-		RequestsUnanswered = 0;
+
+		entities =
+			EntityListResponses;  // copy instead of move to avoid race if late packets arrive
+
 		auto endTime = std::chrono::high_resolution_clock::now();
 		auto elapsedMs =
 			std::chrono::duration_cast<std::chrono::milliseconds>(endTime - startTime).count();
 
-		entities = std::move(EntityListResponses);
 		logger.DebugFormatted("GetEntityLists completed in {}ms. returned {} entries",
 							  std::to_string(elapsedMs), entities.size());
 	}

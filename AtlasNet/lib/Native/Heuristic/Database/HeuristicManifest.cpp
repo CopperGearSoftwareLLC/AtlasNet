@@ -226,9 +226,10 @@ std::optional<NetworkIdentity> HeuristicManifest::ShardFromPosition(const Transf
 {
 	const auto heuristic = PullHeuristic();
 	ASSERT(heuristic, "Pull heuristic returned nothing");
-	const auto bound = heuristic->QueryPosition(t.position);
-	logger.DebugFormatted("found bound for position {}", bound->GetID());
-	return ShardFromBoundID(bound->GetID());
+	const auto boundID = heuristic->QueryPosition(t.position);
+	if (!boundID.has_value()) return std::nullopt;
+	logger.DebugFormatted("found bound for position {}", *boundID);
+	return ShardFromBoundID(*boundID);
 	// bound->GetID()
 }
 std::optional<NetworkIdentity> HeuristicManifest::ShardFromBoundID(const IBounds::BoundsID id)

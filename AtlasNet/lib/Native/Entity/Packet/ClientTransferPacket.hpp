@@ -9,19 +9,10 @@
 #include "Global/Serialize/ByteWriter.hpp"
 #include "Network/NetworkIdentity.hpp"
 #include "Network/Packet/Packet.hpp"
-
+#include "Entity/EntityEnums.hpp"
 class ClientTransferPacket : public TPacket<ClientTransferPacket, "ClientTransferPacket">
 {
 	public:
-	enum class MsgStage	 // A = From Shard, B = To Shard
-	{
-		eShardPrepare,		  // A -> B notify of intent to transfer
-		eShardReady,		  // B -> A notifying readiness to receive transfer,
-		eProxyRequestSwitch,  // A -> Proxy request
-		eProxyFreeze,		  // Proxy -> A  Notification of request approval and stream freeze
-		eShardDrained,	// A -> Proxy notification of completion on processing lingering packets
-		eProxyTransferActivate,	 // Proxy -> B, Transfer complete, ownership transferred
-	};
 
 	struct StageData
 	{
@@ -196,7 +187,7 @@ class ClientTransferPacket : public TPacket<ClientTransferPacket, "ClientTransfe
 
    
 	UUID TransferID;
-	MsgStage stage;
+	ClientTransferStage stage;
 	std::variant<PrepareStageData, ReadyStageData, RequestSwitchStageData, FreezeStageData,
 				 DrainedStageData, TransferActivateStageData>
 		Data;
@@ -205,7 +196,7 @@ class ClientTransferPacket : public TPacket<ClientTransferPacket, "ClientTransfe
 	void SerializeData(ByteWriter& bw) const override
 	{
 		bw.uuid(TransferID);
-		bw.write_scalar<MsgStage>(stage);
+		bw.write_scalar<ClientTransferStage>(stage);
 
 		// 3️⃣ Serialize correct variant
 		std::visit([&bw](auto const& stageData) { stageData.Serialize(bw); }, Data);
@@ -213,31 +204,31 @@ class ClientTransferPacket : public TPacket<ClientTransferPacket, "ClientTransfe
 	void DeserializeData(ByteReader& br) override
 	{
 		TransferID = br.uuid();
-		stage = br.read_scalar<MsgStage>();
+		stage = br.read_scalar<ClientTransferStage>();
 		// 3️⃣ Construct correct variant type
 		switch (stage)
 		{
-			case MsgStage::eShardPrepare:
+			case ClientTransferStage::eShardPrepare:
 				Data.emplace<PrepareStageData>();
 				break;
 
-			case MsgStage::eShardReady:
+			case ClientTransferStage::eShardReady:
 				Data.emplace<ReadyStageData>();
 				break;
 
-			case MsgStage::eProxyRequestSwitch:
+			case ClientTransferStage::eProxyRequestSwitch:
 				Data.emplace<RequestSwitchStageData>();
 				break;
 
-			case MsgStage::eProxyFreeze:
+			case ClientTransferStage::eProxyFreeze:
 				Data.emplace<FreezeStageData>();
 				break;
 
-			case MsgStage::eShardDrained:
+			case ClientTransferStage::eShardDrained:
 				Data.emplace<DrainedStageData>();
 				break;
 
-			case MsgStage::eProxyTransferActivate:
+			case ClientTransferStage::eProxyTransferActivate:
 				Data.emplace<TransferActivateStageData>();
 				break;
 
