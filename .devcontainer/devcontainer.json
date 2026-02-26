@@ -5,10 +5,11 @@
   },
   "overrideCommand": false,
   "remoteUser": "vscode",
-  "postStartCommand": "/bin/bash .devcontainer/fix-docker-sock-group.sh",
+  "postStartCommand": "/bin/bash .devcontainer/post-start.sh",
   "runArgs": [
     "--init",
     "--shm-size=2g" ,
+    "--add-host=host.docker.internal:host-gateway",
     //"--network=host",
     //"--memory=10g",
     //"--memory-swap=10g",
@@ -21,6 +22,7 @@
   ],
   "forwardPorts": [
     3000,
+    9000,
     5000,
     8000,
     8080,
@@ -38,7 +40,9 @@
       "label": "VNC (raw)",
       "onAutoForward": "silent"
     },
-    "9443": { "label": "HTTPS", "onAutoForward": "silent" }
+    "3000": { "label": "Cartograph", "onAutoForward": "openBrowser" },
+    "9000": { "label": "Portainer (HTTP)", "onAutoForward": "openBrowser" },
+    "9443": { "label": "Portainer (HTTPS)", "onAutoForward": "silent" }
   },
   "containerEnv": {
     "DOCKER_HOST": "unix:///var/run/docker.sock",

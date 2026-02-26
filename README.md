@@ -229,8 +229,11 @@ The repo includes a **dev container** (`.devcontainer/`) with:
 
 Use it in VS Code/Cursor with “Reopen in Container” to get a consistent build and run environment.
 
+When running DooD from the dev container, host ports are proxied back into the container for convenience:
+- Cartograph: `http://localhost:3000`
+- Portainer: `http://localhost:9000` (auto-started on post-start)
+
 To build images and spawn a runtime container on the host daemon from CMake:
 ```bash
 cmake --build build --target AtlasnetDockerRun_Host
 ```
-

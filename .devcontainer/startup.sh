@@ -46,8 +46,15 @@ case "$MODE" in
     exec websockify --web=/usr/share/novnc/ 6080 127.0.0.1:5901
     ;;
 
+  hostproxy)
+    LISTEN_PORT="${2:?usage: $0 hostproxy <listen-port> [target-host] [target-port]}"
+    TARGET_HOST="${3:-host.docker.internal}"
+    TARGET_PORT="${4:-$LISTEN_PORT}"
+    exec socat "TCP-LISTEN:${LISTEN_PORT},fork,reuseaddr" "TCP:${TARGET_HOST}:${TARGET_PORT}"
+    ;;
+
   *)
-    echo "usage: $0 {tigervnc|fluxbox|novnc}"
+    echo "usage: $0 {tigervnc|fluxbox|novnc|hostproxy}"
     exit 2
     ;;
 esac
