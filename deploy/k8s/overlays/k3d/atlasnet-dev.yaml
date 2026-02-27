@@ -180,6 +180,10 @@ spec:
             - "yes"
             - --port
             - "6379"
+            - --loadmodule
+            - /usr/lib/valkey/libjson.so
+            - --loadmodule
+            - /usr/lib/valkey/libsearch.so
           ports:
             - name: redis
               containerPort: 6379

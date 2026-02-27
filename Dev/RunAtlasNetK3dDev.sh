@@ -118,6 +118,39 @@ else
     echo "==> k3d cluster '$CLUSTER_NAME' already exists."
 fi
 
+write_host_kubeconfig() {
+    local server_lb host_cfg api_port
+    server_lb="k3d-${CLUSTER_NAME}-serverlb"
+    if ! docker ps --format '{{.Names}}' | grep -Fxq "$server_lb"; then
+        return
+    fi
+
+    api_port="$(docker inspect --format '{{with index .NetworkSettings.Ports "6443/tcp"}}{{(index . 0).HostPort}}{{end}}' "$server_lb" 2>/dev/null || true)"
+    if [[ -z "$api_port" ]]; then
+        return
+    fi
+
+    host_cfg="${ATLASNET_HOST_KUBECONFIG:-$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)/Dev/.kube/k3d-${CLUSTER_NAME}-host.yaml}"
+    mkdir -p "$(dirname "$host_cfg")"
+
+    k3d kubeconfig get "$CLUSTER_NAME" >"$host_cfg"
+    if command -v kubectl >/dev/null 2>&1; then
+        local cluster
+        cluster="$(kubectl --kubeconfig "$host_cfg" config view --minify -o jsonpath='{.contexts[0].context.cluster}' 2>/dev/null || true)"
+        if [[ -n "$cluster" ]]; then
+            kubectl --kubeconfig "$host_cfg" config set-cluster "$cluster" --server "https://127.0.0.1:${api_port}" >/dev/null 2>&1 || true
+        fi
+    fi
+    # Fallback text rewrite in case kubectl config set-cluster is unavailable.
+    sed -i -E "s#https://0\\.0\\.0\\.0:[0-9]+#https://127.0.0.1:${api_port}#g" "$host_cfg" || true
+
+    echo "==> Host kubeconfig written: $host_cfg"
+    echo "==> Host API endpoint: https://127.0.0.1:${api_port}"
+    echo "==> Headlamp: import/use this kubeconfig file on your host."
+}
+
+write_host_kubeconfig
+
 TEMP_KUBECONFIG="$(mktemp /tmp/k3d-kubeconfig-XXXX.yaml)"
 TEMP_MANIFEST="$(mktemp /tmp/atlasnet-k3d-XXXX.yaml)"
 trap 'rm -f "$TEMP_MANIFEST" "$TEMP_KUBECONFIG"' EXIT
@@ -236,6 +269,9 @@ if [[ "$KUBECTL_MODE" == "incluster" ]]; then
 else
     kctl apply -f "$TEMP_MANIFEST" >/dev/null
 fi
+# Shard deployment is declared with replicas=0 and is expected to be scaled by Watchdog.
+# Restart Watchdog after apply so it recomputes heuristic + shard target for each run.
+kctl -n "$NAMESPACE" rollout restart deployment/atlasnet-watchdog >/dev/null
 # Remove a legacy service name from earlier k3d migration iterations.
 kctl -n "$NAMESPACE" delete svc atlasnet-internaldb --ignore-not-found >/dev/null || true
 
