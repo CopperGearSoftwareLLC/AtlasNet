@@ -35,6 +35,14 @@ function asFiniteNumber(value: unknown, fallback = 0): number {
   return Number.isFinite(n) ? n : fallback;
 }
 
+function asOptionalFiniteNumber(value: unknown): number | null {
+  if (value == null) {
+    return null;
+  }
+  const n = Number(value);
+  return Number.isFinite(n) ? n : null;
+}
+
 function parseDaemon(raw: unknown): WorkerDaemonTelemetry | null {
   const daemon = asObject(raw);
   if (!daemon) {
@@ -76,6 +84,19 @@ function parseSwarmNode(raw: unknown): WorkerSwarmNodeTelemetry | null {
     managerStatus: asOptionalString(node.managerStatus),
     engineVersion: asString(node.engineVersion),
     tlsStatus: asOptionalString(node.tlsStatus),
+    address: asOptionalString(node.address),
+    cpuUsageCores: asOptionalFiniteNumber(node.cpuUsageCores),
+    cpuCapacityCores: asOptionalFiniteNumber(node.cpuCapacityCores),
+    cpuUsagePct: asOptionalFiniteNumber(node.cpuUsagePct),
+    memoryUsageBytes: asOptionalFiniteNumber(node.memoryUsageBytes),
+    memoryCapacityBytes: asOptionalFiniteNumber(node.memoryCapacityBytes),
+    memoryUsagePct: asOptionalFiniteNumber(node.memoryUsagePct),
+    containers: Array.isArray(node.containers)
+      ? node.containers
+          .map(parseContainer)
+          .filter((container): container is WorkerContainerTelemetry => container != null)
+      : undefined,
+    aggregateLogs: asOptionalString(node.aggregateLogs) ?? undefined,
   };
 }
 
@@ -95,6 +116,14 @@ function parseContainer(raw: unknown): WorkerContainerTelemetry | null {
     runningFor: asString(container.runningFor),
     createdAt: asString(container.createdAt),
     ports: asString(container.ports),
+    nodeId: asOptionalString(container.nodeId) ?? undefined,
+    logs: asOptionalString(container.logs) ?? undefined,
+    cpuUsageCores: asOptionalFiniteNumber(container.cpuUsageCores),
+    cpuCapacityCores: asOptionalFiniteNumber(container.cpuCapacityCores),
+    cpuUsagePct: asOptionalFiniteNumber(container.cpuUsagePct),
+    memoryUsageBytes: asOptionalFiniteNumber(container.memoryUsageBytes),
+    memoryCapacityBytes: asOptionalFiniteNumber(container.memoryCapacityBytes),
+    memoryUsagePct: asOptionalFiniteNumber(container.memoryUsagePct),
   };
 }
 

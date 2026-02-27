@@ -101,6 +101,15 @@ export interface WorkerSwarmNodeTelemetry {
   managerStatus: string | null;
   engineVersion: string;
   tlsStatus: string | null;
+  address?: string | null;
+  cpuUsageCores?: number | null;
+  cpuCapacityCores?: number | null;
+  cpuUsagePct?: number | null;
+  memoryUsageBytes?: number | null;
+  memoryCapacityBytes?: number | null;
+  memoryUsagePct?: number | null;
+  containers?: WorkerContainerTelemetry[];
+  aggregateLogs?: string;
 }
 
 export interface WorkerContainerTelemetry {
@@ -113,6 +122,14 @@ export interface WorkerContainerTelemetry {
   runningFor: string;
   createdAt: string;
   ports: string;
+  nodeId?: string;
+  logs?: string;
+  cpuUsageCores?: number | null;
+  cpuCapacityCores?: number | null;
+  cpuUsagePct?: number | null;
+  memoryUsageBytes?: number | null;
+  memoryCapacityBytes?: number | null;
+  memoryUsagePct?: number | null;
 }
 
 export interface WorkerContextTelemetry {

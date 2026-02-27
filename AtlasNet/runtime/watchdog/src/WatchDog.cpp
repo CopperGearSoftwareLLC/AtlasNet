@@ -15,16 +15,15 @@
 //#include "Entity/EntityHandoff/Telemetry/HandoffTransferManifest.hpp"
 #include "Global/Serialize/ByteReader.hpp"
 #include "Interlink/Database/HealthManifest.hpp"
+#include "Interlink/Database/ServerRegistry.hpp"
 #include "Heuristic/Database/HeuristicManifest.hpp"
 #include "Docker/DockerIO.hpp"
 #include "Entity/Entity.hpp"
 #include "Entity/Transform.hpp"
 #include "Events/EventSystem.hpp"
 #include "Events/Events/Debug/LogEvent.hpp"
-#include "Heuristic/Database/HeuristicManifest.hpp"
 #include "Heuristic/GridHeuristic/GridHeuristic.hpp"
 #include "Heuristic/IHeuristic.hpp"
-#include "Interlink/Database/HealthManifest.hpp"
 #include "Interlink/Interlink.hpp"
 #include "Interlink/InterlinkEnums.hpp"
 #include "Interlink/Telemetry/NetworkManifest.hpp"
@@ -261,7 +260,6 @@ void WatchDog::Run()
 	}
 	logger->Debug("Shutting down");
 	Cleanup();
-	Interlink::Get().Shutdown();
 }
 void WatchDog::Init()
 {
@@ -283,6 +281,11 @@ void WatchDog::Init()
 									   ID_fail.ToString());
 			}
 			HealthManifest::Get().RemovePing(key);
+			if (ID_fail.IsInternal() &&
+				ID_fail != NetworkCredentials::Get().GetID())
+			{
+				ServerRegistry::Get().DeRegisterSelf(ID_fail);
+			}
 		});
 	Interlink::Get().Init();
 	EventSystem::Get().Init();
@@ -316,6 +319,14 @@ void WatchDog::SetShardCount(uint32 NewCount)
 			logger->ErrorFormatted(
 				"Unable to scale k8s shard deployment to {} replicas", NewCount);
 		}
+		return;
+	}
+
+	const char* swarmFallback = std::getenv("ATLASNET_ENABLE_SWARM_FALLBACK");
+	if (!swarmFallback || std::string(swarmFallback) != "1")
+	{
+		logger->Warning(
+			"Legacy Swarm scaling is disabled (set ATLASNET_ENABLE_SWARM_FALLBACK=1 to enable).");
 		return;
 	}
 

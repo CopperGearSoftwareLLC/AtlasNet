@@ -6,6 +6,21 @@ SHARD_IMAGE_NAME="${2:-sandbox-server:latest}"
 NAMESPACE="${ATLASNET_K8S_NAMESPACE:-atlasnet-dev}"
 SWARM_STACK_PREFIX="${ATLASNET_SWARM_STACK_PREFIX:-atlasnet_dev}"
 MANIFEST_TEMPLATE="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)/deploy/k8s/overlays/k3d/atlasnet-dev.yaml"
+K3D_SERVER_COUNT="${ATLASNET_K3D_SERVERS:-1}"
+K3D_AGENT_COUNT="${ATLASNET_K3D_AGENTS:-2}"
+
+is_nonnegative_int() {
+    [[ "$1" =~ ^[0-9]+$ ]]
+}
+
+if ! is_nonnegative_int "$K3D_SERVER_COUNT" || ((K3D_SERVER_COUNT < 1)); then
+    echo "Error: ATLASNET_K3D_SERVERS must be an integer >= 1 (got '$K3D_SERVER_COUNT')." >&2
+    exit 1
+fi
+if ! is_nonnegative_int "$K3D_AGENT_COUNT"; then
+    echo "Error: ATLASNET_K3D_AGENTS must be an integer >= 0 (got '$K3D_AGENT_COUNT')." >&2
+    exit 1
+fi
 
 require_cmd() {
     local cmd="$1"
@@ -102,12 +117,12 @@ fi
 
 remove_swarm_leftovers
 
-echo "==> Ensuring k3d cluster '$CLUSTER_NAME' exists..."
+echo "==> Ensuring k3d cluster '$CLUSTER_NAME' exists (servers=${K3D_SERVER_COUNT}, agents=${K3D_AGENT_COUNT})..."
 if ((CLUSTER_EXISTS == 0)); then
     wait_for_ports_free
     k3d cluster create "$CLUSTER_NAME" \
-        --servers 1 \
-        --agents 0 \
+        --servers "$K3D_SERVER_COUNT" \
+        --agents "$K3D_AGENT_COUNT" \
         --wait \
         -p "3000:3000@loadbalancer" \
         -p "9229:9229@loadbalancer" \

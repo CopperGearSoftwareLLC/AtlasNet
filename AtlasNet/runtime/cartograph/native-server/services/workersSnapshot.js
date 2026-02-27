@@ -9,6 +9,12 @@ const K8S_COMMAND_TIMEOUT_MS = 3500;
 const MAX_CONTEXTS = 64;
 const MAX_CONTAINERS_PER_CONTEXT = 300;
 const DEFAULT_DOCKER_SOCKET_PATH = '/var/run/docker.sock';
+const MAX_LOG_CHARS_PER_NODE = 24 * 1024;
+const MAX_LOG_SOURCES_PER_NODE = 10;
+const NODE_LOG_CACHE_TTL_MS = 4000;
+
+const k8sNodeLogCache = new Map();
+const dockerNodeLogCache = new Map();
 
 function asObject(value) {
   return value && typeof value === 'object' ? value : null;
@@ -58,6 +64,30 @@ function asBoolean(value, defaultValue = false) {
 function asFiniteNumber(value, fallback = 0) {
   const n = Number(value);
   return Number.isFinite(n) ? n : fallback;
+}
+
+function asOptionalFiniteNumber(value) {
+  if (value == null) {
+    return null;
+  }
+  const n = Number(value);
+  return Number.isFinite(n) ? n : null;
+}
+
+function safePercent(numerator, denominator) {
+  if (!Number.isFinite(numerator) || !Number.isFinite(denominator) || denominator <= 0) {
+    return null;
+  }
+  const pct = (numerator / denominator) * 100;
+  return Number.isFinite(pct) ? Math.max(0, Math.min(100, pct)) : null;
+}
+
+function truncateText(value, maxChars = MAX_LOG_CHARS_PER_NODE) {
+  const text = String(value ?? '');
+  if (text.length <= maxChars) {
+    return text;
+  }
+  return `${text.slice(0, maxChars)}\n...[truncated ${text.length - maxChars} chars]`;
 }
 
 function parseJsonLines(stdout) {
@@ -289,6 +319,38 @@ function nodeAddressForDisplay(node) {
   return '';
 }
 
+function parseK8sNodeRows(rawNodes) {
+  const items = Array.isArray(rawNodes?.items) ? rawNodes.items : [];
+  return items.map((node) => {
+    const metadata = asObject(node?.metadata) ?? {};
+    const spec = asObject(node?.spec) ?? {};
+    const status = asObject(node?.status) ?? {};
+    const nodeInfo = asObject(status.nodeInfo) ?? {};
+    const conditions = Array.isArray(status.conditions) ? status.conditions : [];
+    const ready = conditions.find((condition) => asString(condition?.type) === 'Ready');
+    const allocatable = asObject(status.allocatable) ?? {};
+    const hostname = asString(metadata.name) || asString(nodeInfo.hostname);
+    return {
+      id: asString(metadata.uid) || hostname,
+      hostname: hostname || asString(metadata.uid),
+      status: asString(ready?.status, 'Unknown'),
+      availability: spec.unschedulable ? 'cordoned' : 'active',
+      managerStatus: 'kubernetes-node',
+      engineVersion: asString(nodeInfo.kubeletVersion),
+      tlsStatus: null,
+      address: nodeAddressForDisplay(node),
+      cpuCapacityCores: parseK8sCpuQuantity(allocatable.cpu),
+      memoryCapacityBytes: parseK8sMemoryQuantity(allocatable.memory),
+      cpuUsageCores: null,
+      memoryUsageBytes: null,
+      cpuUsagePct: null,
+      memoryUsagePct: null,
+      containers: [],
+      aggregateLogs: '',
+    };
+  });
+}
+
 function parseK8sNodeRowsFromPods(rawPods) {
   const items = Array.isArray(rawPods?.items) ? rawPods.items : [];
   const nodeNames = new Set();
@@ -307,7 +369,114 @@ function parseK8sNodeRowsFromPods(rawPods) {
     managerStatus: 'kubernetes-node',
     engineVersion: '',
     tlsStatus: null,
+    address: null,
+    cpuCapacityCores: null,
+    memoryCapacityBytes: null,
+    cpuUsageCores: null,
+    memoryUsageBytes: null,
+    cpuUsagePct: null,
+    memoryUsagePct: null,
+    containers: [],
+    aggregateLogs: '',
   }));
+}
+
+function parseK8sNodeMetricsMap(rawNodeMetrics) {
+  const items = Array.isArray(rawNodeMetrics?.items) ? rawNodeMetrics.items : [];
+  const usageByNode = new Map();
+  for (const item of items) {
+    const metadata = asObject(item?.metadata) ?? {};
+    const usage = asObject(item?.usage) ?? {};
+    const nodeName = asString(metadata.name);
+    if (!nodeName) {
+      continue;
+    }
+    usageByNode.set(nodeName, {
+      cpuUsageCores: parseK8sCpuQuantity(usage.cpu),
+      memoryUsageBytes: parseK8sMemoryQuantity(usage.memory),
+    });
+  }
+  return usageByNode;
+}
+
+function collectK8sPodContainersByNode(rawPods) {
+  const items = Array.isArray(rawPods?.items) ? rawPods.items : [];
+  const byNode = new Map();
+  for (const pod of items) {
+    const podName = asString(pod?.metadata?.name);
+    const nodeName = asString(pod?.spec?.nodeName);
+    if (!podName || !nodeName) {
+      continue;
+    }
+
+    const containers = Array.isArray(pod?.spec?.containers) ? pod.spec.containers : [];
+    if (!byNode.has(nodeName)) {
+      byNode.set(nodeName, []);
+    }
+    const current = byNode.get(nodeName);
+    for (const container of containers) {
+      const containerName = asString(container?.name);
+      if (!containerName) {
+        continue;
+      }
+      current.push({
+        podName,
+        containerName,
+      });
+    }
+  }
+  return byNode;
+}
+
+async function collectK8sNodeAggregateLogs(api, podContainersByNode) {
+  const nowMs = Date.now();
+  const out = new Map();
+
+  for (const [nodeName, podContainers] of podContainersByNode.entries()) {
+    const cacheKey = `${api.namespace}:${nodeName}`;
+    const cached = k8sNodeLogCache.get(cacheKey);
+    if (cached && nowMs - cached.atMs < NODE_LOG_CACHE_TTL_MS) {
+      out.set(nodeName, cached.text);
+      continue;
+    }
+
+    const selectedSources = podContainers.slice(0, MAX_LOG_SOURCES_PER_NODE);
+    const chunks = await Promise.all(
+      selectedSources.map(async (source) => {
+        const podName = asString(source?.podName);
+        const containerName = asString(source?.containerName);
+        if (!podName || !containerName) {
+          return '';
+        }
+
+        const path =
+          `/api/v1/namespaces/${encodeURIComponent(api.namespace)}/pods/` +
+          `${encodeURIComponent(podName)}/log?container=${encodeURIComponent(containerName)}` +
+          '&tailLines=40&timestamps=true';
+
+        const result = await kubernetesApiRequest(api, path, 1200);
+        if (!result.ok) {
+          return '';
+        }
+
+        const body = asString(result.body);
+        if (!body) {
+          return '';
+        }
+
+        return `[${podName}/${containerName}]\n${body}`;
+      })
+    );
+
+    const text = truncateText(chunks.filter((chunk) => chunk.length > 0).join('\n\n'));
+    k8sNodeLogCache.set(cacheKey, {
+      atMs: nowMs,
+      text,
+    });
+    out.set(nodeName, text);
+  }
+
+  return out;
 }
 
 function formatK8sContainerPorts(container) {
@@ -362,6 +531,7 @@ function parseK8sContainerRows(rawPods) {
 
   for (const pod of items) {
     const podName = asString(pod?.metadata?.name);
+    const nodeId = asString(pod?.spec?.nodeName);
     const podPhase = asString(pod?.status?.phase);
     const startTime = asString(pod?.status?.startTime || pod?.metadata?.creationTimestamp);
     const containers = Array.isArray(pod?.spec?.containers) ? pod.spec.containers : [];
@@ -396,6 +566,7 @@ function parseK8sContainerRows(rawPods) {
         runningFor: elapsedSinceIso(startTime),
         createdAt: formatIsoTimestamp(startTime),
         ports: formatK8sContainerPorts(container),
+        nodeId: nodeId || undefined,
       });
     }
   }
@@ -466,9 +637,11 @@ async function readWorkersSnapshotViaKubernetes() {
     return null;
   }
 
-  const [versionResult, podsResult] = await Promise.all([
+  const [versionResult, podsResult, nodesResult, nodeMetricsResult] = await Promise.all([
     kubernetesApiRequest(api, '/version'),
     kubernetesApiRequest(api, `/api/v1/namespaces/${api.namespace}/pods`),
+    kubernetesApiRequest(api, '/api/v1/nodes'),
+    kubernetesApiRequest(api, '/apis/metrics.k8s.io/v1beta1/nodes'),
   ]);
 
   const endpoint = api.endpoint;
@@ -508,10 +681,79 @@ async function readWorkersSnapshotViaKubernetes() {
 
   const parsedVersion = parseJsonBody(versionResult.body);
   const parsedPods = parseJsonBody(podsResult.body);
+  const parsedNodes = nodesResult.ok ? parseJsonBody(nodesResult.body) : null;
+  const allContainers = parseK8sContainerRows(parsedPods);
+  const containers = allContainers.slice(0, MAX_CONTAINERS_PER_CONTEXT);
 
-  const daemon = buildK8sDaemonInfo(api, parsedVersion, null, parsedPods);
-  const nodes = parseK8sNodeRowsFromPods(parsedPods);
-  const containers = parseK8sContainerRows(parsedPods).slice(0, MAX_CONTAINERS_PER_CONTEXT);
+  const daemon = buildK8sDaemonInfo(api, parsedVersion, parsedNodes, parsedPods);
+  const nodeRows = nodesResult.ok
+    ? parseK8sNodeRows(parsedNodes)
+    : parseK8sNodeRowsFromPods(parsedPods);
+  const metricsByNode = nodeMetricsResult.ok
+    ? parseK8sNodeMetricsMap(parseJsonBody(nodeMetricsResult.body))
+    : new Map();
+
+  const containersByNode = new Map();
+  for (const container of allContainers) {
+    const nodeId = asString(container?.nodeId);
+    if (!nodeId) {
+      continue;
+    }
+    if (!containersByNode.has(nodeId)) {
+      containersByNode.set(nodeId, []);
+    }
+    containersByNode.get(nodeId).push(container);
+  }
+
+  const podContainersByNode = collectK8sPodContainersByNode(parsedPods);
+  const logsByNode = await collectK8sNodeAggregateLogs(api, podContainersByNode);
+
+  const nodes = nodeRows.map((node) => {
+    const nodeId = asString(node.hostname || node.id);
+    const nodeContainers = (containersByNode.get(nodeId) ?? []).slice(
+      0,
+      MAX_CONTAINERS_PER_CONTEXT
+    );
+    const metric = metricsByNode.get(nodeId);
+
+    const cpuCapacityCores = asOptionalFiniteNumber(node.cpuCapacityCores);
+    const memoryCapacityBytes = asOptionalFiniteNumber(node.memoryCapacityBytes);
+    const cpuUsageCores = metric ? metric.cpuUsageCores : null;
+    const memoryUsageBytes = metric ? metric.memoryUsageBytes : null;
+
+    return {
+      ...node,
+      cpuUsageCores,
+      memoryUsageBytes,
+      cpuUsagePct: safePercent(cpuUsageCores, cpuCapacityCores),
+      memoryUsagePct: safePercent(memoryUsageBytes, memoryCapacityBytes),
+      containers: nodeContainers,
+      aggregateLogs: logsByNode.get(nodeId) ?? '',
+    };
+  });
+
+  if (nodes.length === 0) {
+    for (const [nodeId, nodeContainers] of containersByNode.entries()) {
+      nodes.push({
+        id: nodeId,
+        hostname: nodeId,
+        status: 'Unknown',
+        availability: 'active',
+        managerStatus: 'kubernetes-node',
+        engineVersion: '',
+        tlsStatus: null,
+        address: null,
+        cpuCapacityCores: null,
+        memoryCapacityBytes: null,
+        cpuUsageCores: null,
+        memoryUsageBytes: null,
+        cpuUsagePct: null,
+        memoryUsagePct: null,
+        containers: nodeContainers.slice(0, MAX_CONTAINERS_PER_CONTEXT),
+        aggregateLogs: logsByNode.get(nodeId) ?? '',
+      });
+    }
+  }
 
   return {
     collectedAtMs: Date.now(),
@@ -988,12 +1230,50 @@ async function readWorkersSnapshotViaDockerApi(baseErrorMessage) {
   const nodes = nodesResult.ok
     ? parseSwarmNodeRowsFromApi(parseJsonBody(nodesResult.body))
     : [];
-  const containers = containersResult.ok
+  const containersRaw = containersResult.ok
     ? parseContainerRowsFromApi(parseJsonBody(containersResult.body)).slice(
         0,
         MAX_CONTAINERS_PER_CONTEXT
       )
     : [];
+
+  const fallbackNodeId = asString(daemon.swarmNodeId || daemon.id || daemon.name || 'default');
+  const materializedNodes =
+    nodes.length > 0
+      ? nodes
+      : [
+          {
+            id: fallbackNodeId,
+            hostname: asString(daemon.name, fallbackNodeId),
+            status: 'Ready',
+            availability: 'active',
+            managerStatus: daemon.swarmState || 'docker-node',
+            engineVersion: daemon.serverVersion,
+            tlsStatus: null,
+          },
+        ];
+
+  const primaryNode = materializedNodes[0];
+  const primaryNodeId = asString(primaryNode?.id || primaryNode?.hostname || fallbackNodeId);
+  const containers = containersRaw.map((container) => ({
+    ...container,
+    nodeId: primaryNodeId,
+  }));
+  const enrichedNodes = materializedNodes.map((node) => {
+    const nodeId = asString(node.id || node.hostname || primaryNodeId);
+    const nodeContainers = nodeId === primaryNodeId ? containers : [];
+    return {
+      ...node,
+      cpuUsageCores: null,
+      cpuCapacityCores: daemon.cpuCount,
+      cpuUsagePct: null,
+      memoryUsageBytes: null,
+      memoryCapacityBytes: daemon.memoryTotalBytes,
+      memoryUsagePct: null,
+      containers: nodeContainers,
+      aggregateLogs: '',
+    };
+  });
 
   return {
     collectedAtMs: Date.now(),
@@ -1011,7 +1291,7 @@ async function readWorkersSnapshotViaDockerApi(baseErrorMessage) {
         status: 'ok',
         error: null,
         daemon,
-        nodes,
+        nodes: enrichedNodes,
         containers,
       },
     ],
@@ -1081,6 +1361,51 @@ function runDockerCommand(args, timeoutMs = DOCKER_COMMAND_TIMEOUT_MS) {
   });
 }
 
+async function collectDockerAggregateLogs(contextName, nodeKey, containers) {
+  const cacheKey = `${contextName}:${nodeKey}`;
+  const nowMs = Date.now();
+  const cached = dockerNodeLogCache.get(cacheKey);
+  if (cached && nowMs - cached.atMs < NODE_LOG_CACHE_TTL_MS) {
+    return cached.text;
+  }
+
+  const selectedContainers = (Array.isArray(containers) ? containers : []).slice(
+    0,
+    MAX_LOG_SOURCES_PER_NODE
+  );
+  const chunks = await Promise.all(
+    selectedContainers.map(async (container) => {
+      const containerRef = asString(container?.id || container?.name);
+      const containerName = asString(container?.name, containerRef);
+      if (!containerRef) {
+        return '';
+      }
+
+      const result = await runDockerCommand(
+        ['--context', contextName, 'logs', '--tail', '40', containerRef],
+        1200
+      );
+      if (!result.ok) {
+        return '';
+      }
+
+      const logBody = asString(result.stdout);
+      if (!logBody) {
+        return '';
+      }
+
+      return `[${containerName}]\n${logBody}`;
+    })
+  );
+
+  const text = truncateText(chunks.filter((chunk) => chunk.length > 0).join('\n\n'));
+  dockerNodeLogCache.set(cacheKey, {
+    atMs: nowMs,
+    text,
+  });
+  return text;
+}
+
 async function enrichContext(baseContext) {
   const contextName = baseContext.name;
   const [inspectResult, infoResult] = await Promise.all([
@@ -1140,10 +1465,49 @@ async function enrichContext(baseContext) {
       : Promise.resolve(null),
   ]);
 
-  const containers = psResult.ok
+  const containersRaw = psResult.ok
     ? parseContainerRows(psResult.stdout).slice(0, MAX_CONTAINERS_PER_CONTEXT)
     : [];
-  const nodes = nodesResult && nodesResult.ok ? parseNodeRows(nodesResult.stdout) : [];
+  const nodesRaw = nodesResult && nodesResult.ok ? parseNodeRows(nodesResult.stdout) : [];
+
+  const fallbackNodeId = asString(daemon.swarmNodeId || daemon.id || daemon.name || contextName);
+  const materializedNodes =
+    nodesRaw.length > 0
+      ? nodesRaw
+      : [
+          {
+            id: fallbackNodeId,
+            hostname: asString(daemon.name, fallbackNodeId),
+            status: 'Ready',
+            availability: 'active',
+            managerStatus: daemon.swarmState || 'docker-node',
+            engineVersion: daemon.serverVersion,
+            tlsStatus: null,
+          },
+        ];
+
+  const primaryNode = materializedNodes[0];
+  const primaryNodeId = asString(primaryNode?.id || primaryNode?.hostname || fallbackNodeId);
+  const containers = containersRaw.map((container) => ({
+    ...container,
+    nodeId: primaryNodeId,
+  }));
+  const aggregateLogs = await collectDockerAggregateLogs(contextName, primaryNodeId, containers);
+  const nodes = materializedNodes.map((node) => {
+    const nodeId = asString(node.id || node.hostname || primaryNodeId);
+    const nodeContainers = nodeId === primaryNodeId ? containers : [];
+    return {
+      ...node,
+      cpuUsageCores: null,
+      cpuCapacityCores: daemon.cpuCount,
+      cpuUsagePct: null,
+      memoryUsageBytes: null,
+      memoryCapacityBytes: daemon.memoryTotalBytes,
+      memoryUsagePct: null,
+      containers: nodeContainers,
+      aggregateLogs: nodeId === primaryNodeId ? aggregateLogs : '',
+    };
+  });
 
   return {
     ...merged,

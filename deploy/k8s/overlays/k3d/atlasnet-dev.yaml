@@ -54,6 +54,7 @@ rules:
       - ""
     resources:
       - pods
+      - pods/log
     verbs:
       - get
       - list
@@ -71,6 +72,40 @@ roleRef:
   apiGroup: rbac.authorization.k8s.io
   kind: Role
   name: atlasnet-cartograph-reader
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: atlasnet-cartograph-cluster-reader
+rules:
+  - apiGroups:
+      - ""
+    resources:
+      - nodes
+    verbs:
+      - get
+      - list
+  - apiGroups:
+      - metrics.k8s.io
+    resources:
+      - nodes
+      - pods
+    verbs:
+      - get
+      - list
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: atlasnet-cartograph-cluster-reader
+subjects:
+  - kind: ServiceAccount
+    name: atlasnet-cartograph
+    namespace: __NAMESPACE__
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: atlasnet-cartograph-cluster-reader
 ---
 apiVersion: apps/v1
 kind: Deployment
@@ -114,7 +149,7 @@ spec:
           ports:
             - name: interlink
               containerPort: 25555
-              protocol: TCP
+              protocol: UDP
 ---
 apiVersion: apps/v1
 kind: Deployment
@@ -135,6 +170,22 @@ spec:
         app: atlasnet-shard
         atlasnet.role: shard
     spec:
+      affinity:
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+            - weight: 100
+              podAffinityTerm:
+                topologyKey: kubernetes.io/hostname
+                labelSelector:
+                  matchLabels:
+                    app: atlasnet-shard
+      topologySpreadConstraints:
+        - maxSkew: 1
+          topologyKey: kubernetes.io/hostname
+          whenUnsatisfiable: ScheduleAnyway
+          labelSelector:
+            matchLabels:
+              app: atlasnet-shard
       containers:
         - name: shard
           image: __SHARD_IMAGE__
@@ -151,7 +202,7 @@ spec:
           ports:
             - name: interlink
               containerPort: 25555
-              protocol: TCP
+              protocol: UDP
 ---
 apiVersion: apps/v1
 kind: Deployment
@@ -290,8 +341,6 @@ spec:
           env:
             - name: HANDSHAKE_SERVICE_ENABLE
               value: "1"
-            - name: HANDSHAKE_SERVICE_IP
-              value: postgres
             - name: POD_IP
               valueFrom:
                 fieldRef:
@@ -309,7 +358,7 @@ spec:
               protocol: UDP
             - name: interlink
               containerPort: 25555
-              protocol: TCP
+              protocol: UDP
 ---
 apiVersion: v1
 kind: Service

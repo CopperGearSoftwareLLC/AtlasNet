@@ -4,7 +4,6 @@ import { useEffect, useMemo, useState } from 'react';
 import type {
   WorkerContainerTelemetry,
   WorkerContextTelemetry,
-  WorkerDaemonTelemetry,
   WorkerSwarmNodeTelemetry,
 } from '../lib/cartographTypes';
 import { useWorkersSnapshot } from '../lib/hooks/useTelemetryFeeds';
@@ -14,8 +13,16 @@ const MIN_POLL_INTERVAL_MS = 0;
 const MAX_POLL_INTERVAL_MS = 30000;
 const POLL_STEP_MS = 1000;
 
-function formatBytes(totalBytes: number): string {
-  if (!Number.isFinite(totalBytes) || totalBytes <= 0) {
+interface WorkerNodeView {
+  key: string;
+  context: WorkerContextTelemetry;
+  node: WorkerSwarmNodeTelemetry;
+  containers: WorkerContainerTelemetry[];
+  aggregateLogs: string;
+}
+
+function formatBytes(totalBytes: number | null | undefined): string {
+  if (!Number.isFinite(totalBytes) || !totalBytes || totalBytes <= 0) {
     return '0 B';
   }
 
@@ -38,143 +45,408 @@ function formatUpdatedAt(updatedAtMs: number | null): string {
   return new Date(updatedAtMs).toLocaleTimeString();
 }
 
-function statusPillClasses(status: WorkerContextTelemetry['status']): string {
-  return status === 'ok'
-    ? 'bg-emerald-500/10 text-emerald-300 border-emerald-700/50'
-    : 'bg-rose-500/10 text-rose-200 border-rose-800/60';
+function formatCpuUsageValues(
+  usedCores: number | null | undefined,
+  capacityCores: number | null | undefined
+): string {
+  if (Number.isFinite(usedCores) && Number.isFinite(capacityCores) && capacityCores && capacityCores > 0) {
+    return `${usedCores!.toFixed(2)} / ${capacityCores!.toFixed(2)} cores`;
+  }
+  if (Number.isFinite(capacityCores) && capacityCores && capacityCores > 0) {
+    return `capacity ${capacityCores!.toFixed(2)} cores`;
+  }
+  if (Number.isFinite(usedCores)) {
+    return `${usedCores!.toFixed(2)} cores`;
+  }
+  return 'n/a';
 }
 
-function WorkerDetailRow({
-  label,
-  value,
-}: {
-  label: string;
-  value: string;
-}) {
+function formatMemoryUsageValues(
+  usedBytes: number | null | undefined,
+  capacityBytes: number | null | undefined
+): string {
+  if (Number.isFinite(usedBytes) && Number.isFinite(capacityBytes) && capacityBytes && capacityBytes > 0) {
+    return `${formatBytes(usedBytes)} / ${formatBytes(capacityBytes)}`;
+  }
+  if (Number.isFinite(capacityBytes) && capacityBytes && capacityBytes > 0) {
+    return `capacity ${formatBytes(capacityBytes)}`;
+  }
+  if (Number.isFinite(usedBytes)) {
+    return formatBytes(usedBytes);
+  }
+  return 'n/a';
+}
+
+function formatPct(value: number | null | undefined): string {
+  if (!Number.isFinite(value)) {
+    return 'n/a';
+  }
+  return `${value!.toFixed(1)}%`;
+}
+
+function pickMetricValue(
+  containerValue: number | null | undefined,
+  workerValue: number | null | undefined
+): number | null | undefined {
+  if (Number.isFinite(containerValue)) {
+    return Number(containerValue);
+  }
+  return workerValue;
+}
+
+function hasContainerCpuMetrics(container: WorkerContainerTelemetry | null): boolean {
+  if (!container) {
+    return false;
+  }
   return (
-    <>
-      <dt className="text-slate-500">{label}</dt>
-      <dd className="truncate font-mono text-slate-200" title={value}>
-        {value || '-'}
-      </dd>
-    </>
+    Number.isFinite(container.cpuUsageCores) ||
+    Number.isFinite(container.cpuCapacityCores) ||
+    Number.isFinite(container.cpuUsagePct)
   );
 }
 
-function WorkerDaemonCard({ daemon }: { daemon: WorkerDaemonTelemetry | null }) {
-  if (!daemon) {
-    return (
-      <div className="rounded-2xl border border-slate-800 bg-slate-900/70 p-4 text-sm text-slate-400">
-        Runtime details unavailable for this worker.
-      </div>
-    );
+function hasContainerMemoryMetrics(container: WorkerContainerTelemetry | null): boolean {
+  if (!container) {
+    return false;
+  }
+  return (
+    Number.isFinite(container.memoryUsageBytes) ||
+    Number.isFinite(container.memoryCapacityBytes) ||
+    Number.isFinite(container.memoryUsagePct)
+  );
+}
+
+function containerSelectionKey(container: WorkerContainerTelemetry, index: number): string {
+  const id = String(container.id || '').trim();
+  if (id) {
+    return `id:${id}`;
+  }
+  const name = String(container.name || '').trim();
+  if (name) {
+    return `name:${name}:${index}`;
+  }
+  return `idx:${index}`;
+}
+
+function parseAggregateLogsBySource(aggregateLogs: string): Map<string, string> {
+  const out = new Map<string, string>();
+  const lines = String(aggregateLogs || '').split(/\r?\n/);
+
+  let currentSource: string | null = null;
+  let buffer: string[] = [];
+
+  function flushCurrentSource() {
+    if (!currentSource) {
+      return;
+    }
+    const text = buffer.join('\n').trimEnd();
+    out.set(currentSource, text);
   }
 
+  for (const line of lines) {
+    const sourceMatch = line.match(/^\[([^\]]+)\]\s*$/);
+    if (sourceMatch) {
+      flushCurrentSource();
+      currentSource = sourceMatch[1].trim();
+      buffer = [];
+      continue;
+    }
+
+    if (currentSource) {
+      buffer.push(line);
+    }
+  }
+
+  flushCurrentSource();
+  return out;
+}
+
+function collectContainerLogCandidates(container: WorkerContainerTelemetry): string[] {
+  const values = new Set<string>();
+
+  function addCandidate(value: string | null | undefined) {
+    const text = String(value || '').trim();
+    if (text) {
+      values.add(text);
+    }
+  }
+
+  addCandidate(container.name);
+  addCandidate(container.id);
+
+  const id = String(container.id || '').trim();
+  const idWithoutPrefix = id.includes('://') ? id.split('://').pop() : null;
+  addCandidate(idWithoutPrefix);
+
+  const name = String(container.name || '').trim();
+  if (name.includes('/')) {
+    addCandidate(name.split('/').pop());
+  }
+
+  return Array.from(values.values());
+}
+
+function resolveContainerLogs(
+  container: WorkerContainerTelemetry,
+  aggregateLogsBySource: Map<string, string>
+): string {
+  const directLogs = String(container.logs || '').trim();
+  if (directLogs.length > 0) {
+    return directLogs;
+  }
+
+  const candidates = collectContainerLogCandidates(container);
+  for (const candidate of candidates) {
+    if (aggregateLogsBySource.has(candidate)) {
+      return aggregateLogsBySource.get(candidate) || '';
+    }
+  }
+
+  for (const [source, text] of aggregateLogsBySource.entries()) {
+    for (const candidate of candidates) {
+      if (source.endsWith(`/${candidate}`)) {
+        return text;
+      }
+    }
+  }
+
+  return '';
+}
+
+function nodeStatusPillClasses(node: WorkerSwarmNodeTelemetry): string {
+  const normalized = String(node.status || '').trim().toLowerCase();
+  const healthy =
+    normalized === 'ready' ||
+    normalized === 'true' ||
+    normalized === 'up' ||
+    normalized === 'active';
+  return healthy
+    ? 'bg-emerald-500/10 text-emerald-300 border-emerald-700/50'
+    : 'bg-amber-500/10 text-amber-300 border-amber-700/50';
+}
+
+function buildNodeViews(contexts: WorkerContextTelemetry[]): WorkerNodeView[] {
+  const views: WorkerNodeView[] = [];
+
+  for (const context of contexts) {
+    const fallbackNodes: WorkerSwarmNodeTelemetry[] =
+      context.nodes.length > 0
+        ? context.nodes
+        : [
+            {
+              id: context.daemon?.id || context.name,
+              hostname: context.daemon?.name || context.name,
+              status: context.status === 'ok' ? 'Ready' : 'Unknown',
+              availability: 'active',
+              managerStatus: context.orchestrator || null,
+              engineVersion: context.daemon?.serverVersion || '',
+              tlsStatus: null,
+              address: context.host,
+              cpuCapacityCores: context.daemon?.cpuCount ?? null,
+              memoryCapacityBytes: context.daemon?.memoryTotalBytes ?? null,
+              containers: context.containers,
+              aggregateLogs: '',
+            },
+          ];
+
+    for (const node of fallbackNodes) {
+      const identifiers = new Set(
+        [node.id, node.hostname]
+          .map((value) => String(value || '').trim())
+          .filter((value) => value.length > 0)
+      );
+
+      let containers = Array.isArray(node.containers) ? node.containers : [];
+      if (containers.length === 0) {
+        containers = context.containers.filter((container) => {
+          const nodeId = String(container.nodeId || '').trim();
+          return nodeId.length > 0 && identifiers.has(nodeId);
+        });
+      }
+      if (containers.length === 0 && fallbackNodes.length === 1) {
+        containers = context.containers;
+      }
+
+      const key = `${context.name}:${node.id || node.hostname}`;
+      views.push({
+        key,
+        context,
+        node,
+        containers,
+        aggregateLogs: String(node.aggregateLogs || ''),
+      });
+    }
+  }
+
+  views.sort((left, right) => {
+    if (left.context.current !== right.context.current) {
+      return left.context.current ? -1 : 1;
+    }
+    return (left.node.hostname || left.node.id).localeCompare(
+      right.node.hostname || right.node.id
+    );
+  });
+
+  return views;
+}
+
+function UtilizationCard({
+  title,
+  usageText,
+  percentText,
+  percentValue,
+}: {
+  title: string;
+  usageText: string;
+  percentText: string;
+  percentValue: number | null | undefined;
+}) {
+  const normalizedPercent = Number.isFinite(percentValue)
+    ? Math.max(0, Math.min(100, Number(percentValue)))
+    : 0;
+
   return (
-    <div className="rounded-2xl border border-slate-800 bg-slate-900/70 p-4">
-      <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-slate-400">
-        Runtime Control Plane
-      </h2>
-      <dl className="grid grid-cols-[140px_minmax(0,1fr)] gap-x-3 gap-y-2 text-sm">
-        <WorkerDetailRow label="Name" value={daemon.name} />
-        <WorkerDetailRow label="Version" value={daemon.serverVersion} />
-        <WorkerDetailRow label="OS" value={daemon.operatingSystem} />
-        <WorkerDetailRow label="Kernel" value={daemon.kernelVersion} />
-        <WorkerDetailRow label="Arch" value={daemon.architecture} />
-        <WorkerDetailRow label="CPUs" value={String(daemon.cpuCount)} />
-        <WorkerDetailRow label="Memory" value={formatBytes(daemon.memoryTotalBytes)} />
-        <WorkerDetailRow label="Orchestrator State" value={daemon.swarmState || 'inactive'} />
-        <WorkerDetailRow
-          label="Node Address"
-          value={daemon.swarmNodeAddress || '-'}
+    <div className="rounded-2xl border border-slate-800 bg-slate-900/70 p-3">
+      <div className="text-xs uppercase tracking-wide text-slate-400">{title}</div>
+      <div className="mt-1 font-mono text-sm text-slate-200">{usageText}</div>
+      <div className="mt-1 text-xs text-slate-500">{percentText}</div>
+      <div className="mt-2 h-2 overflow-hidden rounded-full bg-slate-800">
+        <div
+          className="h-full rounded-full bg-sky-500/70"
+          style={{ width: `${normalizedPercent}%` }}
         />
-      </dl>
-    </div>
-  );
-}
-
-function WorkerNodesTable({ nodes }: { nodes: WorkerSwarmNodeTelemetry[] }) {
-  return (
-    <div className="overflow-hidden rounded-2xl border border-slate-800 bg-slate-900/70">
-      <div className="border-b border-slate-800 px-4 py-3 text-sm font-semibold uppercase tracking-wide text-slate-400">
-        Connected Nodes
       </div>
-      {nodes.length === 0 ? (
-        <div className="px-4 py-4 text-sm text-slate-500">No node data reported.</div>
-      ) : (
-        <div className="overflow-x-auto">
-          <table className="min-w-full text-left text-sm">
-            <thead className="text-xs uppercase text-slate-500">
-              <tr>
-                <th className="px-4 py-3">Hostname</th>
-                <th className="px-4 py-3">Status</th>
-                <th className="px-4 py-3">Availability</th>
-                <th className="px-4 py-3">Manager</th>
-                <th className="px-4 py-3">Engine</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-800 text-slate-200">
-              {nodes.map((node) => (
-                <tr key={`${node.id}:${node.hostname}`}>
-                  <td className="px-4 py-2 font-mono">{node.hostname || node.id}</td>
-                  <td className="px-4 py-2">{node.status || '-'}</td>
-                  <td className="px-4 py-2">{node.availability || '-'}</td>
-                  <td className="px-4 py-2">{node.managerStatus ?? '-'}</td>
-                  <td className="px-4 py-2">{node.engineVersion || '-'}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      )}
     </div>
   );
 }
 
-function WorkerContainersTable({
+function WorkerContainerList({
   containers,
+  selectedContainerKey,
+  onSelectContainer,
 }: {
   containers: WorkerContainerTelemetry[];
+  selectedContainerKey: string | null;
+  onSelectContainer: (containerKey: string) => void;
 }) {
   return (
     <div className="overflow-hidden rounded-2xl border border-slate-800 bg-slate-900/70">
       <div className="border-b border-slate-800 px-4 py-3 text-sm font-semibold uppercase tracking-wide text-slate-400">
-        Containers
+        Containers On Worker
       </div>
       {containers.length === 0 ? (
-        <div className="px-4 py-4 text-sm text-slate-500">No containers found.</div>
+        <div className="px-4 py-4 text-sm text-slate-500">
+          No containers found for this worker.
+        </div>
       ) : (
-        <div className="overflow-x-auto">
-          <table className="min-w-full text-left text-sm">
-            <thead className="text-xs uppercase text-slate-500">
-              <tr>
-                <th className="px-4 py-3">Name</th>
-                <th className="px-4 py-3">Image</th>
-                <th className="px-4 py-3">State</th>
-                <th className="px-4 py-3">Status</th>
-                <th className="px-4 py-3">Ports</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-800 text-slate-200">
-              {containers.map((container) => (
-                <tr key={container.id || `${container.name}:${container.image}`}>
-                  <td className="max-w-56 truncate px-4 py-2 font-mono" title={container.name}>
-                    {container.name || container.id || '-'}
-                  </td>
-                  <td className="max-w-64 truncate px-4 py-2" title={container.image}>
+        <div className="max-h-[420px] space-y-2 overflow-auto p-2">
+          {containers.map((container, index) => {
+            const key = containerSelectionKey(container, index);
+            const isSelected = selectedContainerKey === key;
+            const title = container.name || container.id || `container-${index + 1}`;
+            const stateLabel = container.state || 'unknown';
+            const hasCpuMetrics =
+              Number.isFinite(container.cpuUsageCores) || Number.isFinite(container.cpuUsagePct);
+            const hasMemoryMetrics =
+              Number.isFinite(container.memoryUsageBytes) ||
+              Number.isFinite(container.memoryUsagePct);
+
+            return (
+              <div key={key}>
+                <button
+                  type="button"
+                  onClick={() => onSelectContainer(key)}
+                  className={
+                    'w-full rounded-lg border px-3 py-2 text-left transition-colors ' +
+                    (isSelected
+                      ? 'rounded-b-none border-sky-600 bg-sky-950/35 text-sky-100'
+                      : 'border-slate-700 bg-slate-950/75 text-slate-300 hover:border-sky-800/60 hover:bg-slate-900')
+                  }
+                >
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="truncate font-mono text-xs" title={title}>
+                      {title}
+                    </span>
+                    <span className="rounded-full border border-slate-600 px-2 py-0.5 text-[10px] uppercase tracking-wide text-slate-300">
+                      {stateLabel}
+                    </span>
+                  </div>
+                  <div className="mt-1 truncate text-[11px] text-slate-500" title={container.image || '-'}>
                     {container.image || '-'}
-                  </td>
-                  <td className="px-4 py-2">{container.state || '-'}</td>
-                  <td className="max-w-64 truncate px-4 py-2" title={container.status}>
+                  </div>
+                  <div className="mt-1 truncate text-[11px] text-slate-500" title={container.status || '-'}>
                     {container.status || '-'}
-                  </td>
-                  <td className="max-w-72 truncate px-4 py-2 font-mono" title={container.ports}>
-                    {container.ports || '-'}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+                  </div>
+                </button>
+
+                {isSelected && (
+                  <div className="rounded-b-lg border border-t-0 border-sky-700/70 bg-slate-950/85 px-3 py-3 text-xs text-slate-300">
+                    <div className="grid grid-cols-1 gap-2 md:grid-cols-2">
+                      <div>
+                        <div className="text-[11px] uppercase tracking-wide text-slate-500">
+                          Running For
+                        </div>
+                        <div className="font-mono text-slate-200">{container.runningFor || '-'}</div>
+                      </div>
+                      <div>
+                        <div className="text-[11px] uppercase tracking-wide text-slate-500">
+                          Created At
+                        </div>
+                        <div className="truncate text-slate-200" title={container.createdAt || '-'}>
+                          {container.createdAt || '-'}
+                        </div>
+                      </div>
+                      <div>
+                        <div className="text-[11px] uppercase tracking-wide text-slate-500">Ports</div>
+                        <div className="font-mono text-slate-200" title={container.ports || '-'}>
+                          {container.ports || '-'}
+                        </div>
+                      </div>
+                      <div>
+                        <div className="text-[11px] uppercase tracking-wide text-slate-500">ID</div>
+                        <div className="break-all font-mono text-slate-200" title={container.id || '-'}>
+                          {container.id || '-'}
+                        </div>
+                      </div>
+                    </div>
+
+                    {container.command && (
+                      <div className="mt-3">
+                        <div className="text-[11px] uppercase tracking-wide text-slate-500">Command</div>
+                        <div className="break-words font-mono text-slate-200" title={container.command}>
+                          {container.command}
+                        </div>
+                      </div>
+                    )}
+
+                    {(hasCpuMetrics || hasMemoryMetrics) && (
+                      <div className="mt-3 grid grid-cols-1 gap-2 md:grid-cols-2">
+                        <div className="rounded border border-slate-700 bg-slate-900/60 px-2 py-2">
+                          <div className="text-[11px] uppercase tracking-wide text-slate-500">CPU</div>
+                          <div className="font-mono text-slate-200">
+                            {formatCpuUsageValues(container.cpuUsageCores, container.cpuCapacityCores)}
+                          </div>
+                          <div className="text-[11px] text-slate-500">{formatPct(container.cpuUsagePct)}</div>
+                        </div>
+                        <div className="rounded border border-slate-700 bg-slate-900/60 px-2 py-2">
+                          <div className="text-[11px] uppercase tracking-wide text-slate-500">Memory</div>
+                          <div className="font-mono text-slate-200">
+                            {formatMemoryUsageValues(
+                              container.memoryUsageBytes,
+                              container.memoryCapacityBytes
+                            )}
+                          </div>
+                          <div className="text-[11px] text-slate-500">
+                            {formatPct(container.memoryUsagePct)}
+                          </div>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+            );
+          })}
         </div>
       )}
     </div>
@@ -183,7 +455,8 @@ function WorkerContainersTable({
 
 export default function WorkersPage() {
   const [pollIntervalMs, setPollIntervalMs] = useState(DEFAULT_POLL_INTERVAL_MS);
-  const [selectedContextName, setSelectedContextName] = useState<string | null>(null);
+  const [selectedNodeKey, setSelectedNodeKey] = useState<string | null>(null);
+  const [selectedContainerByWorker, setSelectedContainerByWorker] = useState<Record<string, string>>({});
 
   const snapshot = useWorkersSnapshot({
     intervalMs: pollIntervalMs,
@@ -201,63 +474,178 @@ export default function WorkersPage() {
     });
   }, [snapshot.contexts]);
 
+  const workerNodes = useMemo(() => buildNodeViews(contexts), [contexts]);
+
   useEffect(() => {
-    if (contexts.length === 0) {
-      setSelectedContextName(null);
+    if (workerNodes.length === 0) {
+      setSelectedNodeKey(null);
       return;
     }
-    if (!selectedContextName || !contexts.some((ctx) => ctx.name === selectedContextName)) {
-      setSelectedContextName(contexts[0].name);
+    if (!selectedNodeKey || !workerNodes.some((node) => node.key === selectedNodeKey)) {
+      setSelectedNodeKey(workerNodes[0].key);
     }
-  }, [contexts, selectedContextName]);
+  }, [selectedNodeKey, workerNodes]);
 
-  const selectedContext = useMemo(() => {
-    if (!selectedContextName) {
-      return contexts[0] ?? null;
+  const selectedWorker = useMemo(() => {
+    if (!selectedNodeKey) {
+      return workerNodes[0] ?? null;
     }
-    return contexts.find((ctx) => ctx.name === selectedContextName) ?? contexts[0] ?? null;
-  }, [contexts, selectedContextName]);
+    return workerNodes.find((node) => node.key === selectedNodeKey) ?? workerNodes[0] ?? null;
+  }, [selectedNodeKey, workerNodes]);
 
-  const onlineCount = contexts.filter((ctx) => ctx.status === 'ok').length;
-  const totalNodes = contexts.reduce((sum, ctx) => sum + ctx.nodes.length, 0);
-  const totalContainers = contexts.reduce((sum, ctx) => sum + ctx.containers.length, 0);
+  useEffect(() => {
+    if (!selectedWorker) {
+      return;
+    }
+
+    setSelectedContainerByWorker((previous) => {
+      const selectedContainerKey = previous[selectedWorker.key];
+      if (!selectedContainerKey) {
+        return previous;
+      }
+
+      const stillExists = selectedWorker.containers.some(
+        (container, index) => containerSelectionKey(container, index) === selectedContainerKey
+      );
+      if (stillExists) {
+        return previous;
+      }
+
+      const next = { ...previous };
+      delete next[selectedWorker.key];
+      return next;
+    });
+  }, [selectedWorker]);
+
+  const selectedContainerKey = selectedWorker
+    ? selectedContainerByWorker[selectedWorker.key] ?? null
+    : null;
+
+  const selectedContainer = useMemo(() => {
+    if (!selectedWorker || !selectedContainerKey) {
+      return null;
+    }
+    return (
+      selectedWorker.containers.find(
+        (container, index) =>
+          containerSelectionKey(container, index) === selectedContainerKey
+      ) ?? null
+    );
+  }, [selectedContainerKey, selectedWorker]);
+
+  const aggregateLogsBySource = useMemo(
+    () => parseAggregateLogsBySource(selectedWorker?.aggregateLogs || ''),
+    [selectedWorker?.aggregateLogs]
+  );
+
+  const selectedContainerLogs = useMemo(() => {
+    if (!selectedContainer) {
+      return '';
+    }
+    return resolveContainerLogs(selectedContainer, aggregateLogsBySource);
+  }, [aggregateLogsBySource, selectedContainer]);
+
+  const totalContainers = useMemo(
+    () => workerNodes.reduce((sum, node) => sum + node.containers.length, 0),
+    [workerNodes]
+  );
+  const onlineContexts = contexts.filter((context) => context.status === 'ok').length;
+
+  const cpuUsageCores = selectedWorker
+    ? pickMetricValue(selectedContainer?.cpuUsageCores, selectedWorker.node.cpuUsageCores)
+    : null;
+  const cpuCapacityCores = selectedWorker
+    ? pickMetricValue(selectedContainer?.cpuCapacityCores, selectedWorker.node.cpuCapacityCores)
+    : null;
+  const cpuUsagePct = selectedWorker
+    ? pickMetricValue(selectedContainer?.cpuUsagePct, selectedWorker.node.cpuUsagePct)
+    : null;
+
+  const memoryUsageBytes = selectedWorker
+    ? pickMetricValue(selectedContainer?.memoryUsageBytes, selectedWorker.node.memoryUsageBytes)
+    : null;
+  const memoryCapacityBytes = selectedWorker
+    ? pickMetricValue(
+        selectedContainer?.memoryCapacityBytes,
+        selectedWorker.node.memoryCapacityBytes
+      )
+    : null;
+  const memoryUsagePct = selectedWorker
+    ? pickMetricValue(selectedContainer?.memoryUsagePct, selectedWorker.node.memoryUsagePct)
+    : null;
+
+  const useContainerCpuUtilization = hasContainerCpuMetrics(selectedContainer);
+  const useContainerMemoryUtilization = hasContainerMemoryMetrics(selectedContainer);
+
+  const logsTitle = selectedContainer
+    ? `Container Logs (${selectedContainer.name || selectedContainer.id || 'selected'})`
+    : 'Aggregate Container Logs';
+  const visibleLogs = selectedContainer
+    ? selectedContainerLogs
+    : selectedWorker?.aggregateLogs || '';
+  const emptyLogsText = selectedContainer
+    ? 'No logs collected for this container yet.'
+    : 'No logs collected for this worker yet.';
+
+  function onSelectContainer(containerKey: string): void {
+    if (!selectedWorker) {
+      return;
+    }
+
+    setSelectedContainerByWorker((previous) => {
+      const current = previous[selectedWorker.key] ?? null;
+      const next = { ...previous };
+
+      if (current === containerKey) {
+        delete next[selectedWorker.key];
+      } else {
+        next[selectedWorker.key] = containerKey;
+      }
+
+      return next;
+    });
+  }
 
   return (
-    <div className="grid grid-cols-1 gap-5 lg:grid-cols-[250px_minmax(0,1fr)]">
+    <div className="grid grid-cols-1 gap-5 lg:grid-cols-[280px_minmax(0,1fr)]">
       <aside className="rounded-2xl border border-slate-800 bg-slate-900/70 p-3">
-        <div className="mb-2 text-xs uppercase tracking-wide text-slate-500">Workers</div>
+        <div className="mb-2 text-xs uppercase tracking-wide text-slate-500">Workers (Nodes)</div>
         <div className="space-y-2">
-          {contexts.map((context) => (
-            <button
-              key={context.name}
-              type="button"
-              onClick={() => setSelectedContextName(context.name)}
-              className={
-                'w-full rounded-lg border px-3 py-2 text-left text-sm ' +
-                (context.name === selectedContext?.name
-                  ? 'border-sky-600 bg-sky-900/30 text-sky-100'
-                  : 'border-slate-700 bg-slate-950 text-slate-300 hover:bg-slate-900')
-              }
-            >
-              <div className="flex items-center justify-between gap-2">
-                <span className="truncate font-mono text-xs">{context.name}</span>
-                <span
-                  className={
-                    'rounded-full border px-2 py-0.5 text-[10px] uppercase tracking-wide ' +
-                    statusPillClasses(context.status)
-                  }
-                >
-                  {context.status}
-                </span>
-              </div>
-              <div className="mt-1 truncate text-[11px] text-slate-500" title={context.host ?? ''}>
-                {(context.host ?? context.dockerEndpoint) || '-'}
-              </div>
-            </button>
-          ))}
-          {contexts.length === 0 && (
+          {workerNodes.map((workerNode) => {
+            const nodeTitle = workerNode.node.hostname || workerNode.node.id || 'unknown-node';
+            const subTitle = `${workerNode.context.name} • ${workerNode.containers.length} containers`;
+            return (
+              <button
+                key={workerNode.key}
+                type="button"
+                onClick={() => setSelectedNodeKey(workerNode.key)}
+                className={
+                  'w-full rounded-lg border px-3 py-2 text-left text-sm ' +
+                  (workerNode.key === selectedWorker?.key
+                    ? 'border-sky-600 bg-sky-900/30 text-sky-100'
+                    : 'border-slate-700 bg-slate-950 text-slate-300 hover:bg-slate-900')
+                }
+              >
+                <div className="flex items-center justify-between gap-2">
+                  <span className="truncate font-mono text-xs">{nodeTitle}</span>
+                  <span
+                    className={
+                      'rounded-full border px-2 py-0.5 text-[10px] uppercase tracking-wide ' +
+                      nodeStatusPillClasses(workerNode.node)
+                    }
+                  >
+                    {workerNode.node.status || 'unknown'}
+                  </span>
+                </div>
+                <div className="mt-1 truncate text-[11px] text-slate-500" title={subTitle}>
+                  {subTitle}
+                </div>
+              </button>
+            );
+          })}
+          {workerNodes.length === 0 && (
             <div className="rounded border border-slate-700 bg-slate-950 px-2 py-2 text-xs text-slate-500">
-              No worker contexts detected.
+              No worker nodes detected.
             </div>
           )}
         </div>
@@ -267,7 +655,7 @@ export default function WorkersPage() {
         <div>
           <h1 className="text-2xl font-semibold text-slate-100">Workers</h1>
           <p className="mt-1 text-sm text-slate-400">
-            Full worker context, node, and workload details for connected runtimes.
+            Node-specific worker state with containers, logs, and utilization.
           </p>
           <p className="mt-1 text-xs text-slate-500">
             Last updated: {formatUpdatedAt(snapshot.collectedAtMs)}
@@ -281,11 +669,11 @@ export default function WorkersPage() {
           </div>
           <div className="rounded-2xl border border-slate-800 bg-slate-900/70 p-3">
             <div className="text-xs text-slate-400">Reachable</div>
-            <div className="font-mono text-xl text-slate-100">{onlineCount}</div>
+            <div className="font-mono text-xl text-slate-100">{onlineContexts}</div>
           </div>
           <div className="rounded-2xl border border-slate-800 bg-slate-900/70 p-3">
-            <div className="text-xs text-slate-400">Nodes</div>
-            <div className="font-mono text-xl text-slate-100">{totalNodes}</div>
+            <div className="text-xs text-slate-400">Worker Nodes</div>
+            <div className="font-mono text-xl text-slate-100">{workerNodes.length}</div>
           </div>
           <div className="rounded-2xl border border-slate-800 bg-slate-900/70 p-3">
             <div className="text-xs text-slate-400">Containers</div>
@@ -320,56 +708,54 @@ export default function WorkersPage() {
             Worker snapshot error: {snapshot.error}
           </div>
         )}
-        {snapshot.collectedAtMs != null &&
-          !snapshot.dockerCliAvailable &&
-          snapshot.contexts.length === 0 && (
-          <div className="rounded-xl border border-amber-900 bg-amber-950/40 px-3 py-2 text-sm text-amber-200">
-            Docker CLI is not available in the Cartograph runtime environment.
-          </div>
-        )}
 
-        {selectedContext ? (
-          <div className="space-y-4">
-            <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">
-              <div className="rounded-2xl border border-slate-800 bg-slate-900/70 p-4">
-                <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-slate-400">
-                  Selected Worker
-                </h2>
-                <dl className="grid grid-cols-[140px_minmax(0,1fr)] gap-x-3 gap-y-2 text-sm">
-                  <WorkerDetailRow label="Context" value={selectedContext.name} />
-                  <WorkerDetailRow
-                    label="Endpoint"
-                    value={selectedContext.dockerEndpoint || '-'}
-                  />
-                  <WorkerDetailRow label="Host" value={selectedContext.host || '-'} />
-                  <WorkerDetailRow
-                    label="Current"
-                    value={selectedContext.current ? 'yes' : 'no'}
-                  />
-                  <WorkerDetailRow
-                    label="Orchestrator"
-                    value={selectedContext.orchestrator || '-'}
-                  />
-                  <WorkerDetailRow label="Source" value={selectedContext.source || '-'} />
-                  <WorkerDetailRow label="Status" value={selectedContext.status} />
-                </dl>
-              </div>
-
-              <WorkerDaemonCard daemon={selectedContext.daemon} />
+        {selectedWorker ? (
+          <>
+            <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+              <UtilizationCard
+                title={
+                  useContainerCpuUtilization
+                    ? 'CPU Utilization (Container)'
+                    : 'CPU Utilization (Worker)'
+                }
+                usageText={formatCpuUsageValues(cpuUsageCores, cpuCapacityCores)}
+                percentText={formatPct(cpuUsagePct)}
+                percentValue={cpuUsagePct}
+              />
+              <UtilizationCard
+                title={
+                  useContainerMemoryUtilization
+                    ? 'Memory Utilization (Container)'
+                    : 'Memory Utilization (Worker)'
+                }
+                usageText={formatMemoryUsageValues(memoryUsageBytes, memoryCapacityBytes)}
+                percentText={formatPct(memoryUsagePct)}
+                percentValue={memoryUsagePct}
+              />
             </div>
 
-            {selectedContext.error && (
-              <div className="rounded-xl border border-rose-900 bg-rose-950/40 px-3 py-2 text-sm text-rose-200">
-                Context error: {selectedContext.error}
-              </div>
-            )}
+            <WorkerContainerList
+              containers={selectedWorker.containers}
+              selectedContainerKey={selectedContainerKey}
+              onSelectContainer={onSelectContainer}
+            />
 
-            <WorkerNodesTable nodes={selectedContext.nodes} />
-            <WorkerContainersTable containers={selectedContext.containers} />
-          </div>
+            <div className="overflow-hidden rounded-2xl border border-slate-800 bg-slate-900/70">
+              <div className="border-b border-slate-800 px-4 py-3 text-sm font-semibold uppercase tracking-wide text-slate-400">
+                {logsTitle}
+              </div>
+              {visibleLogs ? (
+                <pre className="max-h-[420px] overflow-auto whitespace-pre-wrap break-words px-4 py-3 font-mono text-sm leading-6 text-slate-200">
+                  {visibleLogs}
+                </pre>
+              ) : (
+                <div className="px-4 py-4 text-sm text-slate-500">{emptyLogsText}</div>
+              )}
+            </div>
+          </>
         ) : (
-          <div className="rounded-2xl border border-slate-800 bg-slate-900/70 p-4 text-sm text-slate-500">
-            Select a worker context to inspect machine and container details.
+          <div className="rounded-xl border border-slate-800 bg-slate-900/70 px-3 py-3 text-sm text-slate-500">
+            Select a worker node from the sidebar.
           </div>
         )}
       </section>
