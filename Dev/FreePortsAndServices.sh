@@ -14,7 +14,7 @@ Frees host ports by:
   5) Killing remaining local processes listening on those ports
 
 Default ports (if none provided):
-  2555 3000 6379 9229 9000 9443
+  2555 3000 6379 9229
 
 Examples:
   Dev/FreePortsAndServices.sh
@@ -25,7 +25,7 @@ EOF
 
 DRY_RUN=0
 declare -a INPUT_PORTS=()
-declare -a DEFAULT_PORTS=(2555 3000 6379 9229 9000 9443)
+declare -a DEFAULT_PORTS=(2555 3000 6379 9229)
 
 while (($# > 0)); do
     case "$1" in

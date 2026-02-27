@@ -5,6 +5,8 @@ PORTAINER_NAME="${PORTAINER_NAME:-portainer}"
 PORTAINER_HTTP_PORT="${PORTAINER_HTTP_PORT:-9000}"
 PORTAINER_HTTPS_PORT="${PORTAINER_HTTPS_PORT:-9443}"
 PORTAINER_DATA_VOLUME="${PORTAINER_DATA_VOLUME:-portainer_data}"
+PORTAINER_START_RETRIES="${PORTAINER_START_RETRIES:-20}"
+PORTAINER_START_RETRY_DELAY_SECS="${PORTAINER_START_RETRY_DELAY_SECS:-1}"
 
 if ! command -v docker >/dev/null 2>&1; then
     echo "[portainer] docker CLI not found; skipping."
@@ -15,14 +17,20 @@ DOCKER=(docker)
 if ! docker info >/dev/null 2>&1; then
     if command -v sudo >/dev/null 2>&1 && sudo -n docker info >/dev/null 2>&1; then
         DOCKER=(sudo docker)
-    else
-        echo "[portainer] docker daemon not reachable yet; skipping."
-        exit 0
     fi
 fi
 
-if ! "${DOCKER[@]}" info >/dev/null 2>&1; then
-    echo "[portainer] docker daemon not reachable yet; skipping."
+daemon_ready=0
+for _ in $(seq 1 "${PORTAINER_START_RETRIES}"); do
+    if "${DOCKER[@]}" info >/dev/null 2>&1; then
+        daemon_ready=1
+        break
+    fi
+    sleep "${PORTAINER_START_RETRY_DELAY_SECS}"
+done
+
+if [ "${daemon_ready}" -ne 1 ]; then
+    echo "[portainer] docker daemon not reachable after retries; skipping."
     exit 0
 fi
 
