@@ -38,6 +38,7 @@ make linux-pi
 By default it frees `7946` on server/worker (common Docker Swarm vs MetalLB conflict).
 You can override with `SERVER_PORT_CLEANUP_PORTS` / `WORKER_PORT_CLEANUP_PORTS` in `.env`.
 Port cleanup will stop a systemd service if it owns the port, otherwise it terminates the process.
+By default it also checks server API port `6443` for conflicts (`SERVER_CLEAN_K3S_API_PORT=true`) while preserving an existing `k3s` listener unless you explicitly set `SERVER_STOP_K3S_ON_PORT_CLEANUP=true`.
 
 ## 3) Verify
 ```bash
