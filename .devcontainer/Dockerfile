@@ -3,7 +3,7 @@ FROM mcr.microsoft.com/devcontainers/base:ubuntu-24.04
 ENV DEBIAN_FRONTEND=noninteractive
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    tini less coreutils \
+    tini less coreutils acl \
     iproute2 iputils-ping net-tools dnsutils tcpdump nmap socat \
     curl wget jq openssh-client \
     build-essential g++ binutils \
