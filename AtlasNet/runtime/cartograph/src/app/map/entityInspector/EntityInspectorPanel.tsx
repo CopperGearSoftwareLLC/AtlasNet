@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from 'react';
 import type { MouseEvent as ReactMouseEvent } from 'react';
 import type { AuthorityEntityTelemetry } from '../../lib/cartographTypes';
 import { DatabaseExplorerInspector } from '../../database/components/DatabaseExplorerInspector';
-import { useEntityDatabaseDetails } from './useEntityDatabaseDetails';
+import type { EntityDatabaseDetailsState } from './useEntityDatabaseDetails';
 
 const ENTITY_INSPECTOR_DESKTOP_GRID_COLUMNS_CLASS =
   'lg:grid-cols-[minmax(0,1fr)_minmax(0,2fr)]';
@@ -14,6 +14,8 @@ interface EntityInspectorPanelProps {
   selectedEntities: AuthorityEntityTelemetry[];
   activeEntityId: string | null;
   hoveredEntityId: string | null;
+  detailsState: EntityDatabaseDetailsState;
+  playbackMode?: boolean;
   pollIntervalMs: number;
   minPollIntervalMs: number;
   maxPollIntervalMs: number;
@@ -33,6 +35,7 @@ function formatNumber(value: number, digits = 2): string {
 
 export function EntityInspectorPanel({
   activeEntityId,
+  detailsState,
   hoveredEntityId,
   maxPollIntervalMs,
   minPollIntervalMs,
@@ -42,6 +45,7 @@ export function EntityInspectorPanel({
   onClearSelection,
   onHoverEntity,
   onSelectEntity,
+  playbackMode = false,
   selectedEntities,
 }: EntityInspectorPanelProps) {
   const panelRef = useRef<HTMLDivElement | null>(null);
@@ -138,7 +142,7 @@ export function EntityInspectorPanel({
   const activeEntity =
     selectedEntities.find((entity) => entity.entityId === activeEntityId) ?? null;
   const visibleEntities = activeEntity ? [activeEntity] : selectedEntities;
-  const details = useEntityDatabaseDetails(activeEntity, pollIntervalMs);
+  const details = detailsState;
 
   if (selectedEntities.length === 0) {
     return null;
@@ -217,6 +221,7 @@ export function EntityInspectorPanel({
               max={maxPollIntervalMs}
               step={250}
               value={pollIntervalMs}
+              disabled={playbackMode}
               onChange={(event) =>
                 onSetPollIntervalMs(
                   Math.max(
@@ -226,7 +231,11 @@ export function EntityInspectorPanel({
                 )
               }
             />
-            {pollIntervalMs >= pollDisabledAtMs ? 'off' : `${pollIntervalMs}ms`}
+            {playbackMode
+              ? 'snapshot'
+              : pollIntervalMs >= pollDisabledAtMs
+                ? 'off'
+                : `${pollIntervalMs}ms`}
           </label>
 
           <button

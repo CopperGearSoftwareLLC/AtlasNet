@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react';
 import type { AuthorityEntityTelemetry } from '../../lib/cartographTypes';
 import type { EntityInspectorLookupResponse } from './types';
 
-interface EntityDatabaseDetailsState {
+export interface EntityDatabaseDetailsState {
   loading: boolean;
   error: string | null;
   data: EntityInspectorLookupResponse | null;

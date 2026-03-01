@@ -26,6 +26,9 @@ interface MapHudProps {
   onSetProjectionMode: (mode: MapProjectionMode) => void;
   interactionSensitivity: number;
   onSetInteractionSensitivity: (value: number) => void;
+  playbackActive: boolean;
+  onTakeSnapshot: () => void;
+  onResumeLive: () => void;
   pollIntervalMs: number;
   minPollIntervalMs: number;
   maxPollIntervalMs: number;
@@ -78,11 +81,14 @@ export function MapHud({
   onSetPollIntervalMs,
   onSetProjectionMode,
   onSetViewMode,
+  onResumeLive,
   onSetAuthorityLinkMode,
+  onTakeSnapshot,
   onToggleAuthorityEntities,
   onToggleGnsConnections,
   onToggleShardHoverDetails,
   authorityLinkMode,
+  playbackActive,
   pollIntervalMs,
   projectionMode,
   shardCount,
@@ -183,6 +189,24 @@ export function MapHud({
         />
         shard hover details
       </label>
+      <button
+        type="button"
+        style={hudButtonStyle(playbackActive)}
+        onClick={onTakeSnapshot}
+        title="Snapshot and pause last 30 seconds"
+      >
+        snapshot 30s
+      </button>
+      {playbackActive && (
+        <button
+          type="button"
+          style={hudButtonStyle(false)}
+          onClick={onResumeLive}
+          title="Exit snapshot playback"
+        >
+          resume live
+        </button>
+      )}
       <span style={{ opacity: 0.8 }}>
         entities: {entityCount} | shards: {shardCount}
       </span>
