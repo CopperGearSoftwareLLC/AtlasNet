@@ -1,0 +1,5 @@
+[dns]
+  # Keep BuildKit DNS on the devcontainer resolver instead of Docker's
+  # fallback public resolvers, which can be blocked in nested Docker setups.
+  nameservers = ["127.0.0.53"]
+  options = ["edns0", "trust-ad"]

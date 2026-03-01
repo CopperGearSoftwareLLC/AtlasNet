@@ -4,11 +4,13 @@
 #include <unordered_set>
 
 #include "Client/Client.hpp"
+#include "Command/ServerCommandBus.hpp"
 #include "Debug/Log.hpp"
 #include "Docker/DockerEvents.hpp"
 #include "Entity/Entity.hpp"
 #include "Entity/EntityHandle.hpp"
 #include "Entity/EntityLedger.hpp"
+#include "Entity/Transform.hpp"
 #include "Global/AtlasNet.hpp"
 #include "Global/AtlasNetApi.hpp"
 #include "Global/AtlasNetInterface.hpp"
@@ -28,34 +30,29 @@ struct KDServerRequest
 };
 using KDServerResponseType = std::vector<std::byte>;
 
-class ATLASNET_API AtlasNetServer : public AtlasNetInterface, public Singleton<AtlasNetServer>
+class ATLASNET_API IAtlasNetServer : public AtlasNetInterface
 {
 	std::shared_ptr<Log> logger = std::make_shared<Log>("AtlasNetServer");
-	std::unordered_map<AtlasEntityID, AtlasEntity> CachedEntities;
-	std::unordered_set<NetworkIdentity> ConnectedClients;
-	std::vector<AtlasEntity> IncomingCache;
-	std::vector<AtlasEntityID> OutgoingCache;
-	NetworkIdentity identity;
 
-	std::jthread ShardLogicThread;
+	static inline IAtlasNetServer* Instance = nullptr;
+	static IAtlasNetServer& GetInstance()
+	{
+		ASSERT(Instance, "ERROR");
+		return *Instance;
+	}
 
    public:
-	AtlasNetServer(){};
+	IAtlasNetServer() { Instance = this; };
 	/**
 	 * @brief
 	 *
 	 */
-	struct InitializeProperties
-	{
-		std::function<KDServerRequestType(KDServerRequest)> RequestHandleFunction;
-		// std::string ExePath;
-		std::function<void(SignalType signal)> OnShutdownRequest;
-	};
+
 	/**
 	 * @brief Initializes the AtlasNet Front end
 	 *
 	 */
-	void Initialize(InitializeProperties& properties);
+	void AtlasNet_Initialize();
 
 	/**
 	 * @brief Syncronise entity lists with your own fuck you
@@ -65,19 +62,28 @@ class ATLASNET_API AtlasNetServer : public AtlasNetInterface, public Singleton<A
 	 * track of.
 	 * @param OutgoingEntities Entity IDs of entities you should get rid of.
 	 */
-	void SyncEntities(std::span<const AtlasEntityID> ActiveEntities,
-					  std::span<const AtlasEntityID>& ReleasedEntities,
-					  std::span<const AtlasEntityHandle>& AcquiredEntities);
+	void AtlasNet_SyncEntities(std::span<const AtlasEntityID> ActiveEntities,
+							   std::span<const AtlasEntityID>& ReleasedEntities,
+							   std::span<const AtlasEntityHandle>& AcquiredEntities);
 	/**
 	Simple get local entities
 	*/
 
-	[[nodiscard]] AtlasEntityHandle CreateEntity(const Transform& t,
-												 std::span<const uint8_t> metadata = {});
-	[[nodiscard]] AtlasEntityHandle CreateClientEntity(ClientID c_id, const Transform& t,
-													   std::span<const uint8_t> metadata = {});
+	[[nodiscard]] AtlasEntityHandle AtlasNet_CreateEntity(const Transform& t,
+														  std::span<const uint8_t> metadata = {});
+	[[nodiscard]] AtlasEntityHandle AtlasNet_CreateClientEntity(
+		ClientID c_id, const Transform& t, std::span<const uint8_t> metadata = {});
+	struct ClientSpawnInfo
+	{
+		Client client;
+		Transform spawnLocation;  // Determined by handshake service
+	};
+	virtual void OnClientSpawn(const ClientSpawnInfo& c) = 0;
+
+	ServerCommandBus& GetCommandBus() { return commandbus; }
 
    private:
+	ServerCommandBus commandbus;
 	AtlasEntity Internal_CreateEntity(const Transform& t, std::span<const uint8_t> metadata = {});
 	void ShardLogicEntry(std::stop_token st);
 };

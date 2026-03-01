@@ -5,7 +5,7 @@
 #include "Global/Serialize/ByteReader.hpp"
 #include "Global/Serialize/ByteWriter.hpp"
 #include "Global/pch.hpp"
-
+#include "Global/Types/FixedString.hpp"
 using PacketTypeID = uint32_t;
 
 class IPacket
@@ -84,17 +84,7 @@ public:
 private:
     std::unordered_map<PacketTypeID, FactoryFn> factories;
 };
-template <size_t N>
-struct FixedString
-{
-    char value[N];
 
-    constexpr FixedString(const char (&str)[N])
-    {
-        for (size_t i = 0; i < N; ++i)
-            value[i] = str[i];
-    }
-};
 static constexpr uint32_t HashString(const char* str)
 {
     uint32_t hash = 2166136261u;
@@ -131,7 +121,7 @@ public:
     }
 };
 
-#define ATLASNET_REGISTER_PACKET(Type, Name)                     \
+#define ATLASNET_REGISTER_PACKET(Type)                     \
     static const bool Type##_registered = []() -> bool {         \
         PacketRegistry::Get().Register(HashString(Type::GetPacketNameStatic().data()),         \
                                        &Type::Create);           \

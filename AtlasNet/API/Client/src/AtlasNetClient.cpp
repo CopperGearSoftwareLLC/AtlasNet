@@ -1,6 +1,7 @@
 #include "AtlasNetClient.hpp"
 
 #include "Client/ClientLink.hpp"
+#include "Command/ClientCommandBus.hpp"
 #include "Docker/DockerIO.hpp"
 #include "Interlink/Interlink.hpp"
 #include "Global/Misc/UUID.hpp"

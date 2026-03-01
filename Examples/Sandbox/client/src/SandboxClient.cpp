@@ -1,21 +1,16 @@
 #include "SandboxClient.hpp"
+
+#include <thread>
+
+#include "AtlasNetClient.hpp"
+#include "Command/NetCommand.hpp"
+#include "Commands/GameClientInputCommand.hpp"
+#include "Commands/GameStateCommand.hpp"
 #include "Network/IPAddress.hpp"
 #include "imgui.h"
 #include "imgui_impl_glfw.h"
 #include "imgui_impl_opengl3.h"
 #include "implot.h"
-#include <thread>
-void SandboxClient::Startup()
-{
-	SetImGui();
-	if (!GUIEnabled)
-	{
-		logger.Warning("failed to initialize GUI. Running headless");
-	}
-	AtlasNetClient::InitializeProperties properties;
-	properties.AtlasNetProxyIP = IPAddress::MakeLocalHost(_PORT_PROXY_PUBLISHED);
-	AtlasNetClient::Get().Initialize(properties);
-}
 
 void SandboxClient::SetImGui()
 {
@@ -51,7 +46,7 @@ void SandboxClient::SetImGui()
 	io.Fonts->AddFontDefault(&fontconfig);
 	io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;  // Enable Keyboard Controls
 	io.ConfigFlags |= ImGuiConfigFlags_NavEnableGamepad;   // Enable Gamepad Controls
-	//io.ConfigFlags |= ImGuiConfigFlags_DockingEnable;
+	// io.ConfigFlags |= ImGuiConfigFlags_DockingEnable;
 	ImGui_ImplGlfw_InitForOpenGL(*window, true);
 	ImGui_ImplOpenGL3_Init("#version 330");
 	GUIEnabled = true;
@@ -59,8 +54,7 @@ void SandboxClient::SetImGui()
 
 void SandboxClient::RenderView()
 {
-	ImGuiWindowFlags window_flags = 
-									ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoResize |
+	ImGuiWindowFlags window_flags = ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoResize |
 									ImGuiWindowFlags_NoMove |
 									ImGuiWindowFlags_NoBringToFrontOnFocus |
 									ImGuiWindowFlags_NoNavFocus | ImGuiWindowFlags_NoBackground;
@@ -68,7 +62,7 @@ void SandboxClient::RenderView()
 	const ImGuiViewport *viewport = ImGui::GetMainViewport();
 	ImGui::SetNextWindowPos(viewport->Pos);
 	ImGui::SetNextWindowSize(viewport->Size);
-	//ImGui::SetNextWindowViewport(viewport->ID);
+	// ImGui::SetNextWindowViewport(viewport->ID);
 
 	ImGui::PushStyleVar(ImGuiStyleVar_WindowRounding, 0.0f);
 	ImGui::PushStyleVar(ImGuiStyleVar_WindowBorderSize, 0.0f);
@@ -106,10 +100,17 @@ void SandboxClient::RenderView()
 	ImGui::End();
 }
 
-void SandboxClient::Run()
+void SandboxClient::Run(const IPAddress &address)
 {
-
-	Startup();
+	SetImGui();
+	if (!GUIEnabled)
+	{
+		logger.Warning("failed to initialize GUI. Running headless");
+	}
+	AtlasNetClient::InitializeProperties properties;
+	logger.DebugFormatted("Connecting To AtlasNet at {}", address.ToString());
+	properties.AtlasNetProxyIP = address;
+	AtlasNetClient::Get().Initialize(properties);
 
 	using clock = std::chrono::high_resolution_clock;
 	auto previous = clock::now();
@@ -117,6 +118,9 @@ void SandboxClient::Run()
 	{
 		ShouldDisconnect = ShouldDisconnect || glfwWindowShouldClose(*window);
 	}
+	AtlasNetClient::Get().GetCommandBus().Subscribe<GameStateCommand>(
+		[this](const NetServerStateHeader&, const GameStateCommand &c)
+		{ logger.Debug("Received a command of GameStateCommand"); });
 	while (!ShouldDisconnect)
 	{
 		auto now = clock::now();
@@ -126,6 +130,9 @@ void SandboxClient::Run()
 
 		AtlasNetClient::Get().Tick();
 
+		AtlasNetClient::Get().GetCommandBus().Dispatch(GameClientInputCommand{});
+
+		AtlasNetClient::Get().GetCommandBus().Flush();
 		// Print positions every second
 		// scene.printPositions();
 
@@ -140,7 +147,7 @@ void SandboxClient::Run()
 			ImGui_ImplOpenGL3_NewFrame();
 			ImGui_ImplGlfw_NewFrame();
 			ImGui::NewFrame();
-			//ImGui::ShowDemoWindow();
+			// ImGui::ShowDemoWindow();
 			RenderView();
 			ImGui::EndFrame();
 			ImGui::Render();
@@ -150,4 +157,8 @@ void SandboxClient::Run()
 			glfwPollEvents();
 		}
 	}
+}
+void SandboxClient::OnGameStateCommand(const NetServerStateHeader &header,
+									   const GameStateCommand &command)
+{
 }

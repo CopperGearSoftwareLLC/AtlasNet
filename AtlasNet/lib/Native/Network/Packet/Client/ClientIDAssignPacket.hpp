@@ -22,4 +22,4 @@ class ClientIDAssignPacket
    public:
 	NetworkIdentity AssignedClientID;
 };
-ATLASNET_REGISTER_PACKET(ClientIDAssignPacket,"ClientIDAssignPacket");
+ATLASNET_REGISTER_PACKET(ClientIDAssignPacket);

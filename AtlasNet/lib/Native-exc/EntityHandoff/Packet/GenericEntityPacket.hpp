@@ -45,4 +45,4 @@ class GenericEntityPacket
 	}
 };
 
-ATLASNET_REGISTER_PACKET(GenericEntityPacket, "GenericEntityPacket");
+ATLASNET_REGISTER_PACKET(GenericEntityPacket);

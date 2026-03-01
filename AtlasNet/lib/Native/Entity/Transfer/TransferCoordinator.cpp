@@ -9,6 +9,7 @@
 #include "Entity/Packet/EntityTransferPacket.hpp"
 #include "Entity/Transfer/TransferData.hpp"
 #include "Entity/Transfer/TransferManifest.hpp"
+#include "Entity/Transform.hpp"
 #include "Global/Misc/UUID.hpp"
 #include "Global/pch.hpp"
 #include "Interlink/Interlink.hpp"
@@ -44,30 +45,38 @@ void TransferCoordinator::ParseEntitiesForTargets()
 		// transfered
 		if (EntitiesInTransfer.contains(entityID))
 		{
-		//	logger.ErrorFormatted("Entiy {} already marked as in transfer",
-		//						  UUIDGen::ToString(entityID));
+			//	logger.ErrorFormatted("Entiy {} already marked as in transfer",
+			//						  UUIDGen::ToString(entityID));
 			continue;
 		}
+		std::optional<Transform> entityTransform = EntityLedger::Get()._ReadLock(
+			[&]() -> std::optional<Transform>
+			{
+				if (EntityLedger::Get().ExistsEntity(entityID) &&
+					!EntityLedger::Get().IsEntityClient(entityID))
+				{
+					return EntityLedger::Get().GetEntityMinimal(entityID).transform;
+				}
+				return std::nullopt;
+			});
 
-		if (EntityLedger::Get().IsEntityClient(entityID))
+		if (!entityTransform.has_value())
 		{
-			logger.ErrorFormatted("Client Transfering is not yet implemented, Entity ID {}",
-								  UUIDGen::ToString(entityID));
 			continue;
 		}
 		// Get the Bounds ID at the entity position
-		const std::optional<IBounds::BoundsID> boundsID = heuristic->QueryPosition(
-			EntityLedger::Get().GetEntity(entityID).data.transform.position);
+		const std::optional<IBounds::BoundsID> boundsID =
+			heuristic->QueryPosition(entityTransform->position);
 
 		// if not a bound, aka outside any bound then continue
 		if (!boundsID.has_value())
 		{
-		//	logger.ErrorFormatted("Entiy {}, was not able to find a correspoinding bound",
-		//						  UUIDGen::ToString(entityID));
+			//	logger.ErrorFormatted("Entiy {}, was not able to find a correspoinding bound",
+			//						  UUIDGen::ToString(entityID));
 			continue;
 		}
-		//logger.ErrorFormatted("Entiy {} scheduled for transfer to {}", UUIDGen::ToString(entityID),
-		//					  *boundsID);
+		// logger.ErrorFormatted("Entiy {} scheduled for transfer to {}",
+		// UUIDGen::ToString(entityID), 					  *boundsID);
 		NewEntityTransfers[*boundsID].entityIDs.push_back(entityID);
 
 		// heuristic->QueryPosition(vec3 p)
@@ -260,7 +269,7 @@ void TransferCoordinator::OnEntityTransferPacketArrival(const EntityTransferPack
 			EntityTransfers.erase(EntityTransfers.get<TransferByID>().find(p.TransferID));
 			logger.DebugFormatted("Entity Transfer Complete\n - ID:{}",
 								  UUIDGen::ToString(p.TransferID));
-								  TransferManifest::Get().DeleteTransferInfo(p.TransferID);
+			TransferManifest::Get().DeleteTransferInfo(p.TransferID);
 		}
 		break;
 	}

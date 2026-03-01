@@ -20,31 +20,30 @@ class ClientLink : public Singleton<ClientLink>
 	void Init();
 	void ConnectToAtlasNet(const IPAddress& address);
 
-	void OnSteamNetConnectionStatusChanged(
-		SteamNetConnectionStatusChangedCallback_t* pInfo);
+	void OnSteamNetConnectionStatusChanged(SteamNetConnectionStatusChangedCallback_t* pInfo);
 
 	PacketManager& GetPacketManager() { return packet_manager; }
 
+	constexpr const NetworkIdentity& GetManagingProxy() const {return ManagingProxy;}
    private:
 	void OnConnected(SteamNetConnectionStatusChangedCallback_t* pInfo);
-	std::jthread TickThread;
 	void Update();
-
-	HSteamNetPollGroup poll_group;
 
 	void InitGNS();
 
 	void ReceiveMessages();
 
-	void OnClientIDAssignedPacket(const ClientIDAssignPacket& clientIDPacket,const PacketManager::PacketInfo&);
+	void OnClientIDAssignedPacket(const ClientIDAssignPacket& clientIDPacket,
+								  const PacketManager::PacketInfo&);
 
+	std::jthread TickThread;
+	HSteamNetPollGroup poll_group;
 	PacketManager packet_manager;
-	
-	PacketManager::Subscription ClientIDAssignSub =
-		packet_manager.Subscribe<ClientIDAssignPacket>(
-			[&](const ClientIDAssignPacket& clientIDPacket,const PacketManager::PacketInfo& info)
-			{ OnClientIDAssignedPacket(clientIDPacket,info); });
+	PacketManager::Subscription ClientIDAssignSub;
 	Log logger = Log("ClientLink");
+
+	NetworkIdentity ManagingProxy;
+
 	struct IndexByState
 	{
 	};
@@ -60,14 +59,12 @@ class ClientLink : public Singleton<ClientLink>
 			// non-unique by connection state
 			boost::multi_index::ordered_non_unique<
 				boost::multi_index::tag<IndexByState>,
-				boost::multi_index::member<Connection, ConnectionState,
-										   &Connection::state>>,
+				boost::multi_index::member<Connection, ConnectionState, &Connection::state>>,
 			// non-unique, the reason its non unique is because GameClient on
 			// connection dont have an ID
 			boost::multi_index::ordered_non_unique<
 				boost::multi_index::tag<IndexByTarget>,
-				boost::multi_index::member<Connection, NetworkIdentity,
-										   &Connection::target>>,
+				boost::multi_index::member<Connection, NetworkIdentity, &Connection::target>>,
 			// Unique By HConnection
 			boost::multi_index::ordered_non_unique<
 				boost::multi_index::tag<IndexByHSteamNetConnection>,

@@ -2,6 +2,7 @@
 
 #include <thread>
 
+#include "Command/CommandRouter.hpp"
 #include "Debug/Crash/CrashHandler.hpp"
 #include "Events/EventSystem.hpp"
 #include "Global/Misc/UUID.hpp"
@@ -32,6 +33,7 @@ void Proxy::Init()
 	NetworkCredentials::Make(NetworkIdentity(NetworkIdentityType::eProxy, UUIDGen::Gen()));
 
 	Interlink::Get().Init();
+	CommandRouter::Ensure();
 	NetworkManifest::Get().ScheduleNetworkPings();
 	HealthManifest::Get().ScheduleHealthPings();
 	EventSystem::Get().Init();

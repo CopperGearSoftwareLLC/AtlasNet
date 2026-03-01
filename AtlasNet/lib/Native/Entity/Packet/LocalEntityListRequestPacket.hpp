@@ -86,4 +86,4 @@ class LocalEntityListRequestPacket
 		return false;  // any other status
 	}
 };
-ATLASNET_REGISTER_PACKET(LocalEntityListRequestPacket, "LocalEntityListRequestPacket");
+ATLASNET_REGISTER_PACKET(LocalEntityListRequestPacket);

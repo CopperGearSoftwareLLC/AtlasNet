@@ -9,7 +9,7 @@
 #include "Global/Serialize/ByteWriter.hpp"
 #include "Network/NetworkIdentity.hpp"
 #include "Network/Packet/Packet.hpp"
-#include "Entity/EntityEnums.hpp"
+#include "Client/ClientEnums.hpp"
 class ClientTransferPacket : public TPacket<ClientTransferPacket, "ClientTransferPacket">
 {
 	public:
@@ -240,4 +240,4 @@ class ClientTransferPacket : public TPacket<ClientTransferPacket, "ClientTransfe
 	}
 	[[nodiscard]] bool ValidateData() const override { return true; }
 };
-ATLASNET_REGISTER_PACKET(ClientTransferPacket, "ClientTransferPacket");
+ATLASNET_REGISTER_PACKET(ClientTransferPacket);

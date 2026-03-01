@@ -9,6 +9,7 @@ BAKE_FILE="${BAKE_FILE:-$(dirname "$0")/Dockerfiles/docker-bake.json}"
 
 # Builder name
 BUILDER_NAME="atlasnet-builder"
+BUILDKITD_CONFIG="${BUILDKITD_CONFIG:-$(dirname "$0")/buildkitd.toml}"
 
 usage() {
     echo "Usage: $0 [-p platforms] [-f bake_file]"
@@ -44,19 +45,43 @@ if ! docker buildx version >/dev/null 2>&1; then
     exit 1
 fi
 
-# Create builder if it doesn't exist
-if ! docker buildx inspect "$BUILDER_NAME" >/dev/null 2>&1; then
+create_builder() {
     echo "==> Creating buildx builder: $BUILDER_NAME"
     docker buildx create \
         --name "$BUILDER_NAME" \
         --driver docker-container \
+        --driver-opt network=host \
+        --buildkitd-config "$BUILDKITD_CONFIG" \
+        --buildkitd-flags '--allow-insecure-entitlement=network.host' \
         --use
+}
+
+recreate_builder() {
+    echo "==> Recreating buildx builder: $BUILDER_NAME"
+    docker buildx rm -f "$BUILDER_NAME" >/dev/null 2>&1 || true
+    create_builder
+}
+
+# Create builder if it doesn't exist
+if ! docker buildx inspect "$BUILDER_NAME" >/dev/null 2>&1; then
+    create_builder
 else
     docker buildx use "$BUILDER_NAME"
 fi
 
 # Bootstrap builder (enables QEMU for cross-arch)
-docker buildx inspect --bootstrap
+docker buildx inspect "$BUILDER_NAME" --bootstrap
+
+# Self-heal if builder config drifted (common after Dev Container reopen).
+if ! docker buildx inspect "$BUILDER_NAME" | grep -q 'network="host"'; then
+    recreate_builder
+    docker buildx inspect "$BUILDER_NAME" --bootstrap
+fi
+
+if ! docker buildx inspect "$BUILDER_NAME" | grep -q "File#$(basename "$BUILDKITD_CONFIG"):"; then
+    recreate_builder
+    docker buildx inspect "$BUILDER_NAME" --bootstrap
+fi
 
 echo "==> Building images in parallel with BuildKit..."
 

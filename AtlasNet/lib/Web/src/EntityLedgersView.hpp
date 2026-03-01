@@ -60,9 +60,9 @@ class EntityLedgersView
 				e.ClientID = UUIDGen::ToString(ae.Client_ID);
 				e.EntityID = UUIDGen::ToString(ae.Entity_ID);
 				e.ISClient = ae.IsClient;
-				e.positionx = ae.data.transform.position.x;
-				e.positiony = ae.data.transform.position.y;
-				e.positionz = ae.data.transform.position.z;
+				e.positionx = ae.transform.position.x;
+				e.positiony = ae.transform.position.y;
+				e.positionz = ae.transform.position.z;
 				e.WorldID = 0;
 
 				EntityListResponses.push_back(e);

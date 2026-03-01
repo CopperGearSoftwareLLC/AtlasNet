@@ -1,6 +1,7 @@
 
 #pragma once
 #include <atomic>
+#include <boost/container/flat_map.hpp>
 #include <unordered_map>
 
 #include "Debug/Log.hpp"
@@ -34,9 +35,10 @@ class PacketManager
 
 	struct Subscription
 	{
-		private:
+	   private:
 		Log logger = Log("Subscription");
-		public:
+
+	   public:
 		PacketManager* owner = nullptr;
 		PacketTypeID type{};
 		uint64_t id = 0;
@@ -68,7 +70,7 @@ class PacketManager
 		{
 			if (owner)
 			{
-				logger.DebugFormatted("Deactivated subscription ID {}",id);
+				logger.DebugFormatted("Deactivated subscription ID {}", id);
 				owner->Deactivate(type, id);
 				owner = nullptr;
 			}
@@ -91,7 +93,7 @@ class PacketManager
 			std::lock_guard lock(m_mutex);
 			m_callbacks[TPacket::TypeID].push_back(std::move(entry));
 		}
-				logger.DebugFormatted("New subscription to {}, ID {}",TPacket::GetPacketNameStatic(),id);
+		logger.DebugFormatted("New subscription to {}, ID {}", TPacket::GetPacketNameStatic(), id);
 
 		return Subscription{this, TPacket::TypeID, id};
 	}
@@ -105,7 +107,7 @@ class PacketManager
 			auto it = m_callbacks.find(type);
 			if (it == m_callbacks.end())
 			{
-				//logger.DebugFormatted("Dispatching 0 callbacks to {}",
+				// logger.DebugFormatted("Dispatching 0 callbacks to {}",
 				//			  pkt.GetPacketName());
 				return;
 			}
@@ -113,9 +115,9 @@ class PacketManager
 			snapshot.reserve(it->second.size());
 			for (auto& e : it->second) snapshot.push_back(e.get());
 		}
-		//logger.DebugFormatted("Dispatching {} callbacks to {}", snapshot.size(),
+		// logger.DebugFormatted("Dispatching {} callbacks to {}", snapshot.size(),
 		//					  pkt.GetPacketName());
-		// Hot path: no locks held
+		//  Hot path: no locks held
 		for (auto* e : snapshot)
 		{
 			if (e->alive.load(std::memory_order_acquire))
@@ -153,7 +155,8 @@ class PacketManager
 	}
 
    private:
-	std::unordered_map<PacketTypeID, std::vector<std::unique_ptr<CallbackEntry>>> m_callbacks;
+	boost::container::flat_map<PacketTypeID, std::vector<std::unique_ptr<CallbackEntry>>>
+		m_callbacks;
 
 	std::mutex m_mutex;
 	std::atomic<uint64_t> m_nextId{1};
