@@ -147,34 +147,52 @@ else
 fi
 
 write_host_kubeconfig() {
-    local server_lb host_cfg api_port
-    server_lb="k3d-${CLUSTER_NAME}-serverlb"
-    if ! docker ps --format '{{.Names}}' | grep -Fxq "$server_lb"; then
-        return
-    fi
-
-    api_port="$(docker inspect --format '{{with index .NetworkSettings.Ports "6443/tcp"}}{{(index . 0).HostPort}}{{end}}' "$server_lb" 2>/dev/null || true)"
-    if [[ -z "$api_port" ]]; then
-        return
-    fi
-
+    local server_lb host_cfg api_port cluster server_url
     host_cfg="${ATLASNET_HOST_KUBECONFIG:-$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)/Dev/.kube/k3d-${CLUSTER_NAME}-host.yaml}"
     mkdir -p "$(dirname "$host_cfg")"
 
-    k3d kubeconfig get "$CLUSTER_NAME" >"$host_cfg"
+    if ! k3d kubeconfig get "$CLUSTER_NAME" >"$host_cfg"; then
+        echo "Error: failed to write host kubeconfig for cluster '$CLUSTER_NAME' to '$host_cfg'." >&2
+        exit 1
+    fi
+    if [[ ! -s "$host_cfg" ]]; then
+        echo "Error: host kubeconfig file '$host_cfg' is empty after write." >&2
+        exit 1
+    fi
+    chmod 600 "$host_cfg" 2>/dev/null || true
+
+    server_lb="k3d-${CLUSTER_NAME}-serverlb"
+    if docker ps --format '{{.Names}}' | grep -Fxq "$server_lb"; then
+        api_port="$(docker inspect --format '{{with index .NetworkSettings.Ports "6443/tcp"}}{{(index . 0).HostPort}}{{end}}' "$server_lb" 2>/dev/null || true)"
+    fi
+
+    # Fallback: infer the API port from the kubeconfig endpoint when possible.
+    if [[ -z "${api_port:-}" ]] && command -v kubectl >/dev/null 2>&1; then
+        server_url="$(kubectl --kubeconfig "$host_cfg" config view --minify -o jsonpath='{.clusters[0].cluster.server}' 2>/dev/null || true)"
+        if [[ "$server_url" =~ ^https://(0\.0\.0\.0|127\.0\.0\.1):([0-9]+)$ ]]; then
+            api_port="${BASH_REMATCH[2]}"
+        fi
+    fi
+
     if command -v kubectl >/dev/null 2>&1; then
-        local cluster
         cluster="$(kubectl --kubeconfig "$host_cfg" config view --minify -o jsonpath='{.contexts[0].context.cluster}' 2>/dev/null || true)"
-        if [[ -n "$cluster" ]]; then
+        if [[ -n "$cluster" && -n "${api_port:-}" ]]; then
             kubectl --kubeconfig "$host_cfg" config set-cluster "$cluster" --server "https://127.0.0.1:${api_port}" >/dev/null 2>&1 || true
         fi
     fi
-    # Fallback text rewrite in case kubectl config set-cluster is unavailable.
-    sed -i -E "s#https://0\\.0\\.0\\.0:[0-9]+#https://127.0.0.1:${api_port}#g" "$host_cfg" || true
+
+    if [[ -n "${api_port:-}" ]]; then
+        # Fallback text rewrite in case kubectl config set-cluster is unavailable.
+        sed -i -E "s#https://0\\.0\\.0\\.0:[0-9]+#https://127.0.0.1:${api_port}#g" "$host_cfg" || true
+    fi
     HOST_KUBECONFIG_PATH="$host_cfg"
 
     echo "==> Host kubeconfig written: $host_cfg"
-    echo "==> Host API endpoint: https://127.0.0.1:${api_port}"
+    if [[ -n "${api_port:-}" ]]; then
+        echo "==> Host API endpoint: https://127.0.0.1:${api_port}"
+    else
+        echo "==> Host API endpoint: using k3d-emitted server address from kubeconfig."
+    fi
     echo "==> Headlamp: import/use this kubeconfig file on your host."
 }
 
@@ -185,48 +203,81 @@ sync_headlamp_default_kubeconfig() {
         return
     fi
 
-    local source_cfg target_cfg source_ctx source_cluster source_user tmp_cfg
+    local source_cfg target_cfg source_ctx source_cluster source_user tmp_cfg default_kubectl_cfg
+    local -a target_cfgs=()
+    local -A seen_targets=()
     source_cfg="${HOST_KUBECONFIG_PATH:-}"
     if [[ -z "$source_cfg" || ! -f "$source_cfg" ]]; then
         return
     fi
 
-    target_cfg="${ATLASNET_HEADLAMP_KUBECONFIG_PATH:-$HOME/.kube/config}"
-    mkdir -p "$(dirname "$target_cfg")"
-    touch "$target_cfg"
-
-    if [[ "$source_cfg" == "$target_cfg" ]]; then
-        echo "==> Headlamp/default kubeconfig already at $target_cfg"
-        return
+    default_kubectl_cfg="$HOME/.kube/config"
+    if [[ -n "${ATLASNET_HEADLAMP_KUBECONFIG_PATH:-}" ]]; then
+        target_cfg="$ATLASNET_HEADLAMP_KUBECONFIG_PATH"
+    else
+        target_cfg="$default_kubectl_cfg"
     fi
 
-    if ! command -v kubectl >/dev/null 2>&1; then
-        cp "$source_cfg" "$target_cfg"
-        chmod 600 "$target_cfg" 2>/dev/null || true
-        echo "==> kubectl not found; copied kubeconfig to $target_cfg"
-        return
+    # Always keep both the preferred target and ~/.kube/config up to date.
+    target_cfgs+=("$target_cfg" "$default_kubectl_cfg")
+
+    source_ctx=""
+    source_cluster=""
+    source_user=""
+    if command -v kubectl >/dev/null 2>&1; then
+        source_ctx="$(kubectl --kubeconfig "$source_cfg" config current-context 2>/dev/null || true)"
+        source_cluster="$(kubectl --kubeconfig "$source_cfg" config view --minify -o jsonpath='{.contexts[0].context.cluster}' 2>/dev/null || true)"
+        source_user="$(kubectl --kubeconfig "$source_cfg" config view --minify -o jsonpath='{.contexts[0].context.user}' 2>/dev/null || true)"
     fi
 
-    source_ctx="$(kubectl --kubeconfig "$source_cfg" config current-context 2>/dev/null || true)"
-    source_cluster="$(kubectl --kubeconfig "$source_cfg" config view --minify -o jsonpath='{.contexts[0].context.cluster}' 2>/dev/null || true)"
-    source_user="$(kubectl --kubeconfig "$source_cfg" config view --minify -o jsonpath='{.contexts[0].context.user}' 2>/dev/null || true)"
+    for target_cfg in "${target_cfgs[@]}"; do
+        if [[ -n "${seen_targets[$target_cfg]:-}" ]]; then
+            continue
+        fi
+        seen_targets["$target_cfg"]=1
 
-    KUBECONFIG="$target_cfg" kubectl config delete-context "$source_ctx" >/dev/null 2>&1 || true
-    KUBECONFIG="$target_cfg" kubectl config delete-cluster "$source_cluster" >/dev/null 2>&1 || true
-    if [[ -n "$source_user" ]]; then
-        KUBECONFIG="$target_cfg" kubectl config unset "users.${source_user}" >/dev/null 2>&1 || true
-    fi
+        mkdir -p "$(dirname "$target_cfg")"
+        touch "$target_cfg"
 
-    tmp_cfg="$(mktemp /tmp/atlasnet-headlamp-kubeconfig-XXXX.yaml)"
-    KUBECONFIG="$target_cfg:$source_cfg" kubectl config view --flatten >"$tmp_cfg"
-    chmod 600 "$tmp_cfg" 2>/dev/null || true
-    mv "$tmp_cfg" "$target_cfg"
+        if [[ "$source_cfg" == "$target_cfg" ]]; then
+            echo "==> Headlamp/default kubeconfig already at $target_cfg"
+            continue
+        fi
 
-    if [[ -n "$source_ctx" ]]; then
-        KUBECONFIG="$target_cfg" kubectl config use-context "$source_ctx" >/dev/null 2>&1 || true
-    fi
+        # Dedicated files get a full overwrite so host tools always see latest cluster config.
+        if [[ "$target_cfg" != "$default_kubectl_cfg" ]]; then
+            tmp_cfg="$(mktemp /tmp/atlasnet-headlamp-kubeconfig-XXXX.yaml)"
+            cp "$source_cfg" "$tmp_cfg"
+            chmod 600 "$tmp_cfg" 2>/dev/null || true
+            mv "$tmp_cfg" "$target_cfg"
+            echo "==> Headlamp kubeconfig file updated: $target_cfg"
+            continue
+        fi
 
-    echo "==> Headlamp/default kubeconfig updated: $target_cfg"
+        # Default kubectl config is merged to preserve other clusters.
+        if ! command -v kubectl >/dev/null 2>&1; then
+            cp "$source_cfg" "$target_cfg"
+            chmod 600 "$target_cfg" 2>/dev/null || true
+            echo "==> kubectl not found; copied kubeconfig to $target_cfg"
+            continue
+        fi
+
+        KUBECONFIG="$target_cfg" kubectl config delete-context "$source_ctx" >/dev/null 2>&1 || true
+        KUBECONFIG="$target_cfg" kubectl config delete-cluster "$source_cluster" >/dev/null 2>&1 || true
+        if [[ -n "$source_user" ]]; then
+            KUBECONFIG="$target_cfg" kubectl config unset "users.${source_user}" >/dev/null 2>&1 || true
+        fi
+
+        tmp_cfg="$(mktemp /tmp/atlasnet-headlamp-kubeconfig-XXXX.yaml)"
+        KUBECONFIG="$target_cfg:$source_cfg" kubectl config view --flatten >"$tmp_cfg"
+        chmod 600 "$tmp_cfg" 2>/dev/null || true
+        mv "$tmp_cfg" "$target_cfg"
+
+        if [[ -n "$source_ctx" ]]; then
+            KUBECONFIG="$target_cfg" kubectl config use-context "$source_ctx" >/dev/null 2>&1 || true
+        fi
+        echo "==> Headlamp/default kubeconfig updated: $target_cfg"
+    done
 }
 
 TEMP_KUBECONFIG="$(mktemp /tmp/k3d-kubeconfig-XXXX.yaml)"

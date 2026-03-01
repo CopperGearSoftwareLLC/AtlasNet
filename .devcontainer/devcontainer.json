@@ -18,7 +18,8 @@
     "--security-opt=seccomp=unconfined"    // Docker default seccomp blocks perf_event_open
   ],
   "mounts": [
-    "source=/var/run/docker.sock,target=/var/run/docker.sock,type=bind"
+    "source=/var/run/docker.sock,target=/var/run/docker.sock,type=bind",
+    "source=${localEnv:HOME}/.kube,target=/home/vscode/.kube,type=bind"
   ],
   "containerEnv": {
     "DOCKER_HOST": "unix:///var/run/docker.sock",
