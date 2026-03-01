@@ -12,6 +12,7 @@ export interface ShapeJS {
   size?: Vec2;
   points?: Vec2[];
   color?: string;
+  label?: string;
 }
 
 export interface ConnectionTelemetry {
@@ -54,6 +55,27 @@ export interface AuthorityEntityTelemetry {
   z: number;
   isClient: boolean;
   clientId: string;
+}
+
+export type AuthorityLinkMode = 'owner' | 'handoff';
+
+export type TransferManifestStage =
+  | 'eNone'
+  | 'ePrepare'
+  | 'eReady'
+  | 'eCommit'
+  | 'eComplete'
+  | 'eUnknown';
+
+export type TransferLinkState = 'source' | 'target';
+
+export interface TransferManifestTelemetry {
+  transferId: string;
+  fromId: string;
+  toId: string;
+  stage: TransferManifestStage;
+  state: TransferLinkState;
+  entityIds: string[];
 }
 
 export interface DatabaseRecord {

@@ -8,11 +8,20 @@ const HEALTH_PING_KEY = 'Health_Ping';
 const NETWORK_TELEMETRY_KEY = 'Network_Telemetry';
 const HEURISTIC_MANIFEST_KEY = 'HeuristicManifest';
 const NODE_MANIFEST_SHARD_NODE_KEY = 'Node Manifest Shard_Node';
+const TRANSFER_MANIFEST_KEY = 'Transfer::TransferManifest';
 
 const AUTHORITY_TELEMETRY_COLUMN_COUNT = 7;
 const NETWORK_TELEMETRY_COLUMN_COUNT = 13;
 const GRID_SHAPE_SERIALIZED_SIZE_BYTES = 28;
 const CLAIMED_OWNER_MAP_CACHE_TTL_MS = 500;
+const TRANSFER_STAGE_SOURCE_STATES = new Set(['eNone', 'ePrepare', 'eUnknown']);
+const VALID_TRANSFER_STAGES = new Set([
+  'eNone',
+  'ePrepare',
+  'eReady',
+  'eCommit',
+  'eComplete',
+]);
 
 const NETWORK_IDENTITY_TYPE_BY_CODE = {
   0: 'eInvalid',
@@ -260,6 +269,59 @@ function getManifestEntryValues(section) {
   return [];
 }
 
+function normalizeTransferStage(value) {
+  const stage = typeof value === 'string' ? value.trim() : '';
+  return VALID_TRANSFER_STAGES.has(stage) ? stage : 'eUnknown';
+}
+
+function deriveTransferLinkState(stage) {
+  return TRANSFER_STAGE_SOURCE_STATES.has(stage) ? 'source' : 'target';
+}
+
+function toTrimmedString(value) {
+  return typeof value === 'string' ? value.trim() : '';
+}
+
+function decodeIdentityFromBase64(value) {
+  const base64 = toTrimmedString(value);
+  if (!base64) {
+    return '';
+  }
+  try {
+    return decodeNetworkIdentity(Buffer.from(base64, 'base64')).trim();
+  } catch {
+    return '';
+  }
+}
+
+function resolveTransferIdentity(record, plainKey, encodedKey) {
+  const plain = toTrimmedString(record?.[plainKey]);
+  if (plain) {
+    return plain;
+  }
+  return decodeIdentityFromBase64(record?.[encodedKey]);
+}
+
+function parseTransferEntityIds(raw) {
+  const values = Array.isArray(raw)
+    ? raw
+    : raw && typeof raw === 'object'
+    ? Object.values(raw)
+    : [];
+
+  const out = [];
+  const seen = new Set();
+  for (const value of values) {
+    const id = toTrimmedString(value);
+    if (!id || seen.has(id)) {
+      continue;
+    }
+    seen.add(id);
+    out.push(id);
+  }
+  return out;
+}
+
 async function readAuthorityTelemetryFromDatabase() {
   return (
     (await withInternalDatabase(async (client) => {
@@ -278,6 +340,50 @@ async function readAuthorityTelemetryFromDatabase() {
       }
 
       rows.sort((left, right) => left[0].localeCompare(right[0]));
+      return rows;
+    })) || []
+  );
+}
+
+async function readTransferManifestFromDatabase() {
+  return (
+    (await withInternalDatabase(async (client) => {
+      const payload = await client.call('JSON.GET', TRANSFER_MANIFEST_KEY, '.');
+      const manifest = normalizeRedisJsonPayload(payload);
+      if (!manifest || typeof manifest !== 'object') {
+        return [];
+      }
+
+      const transfers = manifest.EntityTransfers;
+      if (!transfers || typeof transfers !== 'object') {
+        return [];
+      }
+
+      const rows = [];
+      for (const [transferId, entry] of Object.entries(transfers)) {
+        if (!entry || typeof entry !== 'object') {
+          continue;
+        }
+
+        const stage = normalizeTransferStage(entry.Stage);
+        const fromId = resolveTransferIdentity(entry, 'From', 'From(64)');
+        const toId = resolveTransferIdentity(entry, 'To', 'To(64)');
+        const entityIds = parseTransferEntityIds(entry.EntityIDs);
+        if (!fromId || !toId || entityIds.length === 0) {
+          continue;
+        }
+
+        rows.push({
+          transferId: String(transferId).trim() || `${fromId}->${toId}:${stage}`,
+          fromId,
+          toId,
+          stage,
+          state: deriveTransferLinkState(stage),
+          entityIds,
+        });
+      }
+
+      rows.sort((left, right) => left.transferId.localeCompare(right.transferId));
       return rows;
     })) || []
   );
@@ -531,6 +637,7 @@ async function readHeuristicTypeFromDatabase() {
 
 module.exports = {
   readAuthorityTelemetryFromDatabase,
+  readTransferManifestFromDatabase,
   readNetworkTelemetryFromDatabase,
   readShardPlacementFromDatabase,
   readHeuristicShapesFromDatabase,

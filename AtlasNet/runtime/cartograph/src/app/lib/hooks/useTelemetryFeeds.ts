@@ -6,9 +6,11 @@ import type {
   ShardPlacementTelemetry,
   ShapeJS,
   ShardTelemetry,
+  TransferManifestTelemetry,
   WorkersSnapshotResponse,
 } from '../cartographTypes';
 import { parseAuthorityRows } from '../authorityTelemetryTypes';
+import { parseTransferManifestRows } from '../transferManifestTypes';
 
 interface PolledResourceOptions<T> {
   url: string;
@@ -212,6 +214,27 @@ export function useAuthorityEntities({
     enabled,
     createInitialValue: () => [],
     mapResponse: parseAuthorityRows,
+    resetOnException,
+    resetOnHttpError,
+    onException,
+    onHttpError,
+  });
+}
+
+export function useTransferManifest({
+  intervalMs,
+  enabled = true,
+  resetOnException = false,
+  resetOnHttpError = false,
+  onException,
+  onHttpError,
+}: TelemetryPollingOptions): TransferManifestTelemetry[] {
+  return usePolledResource<TransferManifestTelemetry[]>({
+    url: '/api/transfermanifest',
+    intervalMs,
+    enabled,
+    createInitialValue: () => [],
+    mapResponse: parseTransferManifestRows,
     resetOnException,
     resetOnHttpError,
     onException,

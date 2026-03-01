@@ -1,6 +1,7 @@
 'use client';
 
 import type { CSSProperties } from 'react';
+import type { AuthorityLinkMode } from '../../lib/cartographTypes';
 import type {
   MapProjectionMode,
   MapViewMode,
@@ -9,9 +10,11 @@ import type {
 interface MapHudProps {
   showGnsConnections: boolean;
   showAuthorityEntities: boolean;
+  authorityLinkMode: AuthorityLinkMode;
   showShardHoverDetails: boolean;
   onToggleGnsConnections: () => void;
   onToggleAuthorityEntities: () => void;
+  onSetAuthorityLinkMode: (mode: AuthorityLinkMode) => void;
   onToggleShardHoverDetails: () => void;
   entityCount: number;
   shardCount: number;
@@ -75,9 +78,11 @@ export function MapHud({
   onSetPollIntervalMs,
   onSetProjectionMode,
   onSetViewMode,
+  onSetAuthorityLinkMode,
   onToggleAuthorityEntities,
   onToggleGnsConnections,
   onToggleShardHoverDetails,
+  authorityLinkMode,
   pollIntervalMs,
   projectionMode,
   shardCount,
@@ -142,8 +147,34 @@ export function MapHud({
           checked={showAuthorityEntities}
           onChange={() => onToggleAuthorityEntities()}
         />
-        entities + owner links
+        entities
       </label>
+      <div
+        style={{
+          display: 'inline-flex',
+          alignItems: 'center',
+          gap: 4,
+          opacity: showAuthorityEntities ? 1 : 0.65,
+        }}
+      >
+        <span style={{ fontSize: 12, opacity: 0.9 }}>links:</span>
+        <button
+          type="button"
+          style={hudButtonStyle(authorityLinkMode === 'owner')}
+          onClick={() => onSetAuthorityLinkMode('owner')}
+          disabled={!showAuthorityEntities}
+        >
+          owner
+        </button>
+        <button
+          type="button"
+          style={hudButtonStyle(authorityLinkMode === 'handoff')}
+          onClick={() => onSetAuthorityLinkMode('handoff')}
+          disabled={!showAuthorityEntities}
+        >
+          handoff
+        </button>
+      </div>
       <label style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
         <input
           type="checkbox"

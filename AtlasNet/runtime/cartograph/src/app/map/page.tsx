@@ -8,6 +8,7 @@ import {
   useHeuristicShapes,
   useNetworkTelemetry,
   useShardPlacement,
+  useTransferManifest,
 } from '../lib/hooks/useTelemetryFeeds';
 import {
   createMapRenderer,
@@ -34,6 +35,9 @@ export default function MapPage() {
   const rendererRef = useRef<ReturnType<typeof createMapRenderer> | null>(null);
   const [showGnsConnections, setShowGnsConnections] = useState(true);
   const [showAuthorityEntities, setShowAuthorityEntities] = useState(true);
+  const [authorityLinkMode, setAuthorityLinkMode] = useState<'owner' | 'handoff'>(
+    'owner'
+  );
   const [showShardHoverDetails, setShowShardHoverDetails] = useState(true);
   const [hoveredShardId, setHoveredShardId] = useState<string | null>(null);
   const [hoveredShardAnchor, setHoveredShardAnchor] = useState<{
@@ -64,6 +68,11 @@ export default function MapPage() {
     resetOnHttpError: false,
   });
   const authorityEntities = useAuthorityEntities({
+    intervalMs: telemetryPollIntervalMs,
+    resetOnException: true,
+    resetOnHttpError: false,
+  });
+  const transferManifest = useTransferManifest({
     intervalMs: telemetryPollIntervalMs,
     resetOnException: true,
     resetOnHttpError: false,
@@ -105,6 +114,8 @@ export default function MapPage() {
     baseShapes,
     networkTelemetry,
     authorityEntities,
+    authorityLinkMode,
+    transferManifest,
     showAuthorityEntities,
     showGnsConnections,
     hoveredShardId,
@@ -297,9 +308,11 @@ export default function MapPage() {
       <MapHud
         showGnsConnections={showGnsConnections}
         showAuthorityEntities={showAuthorityEntities}
+        authorityLinkMode={authorityLinkMode}
         showShardHoverDetails={showShardHoverDetails}
         onToggleGnsConnections={() => setShowGnsConnections((value) => !value)}
         onToggleAuthorityEntities={() => setShowAuthorityEntities((value) => !value)}
+        onSetAuthorityLinkMode={setAuthorityLinkMode}
         onToggleShardHoverDetails={() => setShowShardHoverDetails((value) => !value)}
         entityCount={authorityEntities.length}
         shardCount={networkNodeIds.length}

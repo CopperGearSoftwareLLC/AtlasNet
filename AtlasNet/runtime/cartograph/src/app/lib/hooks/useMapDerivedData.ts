@@ -1,8 +1,10 @@
 import { useMemo } from 'react';
 import type {
+  AuthorityLinkMode,
   AuthorityEntityTelemetry,
   ShapeJS,
   ShardTelemetry,
+  TransferManifestTelemetry,
 } from '../cartographTypes';
 import {
   buildHoveredShardEdgeLabels,
@@ -24,6 +26,8 @@ interface UseMapDerivedDataArgs {
   baseShapes: ShapeJS[];
   networkTelemetry: ShardTelemetry[];
   authorityEntities: AuthorityEntityTelemetry[];
+  authorityLinkMode: AuthorityLinkMode;
+  transferManifest: TransferManifestTelemetry[];
   showAuthorityEntities: boolean;
   showGnsConnections: boolean;
   hoveredShardId: string | null;
@@ -41,9 +45,11 @@ interface MapDerivedData {
 
 export function useMapDerivedData({
   authorityEntities,
+  authorityLinkMode,
   baseShapes,
   hoveredShardId,
   networkTelemetry,
+  transferManifest,
   showAuthorityEntities,
   showGnsConnections,
 }: UseMapDerivedDataArgs): MapDerivedData {
@@ -122,21 +128,25 @@ export function useMapDerivedData({
     () =>
       buildOverlayShapes({
         authorityEntities,
+        authorityLinkMode,
         networkTelemetry,
         networkNodeIds,
         networkNodeIdSet,
         ownerPositions,
         projectedShardPositions,
+        transferManifest,
         showAuthorityEntities,
         showGnsConnections,
       }),
     [
       authorityEntities,
+      authorityLinkMode,
       networkTelemetry,
       networkNodeIds,
       networkNodeIdSet,
       ownerPositions,
       projectedShardPositions,
+      transferManifest,
       showAuthorityEntities,
       showGnsConnections,
     ]
