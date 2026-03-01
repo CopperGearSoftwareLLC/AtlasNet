@@ -6,3 +6,5 @@ temp
 imgui.ini
 logs
 Dev/.kube/
+/build-local
+deploy/k3s_slim/.env
