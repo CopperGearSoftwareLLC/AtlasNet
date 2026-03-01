@@ -67,34 +67,27 @@ linux:
 # Backward-compatible alias.
 linux-pi: linux
 
-# run in this order:
-# ssh-setup
-# sudo-setup
-# linux
+#############
+# one-time per machine/session for Docker Hub push
+# docker login docker.io -u dannys0n
 
-#########################
-
-#Run these from repo root:
-
-#cd /home/danny/Desktop/AtlasNet/deploy/k3s_slim
-#First-time (cluster + build + publish + deploy):
-#
-#docker login <registry>
-#make ssh-setup
-#make sudo-setup
-#make linux
-#make images
-#make publish
-#make deploy
-#make status
-#If cluster is already up, just refresh images + rollout:
-#
-#cd /home/danny/Desktop/AtlasNet/deploy/k3s_slim
-#docker login <registry>
-#make up
-#make status
-#If your registry is private, set these in deploy/k3s_slim/.env before deploy:
-#
-#CREATE_PULL_SECRET=true
-#REGISTRY_PASSWORD=<your token>
-#(and username/server values already in there)
+# # one-time cluster bootstrap
+# make ssh-setup
+# make sudo-setup
+# make linux
+# make platform
+# Per deploy iteration (your VSCode/CMake dev flow)
+# 
+# In VSCode, build your normal targets (sandbox_atlasnet_run and ensure Web.node is built).
+# make up-prebuilt
+# make status
+# make up-prebuilt = make publish-prebuilt + make deploy, and image tag auto-uses current git short SHA if IMAGE_TAG is empty.
+# 
+# If you want a local image check before push:
+# 
+# bash
+# 
+# make images-prebuilt
+# make publish-prebuilt
+# make deploy
+# make status

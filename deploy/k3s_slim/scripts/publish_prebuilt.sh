@@ -11,6 +11,41 @@ TAG_RECORD_FILE="${TEMPLATE_DIR}/config/image_tag"
 die() { echo "ERROR: $*" >&2; exit 1; }
 need_cmd() { command -v "$1" >/dev/null 2>&1 || die "Missing '$1'. Install it first."; }
 
+registry_from_repo() {
+  local repo="$1"
+  local first_segment="${repo%%/*}"
+  if [[ "${first_segment}" == *.* || "${first_segment}" == *:* || "${first_segment}" == "localhost" ]]; then
+    printf '%s' "${first_segment}"
+    return
+  fi
+  printf '%s' "docker.io"
+}
+
+require_registry_login_for_push() {
+  local registry="$1"
+  local docker_config="${DOCKER_CONFIG:-${HOME}/.docker}/config.json"
+
+  [[ -f "${docker_config}" ]] || die "Docker config not found at ${docker_config}. Run 'docker login ${registry}' first."
+
+  # If a credential helper is configured, do not enforce file-based auth key checks.
+  if grep -Eq '"credsStore"|"credHelpers"' "${docker_config}"; then
+    return 0
+  fi
+
+  case "${registry}" in
+    docker.io|index.docker.io|registry-1.docker.io)
+      if ! grep -Eq '"(https://index\.docker\.io/v1/|index\.docker\.io|docker\.io)"' "${docker_config}"; then
+        die "No Docker Hub credentials found. Run 'docker login docker.io -u <dockerhub-username>' and retry."
+      fi
+      ;;
+    *)
+      if ! grep -Fq "\"${registry}\"" "${docker_config}"; then
+        die "No credentials found for '${registry}'. Run 'docker login ${registry}' and retry."
+      fi
+      ;;
+  esac
+}
+
 declare -A OVERRIDES=()
 capture_override() {
   local key="$1"
@@ -56,6 +91,9 @@ PREBUILT_WEB_NODE_PATH="${PREBUILT_WEB_NODE_PATH:-}"
 if [[ "${PREBUILT_IMAGE_PLATFORM}" == *,* ]]; then
   die "publish-prebuilt supports one platform at a time. Set PREBUILT_IMAGE_PLATFORM (example: linux/amd64)."
 fi
+
+REGISTRY_HOST="$(registry_from_repo "${IMAGE_REPO}")"
+require_registry_login_for_push "${REGISTRY_HOST}"
 
 TAG_SOURCE="env"
 if [[ -z "${IMAGE_TAG}" ]]; then
