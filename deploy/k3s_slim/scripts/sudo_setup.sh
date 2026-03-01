@@ -3,15 +3,17 @@ set -euo pipefail
 
 die() { echo "ERROR: $*" >&2; exit 1; }
 need_cmd() { command -v "$1" >/dev/null 2>&1 || die "Missing '$1'. Install openssh-client."; }
+normalize_hosts() { printf '%s' "${1//,/ }"; }
 
 : "${SERVER_IP:?Set SERVER_IP in .env or pass SERVER_IP=...}"
 : "${SERVER_SSH_USER:?Set SERVER_SSH_USER in .env or pass SERVER_SSH_USER=...}"
-: "${PI_WORKER_IP:?Set PI_WORKER_IP in .env or pass PI_WORKER_IP=...}"
 : "${WORKER_SSH_USER:=pi}"
 : "${SSH_KEY:=$HOME/.ssh/id_ed25519}"
+: "${WORKER_IPS:=${PI_WORKER_IP:-}}"
 
 SSH_KEY="${SSH_KEY/#\~/$HOME}"
 [[ -f "$SSH_KEY" ]] || die "SSH key file does not exist: $SSH_KEY"
+WORKER_IPS="$(normalize_hosts "$WORKER_IPS")"
 
 need_cmd ssh
 
@@ -73,9 +75,17 @@ ensure_passwordless_sudo() {
 
 echo "Checking SSH access before sudo setup ..."
 check_ssh_access "$SERVER_IP" "$SERVER_SSH_USER"
-check_ssh_access "$PI_WORKER_IP" "$WORKER_SSH_USER"
+for ip in $WORKER_IPS; do
+  check_ssh_access "$ip" "$WORKER_SSH_USER"
+done
 
 ensure_passwordless_sudo "$SERVER_IP" "$SERVER_SSH_USER" "server"
-ensure_passwordless_sudo "$PI_WORKER_IP" "$WORKER_SSH_USER" "worker"
+if [[ -z "${WORKER_IPS// }" ]]; then
+  echo "No workers configured (WORKER_IPS/PI_WORKER_IP is empty); skipping worker sudo setup."
+else
+  for ip in $WORKER_IPS; do
+    ensure_passwordless_sudo "$ip" "$WORKER_SSH_USER" "worker ${ip}"
+  done
+fi
 
-echo "Sudo setup done. Run 'make linux-pi'."
+echo "Sudo setup done. Run 'make linux' (or legacy alias 'make linux-pi')."

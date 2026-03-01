@@ -7,14 +7,14 @@
   "target": {
     "atlasnetsdk": {
       "context": ".",
-      "dockerfile": "scripts/Dockerfiles/BuildDockerfile",
+      "dockerfile": "docker/dockerfiles/BuildDockerfile",
       "target": "atlasnetsdk",
       "load": true,
       "tags": ["atlasnetsdk:latest"]
     },
     "watchdog": {
       "context": ".",
-      "dockerfile": "scripts/Dockerfiles/BuildDockerfile",
+      "dockerfile": "docker/dockerfiles/BuildDockerfile",
       "target": "watchdog",
       "depends-on": ["atlasnetsdk"],
       "load": true,
@@ -22,7 +22,7 @@
     },
     "proxy": {
       "context": ".",
-      "dockerfile": "scripts/Dockerfiles/BuildDockerfile",
+      "dockerfile": "docker/dockerfiles/BuildDockerfile",
       "target": "proxy",
       "depends-on": ["atlasnetsdk"],
       "load": true,
@@ -30,7 +30,7 @@
     },
     "shard": {
       "context": ".",
-      "dockerfile": "scripts/Dockerfiles/BuildDockerfile",
+      "dockerfile": "docker/dockerfiles/BuildDockerfile",
       "target": "shard",
       "depends-on": ["atlasnetsdk"],
       "load": true,
@@ -38,7 +38,7 @@
     },
     "cartograph": {
       "context": ".",
-      "dockerfile": "scripts/Dockerfiles/BuildDockerfile",
+      "dockerfile": "docker/dockerfiles/BuildDockerfile",
       "target": "cartograph",
       "depends-on": ["atlasnetsdk"],
       "load": true,

@@ -1,12 +1,12 @@
 SHELL := /usr/bin/env bash
 
 ENV_FILE ?= .env
-ENV_EXPORTS := SERVER_IP SERVER_SSH_USER PI_WORKER_IP WORKER_SSH_USER SSH_KEY K3S_API_ENDPOINT K3SUP_USE_SUDO
+ENV_EXPORTS := SERVER_IP SERVER_SSH_USER WORKER_IPS PI_WORKER_IP WORKER_SSH_USER SSH_KEY K3S_API_ENDPOINT K3SUP_USE_SUDO NAMESPACE IMAGE_REPO IMAGE_TAG IMAGE_PLATFORMS IMAGE_BUILD_PLATFORM BUILD_DIR BAKE_FILE BUILDER_NAME WITH_LATEST_TAG TOOLCHAIN_FILE IMAGE_PULL_SECRET_NAME CREATE_PULL_SECRET REGISTRY_SERVER REGISTRY_USERNAME REGISTRY_PASSWORD REGISTRY_EMAIL PROXY_PUBLIC_IP PROXY_PUBLIC_PORT IMAGE_VALKEY KUBECTL_CONTEXT
 
 -include $(ENV_FILE)
 export $(ENV_EXPORTS)
 
-.PHONY: bootstrap platform nodes linux-pi ssh-setup sudo-setup port-cleanup cleanup-cluster atlasnet-images atlasnet-deploy atlasnet-up atlasnet-status
+.PHONY: bootstrap platform nodes linux linux-pi ssh-setup sudo-setup port-cleanup cleanup-cluster images publish deploy up status
 
 bootstrap:
 	./scripts/bootstrap.sh
@@ -29,59 +29,64 @@ port-cleanup:
 cleanup-cluster:
 	./scripts/cleanup_cluster.sh
 
-atlasnet-images:
-	./scripts/atlasnet_build_push.sh
+images:
+	./scripts/images.sh
 
-atlasnet-deploy:
-	./scripts/atlasnet_deploy.sh
+publish:
+	./scripts/publish.sh
 
-atlasnet-up: atlasnet-images atlasnet-deploy
+deploy:
+	./scripts/deploy.sh
 
-atlasnet-status:
-	KUBECONFIG="$(CURDIR)/config/kubeconfig" kubectl -n "$${ATLASNET_K8S_NAMESPACE:-atlasnet}" get deploy,svc,pods -o wide
+up: publish deploy
 
-linux-pi:
+status:
+	KUBECONFIG="$(CURDIR)/config/kubeconfig" kubectl -n "$${NAMESPACE:-atlasnet}" get deploy,svc,pods -o wide
+
+linux:
 	@: "$${SERVER_IP:?Set SERVER_IP in .env or pass SERVER_IP=...}"
 	@: "$${SERVER_SSH_USER:?Set SERVER_SSH_USER in .env or pass SERVER_SSH_USER=...}"
-	@: "$${PI_WORKER_IP:?Set PI_WORKER_IP in .env or pass PI_WORKER_IP=...}"
 	./scripts/port_cleanup.sh
 	./scripts/bootstrap.sh \
 	  --server-ip "$$SERVER_IP" \
 	  --server-user "$$SERVER_SSH_USER" \
-	  --worker-ip "$$PI_WORKER_IP" \
+	  --worker-ips "$${WORKER_IPS:-$${PI_WORKER_IP:-}}" \
 	  --worker-user "$${WORKER_SSH_USER:-pi}" \
 	  --ssh-key "$${SSH_KEY:-$$HOME/.ssh/id_ed25519}" \
 	  --use-sudo "$${K3SUP_USE_SUDO:-true}" \
 	  --api-endpoint "$${K3S_API_ENDPOINT:-$$SERVER_IP}"
 
+# Backward-compatible alias.
+linux-pi: linux
+
 # run in this order:
 # ssh-setup
 # sudo-setup
-# linux-pi
+# linux
 
 #########################
 
 #Run these from repo root:
 
 #cd /home/danny/Desktop/AtlasNet/deploy/k3s_slim
-#First-time (cluster + images + deploy):
+#First-time (cluster + build + publish + deploy):
 #
-#docker login ghcr.io
+#docker login <registry>
 #make ssh-setup
 #make sudo-setup
-#make linux-pi
-#make atlasnet-images
-#make atlasnet-deploy
-#make atlasnet-status
+#make linux
+#make images
+#make publish
+#make deploy
+#make status
 #If cluster is already up, just refresh images + rollout:
 #
 #cd /home/danny/Desktop/AtlasNet/deploy/k3s_slim
-#docker login ghcr.io
-#make atlasnet-up
-#make atlasnet-status
+#docker login <registry>
+#make up
+#make status
 #If your registry is private, set these in deploy/k3s_slim/.env before deploy:
 #
-#ATLASNET_CREATE_PULL_SECRET=true
-#ATLASNET_REGISTRY_PASSWORD=<your token>
+#CREATE_PULL_SECRET=true
+#REGISTRY_PASSWORD=<your token>
 #(and username/server values already in there)
-

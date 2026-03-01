@@ -1,11 +1,11 @@
-# k3s slim (Linux server + Pi worker)
+# k3s slim (Linux server + workers)
 
 Minimal automation to build a small k3s cluster with `k3sup`.
 
 ## What this does
-- Sets up SSH key access to server and worker.
+- Sets up SSH key access to server and worker nodes.
 - Sets up passwordless sudo for those SSH users (if needed).
-- Installs k3s server and joins worker.
+- Installs k3s server and joins worker nodes.
 - Writes kubeconfig to `config/kubeconfig`.
 - Automatically symlinks `~/.kube/config` to that file (backs up existing non-symlink config first).
 
@@ -22,7 +22,8 @@ cp .env.example .env
 Edit `.env`:
 - `SERVER_IP`
 - `SERVER_SSH_USER`
-- `PI_WORKER_IP`
+- `WORKER_IPS` (space/comma-separated worker IPs)
+- Optional legacy single-worker fallback: `PI_WORKER_IP`
 - `WORKER_SSH_USER` (SSH username on the worker; this is not hostname)
 - `SSH_KEY` (default is usually fine)
 - `K3SUP_USE_SUDO=true` (default)
@@ -31,11 +32,11 @@ Edit `.env`:
 ```bash
 make ssh-setup
 make sudo-setup
-make linux-pi
+make linux
 ```
 
-`make linux-pi` automatically runs a port cleanup step first (`scripts/port_cleanup.sh`).
-By default it frees `7946` on server/worker (common Docker Swarm vs MetalLB conflict).
+`make linux` automatically runs a port cleanup step first (`scripts/port_cleanup.sh`).
+By default it frees `7946` on server/workers (common Docker Swarm vs MetalLB conflict).
 You can override with `SERVER_PORT_CLEANUP_PORTS` / `WORKER_PORT_CLEANUP_PORTS` in `.env`.
 Port cleanup will stop a systemd service if it owns the port, otherwise it terminates the process.
 By default it also checks server API port `6443` for conflicts (`SERVER_CLEAN_K3S_API_PORT=true`) while preserving an existing `k3s` listener unless you explicitly set `SERVER_STOP_K3S_ON_PORT_CLEANUP=true`.
@@ -46,54 +47,65 @@ kubectl get nodes -o wide
 kubectl get pods -A -o wide
 ```
 
-`kubectl` should work directly because `make linux-pi` links `~/.kube/config` for you.
+`kubectl` should work directly because `make linux` links `~/.kube/config` for you.
 
-## 4) Build/push AtlasNet images and deploy
+## 4) Build/publish/deploy AtlasNet
 
 Configure AtlasNet variables in `.env`:
 
-- `ATLASNET_IMAGE_REPO` (required)
-- `ATLASNET_IMAGE_TAG` (optional but recommended)
-- `ATLASNET_IMAGE_PLATFORMS` (defaults to `linux/amd64,linux/arm64`)
-- `ATLASNET_K8S_NAMESPACE` (default `atlasnet`)
+- `IMAGE_REPO` (required)
+- `IMAGE_TAG` (optional; leave empty to auto-use git short SHA)
+- `IMAGE_PLATFORMS` (publish platforms; defaults to `linux/amd64,linux/arm64`)
+- `IMAGE_BUILD_PLATFORM` (optional; local platform for `make images`, defaults to first entry in `IMAGE_PLATFORMS`)
+- `NAMESPACE` (default `atlasnet`)
 
-Build and push multi-arch images:
+Build local images (no push):
 
 ```bash
-make atlasnet-images
+make images
 ```
 
 Notes:
 - This target wraps `Dev/BuildAndPushAtlasNetImages.sh`.
-- Ensure your repo has a configured CMake build dir (`cmake -S . -B build`) and run `docker login <registry>` first.
+- If `BAKE_FILE=docker/dockerfiles/docker-bake.json`, it skips local stage build and compiles inside Docker.
+- If `BAKE_FILE=docker/dockerfiles/docker-bake.copy.json`, it performs a fresh local stage build first.
+- If `IMAGE_TAG` is empty, the script auto-picks git short SHA and records it for publish/deploy reuse.
+
+Publish multi-arch images:
+
+```bash
+make publish
+```
+
+`make publish` uses the same bake-driven behavior as `make images`, then pushes to the registry.
 
 Deploy AtlasNet to this cluster:
 
 ```bash
-make atlasnet-deploy
+make deploy
 ```
 
-Do both:
+Publish + deploy:
 
 ```bash
-make atlasnet-up
+make up
 ```
 
 Check deployment status:
 
 ```bash
-make atlasnet-status
+make status
 ```
 
 If your registry is private, set:
 
-- `ATLASNET_IMAGE_PULL_SECRET_NAME`
-- `ATLASNET_CREATE_PULL_SECRET=true`
-- `ATLASNET_REGISTRY_SERVER`
-- `ATLASNET_REGISTRY_USERNAME`
-- `ATLASNET_REGISTRY_PASSWORD`
+- `IMAGE_PULL_SECRET_NAME`
+- `CREATE_PULL_SECRET=true`
+- `REGISTRY_SERVER`
+- `REGISTRY_USERNAME`
+- `REGISTRY_PASSWORD`
 
-Then run `make atlasnet-deploy` (the secret is created/updated automatically).
+Then run `make deploy` (the secret is created/updated automatically).
 
 ## Optional add-ons
 ```bash
@@ -104,17 +116,19 @@ This uses `.env` flags for metrics-server / MetalLB / ingress / cert-manager.
 Legacy `config/cluster.env` values are also supported if the file exists.
 
 ## Make targets
-- `make ssh-setup`: create SSH key (if missing) and copy to server + worker.
-- `make sudo-setup`: enable passwordless sudo for SSH users on server + worker.
-- `make port-cleanup`: free configured required ports on server + worker.
-- `make linux-pi`: install k3s server and join worker.
+- `make ssh-setup`: create SSH key (if missing) and copy to server + workers.
+- `make sudo-setup`: enable passwordless sudo for SSH users on server + workers.
+- `make port-cleanup`: free configured required ports on server + workers.
+- `make linux`: install k3s server and join workers.
+- `make linux-pi`: legacy alias for `make linux`.
 - `make nodes`: quick `kubectl get nodes -o wide` using project kubeconfig.
 - `make platform`: install optional platform add-ons.
-- `make cleanup-cluster`: uninstall k3s from worker/server and remove local project kubeconfig.
-- `make atlasnet-images`: build + push AtlasNet multi-arch images.
-- `make atlasnet-deploy`: deploy AtlasNet manifests to this cluster.
-- `make atlasnet-up`: run images + deploy in sequence.
-- `make atlasnet-status`: show AtlasNet deployments/services/pods.
+- `make cleanup-cluster`: uninstall k3s from workers/server and remove local project kubeconfig.
+- `make images`: build all AtlasNet images locally (no push).
+- `make publish`: build and publish AtlasNet images.
+- `make deploy`: deploy AtlasNet manifests to this cluster.
+- `make up`: run publish + deploy in sequence.
+- `make status`: show AtlasNet deployments/services/pods.
 
 ## Troubleshooting
 - `Permission denied (publickey,password)`:
@@ -122,4 +136,4 @@ Legacy `config/cluster.env` values are also supported if the file exists.
 - `sudo: Authentication failed`:
   run `make sudo-setup`, or use root SSH users and set `K3SUP_USE_SUDO=false`.
 - `kubectl` tries `localhost:8080`:
-  your kubeconfig is not active; rerun `make linux-pi` or check `~/.kube/config` symlink.
+  your kubeconfig is not active; rerun `make linux` or check `~/.kube/config` symlink.

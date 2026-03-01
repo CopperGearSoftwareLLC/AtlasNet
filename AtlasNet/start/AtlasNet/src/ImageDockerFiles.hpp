@@ -228,10 +228,10 @@ RUN apt update \
  && node -v \
  && npm -v
 # Copy built app + node_modules
-COPY --from=atlasnetsdk:latest runtime/cartograph/web/. ./
+COPY --from=atlasnetsdk:latest runtime/cartograph/. ./
 RUN  npm install
-COPY --from=builder ${WORKDIR}/runtime/cartograph/web/nextjs ./nextjs/
-#COPY --from=builder ${WORKDIR}/runtime/cartograph/web ./
+COPY --from=builder ${WORKDIR}/runtime/cartograph/nextjs ./nextjs/
+#COPY --from=builder ${WORKDIR}/runtime/cartograph ./
 #RUN rm -rf ./node_modules ./.next ./native-server/node_modules
 # RUN npm run build
 # Next.js default port

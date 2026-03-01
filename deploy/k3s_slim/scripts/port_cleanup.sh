@@ -7,6 +7,7 @@ ENV_FILE="$ROOT_DIR/.env"
 die() { echo "ERROR: $*" >&2; exit 1; }
 need_cmd() { command -v "$1" >/dev/null 2>&1 || die "Missing '$1'. Install it first."; }
 normalize_ports() { printf '%s' "${1//,/ }"; }
+normalize_hosts() { printf '%s' "${1//,/ }"; }
 has_port() {
   local ports="$1"
   local needle="$2"
@@ -200,9 +201,9 @@ source "$ENV_FILE"
 
 : "${SERVER_IP:?Set SERVER_IP in .env}"
 : "${SERVER_SSH_USER:?Set SERVER_SSH_USER in .env}"
-: "${PI_WORKER_IP:?Set PI_WORKER_IP in .env}"
 : "${WORKER_SSH_USER:=pi}"
 : "${SSH_KEY:=$HOME/.ssh/id_ed25519}"
+: "${WORKER_IPS:=${PI_WORKER_IP:-}}"
 : "${SERVER_PORT_CLEANUP_PORTS:=7946}"
 : "${WORKER_PORT_CLEANUP_PORTS:=7946}"
 : "${SERVER_CLEAN_K3S_API_PORT:=true}"
@@ -210,6 +211,7 @@ source "$ENV_FILE"
 
 SSH_KEY="${SSH_KEY/#\~/$HOME}"
 [[ -f "$SSH_KEY" ]] || die "SSH key file does not exist: $SSH_KEY"
+WORKER_IPS="$(normalize_hosts "$WORKER_IPS")"
 
 need_cmd ssh
 
@@ -253,6 +255,12 @@ cleanup_ports() {
 }
 
 cleanup_ports "$SERVER_SSH_USER" "$SERVER_IP" "server" "$SERVER_PORT_CLEANUP_PORTS" "$SERVER_STOP_K3S_ON_PORT_CLEANUP"
-cleanup_ports "$WORKER_SSH_USER" "$PI_WORKER_IP" "worker" "$WORKER_PORT_CLEANUP_PORTS" "false"
+if [[ -z "${WORKER_IPS// }" ]]; then
+  echo "No workers configured (WORKER_IPS/PI_WORKER_IP is empty); skipping worker port cleanup."
+else
+  for ip in $WORKER_IPS; do
+    cleanup_ports "$WORKER_SSH_USER" "$ip" "worker ${ip}" "$WORKER_PORT_CLEANUP_PORTS" "false"
+  done
+fi
 
 echo "Port cleanup done."

@@ -8,6 +8,7 @@ CONTEXT_NAME="k3s-homelab"
 
 die() { echo "ERROR: $*" >&2; exit 1; }
 need_cmd() { command -v "$1" >/dev/null 2>&1 || die "Missing '$1'. Install it first."; }
+normalize_hosts() { printf '%s' "${1//,/ }"; }
 
 print_usage() {
   cat <<EOF2
@@ -138,6 +139,7 @@ fi
 : "${K3SUP_VERSION:=}"
 : "${K3S_API_ENDPOINT:=$SERVER_IP}"
 : "${K3SUP_USE_SUDO:=true}"
+WORKER_IPS="$(normalize_hosts "$WORKER_IPS")"
 
 [[ "$K3SUP_USE_SUDO" == "true" || "$K3SUP_USE_SUDO" == "false" ]] || \
   die "K3SUP_USE_SUDO must be 'true' or 'false' (got: $K3SUP_USE_SUDO)"

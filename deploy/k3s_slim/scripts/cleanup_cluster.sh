@@ -7,6 +7,7 @@ PROJECT_KUBECONFIG="$ROOT_DIR/config/kubeconfig"
 
 die() { echo "ERROR: $*" >&2; exit 1; }
 need_cmd() { command -v "$1" >/dev/null 2>&1 || die "Missing '$1'. Install it first."; }
+normalize_hosts() { printf '%s' "${1//,/ }"; }
 
 [[ -f "$ENV_FILE" ]] || die "Missing .env at $ENV_FILE"
 # shellcheck disable=SC1090
@@ -14,12 +15,13 @@ source "$ENV_FILE"
 
 : "${SERVER_IP:?Set SERVER_IP in .env}"
 : "${SERVER_SSH_USER:?Set SERVER_SSH_USER in .env}"
-: "${PI_WORKER_IP:?Set PI_WORKER_IP in .env}"
 : "${WORKER_SSH_USER:=pi}"
 : "${SSH_KEY:=$HOME/.ssh/id_ed25519}"
+: "${WORKER_IPS:=${PI_WORKER_IP:-}}"
 
 SSH_KEY="${SSH_KEY/#\~/$HOME}"
 [[ -f "$SSH_KEY" ]] || die "SSH key file does not exist: $SSH_KEY"
+WORKER_IPS="$(normalize_hosts "$WORKER_IPS")"
 
 need_cmd ssh
 
@@ -62,7 +64,13 @@ REMOTE
 }
 
 # Uninstall worker first, then server.
-uninstall_remote_node "$WORKER_SSH_USER" "$PI_WORKER_IP" "worker"
+if [[ -z "${WORKER_IPS// }" ]]; then
+  echo "No workers configured (WORKER_IPS/PI_WORKER_IP is empty); skipping worker uninstall."
+else
+  for ip in $WORKER_IPS; do
+    uninstall_remote_node "$WORKER_SSH_USER" "$ip" "worker ${ip}"
+  done
+fi
 uninstall_remote_node "$SERVER_SSH_USER" "$SERVER_IP" "server"
 
 if [[ -L "$HOME/.kube/config" ]]; then
