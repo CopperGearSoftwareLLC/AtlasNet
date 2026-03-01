@@ -117,6 +117,8 @@ metadata:
     atlasnet.role: watchdog
 spec:
   replicas: 1
+  strategy:
+    type: Recreate
   selector:
     matchLabels:
       app: atlasnet-watchdog
@@ -127,6 +129,28 @@ spec:
         atlasnet.role: watchdog
     spec:
       serviceAccountName: atlasnet-watchdog
+      affinity:
+        nodeAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            nodeSelectorTerms:
+              - matchExpressions:
+                  - key: node-role.kubernetes.io/control-plane
+                    operator: Exists
+              - matchExpressions:
+                  - key: node-role.kubernetes.io/master
+                    operator: Exists
+              - matchExpressions:
+                  - key: kubernetes.io/hostname
+                    operator: In
+                    values:
+                      - __SERVER_NODE_NAME__
+      tolerations:
+        - key: node-role.kubernetes.io/control-plane
+          operator: Exists
+          effect: NoSchedule
+        - key: node-role.kubernetes.io/master
+          operator: Exists
+          effect: NoSchedule
       containers:
         - name: watchdog
           image: watchdog:latest
@@ -171,6 +195,18 @@ spec:
         atlasnet.role: shard
     spec:
       affinity:
+        nodeAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            nodeSelectorTerms:
+              - matchExpressions:
+                  - key: node-role.kubernetes.io/control-plane
+                    operator: DoesNotExist
+                  - key: node-role.kubernetes.io/master
+                    operator: DoesNotExist
+                  - key: kubernetes.io/hostname
+                    operator: NotIn
+                    values:
+                      - __SERVER_NODE_NAME__
         podAntiAffinity:
           preferredDuringSchedulingIgnoredDuringExecution:
             - weight: 100
@@ -221,6 +257,8 @@ metadata:
     app: atlasnet-internaldb
 spec:
   replicas: 1
+  strategy:
+    type: Recreate
   selector:
     matchLabels:
       app: atlasnet-internaldb
@@ -272,6 +310,8 @@ metadata:
     app: atlasnet-cartograph
 spec:
   replicas: 1
+  strategy:
+    type: Recreate
   selector:
     matchLabels:
       app: atlasnet-cartograph
@@ -281,6 +321,28 @@ spec:
         app: atlasnet-cartograph
     spec:
       serviceAccountName: atlasnet-cartograph
+      affinity:
+        nodeAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            nodeSelectorTerms:
+              - matchExpressions:
+                  - key: node-role.kubernetes.io/control-plane
+                    operator: Exists
+              - matchExpressions:
+                  - key: node-role.kubernetes.io/master
+                    operator: Exists
+              - matchExpressions:
+                  - key: kubernetes.io/hostname
+                    operator: In
+                    values:
+                      - __SERVER_NODE_NAME__
+      tolerations:
+        - key: node-role.kubernetes.io/control-plane
+          operator: Exists
+          effect: NoSchedule
+        - key: node-role.kubernetes.io/master
+          operator: Exists
+          effect: NoSchedule
       containers:
         - name: cartograph
           image: cartograph:latest
@@ -326,14 +388,17 @@ spec:
       targetPort: inspect
 ---
 apiVersion: apps/v1
-kind: Deployment
+kind: StatefulSet
 metadata:
   name: atlasnet-proxy
   namespace: __NAMESPACE__
   labels:
     app: atlasnet-proxy
 spec:
+  serviceName: atlasnet-proxy-headless
   replicas: 1
+  updateStrategy:
+    type: RollingUpdate
   selector:
     matchLabels:
       app: atlasnet-proxy
@@ -342,6 +407,19 @@ spec:
       labels:
         app: atlasnet-proxy
     spec:
+      affinity:
+        nodeAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            nodeSelectorTerms:
+              - matchExpressions:
+                  - key: node-role.kubernetes.io/control-plane
+                    operator: DoesNotExist
+                  - key: node-role.kubernetes.io/master
+                    operator: DoesNotExist
+                  - key: kubernetes.io/hostname
+                    operator: NotIn
+                    values:
+                      - __SERVER_NODE_NAME__
       containers:
         - name: proxy
           image: proxy:latest
@@ -367,6 +445,25 @@ spec:
             - name: interlink
               containerPort: 25555
               protocol: UDP
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: atlasnet-proxy-headless
+  namespace: __NAMESPACE__
+spec:
+  clusterIP: None
+  selector:
+    app: atlasnet-proxy
+  ports:
+    - name: proxy-tcp
+      protocol: TCP
+      port: 2555
+      targetPort: proxy-tcp
+    - name: proxy-udp
+      protocol: UDP
+      port: 2555
+      targetPort: proxy-udp
 ---
 apiVersion: v1
 kind: Service

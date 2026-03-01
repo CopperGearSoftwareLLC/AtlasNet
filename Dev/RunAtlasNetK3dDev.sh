@@ -9,6 +9,7 @@ MANIFEST_TEMPLATE="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)/deploy/k8s/o
 K3D_SERVER_COUNT="${ATLASNET_K3D_SERVERS:-1}"
 K3D_AGENT_COUNT="${ATLASNET_K3D_AGENTS:-2}"
 PORT_WAIT_TIMEOUT="${ATLASNET_K3D_PORT_WAIT_TIMEOUT:-15}"
+SERVER_NODE_NAME="${ATLASNET_SERVER_NODE_NAME:-k3d-${CLUSTER_NAME}-server-0}"
 HOST_KUBECONFIG_PATH=""
 
 is_nonnegative_int() {
@@ -25,6 +26,10 @@ if ! is_nonnegative_int "$K3D_AGENT_COUNT"; then
 fi
 if ! is_nonnegative_int "$PORT_WAIT_TIMEOUT" || ((PORT_WAIT_TIMEOUT < 1)); then
     echo "Error: ATLASNET_K3D_PORT_WAIT_TIMEOUT must be an integer >= 1 (got '$PORT_WAIT_TIMEOUT')." >&2
+    exit 1
+fi
+if [[ -z "$SERVER_NODE_NAME" ]]; then
+    echo "Error: ATLASNET_SERVER_NODE_NAME must not be empty." >&2
     exit 1
 fi
 
@@ -300,7 +305,7 @@ setup_external_kubectl() {
 
 setup_incluster_kubectl() {
     local server_node
-    server_node="k3d-${CLUSTER_NAME}-server-0"
+    server_node="$SERVER_NODE_NAME"
     if ! docker ps --format '{{.Names}}' | grep -Fxq "$server_node"; then
         return 1
     fi
@@ -333,7 +338,7 @@ kctl wait --for=condition=Ready nodes --all --timeout=120s >/dev/null
 
 ATLASNET_FORCE_IMAGE_IMPORT="${ATLASNET_FORCE_IMAGE_IMPORT:-0}"
 IMAGE_CACHE_FILE="${ATLASNET_K3D_IMAGE_CACHE_FILE:-/tmp/atlasnet-k3d-${CLUSTER_NAME}-image-cache.txt}"
-server_node="k3d-${CLUSTER_NAME}-server-0"
+server_node="$SERVER_NODE_NAME"
 current_cluster_id="$(docker inspect --format '{{.Id}}' "$server_node" 2>/dev/null || true)"
 current_cluster_id="${current_cluster_id:-unknown}"
 
@@ -353,15 +358,15 @@ if [[ "$cached_cluster_id" != "$current_cluster_id" ]]; then
     PREV_IMAGE_IDS=()
 fi
 
-declare -a ROLLOUT_RESTART_DEPLOYMENTS=()
+declare -a ROLLOUT_RESTART_WORKLOADS=()
 declare -A RESTART_SEEN=()
 add_restart() {
-    local deployment="$1"
-    if [[ -n "${RESTART_SEEN[$deployment]:-}" ]]; then
+    local workload="$1"
+    if [[ -n "${RESTART_SEEN[$workload]:-}" ]]; then
         return
     fi
-    RESTART_SEEN["$deployment"]=1
-    ROLLOUT_RESTART_DEPLOYMENTS+=("$deployment")
+    RESTART_SEEN["$workload"]=1
+    ROLLOUT_RESTART_WORKLOADS+=("$workload")
 }
 
 echo "==> Importing local Docker images into k3d..."
@@ -401,12 +406,12 @@ for image in "${IMAGES[@]}"; do
             echo "   - queued import $image"
             IMAGES_TO_IMPORT+=("$image")
             case "$image" in
-                watchdog:*) add_restart "atlasnet-watchdog" ;;
-                proxy:*) add_restart "atlasnet-proxy" ;;
-                cartograph:*) add_restart "atlasnet-cartograph" ;;
+                watchdog:*) add_restart "deployment/atlasnet-watchdog" ;;
+                proxy:*) add_restart "statefulset/atlasnet-proxy" ;;
+                cartograph:*) add_restart "deployment/atlasnet-cartograph" ;;
             esac
             if [[ "$image" == "shard:latest" || "$image" == "$SHARD_IMAGE_NAME" ]]; then
-                add_restart "atlasnet-shard"
+                add_restart "deployment/atlasnet-shard"
             fi
         else
             echo "   - cached in cluster $image"
@@ -459,6 +464,7 @@ mkdir -p "$(dirname "$IMAGE_CACHE_FILE")"
 sed \
     -e "s|__NAMESPACE__|$NAMESPACE|g" \
     -e "s|__SHARD_IMAGE__|$SHARD_IMAGE_NAME|g" \
+    -e "s|__SERVER_NODE_NAME__|$SERVER_NODE_NAME|g" \
     "$MANIFEST_TEMPLATE" >"$TEMP_MANIFEST"
 
 echo "==> Applying Kubernetes manifest..."
@@ -467,20 +473,22 @@ if [[ "$KUBECTL_MODE" == "incluster" ]]; then
 else
     kctl apply -f "$TEMP_MANIFEST" >/dev/null
 fi
+# Migration cleanup: proxy moved from Deployment -> StatefulSet.
+kctl -n "$NAMESPACE" delete deployment atlasnet-proxy --ignore-not-found >/dev/null || true
 # Shard deployment is declared with replicas=0 and is expected to be scaled by Watchdog.
 # Always restart watchdog so it recomputes shard target each run.
-add_restart "atlasnet-watchdog"
-echo "==> Restarting updated deployments..."
-for deployment in "${ROLLOUT_RESTART_DEPLOYMENTS[@]}"; do
-    kctl -n "$NAMESPACE" rollout restart "deployment/${deployment}" >/dev/null || true
+add_restart "deployment/atlasnet-watchdog"
+echo "==> Restarting updated workloads..."
+for workload in "${ROLLOUT_RESTART_WORKLOADS[@]}"; do
+    kctl -n "$NAMESPACE" rollout restart "$workload" >/dev/null || true
 done
-# Remove a legacy service name from earlier k3d migration iterations.
+# Remove legacy resources from earlier k3d migration iterations.
 kctl -n "$NAMESPACE" delete svc atlasnet-internaldb --ignore-not-found >/dev/null || true
 
-echo "==> Waiting for core deployments..."
+echo "==> Waiting for core workloads..."
 kctl -n "$NAMESPACE" rollout status deployment/atlasnet-internaldb --timeout=180s
 kctl -n "$NAMESPACE" rollout status deployment/atlasnet-watchdog --timeout=180s
-kctl -n "$NAMESPACE" rollout status deployment/atlasnet-proxy --timeout=180s
+kctl -n "$NAMESPACE" rollout status statefulset/atlasnet-proxy --timeout=180s
 kctl -n "$NAMESPACE" rollout status deployment/atlasnet-cartograph --timeout=180s
 
 echo "==> Waiting for watchdog-driven shard scale-up..."
