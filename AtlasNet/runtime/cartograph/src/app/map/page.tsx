@@ -43,8 +43,8 @@ const MAX_ENTITY_DETAIL_POLL_INTERVAL_MS = 5000;
 const ENTITY_DETAIL_POLL_DISABLED_AT_MS = MAX_ENTITY_DETAIL_POLL_INTERVAL_MS;
 const DEFAULT_INTERACTION_SENSITIVITY = 1;
 const SNAPSHOT_WINDOW_MS = 30_000;
-const SNAPSHOT_RECORD_SPACING_MS = 100;
-const PLAYBACK_STEP_MS = 100;
+const SNAPSHOT_RECORD_SPACING_MS = 10;
+const PLAYBACK_TICK_INTERVAL_MS = 16;
 
 const EMPTY_DETAILS_STATE: EntityDatabaseDetailsState = {
   loading: false,
@@ -59,37 +59,22 @@ interface PlaybackFrame {
   authorityEntities: AuthorityEntityTelemetry[];
   transferManifest: TransferManifestTelemetry[];
   shardPlacement: ShardPlacementTelemetry[];
-  selectedEntityIds: string[];
-  activeEntityId: string | null;
-  hoveredEntityId: string | null;
   entityDetails: EntityDatabaseDetailsState;
 }
 
-function resolveSelectedEntities(
-  selectedIds: string[],
-  entities: AuthorityEntityTelemetry[]
-): AuthorityEntityTelemetry[] {
-  if (selectedIds.length === 0 || entities.length === 0) {
-    return [];
+function clonePlaybackPayload(
+  payload: Omit<PlaybackFrame, 'capturedAtMs'>
+): Omit<PlaybackFrame, 'capturedAtMs'> {
+  if (typeof structuredClone === 'function') {
+    return structuredClone(payload);
   }
+  return JSON.parse(JSON.stringify(payload)) as Omit<PlaybackFrame, 'capturedAtMs'>;
+}
 
-  const byId = new Map<string, AuthorityEntityTelemetry>();
-  for (const entity of entities) {
-    const entityId = String(entity.entityId || '').trim();
-    if (!entityId || byId.has(entityId)) {
-      continue;
-    }
-    byId.set(entityId, entity);
-  }
-
-  const out: AuthorityEntityTelemetry[] = [];
-  for (const selectedId of selectedIds) {
-    const entity = byId.get(String(selectedId || '').trim());
-    if (entity) {
-      out.push(entity);
-    }
-  }
-  return out;
+function snapToStep(value: number, origin: number, step: number): number {
+  const safeStep = Math.max(0.01, step);
+  const snapped = Math.round((value - origin) / safeStep) * safeStep + origin;
+  return Number(snapped.toFixed(2));
 }
 
 function getFrameAtCursor(
@@ -122,6 +107,7 @@ export default function MapPage() {
   const containerRef = useRef<HTMLDivElement>(null);
   const rendererRef = useRef<ReturnType<typeof createMapRenderer> | null>(null);
   const historyRef = useRef<PlaybackFrame[]>([]);
+  const playbackLastTickMsRef = useRef<number | null>(null);
   const [showGnsConnections, setShowGnsConnections] = useState(true);
   const [showAuthorityEntities, setShowAuthorityEntities] = useState(true);
   const [authorityLinkMode, setAuthorityLinkMode] =
@@ -148,6 +134,7 @@ export default function MapPage() {
   const [playbackCursorMs, setPlaybackCursorMs] = useState(0);
   const [playbackPaused, setPlaybackPaused] = useState(true);
   const [playbackDirection, setPlaybackDirection] = useState<1 | -1>(1);
+  const [playbackSnapMs, setPlaybackSnapMs] = useState(1);
 
   const telemetryPollIntervalMs =
     pollIntervalMs >= POLL_DISABLED_AT_MS ? 0 : pollIntervalMs;
@@ -178,76 +165,6 @@ export default function MapPage() {
     resetOnException: false,
     resetOnHttpError: false,
   });
-  const {
-    selectedEntities: selectedEntitiesLive,
-    selectedEntityIds: selectedEntityIdsLive,
-    activeEntityId: activeEntityIdLive,
-    hoveredEntityId: hoveredSelectedEntityIdLive,
-    selectionRect: selectionRectLive,
-    clearSelection: clearSelectionLive,
-    onPointerDownCapture: onPointerDownCaptureLive,
-    onPointerMoveCapture: onPointerMoveCaptureLive,
-    onPointerUpCapture: onPointerUpCaptureLive,
-    onPointerCancelCapture: onPointerCancelCaptureLive,
-    setActiveEntityId: setActiveEntityIdLive,
-    setHoveredEntityId: setHoveredEntityIdLive,
-  } = useCtrlDragEntitySelection({
-    containerRef,
-    rendererRef,
-    entities: authorityEntitiesLive,
-  });
-
-  const activeEntityLive =
-    selectedEntitiesLive.find((entity) => entity.entityId === activeEntityIdLive) ??
-    null;
-  const liveEntityDetails = useEntityDatabaseDetails(
-    activeEntityLive,
-    playbackFrames ? 0 : entityDetailPollIntervalMs
-  );
-
-  useEffect(() => {
-    if (playbackFrames) {
-      return;
-    }
-
-    const nowMs = Date.now();
-    const frame: PlaybackFrame = {
-      capturedAtMs: nowMs,
-      baseShapes: baseShapesLive,
-      networkTelemetry: networkTelemetryLive,
-      authorityEntities: authorityEntitiesLive,
-      transferManifest: transferManifestLive,
-      shardPlacement: shardPlacementLive,
-      selectedEntityIds: [...selectedEntityIdsLive],
-      activeEntityId: activeEntityIdLive,
-      hoveredEntityId: hoveredSelectedEntityIdLive,
-      entityDetails: liveEntityDetails,
-    };
-
-    const frames = historyRef.current;
-    const last = frames[frames.length - 1];
-    if (last && nowMs - last.capturedAtMs < SNAPSHOT_RECORD_SPACING_MS) {
-      frames[frames.length - 1] = frame;
-    } else {
-      frames.push(frame);
-    }
-
-    const cutoffMs = nowMs - SNAPSHOT_WINDOW_MS;
-    while (frames.length > 0 && frames[0].capturedAtMs < cutoffMs) {
-      frames.shift();
-    }
-  }, [
-    playbackFrames,
-    baseShapesLive,
-    networkTelemetryLive,
-    authorityEntitiesLive,
-    transferManifestLive,
-    shardPlacementLive,
-    selectedEntityIdsLive,
-    activeEntityIdLive,
-    hoveredSelectedEntityIdLive,
-    liveEntityDetails,
-  ]);
 
   const playbackStartMs =
     playbackFrames && playbackFrames.length > 0
@@ -266,20 +183,106 @@ export default function MapPage() {
   );
   const playbackActive = playbackFrame != null;
 
+  const authorityEntitiesForSelection =
+    playbackFrame?.authorityEntities ?? authorityEntitiesLive;
+  const {
+    selectedEntities,
+    activeEntityId,
+    hoveredEntityId: hoveredSelectedEntityId,
+    selectionRect,
+    clearSelection,
+    onPointerDownCapture,
+    onPointerMoveCapture,
+    onPointerUpCapture,
+    onPointerCancelCapture,
+    setActiveEntityId,
+    setHoveredEntityId,
+  } = useCtrlDragEntitySelection({
+    containerRef,
+    rendererRef,
+    entities: authorityEntitiesForSelection,
+  });
+
+  const activeEntityLive = useMemo(
+    () =>
+      authorityEntitiesLive.find((entity) => entity.entityId === activeEntityId) ??
+      null,
+    [activeEntityId, authorityEntitiesLive]
+  );
+  const liveEntityDetails = useEntityDatabaseDetails(
+    activeEntityLive,
+    entityDetailPollIntervalMs
+  );
+
+  const latestLiveFrameDataRef = useRef<Omit<PlaybackFrame, 'capturedAtMs'> | null>(
+    null
+  );
+
+  useEffect(() => {
+    latestLiveFrameDataRef.current = {
+      baseShapes: baseShapesLive,
+      networkTelemetry: networkTelemetryLive,
+      authorityEntities: authorityEntitiesLive,
+      transferManifest: transferManifestLive,
+      shardPlacement: shardPlacementLive,
+      entityDetails: liveEntityDetails,
+    };
+  }, [
+    baseShapesLive,
+    networkTelemetryLive,
+    authorityEntitiesLive,
+    transferManifestLive,
+    shardPlacementLive,
+    liveEntityDetails,
+  ]);
+
+  useEffect(() => {
+    const intervalId = setInterval(() => {
+      const latest = latestLiveFrameDataRef.current;
+      if (!latest) {
+        return;
+      }
+
+      const nowMs = Date.now();
+      const frozen = clonePlaybackPayload(latest);
+      const frame: PlaybackFrame = {
+        capturedAtMs: nowMs,
+        ...frozen,
+      };
+      const frames = historyRef.current;
+      frames.push(frame);
+
+      const cutoffMs = nowMs - SNAPSHOT_WINDOW_MS;
+      while (frames.length > 0 && frames[0].capturedAtMs < cutoffMs) {
+        frames.shift();
+      }
+    }, SNAPSHOT_RECORD_SPACING_MS);
+
+    return () => {
+      clearInterval(intervalId);
+    };
+  }, []);
+
   useEffect(() => {
     if (!playbackActive || playbackPaused) {
+      playbackLastTickMsRef.current = null;
       return;
     }
 
     const intervalId = setInterval(() => {
+      const now = performance.now();
+      const previousTick = playbackLastTickMsRef.current ?? now;
+      playbackLastTickMsRef.current = now;
+      const elapsedMs = Math.max(0, now - previousTick);
+
       setPlaybackCursorMs((prev) => {
-        const next = prev + playbackDirection * PLAYBACK_STEP_MS;
+        const next = prev + playbackDirection * elapsedMs;
         if (playbackDirection < 0) {
           return Math.max(playbackStartMs, next);
         }
         return Math.min(playbackEndMs, next);
       });
-    }, PLAYBACK_STEP_MS);
+    }, PLAYBACK_TICK_INTERVAL_MS);
 
     return () => {
       clearInterval(intervalId);
@@ -310,6 +313,12 @@ export default function MapPage() {
     playbackStartMs,
   ]);
 
+  const recordedFrameDetails = playbackFrame?.entityDetails ?? null;
+  const entityDetails =
+    playbackActive && recordedFrameDetails
+      ? recordedFrameDetails
+      : liveEntityDetails;
+
   function takeSnapshot(): void {
     const frames = historyRef.current;
     if (frames.length === 0) {
@@ -321,11 +330,13 @@ export default function MapPage() {
     setPlaybackCursorMs(endMs);
     setPlaybackDirection(1);
     setPlaybackPaused(true);
+    playbackLastTickMsRef.current = null;
   }
 
   function resumeLive(): void {
     setPlaybackFrames(null);
     setPlaybackPaused(true);
+    playbackLastTickMsRef.current = null;
   }
 
   function seekPlayback(nextCursorMs: number): void {
@@ -334,7 +345,10 @@ export default function MapPage() {
     }
     const minMs = playbackStartMs;
     const maxMs = playbackEndMs;
-    setPlaybackCursorMs(Math.max(minMs, Math.min(maxMs, nextCursorMs)));
+    const clamped = Math.max(minMs, Math.min(maxMs, nextCursorMs));
+    const snapped = snapToStep(clamped, minMs, playbackSnapMs);
+    setPlaybackCursorMs(Math.max(minMs, Math.min(maxMs, snapped)));
+    playbackLastTickMsRef.current = null;
   }
 
   function playForward(): void {
@@ -343,6 +357,7 @@ export default function MapPage() {
     }
     setPlaybackDirection(1);
     setPlaybackPaused(false);
+    playbackLastTickMsRef.current = null;
   }
 
   function playReverse(): void {
@@ -351,13 +366,20 @@ export default function MapPage() {
     }
     setPlaybackDirection(-1);
     setPlaybackPaused(false);
+    playbackLastTickMsRef.current = null;
   }
 
   function togglePlaybackPause(): void {
     if (!playbackActive) {
       return;
     }
-    setPlaybackPaused((value) => !value);
+    setPlaybackPaused((value) => {
+      const next = !value;
+      if (!next) {
+        playbackLastTickMsRef.current = null;
+      }
+      return next;
+    });
   }
 
   const baseShapes = playbackFrame?.baseShapes ?? baseShapesLive;
@@ -367,14 +389,6 @@ export default function MapPage() {
   const transferManifest =
     playbackFrame?.transferManifest ?? transferManifestLive;
   const shardPlacement = playbackFrame?.shardPlacement ?? shardPlacementLive;
-  const selectedEntities = playbackFrame
-    ? resolveSelectedEntities(playbackFrame.selectedEntityIds, authorityEntities)
-    : selectedEntitiesLive;
-  const activeEntityId = playbackFrame?.activeEntityId ?? activeEntityIdLive;
-  const hoveredSelectedEntityId =
-    playbackFrame?.hoveredEntityId ?? hoveredSelectedEntityIdLive;
-  const selectionRect = playbackFrame ? null : selectionRectLive;
-  const entityDetails = playbackFrame?.entityDetails ?? liveEntityDetails;
 
   const {
     combinedShapes,
@@ -525,10 +539,10 @@ export default function MapPage() {
           border: '1px solid #ccc',
           boxSizing: 'border-box',
         }}
-        onPointerDownCapture={playbackActive ? undefined : onPointerDownCaptureLive}
-        onPointerMoveCapture={playbackActive ? undefined : onPointerMoveCaptureLive}
-        onPointerUpCapture={playbackActive ? undefined : onPointerUpCaptureLive}
-        onPointerCancelCapture={playbackActive ? undefined : onPointerCancelCaptureLive}
+        onPointerDownCapture={onPointerDownCapture}
+        onPointerMoveCapture={onPointerMoveCapture}
+        onPointerUpCapture={onPointerUpCapture}
+        onPointerCancelCapture={onPointerCancelCapture}
         onMouseLeave={clearHoveredShard}
       >
         {showShardHoverDetails && selectedEntities.length === 0 && (
@@ -542,7 +556,7 @@ export default function MapPage() {
           />
         )}
 
-        {!playbackActive && selectedEntities.length === 0 && (
+        {selectedEntities.length === 0 && (
           <div
             style={{
               position: 'absolute',
@@ -561,7 +575,7 @@ export default function MapPage() {
           </div>
         )}
 
-        {selectionRect && !playbackActive && (
+        {selectionRect && (
           <div
             style={{
               position: 'absolute',
@@ -582,12 +596,14 @@ export default function MapPage() {
           startMs={playbackStartMs}
           endMs={playbackEndMs}
           cursorMs={playbackCursorMs}
+          snapMs={playbackSnapMs}
           paused={playbackPaused}
           direction={playbackDirection}
           onPlayForward={playForward}
           onPlayReverse={playReverse}
           onTogglePause={togglePlaybackPause}
           onSeek={seekPlayback}
+          onSetSnapMs={setPlaybackSnapMs}
           onResumeLive={resumeLive}
         />
       </div>
@@ -632,22 +648,13 @@ export default function MapPage() {
         pollDisabledAtMs={ENTITY_DETAIL_POLL_DISABLED_AT_MS}
         onSetPollIntervalMs={setEntityDetailPollIntervalMs}
         onSelectEntity={(entityId) => {
-          if (playbackActive) {
-            return;
-          }
-          setActiveEntityIdLive(activeEntityIdLive === entityId ? null : entityId);
+          setActiveEntityId(activeEntityId === entityId ? null : entityId);
         }}
         onHoverEntity={(entityId) => {
-          if (playbackActive) {
-            return;
-          }
-          setHoveredEntityIdLive(entityId);
+          setHoveredEntityId(entityId);
         }}
         onClearSelection={() => {
-          if (playbackActive) {
-            return;
-          }
-          clearSelectionLive();
+          clearSelection();
         }}
       />
     </div>

@@ -5,12 +5,14 @@ interface MapPlaybackBarProps {
   startMs: number;
   endMs: number;
   cursorMs: number;
+  snapMs: number;
   paused: boolean;
   direction: 1 | -1;
   onPlayForward: () => void;
   onPlayReverse: () => void;
   onTogglePause: () => void;
   onSeek: (nextCursorMs: number) => void;
+  onSetSnapMs: (nextSnapMs: number) => void;
   onResumeLive: () => void;
 }
 
@@ -32,9 +34,11 @@ export function MapPlaybackBar({
   onPlayForward,
   onPlayReverse,
   onResumeLive,
+  onSetSnapMs,
   onSeek,
   onTogglePause,
   paused,
+  snapMs,
   startMs,
   visible,
 }: MapPlaybackBarProps) {
@@ -135,7 +139,7 @@ export function MapPlaybackBar({
         type="range"
         min={0}
         max={durationMs}
-        step={50}
+        step={Math.max(0.01, snapMs)}
         value={relativeMs}
         onChange={(event) =>
           onSeek(
@@ -170,6 +174,30 @@ export function MapPlaybackBar({
       >
         live
       </button>
+
+      <label
+        style={{
+          display: 'inline-flex',
+          alignItems: 'center',
+          gap: 6,
+          fontSize: 11,
+          opacity: 0.86,
+          minWidth: 190,
+        }}
+      >
+        snap ms
+        <input
+          type="range"
+          min={0.01}
+          max={10}
+          step={0.01}
+          value={snapMs}
+          onChange={(event) =>
+            onSetSnapMs(clamp(Number(event.target.value), 0.01, 10))
+          }
+        />
+        {snapMs.toFixed(2)}
+      </label>
     </div>
   );
 }
