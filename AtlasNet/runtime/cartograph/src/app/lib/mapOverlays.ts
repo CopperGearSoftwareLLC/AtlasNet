@@ -3,43 +3,89 @@ import type {
   AuthorityEntityTelemetry,
   ShapeJS,
   ShardTelemetry,
-  TransferManifestStage,
   TransferManifestTelemetry,
 } from './cartographTypes';
 import { normalizeShardId, undirectedEdgeKey, type Point2 } from './mapDataCore';
 
-const TRANSFER_STAGE_COLORS: Record<TransferManifestStage, string> = {
-  eNone: 'rgba(148, 163, 184, 0.9)',
-  ePrepare: 'rgba(251, 191, 36, 0.92)',
-  eReady: 'rgba(56, 189, 248, 0.92)',
-  eCommit: 'rgba(249, 115, 22, 0.92)',
-  eComplete: 'rgba(34, 197, 94, 0.92)',
-  eUnknown: 'rgba(148, 163, 184, 0.9)',
+const TRANSFER_STAGE_COLOR_BY_NAME: Record<string, string> = {
+  none: 'rgba(148, 163, 184, 0.9)',
+  prepare: 'rgba(251, 191, 36, 0.92)',
+  ready: 'rgba(56, 189, 248, 0.92)',
+  commit: 'rgba(249, 115, 22, 0.92)',
+  complete: 'rgba(34, 197, 94, 0.92)',
+  unknown: 'rgba(148, 163, 184, 0.9)',
 };
 
 interface HandoffEntityLink {
   fromId: string;
   toId: string;
-  stage: TransferManifestStage;
-  state: 'source' | 'target';
+  stage: string;
+  state: string;
 }
 
-function transferStageRank(stage: TransferManifestStage): number {
-  switch (stage) {
-    case 'eNone':
+type TransferStageName =
+  | 'none'
+  | 'prepare'
+  | 'ready'
+  | 'commit'
+  | 'complete'
+  | 'unknown';
+
+function normalizeEnumText(rawValue: string): string {
+  const trimmed = rawValue.trim();
+  if (!trimmed) {
+    return '';
+  }
+
+  const withoutEnumPrefix = trimmed.replace(/^e(?=[A-Z])/, '');
+  const withSpaces = withoutEnumPrefix
+    .replace(/[_-]+/g, ' ')
+    .replace(/([a-z0-9])([A-Z])/g, '$1 $2')
+    .trim();
+  return withSpaces.toLowerCase();
+}
+
+function resolveTransferStageName(stage: string): TransferStageName {
+  switch (normalizeEnumText(stage)) {
+    case 'none':
+      return 'none';
+    case 'prepare':
+      return 'prepare';
+    case 'ready':
+      return 'ready';
+    case 'commit':
+      return 'commit';
+    case 'complete':
+      return 'complete';
+    default:
+      return 'unknown';
+  }
+}
+
+function transferStageRank(stage: string): number {
+  switch (resolveTransferStageName(stage)) {
+    case 'none':
       return 0;
-    case 'ePrepare':
+    case 'prepare':
       return 1;
-    case 'eReady':
+    case 'ready':
       return 2;
-    case 'eCommit':
+    case 'commit':
       return 3;
-    case 'eComplete':
+    case 'complete':
       return 4;
-    case 'eUnknown':
+    case 'unknown':
     default:
       return -1;
   }
+}
+
+function resolveTransferStageColor(stage: string): string {
+  return TRANSFER_STAGE_COLOR_BY_NAME[resolveTransferStageName(stage)];
+}
+
+function formatTransferStageLabel(stage: string): string {
+  return resolveTransferStageName(stage);
 }
 
 function indexHandoffLinksByEntity(
@@ -57,8 +103,8 @@ function indexHandoffLinksByEntity(
     const candidate: HandoffEntityLink = {
       fromId,
       toId,
-      stage: transfer.stage,
-      state: transfer.state,
+      stage: String(transfer.stage || '').trim(),
+      state: String(transfer.state || '').trim(),
     };
     const candidateRank = transferStageRank(candidate.stage);
     for (const rawEntityId of transfer.entityIds) {
@@ -178,8 +224,8 @@ function buildAuthorityEntityOverlays(
         { x: entity.x, y: entity.y },
         { x: linkTarget.x, y: linkTarget.y },
       ],
-      color: TRANSFER_STAGE_COLORS[handoffLink.stage],
-      label: `state: ${handoffLink.state}`,
+      color: resolveTransferStageColor(handoffLink.stage),
+      label: formatTransferStageLabel(handoffLink.stage),
     });
   }
   return overlays;

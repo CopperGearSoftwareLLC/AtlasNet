@@ -5,14 +5,14 @@ interface MapPlaybackBarProps {
   startMs: number;
   endMs: number;
   cursorMs: number;
-  snapMs: number;
   paused: boolean;
   direction: 1 | -1;
   onPlayForward: () => void;
   onPlayReverse: () => void;
-  onTogglePause: () => void;
+  onPause: () => void;
+  onStepForward: () => void;
+  onStepReverse: () => void;
   onSeek: (nextCursorMs: number) => void;
-  onSetSnapMs: (nextSnapMs: number) => void;
   onResumeLive: () => void;
 }
 
@@ -22,23 +22,23 @@ function clamp(value: number, min: number, max: number): number {
 
 function formatSeconds(valueMs: number): string {
   if (!Number.isFinite(valueMs)) {
-    return '0.0s';
+    return '0.00s';
   }
-  return `${(valueMs / 1000).toFixed(1)}s`;
+  return `${(valueMs / 1000).toFixed(2)}s`;
 }
 
 export function MapPlaybackBar({
   cursorMs,
   direction,
   endMs,
+  onPause,
   onPlayForward,
   onPlayReverse,
   onResumeLive,
-  onSetSnapMs,
   onSeek,
-  onTogglePause,
+  onStepForward,
+  onStepReverse,
   paused,
-  snapMs,
   startMs,
   visible,
 }: MapPlaybackBarProps) {
@@ -71,6 +71,21 @@ export function MapPlaybackBar({
     >
       <button
         type="button"
+        onClick={onStepReverse}
+        title="Step back one frame"
+        style={{
+          border: '1px solid rgba(148, 163, 184, 0.45)',
+          borderRadius: 6,
+          padding: '4px 9px',
+          background: 'rgba(15, 23, 42, 0.72)',
+          color: '#e2e8f0',
+        }}
+      >
+        {'|<'}
+      </button>
+
+      <button
+        type="button"
         onClick={onPlayReverse}
         title="Play in reverse"
         style={{
@@ -89,8 +104,8 @@ export function MapPlaybackBar({
 
       <button
         type="button"
-        onClick={onTogglePause}
-        title={paused ? 'Resume playback' : 'Pause playback'}
+        onClick={onPause}
+        title="Pause playback"
         style={{
           border: '1px solid rgba(148, 163, 184, 0.45)',
           borderRadius: 6,
@@ -102,7 +117,7 @@ export function MapPlaybackBar({
           minWidth: 58,
         }}
       >
-        {paused ? 'play' : 'pause'}
+        pause
       </button>
 
       <button
@@ -123,9 +138,24 @@ export function MapPlaybackBar({
         {'>'}
       </button>
 
+      <button
+        type="button"
+        onClick={onStepForward}
+        title="Step forward one frame"
+        style={{
+          border: '1px solid rgba(148, 163, 184, 0.45)',
+          borderRadius: 6,
+          padding: '4px 9px',
+          background: 'rgba(15, 23, 42, 0.72)',
+          color: '#e2e8f0',
+        }}
+      >
+        {'>|'}
+      </button>
+
       <span
         style={{
-          fontSize: 11,
+          fontSize: 11.5,
           opacity: 0.85,
           minWidth: 76,
           textAlign: 'right',
@@ -139,7 +169,7 @@ export function MapPlaybackBar({
         type="range"
         min={0}
         max={durationMs}
-        step={Math.max(0.01, snapMs)}
+        step={1}
         value={relativeMs}
         onChange={(event) =>
           onSeek(
@@ -151,7 +181,7 @@ export function MapPlaybackBar({
 
       <span
         style={{
-          fontSize: 11,
+          fontSize: 11.5,
           opacity: 0.65,
           minWidth: 76,
           fontVariantNumeric: 'tabular-nums',
@@ -174,30 +204,6 @@ export function MapPlaybackBar({
       >
         live
       </button>
-
-      <label
-        style={{
-          display: 'inline-flex',
-          alignItems: 'center',
-          gap: 6,
-          fontSize: 11,
-          opacity: 0.86,
-          minWidth: 190,
-        }}
-      >
-        snap ms
-        <input
-          type="range"
-          min={0.01}
-          max={10}
-          step={0.01}
-          value={snapMs}
-          onChange={(event) =>
-            onSetSnapMs(clamp(Number(event.target.value), 0.01, 10))
-          }
-        />
-        {snapMs.toFixed(2)}
-      </label>
     </div>
   );
 }

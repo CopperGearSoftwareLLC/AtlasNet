@@ -59,7 +59,7 @@ interface PlaybackFrame {
   authorityEntities: AuthorityEntityTelemetry[];
   transferManifest: TransferManifestTelemetry[];
   shardPlacement: ShardPlacementTelemetry[];
-  entityDetails: EntityDatabaseDetailsState;
+  entityDetailsByEntityId: Record<string, EntityDatabaseDetailsState>;
 }
 
 function clonePlaybackPayload(
@@ -71,18 +71,9 @@ function clonePlaybackPayload(
   return JSON.parse(JSON.stringify(payload)) as Omit<PlaybackFrame, 'capturedAtMs'>;
 }
 
-function snapToStep(value: number, origin: number, step: number): number {
-  const safeStep = Math.max(0.01, step);
-  const snapped = Math.round((value - origin) / safeStep) * safeStep + origin;
-  return Number(snapped.toFixed(2));
-}
-
-function getFrameAtCursor(
-  frames: PlaybackFrame[],
-  cursorMs: number
-): PlaybackFrame | null {
+function getFrameIndexAtCursor(frames: PlaybackFrame[], cursorMs: number): number {
   if (frames.length === 0) {
-    return null;
+    return -1;
   }
 
   let lo = 0;
@@ -100,7 +91,28 @@ function getFrameAtCursor(
     }
   }
 
-  return frames[best] ?? frames[0] ?? null;
+  return best;
+}
+
+function getFrameAtCursor(
+  frames: PlaybackFrame[],
+  cursorMs: number
+): PlaybackFrame | null {
+  const index = getFrameIndexAtCursor(frames, cursorMs);
+  if (index < 0) {
+    return null;
+  }
+  return frames[index] ?? null;
+}
+
+function snapshotDetailsByEntityId(
+  cache: Map<string, EntityDatabaseDetailsState>
+): Record<string, EntityDatabaseDetailsState> {
+  const out: Record<string, EntityDatabaseDetailsState> = {};
+  for (const [entityId, state] of cache.entries()) {
+    out[entityId] = state;
+  }
+  return out;
 }
 
 export default function MapPage() {
@@ -134,7 +146,6 @@ export default function MapPage() {
   const [playbackCursorMs, setPlaybackCursorMs] = useState(0);
   const [playbackPaused, setPlaybackPaused] = useState(true);
   const [playbackDirection, setPlaybackDirection] = useState<1 | -1>(1);
-  const [playbackSnapMs, setPlaybackSnapMs] = useState(1);
 
   const telemetryPollIntervalMs =
     pollIntervalMs >= POLL_DISABLED_AT_MS ? 0 : pollIntervalMs;
@@ -202,6 +213,11 @@ export default function MapPage() {
     rendererRef,
     entities: authorityEntitiesForSelection,
   });
+  const activeSelectedEntity = useMemo(
+    () =>
+      selectedEntities.find((entity) => entity.entityId === activeEntityId) ?? null,
+    [activeEntityId, selectedEntities]
+  );
 
   const activeEntityLive = useMemo(
     () =>
@@ -213,6 +229,27 @@ export default function MapPage() {
     activeEntityLive,
     entityDetailPollIntervalMs
   );
+  const playbackLookupDetails = useEntityDatabaseDetails(
+    playbackActive ? activeSelectedEntity : null,
+    0
+  );
+  const liveEntityDetailsCacheRef = useRef<Map<string, EntityDatabaseDetailsState>>(
+    new Map()
+  );
+
+  useEffect(() => {
+    const entityId = activeEntityLive?.entityId ?? '';
+    if (!entityId) {
+      return;
+    }
+
+    const previous = liveEntityDetailsCacheRef.current.get(entityId) ?? null;
+    liveEntityDetailsCacheRef.current.set(entityId, {
+      loading: liveEntityDetails.loading,
+      error: liveEntityDetails.error,
+      data: liveEntityDetails.data ?? previous?.data ?? null,
+    });
+  }, [activeEntityLive, liveEntityDetails]);
 
   const latestLiveFrameDataRef = useRef<Omit<PlaybackFrame, 'capturedAtMs'> | null>(
     null
@@ -225,7 +262,9 @@ export default function MapPage() {
       authorityEntities: authorityEntitiesLive,
       transferManifest: transferManifestLive,
       shardPlacement: shardPlacementLive,
-      entityDetails: liveEntityDetails,
+      entityDetailsByEntityId: snapshotDetailsByEntityId(
+        liveEntityDetailsCacheRef.current
+      ),
     };
   }, [
     baseShapesLive,
@@ -234,6 +273,7 @@ export default function MapPage() {
     transferManifestLive,
     shardPlacementLive,
     liveEntityDetails,
+    activeEntityLive,
   ]);
 
   useEffect(() => {
@@ -313,11 +353,13 @@ export default function MapPage() {
     playbackStartMs,
   ]);
 
-  const recordedFrameDetails = playbackFrame?.entityDetails ?? null;
-  const entityDetails =
-    playbackActive && recordedFrameDetails
-      ? recordedFrameDetails
-      : liveEntityDetails;
+  const playbackEntityDetails =
+    playbackActive && activeEntityId
+      ? playbackFrame?.entityDetailsByEntityId[activeEntityId] ?? null
+      : null;
+  const entityDetails = playbackActive
+    ? playbackEntityDetails ?? playbackLookupDetails
+    : liveEntityDetails;
 
   function takeSnapshot(): void {
     const frames = historyRef.current;
@@ -346,8 +388,7 @@ export default function MapPage() {
     const minMs = playbackStartMs;
     const maxMs = playbackEndMs;
     const clamped = Math.max(minMs, Math.min(maxMs, nextCursorMs));
-    const snapped = snapToStep(clamped, minMs, playbackSnapMs);
-    setPlaybackCursorMs(Math.max(minMs, Math.min(maxMs, snapped)));
+    setPlaybackCursorMs(clamped);
     playbackLastTickMsRef.current = null;
   }
 
@@ -369,16 +410,34 @@ export default function MapPage() {
     playbackLastTickMsRef.current = null;
   }
 
-  function togglePlaybackPause(): void {
+  function pausePlayback(): void {
     if (!playbackActive) {
       return;
     }
-    setPlaybackPaused((value) => {
-      const next = !value;
-      if (!next) {
-        playbackLastTickMsRef.current = null;
+    setPlaybackPaused(true);
+    playbackLastTickMsRef.current = null;
+  }
+
+  function stepPlaybackFrame(direction: 1 | -1): void {
+    if (!playbackFrames || playbackFrames.length === 0) {
+      return;
+    }
+
+    setPlaybackPaused(true);
+    playbackLastTickMsRef.current = null;
+
+    setPlaybackCursorMs((previousCursorMs) => {
+      const currentIndex = getFrameIndexAtCursor(playbackFrames, previousCursorMs);
+      if (currentIndex < 0) {
+        return previousCursorMs;
       }
-      return next;
+
+      const nextIndex =
+        direction > 0
+          ? Math.min(playbackFrames.length - 1, currentIndex + 1)
+          : Math.max(0, currentIndex - 1);
+      const nextFrame = playbackFrames[nextIndex];
+      return nextFrame ? nextFrame.capturedAtMs : previousCursorMs;
     });
   }
 
@@ -596,14 +655,14 @@ export default function MapPage() {
           startMs={playbackStartMs}
           endMs={playbackEndMs}
           cursorMs={playbackCursorMs}
-          snapMs={playbackSnapMs}
           paused={playbackPaused}
           direction={playbackDirection}
           onPlayForward={playForward}
           onPlayReverse={playReverse}
-          onTogglePause={togglePlaybackPause}
+          onPause={pausePlayback}
+          onStepForward={() => stepPlaybackFrame(1)}
+          onStepReverse={() => stepPlaybackFrame(-1)}
           onSeek={seekPlayback}
-          onSetSnapMs={setPlaybackSnapMs}
           onResumeLive={resumeLive}
         />
       </div>
