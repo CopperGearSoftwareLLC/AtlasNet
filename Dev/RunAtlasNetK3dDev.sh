@@ -8,6 +8,7 @@ SWARM_STACK_PREFIX="${ATLASNET_SWARM_STACK_PREFIX:-atlasnet_dev}"
 MANIFEST_TEMPLATE="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)/deploy/k8s/overlays/k3d/atlasnet-dev.yaml"
 K3D_SERVER_COUNT="${ATLASNET_K3D_SERVERS:-1}"
 K3D_AGENT_COUNT="${ATLASNET_K3D_AGENTS:-2}"
+PORT_WAIT_TIMEOUT="${ATLASNET_K3D_PORT_WAIT_TIMEOUT:-15}"
 HOST_KUBECONFIG_PATH=""
 
 is_nonnegative_int() {
@@ -20,6 +21,10 @@ if ! is_nonnegative_int "$K3D_SERVER_COUNT" || ((K3D_SERVER_COUNT < 1)); then
 fi
 if ! is_nonnegative_int "$K3D_AGENT_COUNT"; then
     echo "Error: ATLASNET_K3D_AGENTS must be an integer >= 0 (got '$K3D_AGENT_COUNT')." >&2
+    exit 1
+fi
+if ! is_nonnegative_int "$PORT_WAIT_TIMEOUT" || ((PORT_WAIT_TIMEOUT < 1)); then
+    echo "Error: ATLASNET_K3D_PORT_WAIT_TIMEOUT must be an integer >= 1 (got '$PORT_WAIT_TIMEOUT')." >&2
     exit 1
 fi
 
@@ -87,7 +92,7 @@ port_in_use() {
 }
 
 wait_for_ports_free() {
-    local timeout=60
+    local timeout="$PORT_WAIT_TIMEOUT"
     local elapsed=0
     local ports=(3000 9229 2555)
     while ((elapsed < timeout)); do
