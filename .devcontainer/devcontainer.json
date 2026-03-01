@@ -10,7 +10,7 @@
     "--init",
     "--shm-size=2g" ,
     "--add-host=host.docker.internal:host-gateway",
-    //"--network=host",
+    "--network=host",
     //"--memory=10g",
     //"--memory-swap=10g",
      "--cap-add=SYS_PTRACE",
