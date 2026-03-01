@@ -21,30 +21,10 @@
     "source=/var/run/docker.sock,target=/var/run/docker.sock,type=bind"
   ],
   "forwardPorts": [
-    3000,
-    9229,
-    9000,
-    9443,
     5901,
     6080
   ],
   "portsAttributes": {
-    "3000": {
-      "label": "Cartograph (Web)",
-      "onAutoForward": "openBrowser"
-    },
-    "9229": {
-      "label": "Cartograph (Node Inspector)",
-      "onAutoForward": "silent"
-    },
-    "9000": {
-      "label": "Portainer (HTTP)",
-      "onAutoForward": "openBrowser"
-    },
-    "9443": {
-      "label": "Portainer (HTTPS)",
-      "onAutoForward": "openBrowser"
-    },
     "6080": {
       "label": "Web Desktop (noVNC)",
       "onAutoForward": "openBrowser"
@@ -72,7 +52,9 @@
   "customizations": {
     "vscode": {
       "settings": {
-        "terminal.integrated.defaultProfile.linux": "bash"
+        "terminal.integrated.defaultProfile.linux": "bash",
+        "remote.restoreForwardedPorts": false,
+        "remote.autoForwardPorts": false
       },
       "extensions": [
         "llvm-vs-code-extensions.vscode-clangd",

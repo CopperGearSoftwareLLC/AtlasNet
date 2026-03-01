@@ -8,6 +8,7 @@ SWARM_STACK_PREFIX="${ATLASNET_SWARM_STACK_PREFIX:-atlasnet_dev}"
 MANIFEST_TEMPLATE="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)/deploy/k8s/overlays/k3d/atlasnet-dev.yaml"
 K3D_SERVER_COUNT="${ATLASNET_K3D_SERVERS:-1}"
 K3D_AGENT_COUNT="${ATLASNET_K3D_AGENTS:-2}"
+HOST_KUBECONFIG_PATH=""
 
 is_nonnegative_int() {
     [[ "$1" =~ ^[0-9]+$ ]]
@@ -107,6 +108,8 @@ wait_for_ports_free() {
 
     echo "Error: ports are still busy after ${timeout}s; aborting k3d cluster startup." >&2
     ss -ltnu | grep -E ':3000|:9229|:2555' || true
+    echo "Hint: if listeners are on 127.0.0.1:3000/9229, close VS Code forwarded ports for those values and retry." >&2
+    echo "      In this repo, keep 3000/9229 out of static devcontainer forwardPorts to avoid k3d bind conflicts." >&2
     exit 1
 }
 
@@ -158,6 +161,7 @@ write_host_kubeconfig() {
     fi
     # Fallback text rewrite in case kubectl config set-cluster is unavailable.
     sed -i -E "s#https://0\\.0\\.0\\.0:[0-9]+#https://127.0.0.1:${api_port}#g" "$host_cfg" || true
+    HOST_KUBECONFIG_PATH="$host_cfg"
 
     echo "==> Host kubeconfig written: $host_cfg"
     echo "==> Host API endpoint: https://127.0.0.1:${api_port}"
@@ -165,6 +169,55 @@ write_host_kubeconfig() {
 }
 
 write_host_kubeconfig
+
+sync_headlamp_default_kubeconfig() {
+    if [[ "${ATLASNET_HEADLAMP_KUBECONFIG_SYNC:-1}" != "1" ]]; then
+        return
+    fi
+
+    local source_cfg target_cfg source_ctx source_cluster source_user tmp_cfg
+    source_cfg="${HOST_KUBECONFIG_PATH:-}"
+    if [[ -z "$source_cfg" || ! -f "$source_cfg" ]]; then
+        return
+    fi
+
+    target_cfg="${ATLASNET_HEADLAMP_KUBECONFIG_PATH:-$HOME/.kube/config}"
+    mkdir -p "$(dirname "$target_cfg")"
+    touch "$target_cfg"
+
+    if [[ "$source_cfg" == "$target_cfg" ]]; then
+        echo "==> Headlamp/default kubeconfig already at $target_cfg"
+        return
+    fi
+
+    if ! command -v kubectl >/dev/null 2>&1; then
+        cp "$source_cfg" "$target_cfg"
+        chmod 600 "$target_cfg" 2>/dev/null || true
+        echo "==> kubectl not found; copied kubeconfig to $target_cfg"
+        return
+    fi
+
+    source_ctx="$(kubectl --kubeconfig "$source_cfg" config current-context 2>/dev/null || true)"
+    source_cluster="$(kubectl --kubeconfig "$source_cfg" config view --minify -o jsonpath='{.contexts[0].context.cluster}' 2>/dev/null || true)"
+    source_user="$(kubectl --kubeconfig "$source_cfg" config view --minify -o jsonpath='{.contexts[0].context.user}' 2>/dev/null || true)"
+
+    KUBECONFIG="$target_cfg" kubectl config delete-context "$source_ctx" >/dev/null 2>&1 || true
+    KUBECONFIG="$target_cfg" kubectl config delete-cluster "$source_cluster" >/dev/null 2>&1 || true
+    if [[ -n "$source_user" ]]; then
+        KUBECONFIG="$target_cfg" kubectl config unset "users.${source_user}" >/dev/null 2>&1 || true
+    fi
+
+    tmp_cfg="$(mktemp /tmp/atlasnet-headlamp-kubeconfig-XXXX.yaml)"
+    KUBECONFIG="$target_cfg:$source_cfg" kubectl config view --flatten >"$tmp_cfg"
+    chmod 600 "$tmp_cfg" 2>/dev/null || true
+    mv "$tmp_cfg" "$target_cfg"
+
+    if [[ -n "$source_ctx" ]]; then
+        KUBECONFIG="$target_cfg" kubectl config use-context "$source_ctx" >/dev/null 2>&1 || true
+    fi
+
+    echo "==> Headlamp/default kubeconfig updated: $target_cfg"
+}
 
 TEMP_KUBECONFIG="$(mktemp /tmp/k3d-kubeconfig-XXXX.yaml)"
 TEMP_MANIFEST="$(mktemp /tmp/atlasnet-k3d-XXXX.yaml)"
@@ -444,6 +497,8 @@ done
 if [[ "$shard_ready" != true ]]; then
     echo "Warning: shard deployment did not report a ready replica within timeout."
 fi
+
+sync_headlamp_default_kubeconfig
 
 echo
 echo "Kubernetes services in namespace '$NAMESPACE':"
