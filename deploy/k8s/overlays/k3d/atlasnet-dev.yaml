@@ -302,16 +302,15 @@ spec:
       targetPort: redis
 ---
 apiVersion: apps/v1
-kind: Deployment
+kind: DaemonSet
 metadata:
   name: atlasnet-cartograph
   namespace: __NAMESPACE__
   labels:
     app: atlasnet-cartograph
 spec:
-  replicas: 1
-  strategy:
-    type: Recreate
+  updateStrategy:
+    type: RollingUpdate
   selector:
     matchLabels:
       app: atlasnet-cartograph

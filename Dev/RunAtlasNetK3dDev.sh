@@ -358,15 +358,51 @@ if [[ "$cached_cluster_id" != "$current_cluster_id" ]]; then
     PREV_IMAGE_IDS=()
 fi
 
-declare -a ROLLOUT_RESTART_WORKLOADS=()
-declare -A RESTART_SEEN=()
-add_restart() {
-    local workload="$1"
-    if [[ -n "${RESTART_SEEN[$workload]:-}" ]]; then
+declare -a ROLLOUT_RESTART_APPS=()
+declare -A RESTART_APP_SEEN=()
+add_restart_app() {
+    local app="$1"
+    if [[ -n "${RESTART_APP_SEEN[$app]:-}" ]]; then
         return
     fi
-    RESTART_SEEN["$workload"]=1
-    ROLLOUT_RESTART_WORKLOADS+=("$workload")
+    RESTART_APP_SEEN["$app"]=1
+    ROLLOUT_RESTART_APPS+=("$app")
+}
+
+resolve_rollout_workloads() {
+    local app="$1"
+    kctl -n "$NAMESPACE" get deployment,statefulset,daemonset -l "app=${app}" -o name 2>/dev/null || true
+}
+
+restart_marked_apps() {
+    local app workload found
+    for app in "${ROLLOUT_RESTART_APPS[@]}"; do
+        found=0
+        while IFS= read -r workload; do
+            [[ -z "$workload" ]] && continue
+            found=1
+            kctl -n "$NAMESPACE" rollout restart "$workload" >/dev/null || true
+        done < <(resolve_rollout_workloads "$app")
+        if ((found == 0)); then
+            echo "   - warning: no rollout workload found for app '${app}'"
+        fi
+    done
+}
+
+wait_for_app_rollout() {
+    local app="$1"
+    local timeout="${2:-180s}"
+    local workload found=0
+    while IFS= read -r workload; do
+        [[ -z "$workload" ]] && continue
+        found=1
+        kctl -n "$NAMESPACE" rollout status "$workload" --timeout="$timeout"
+    done < <(resolve_rollout_workloads "$app")
+
+    if ((found == 0)); then
+        echo "Error: no rollout workload found for app '$app' in namespace '$NAMESPACE'." >&2
+        exit 1
+    fi
 }
 
 echo "==> Importing local Docker images into k3d..."
@@ -406,12 +442,12 @@ for image in "${IMAGES[@]}"; do
             echo "   - queued import $image"
             IMAGES_TO_IMPORT+=("$image")
             case "$image" in
-                watchdog:*) add_restart "deployment/atlasnet-watchdog" ;;
-                proxy:*) add_restart "statefulset/atlasnet-proxy" ;;
-                cartograph:*) add_restart "deployment/atlasnet-cartograph" ;;
+                watchdog:*) add_restart_app "atlasnet-watchdog" ;;
+                proxy:*) add_restart_app "atlasnet-proxy" ;;
+                cartograph:*) add_restart_app "atlasnet-cartograph" ;;
             esac
             if [[ "$image" == "shard:latest" || "$image" == "$SHARD_IMAGE_NAME" ]]; then
-                add_restart "deployment/atlasnet-shard"
+                add_restart_app "atlasnet-shard"
             fi
         else
             echo "   - cached in cluster $image"
@@ -473,23 +509,23 @@ if [[ "$KUBECTL_MODE" == "incluster" ]]; then
 else
     kctl apply -f "$TEMP_MANIFEST" >/dev/null
 fi
-# Migration cleanup: proxy moved from Deployment -> StatefulSet.
+# Migration cleanup: workloads moved kinds across revisions.
+kctl -n "$NAMESPACE" delete daemonset atlasnet-watchdog --ignore-not-found >/dev/null || true
+kctl -n "$NAMESPACE" delete deployment atlasnet-cartograph --ignore-not-found >/dev/null || true
 kctl -n "$NAMESPACE" delete deployment atlasnet-proxy --ignore-not-found >/dev/null || true
 # Shard deployment is declared with replicas=0 and is expected to be scaled by Watchdog.
 # Always restart watchdog so it recomputes shard target each run.
-add_restart "deployment/atlasnet-watchdog"
+add_restart_app "atlasnet-watchdog"
 echo "==> Restarting updated workloads..."
-for workload in "${ROLLOUT_RESTART_WORKLOADS[@]}"; do
-    kctl -n "$NAMESPACE" rollout restart "$workload" >/dev/null || true
-done
+restart_marked_apps
 # Remove legacy resources from earlier k3d migration iterations.
 kctl -n "$NAMESPACE" delete svc atlasnet-internaldb --ignore-not-found >/dev/null || true
 
 echo "==> Waiting for core workloads..."
-kctl -n "$NAMESPACE" rollout status deployment/atlasnet-internaldb --timeout=180s
-kctl -n "$NAMESPACE" rollout status deployment/atlasnet-watchdog --timeout=180s
-kctl -n "$NAMESPACE" rollout status statefulset/atlasnet-proxy --timeout=180s
-kctl -n "$NAMESPACE" rollout status deployment/atlasnet-cartograph --timeout=180s
+wait_for_app_rollout "atlasnet-internaldb" "180s"
+wait_for_app_rollout "atlasnet-watchdog" "180s"
+wait_for_app_rollout "atlasnet-proxy" "180s"
+wait_for_app_rollout "atlasnet-cartograph" "180s"
 
 echo "==> Waiting for watchdog-driven shard scale-up..."
 shard_ready=false
