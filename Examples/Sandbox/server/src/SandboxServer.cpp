@@ -5,6 +5,9 @@
 #include <thread>
 
 #include "AtlasNetServer.hpp"
+#include "Command/NetCommand.hpp"
+#include "Commands/GameClientInputCommand.hpp"
+#include "Commands/GameStateCommand.hpp"
 #include "Entity/Entity.hpp"
 #include "Entity/EntityHandle.hpp"
 #include "Entity/EntityLedger.hpp"
@@ -18,9 +21,11 @@
 
 void SandboxServer::Run()
 {
-	AtlasNetServer::InitializeProperties InitProperties;
-	InitProperties.OnShutdownRequest = [&](SignalType signal) { ShouldShutdown = true; };
-	AtlasNetServer::Get().Initialize(InitProperties);
+	AtlasNet_Initialize();
+
+	GetCommandBus().Subscribe<GameClientInputCommand>(
+		[this](const NetClientIntentHeader& h, const GameClientInputCommand& c)
+		{ OnGameClientInputCommand(h, c); });
 
 	EventSystem::Get().Subscribe<ClientConnectEvent>(
 		[&](const ClientConnectEvent& e)
@@ -38,7 +43,7 @@ void SandboxServer::Run()
 	{
 		std::mt19937 rng(std::random_device{}());
 		std::uniform_real_distribution<float> dist(0.0f, 1.0f);
-		for (int i = 0; i < 4; i++)
+		for (int i = 0; i < 100; i++)
 		{
 			float z = dist(rng) * 2.0f - 1.0f;					// z in [-1, 1]
 			float theta = dist(rng) * 2.0f * glm::pi<float>();	// angle around Z
@@ -50,38 +55,56 @@ void SandboxServer::Run()
 
 			vec3 velocityVec = vec3(x, y, 0);
 			Transform t;
-			t.position = vec3(0,0, 0);
+			t.position = vec3(0, 0, 0);
 			ByteWriter metadataWriter;
 			metadataWriter.vec3(velocityVec);
-			AtlasEntityHandle e = AtlasNetServer::Get().CreateEntity(t, metadataWriter.bytes());
+			AtlasEntityHandle e = AtlasNet_CreateEntity(t, metadataWriter.bytes());
 		}
 	}
 
 	using Clock = std::chrono::steady_clock;
 
 	auto lastTime = Clock::now();
+	auto fpsTimer = Clock::now();
+
+	constexpr double TargetFPS = 60.0;
+	constexpr std::chrono::duration<double> TargetFrameTime(1.0 / TargetFPS);
+
 	constexpr float MinX = -100.f;
 	constexpr float MaxX = 100.f;
 	constexpr float MinY = -100.f;
 	constexpr float MaxY = 100.f;
+
+	uint64_t frameCount = 0;
+	double accumulatedTime = 0.0;
+
+	AtlasEntityHandle h;
+
 	while (!ShouldShutdown)
 	{
-		const auto now = Clock::now();
-		const std::chrono::duration<double> delta = now - lastTime;
-		lastTime = now;
+		const auto frameStart = Clock::now();
 
-		const float dt = delta.count();	 // seconds as double
+		const std::chrono::duration<double> delta = frameStart - lastTime;
+		lastTime = frameStart;
 
-		EntityLedger::Get().ForEachEntity(
+		const double dt = delta.count();  // seconds
+		accumulatedTime += dt;
+		frameCount++;
+
+		EntityLedger::Get().ForEachEntityWrite(
 			std::execution::par_unseq,
 			[&](AtlasEntity& e)
 			{
-				vec3 velocity = ByteReader(e.Metadata).vec3();
+				if (e.IsClient)
+				{
+					GetCommandBus().Dispatch(e.Client_ID, GameStateCommand{});
+					return;
+				}
+				vec3 velocity = ByteReader(e.payload).vec3();
 
 				// Integrate
-				e.data.transform.position += velocity * dt;
-
-				vec3& pos = e.data.transform.position;
+				e.transform.position += velocity * static_cast<float>(dt);
+				vec3& pos = e.transform.position;
 
 				// ---- X Axis ----
 				if (pos.x > MaxX)
@@ -107,9 +130,42 @@ void SandboxServer::Run()
 					velocity.y *= -1.f;
 				}
 
-				// Write velocity back if needed
 				ByteWriter metadataWriter = ByteWriter().vec3(velocity);
-				e.Metadata.assign(metadataWriter.bytes().begin(), metadataWriter.bytes().end());
+				e.payload.assign(metadataWriter.bytes().begin(), metadataWriter.bytes().end());
 			});
+
+		GetCommandBus().Flush();
+		// ---- FPS print every second ----
+		const auto now = Clock::now();
+		const std::chrono::duration<double> fpsElapsed = now - fpsTimer;
+
+		if (fpsElapsed.count() >= 1.0)
+		{
+			const double avgFPS = frameCount / accumulatedTime;
+			// std::cout << "Active FPS: " << avgFPS << std::endl;
+
+			frameCount = 0;
+			accumulatedTime = 0.0;
+			fpsTimer = now;
+		}
+
+		// ---- Frame limiting to 60 FPS ----
+		const auto frameEnd = Clock::now();
+		const std::chrono::duration<double> frameTime = frameEnd - frameStart;
+
+		if (frameTime < TargetFrameTime)
+		{
+			std::this_thread::sleep_for(TargetFrameTime - frameTime);
+		}
 	}
+}
+void SandboxServer::OnClientSpawn(const ClientSpawnInfo& c)
+{
+	logger.DebugFormatted("SPAWNING CLIENT ENTITY FOR CLIENT {}", UUIDGen::ToString(c.client.ID));
+	AtlasEntityHandle clientHandle = AtlasNet_CreateClientEntity(c.client.ID, c.spawnLocation);
+}
+void SandboxServer::OnGameClientInputCommand(const NetClientIntentHeader& header,
+											 const GameClientInputCommand& command)
+{
+	logger.Debug("Received a GameClientInputCommand");
 }

@@ -65,11 +65,11 @@ services:
       HANDSHAKE_SERVICE_ENABLE: 1
       HANDSHAKE_SERVICE_IP: "postgres"
     ports:
-      - target: 25568
+      - target: 25555
         published: 2555
         protocol: tcp
         mode: ingress
-      - target: 25568
+      - target: 25555
         published: 2555
         protocol: udp
         mode: ingress

@@ -8,6 +8,8 @@
 #include <stop_token>
 #include <thread>
 
+#include "Client/Client.hpp"
+#include "Client/ClientCredentials.hpp"
 #include "Global/pch.hpp"
 #include "Network/Connection.hpp"
 #include "Network/NetworkEnums.hpp"
@@ -117,11 +119,17 @@ void ClientLink::Init()
 				last = now;
 			}
 		});
+	ClientIDAssignSub = packet_manager.Subscribe<ClientIDAssignPacket>(
+		[&](const ClientIDAssignPacket &clientIDPacket, const PacketManager::PacketInfo &info)
+		{ OnClientIDAssignedPacket(clientIDPacket, info); });
 }
-void ClientLink::OnClientIDAssignedPacket(const ClientIDAssignPacket &clientIDPacket,const PacketManager::PacketInfo& info)
+void ClientLink::OnClientIDAssignedPacket(const ClientIDAssignPacket &clientIDPacket,
+										  const PacketManager::PacketInfo &info)
 {
 	logger.DebugFormatted("Received packet assigning ID to {} ",
 						  clientIDPacket.AssignedClientID.ToString());
+	ClientID id = clientIDPacket.AssignedClientID.ID;
+	ClientCredentials::Make(id);
 }
 void ClientLink::ReceiveMessages()
 {
@@ -192,5 +200,6 @@ void ClientLink::OnConnected(SteamNetConnectionStatusChangedCallback_t *pInfo)
 							   c.SetNewState(ConnectionState::eConnected);
 							   c.target = realIdentity;
 						   });
+		ManagingProxy = realIdentity;
 	}
 }

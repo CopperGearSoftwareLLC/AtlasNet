@@ -8,4 +8,4 @@ struct LogEvent : IEvent
 	void Serialize(ByteWriter& bw) const override  { bw.str(message); }
 	void Deserialize(ByteReader& br) override { message = br.str(); }
 };
-ATLASNET_REGISTER_EVENT(LogEvent, "LogEvent");
+ATLASNET_REGISTER_EVENT(LogEvent);

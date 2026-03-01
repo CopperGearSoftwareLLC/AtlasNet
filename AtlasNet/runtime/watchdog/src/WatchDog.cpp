@@ -186,7 +186,7 @@ void WatchDog::ComputeHeuristic()
 	for (int i = 0; i < 4; i++)
 	{
 		AtlasEntityMinimal e;
-		e.data.transform.position = {10 * ((i / 2) ? 1 : -1),
+		e.transform.position = {10 * ((i / 2) ? 1 : -1),
 								10 * ((i % 2) ? 1 : -1), 0};
 		entities.push_back(e);
 	}

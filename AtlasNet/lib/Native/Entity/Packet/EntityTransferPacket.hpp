@@ -159,4 +159,4 @@ class EntityTransferPacket : public TPacket<EntityTransferPacket, "EntityTransfe
 	}
 	[[nodiscard]] bool ValidateData() const override { return true; }
 };
-ATLASNET_REGISTER_PACKET(EntityTransferPacket, "EntityTransferPacket");
+ATLASNET_REGISTER_PACKET(EntityTransferPacket);

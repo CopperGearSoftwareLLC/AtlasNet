@@ -20,7 +20,7 @@
 #include "Entity/Entity.hpp"
 #include "Entity/EntityEnums.hpp"
 #include "Entity/EntityLedger.hpp"
-#include "Entity/Packet/ClientTransferPacket.hpp"
+#include "Client/Packet/ClientTransferPacket.hpp"
 #include "Entity/Packet/EntityTransferPacket.hpp"
 #include "Entity/Transfer/TransferData.hpp"
 #include "Entity/Transfer/TransferManifest.hpp"

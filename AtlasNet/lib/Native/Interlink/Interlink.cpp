@@ -1,5 +1,6 @@
 #include "Interlink.hpp"
 
+#include <steam/isteamnetworkingsockets.h>
 #include <steam/steamtypes.h>
 
 #include <atomic>
@@ -10,7 +11,7 @@
 
 // #include "Database/ProxyRegistry.hpp"
 #include "Client/Client.hpp"
-#include "Client/ClientManifest.hpp"
+#include "Client/Database/ClientManifest.hpp"
 #include "Database/ServerRegistry.hpp"
 #include "Docker/DockerIO.hpp"
 #include "Events/EventSystem.hpp"
@@ -155,7 +156,8 @@ void Interlink::SendMessage(const NetworkIdentity &who, const std::shared_ptr<IP
 		}
 		else
 		{
-			//logger.DebugFormatted("{} Packet sent to {}", packet->GetPacketName(), who.ToString());
+			// logger.DebugFormatted("{} Packet sent to {}", packet->GetPacketName(),
+			// who.ToString());
 		}
 	}
 }
@@ -404,7 +406,7 @@ void Interlink::ReceiveMessages()
 		// Normal internal dispatch
 		std::span<const uint8_t> span = std::span<const uint8_t>((uint8_t *)data, size);
 		const auto packet = PacketRegistry::Get().CreateFromBytes(span);
-		//logger.DebugFormatted("Arrived Packet of type {} from {}",
+		// logger.DebugFormatted("Arrived Packet of type {} from {}",
 		//					  packet->GetPacketName(), sender.target.ToString());
 		packet_manager.Dispatch(*packet, packet->GetPacketType(),
 								PacketManager::PacketInfo{.sender = sender.target});
@@ -520,19 +522,11 @@ void Interlink::Init()
 	TickThread = std::jthread(
 		[this](std::stop_token st)
 		{
-			using clock = std::chrono::steady_clock;
-			auto last = clock::now();
-
 			while (!st.stop_requested())
 			{
 				Tick();
 
-				auto now = clock::now();
-				if (now - last < std::chrono::milliseconds(2))
-				{
-					std::this_thread::sleep_for(std::chrono::milliseconds(50));
-				}
-				last = now;
+				std::this_thread::sleep_for(std::chrono::milliseconds(5));
 			}
 		});
 	IsInit = true;
@@ -780,7 +774,7 @@ void Interlink::OnClientConnected(const Connection &c)
 		ClientManifest::Get().RegisterClient(client);
 		ClientManifest::Get().AssignProxyClient(client.ID, NetworkCredentials::Get().GetID());
 
-		ClientConnectEvent cce;
+		ClientHandshakeEvent cce;
 		cce.client = client;
 		cce.ConnectedProxy = NetworkCredentials::Get().GetID();
 		EventSystem::Get().Dispatch(cce);

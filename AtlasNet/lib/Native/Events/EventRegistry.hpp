@@ -17,10 +17,10 @@
 class EventRegistry : public Singleton<EventRegistry>
 {
    private:
-	static constexpr uint32_t HashName(const std::string_view str)
+	static constexpr EventTypeID HashName(const std::string_view str)
 	{
 		const char* c = str.data();
-		uint32_t hash = 2166136261u;
+		EventTypeID hash = 2166136261u;
 		while (*c)
 		{
 			hash ^= static_cast<uint8_t>(*c++);
@@ -99,9 +99,9 @@ class EventRegistry : public Singleton<EventRegistry>
     }
 };
 
-#define ATLASNET_REGISTER_EVENT(Type, Name)                  \
-	static const bool Event_Type##_registered = []() -> bool \
-	{                                                        \
-		EventRegistry::Get().RegisterEvent<Type>(Name);      \
-		return true;                                         \
+#define ATLASNET_REGISTER_EVENT(Type)                         \
+	static const bool Type##_registered = []() -> bool        \
+	{                                                         \
+		EventRegistry::Get().RegisterEvent<Type>(#Type);      \
+		return true;                                          \
 	}()

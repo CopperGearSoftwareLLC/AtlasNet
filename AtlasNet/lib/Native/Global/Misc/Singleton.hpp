@@ -16,6 +16,10 @@ public:
     Singleton(const Singleton&) = delete;
     Singleton& operator=(const Singleton&) = delete;
 
+    static void Ensure()
+    {
+        Type& t = Get();
+    }
     // Get: constructs ONLY if default-constructible
     [[nodiscard]] static Type& Get()
     {

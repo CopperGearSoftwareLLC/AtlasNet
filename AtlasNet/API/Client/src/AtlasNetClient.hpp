@@ -1,4 +1,5 @@
 #pragma once
+#include "Command/ClientCommandBus.hpp"
 #include "Global/pch.hpp"
 #include <memory>
 #include <mutex>
@@ -26,11 +27,14 @@ public:
 //    void SendEntityUpdate(const AtlasEntity &entity);
 //    int GetRemoteEntities(AtlasEntity *buffer, int maxCount);
     void Shutdown();
+
+    ClientCommandBus& GetCommandBus() {return commandBus;}
 private:
 //    void OnConnected(const InterLinkIdentifier &identifier);
 //    void OnMessageReceived(const Connection& from, std::span<const std::byte> data);
 //    void HandleEntityMessage(const std::span<const std::byte>& data);
 private:
+ClientCommandBus commandBus;
     std::shared_ptr<Log> logger = std::make_shared<Log>("AtlasNetClient");
     std::unordered_map<AtlasEntityID, AtlasEntity> RemoteEntities;
     std::mutex Mutex;

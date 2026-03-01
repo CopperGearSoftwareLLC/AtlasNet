@@ -1,4 +1,6 @@
 #pragma once
+#include "Command/NetCommand.hpp"
+#include "Commands/GameStateCommand.hpp"
 #include "Entity/Entity.hpp"
 #include "Global/pch.hpp"
 #include "AtlasNetClient.hpp"
@@ -17,8 +19,10 @@ class SandboxClient
     void Startup();
     void SetImGui();
     void RenderView();
-public:
+	void OnGameStateCommand(const NetServerStateHeader& header, const GameStateCommand& command);
 
-    void Run();
+   public:
+
+    void Run(const IPAddress& address);
     Log &GetLogger() const { return logger; }
 };

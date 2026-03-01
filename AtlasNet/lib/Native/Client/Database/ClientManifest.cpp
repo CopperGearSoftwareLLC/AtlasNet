@@ -3,7 +3,7 @@
 #include <boost/container/small_vector.hpp>
 #include <optional>
 
-#include "Client.hpp"
+#include "Client/Client.hpp"
 #include "InternalDB/InternalDB.hpp"
 #include "Network/NetworkEnums.hpp"
 #include "Network/NetworkIdentity.hpp"
