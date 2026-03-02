@@ -88,7 +88,7 @@ build-docker: build-core
 	BUILDKITD_CONFIG="$(ATLASNET_ROOT)/AtlasNet/docker/buildkitd.pi.toml" cmake --build "$(BUILD_DIR)" --target AtlasnetDockerBuild_Fast -- -j2
 	@echo "==> Docker images built using CopyDockerfile (arm64 local images: watchdog, proxy, shard, cartograph)."
 
-push-docker: build-docker
+push-docker:
 	@echo "==> Preparing to push arm64 images to Docker Hub..."
 	@if [ -z "$$DOCKERHUB_NAMESPACE" ]; then \
 	  echo "ERROR: DOCKERHUB_NAMESPACE must be set in the environment (e.g. your Docker Hub username)."; \
