@@ -62,7 +62,9 @@ class CommandRouter : public Singleton<CommandRouter>
 		NetworkIdentity TargetID = NetworkIdentity::MakeIDGameClient(packet.target);
 		Interlink::Get().SendMessage(TargetID, packet, NetworkMessageSendFlag::eReliableBatched);
 
-		// logger.DebugFormatted("Received ServerStatePacket");
+		logger.DebugFormatted(
+			"Dispatching ServerState\n - ID: {}\n - From Shard: {}\n - To Client: {}",
+			packet.cmdTypeID, UUIDGen::ToString(info.sender.ID), UUIDGen::ToString(packet.target));
 	};
 	void OnClientIntentPacket(const ClientIntentCommandPacket& packet,
 							  const PacketManager::PacketInfo& info)

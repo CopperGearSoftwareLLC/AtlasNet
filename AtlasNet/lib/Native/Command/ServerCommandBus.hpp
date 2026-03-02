@@ -36,6 +36,8 @@ class ServerCommandBus : public ICommandBus<ClientID, NetClientIntentHeader, Net
 		const auto command = CommandRegistry::Get().MakeFromID(commandID);
 		ByteReader br(packet.commandData);
 		command->Deserialize(br);
-		ExecCallback(NetClientIntentHeader{},*command);
+		NetClientIntentHeader header;
+		header.clientID = packet.Sender;
+		ExecCallback(header,*command);
 	}
 };

@@ -86,8 +86,10 @@ void SandboxClient::RenderView()
 			((ImGui::IsKeyDown(ImGuiKey_Q) ? 1.0f : 0.0f) +
 			 (ImGui::IsKeyDown(ImGuiKey_E) ? -1.0f : 0.0f) - ImGui::GetIO().MouseWheel);
 		CameraSizeX = glm::max(1.0f, CameraSizeX + s_v);
-		const bool wPressed = ImGui::IsKeyDown(ImGuiKey_W), sPressed = ImGui::IsKeyDown(ImGuiKey_S),
-				   aPressed = ImGui::IsKeyDown(ImGuiKey_A), dPressed = ImGui::IsKeyDown(ImGuiKey_D);
+		const bool wPressed = ImGui::IsKeyDown(ImGuiKey_W);
+		const bool sPressed = ImGui::IsKeyDown(ImGuiKey_S);
+		const bool aPressed = ImGui::IsKeyDown(ImGuiKey_A);
+		const bool dPressed = ImGui::IsKeyDown(ImGuiKey_D);
 		const float x_v = dPressed + (aPressed ? -1.0f : 0.0f);
 		const float y_v = wPressed + (sPressed ? -1.0f : 0.0f);
 		CameraPos += vec2(x_v, y_v) * 0.02f * CameraSizeX;

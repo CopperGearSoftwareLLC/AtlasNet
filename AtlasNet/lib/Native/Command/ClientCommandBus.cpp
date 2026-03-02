@@ -2,6 +2,7 @@
 
 #include <algorithm>
 
+#include "Client/ClientCredentials.hpp"
 #include "Client/ClientLink.hpp"
 #include "Command/NetCommand.hpp"
 #include "Command/Packet/CommandPayloadPacket.hpp"
@@ -13,6 +14,7 @@ void ClientCommandBus::implParseCommand(NetworkIdentity target, const INetComman
 	ClientIntentCommandPacket& packet = packets.emplace_back();
 	packet.cmdTypeID = command.GetCommandID();
 	packet.InsertCommand(command);
+	packet.Sender = ClientCredentials::Get().GetClientID();
 	logger.DebugFormatted("Dispatching ClientIntentCommand ID: {}", packet.cmdTypeID);
 }
 void ClientCommandBus::implFlushCommands()

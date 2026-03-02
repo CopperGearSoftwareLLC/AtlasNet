@@ -3,6 +3,7 @@
 #include <optional>
 
 #include "Client/Client.hpp"
+#include "Debug/Log.hpp"
 #include "Entity/Entity.hpp"
 #include "Global/Misc/Singleton.hpp"
 #include "Network/IPAddress.hpp"
@@ -10,6 +11,7 @@
 #include "Network/NetworkIdentity.hpp"
 class ClientManifest : public Singleton<ClientManifest>
 {
+	Log logger = Log("ClientManifest");
 	const std::string ClientID_2_IP_Hashtable = "Client::ClientID -> IP";
 	const std::string ClientID_2_EntityID_Hashtable = "Client::ClientID -> EntityID";
 	const std::string ClientID_2_Proxy_Hashtable = "Client::Routing::ClientID -> Proxy";

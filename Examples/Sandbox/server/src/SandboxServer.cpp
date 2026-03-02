@@ -166,5 +166,7 @@ void SandboxServer::OnClientSpawn(const ClientSpawnInfo& c, const AtlasEntityMin
 void SandboxServer::OnGameClientInputCommand(const NetClientIntentHeader& header,
 											 const GameClientInputCommand& command)
 {
-	logger.Debug("Received a GameClientInputCommand");
+	logger.DebugFormatted("Received a GameClientInputCommand from {}",
+						  UUIDGen::ToString(header.clientID));
+	GetCommandBus().Dispatch(header.clientID, GameStateCommand{});
 }

@@ -15,9 +15,7 @@ void ServerCommandBus::implParseCommand(ClientID target, const INetCommand& comm
 	packet.target = target;
 	packet.ServerStateHeader = NetServerStateHeader{};
 	packet.cmdTypeID = command.GetCommandID();
-	ByteWriter commandDataWriter;
-	command.Serialize(commandDataWriter);
-	packet.commandData.assign(commandDataWriter.bytes().begin(), commandDataWriter.bytes().end());
+	packet.InsertCommand(command);
 }
 void ServerCommandBus::implFlushCommands()
 {
@@ -29,4 +27,5 @@ void ServerCommandBus::implFlushCommands()
 			ASSERT(target.has_value(), "This should never happen");
 			Interlink::Get().SendMessage(*target, p, NetworkMessageSendFlag::eReliableBatched);
 		});
+	packets.clear();
 }

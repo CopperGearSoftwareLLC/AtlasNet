@@ -58,7 +58,7 @@ class TServerIntentCommandPacket : IServerIntentCommandPacket
 };
 */
 class ServerStateCommandPacket
-	: public TPacket<ServerStateCommandPacket, "ServerIntentCommandPacket">
+	: public TPacket<ServerStateCommandPacket, "ServerStateCommandPacket">
 {
    public:
 	ClientID target;
@@ -82,7 +82,7 @@ class ServerStateCommandPacket
 		commandData.assign(blob.begin(), blob.end());
 	}
 	[[nodiscard]] bool ValidateData() const override { return true; }
-	void InsertCommand(const IServerStateCommand& command)
+	void InsertCommand(const INetCommand& command)
 	{
 		ByteWriter bw;
 		command.Serialize(bw);
@@ -105,16 +105,19 @@ class ClientIntentCommandPacket
 	: public TPacket<ClientIntentCommandPacket, "ClientIntentCommandPacket">
 {
    public:
+   ClientID Sender;
 	CommandID cmdTypeID;
 	boost::container::small_vector<uint8_t, 64> commandData;
 
 	void SerializeData(ByteWriter& bw) const override
 	{
+		bw.uuid(Sender);
 		bw.write_scalar(cmdTypeID);
 		bw.blob(commandData);
 	}
 	void DeserializeData(ByteReader& br) override
 	{
+		Sender = br.uuid();
 		cmdTypeID = br.read_scalar<decltype(cmdTypeID)>();
 		std::span blob = br.blob();
 		commandData.assign(blob.begin(), blob.end());

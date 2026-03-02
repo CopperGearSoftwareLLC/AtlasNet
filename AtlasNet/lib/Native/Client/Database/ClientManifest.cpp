@@ -4,6 +4,7 @@
 #include <optional>
 
 #include "Client/Client.hpp"
+#include "Global/Misc/UUID.hpp"
 #include "Global/Serialize/ByteReader.hpp"
 #include "Global/Serialize/ByteWriter.hpp"
 #include "Global/pch.hpp"
@@ -73,6 +74,8 @@ std::optional<NetworkIdentity> ClientManifest::GetClientProxy(const ClientID& cl
 
 	const std::optional<std::string> ret =
 		InternalDB::Get()->HGet(ClientID_2_Proxy_Hashtable, keyWrite.as_string_view());
+	logger.DebugFormatted("GetClientProxy responded for client {}: \n{}",
+						  UUIDGen::ToString(client_ID), ret.value_or("NO RESPONSE"));
 	if (!ret.has_value())
 		return std::nullopt;
 

@@ -18,16 +18,16 @@ struct NetCommandHeader
 struct NetClientIntentHeader : NetCommandHeader
 {
 	ClientID clientID;
-	AtlasEntityID entityID;
+	//AtlasEntityID entityID;
 	void Serialize(ByteWriter& bw) const
 	{
 		bw.uuid(clientID);
-		bw.uuid(entityID);
+	//	bw.uuid(entityID);
 	}
 	void Deserialize(ByteReader& br)
 	{
 		clientID = br.uuid();
-		entityID = br.uuid();
+		//entityID = br.uuid();
 	}
 };
 struct NetServerStateHeader : NetCommandHeader
