@@ -4,7 +4,6 @@ set -euo pipefail
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 REPO_ROOT="$(cd "$ROOT_DIR/../.." && pwd)"
 ENV_FILE="$ROOT_DIR/.env"
-LEGACY_CONFIG_FILE="$ROOT_DIR/config/cluster.env"
 KUBECONFIG_PATH="$ROOT_DIR/config/kubeconfig"
 BASE_TEMPLATE="$REPO_ROOT/deploy/k8s/overlays/k3d/atlasnet-dev.yaml"
 
@@ -122,10 +121,6 @@ wait_for_shard_ready() {
 if [[ -f "$ENV_FILE" ]]; then
   # shellcheck disable=SC1090
   source "$ENV_FILE"
-fi
-if [[ -f "$LEGACY_CONFIG_FILE" ]]; then
-  # shellcheck disable=SC1090
-  source "$LEGACY_CONFIG_FILE"
 fi
 
 : "${ATLASNET_K8S_NAMESPACE:=atlasnet}"

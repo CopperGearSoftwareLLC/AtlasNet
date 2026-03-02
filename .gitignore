@@ -8,3 +8,5 @@ logs
 Dev/.kube/
 /build-local
 deploy/k3s_slim/.env
+/AtlasNet/.vcpkg-temp
+/AtlasNet/build/vcpkg_installed

@@ -17,18 +17,9 @@ source "$ENV_FILE"
 : "${SSH_KEY:=$HOME/.ssh/id_ed25519}"
 : "${SERVER_PORT_CLEANUP_PORTS:=7946}"
 : "${WORKER_PORT_CLEANUP_PORTS:=7946}"
+: "${WORKER_IPS:?Set WORKER_IPS in .env or pass WORKER_IPS=\"ip1 ip2\" ...}"
 
-resolve_worker_ips() {
-  local workers="${WORKER_IPS:-}"
-  if [[ -z "${workers// }" ]]; then
-    workers="${LINUX_WORKER_IP:-} ${PI_WORKER_IP:-}"
-  fi
-  workers="$(echo "$workers" | xargs)"
-  [[ -n "$workers" ]] || die "Set WORKER_IPS (or LINUX_WORKER_IP/PI_WORKER_IP) in .env"
-  echo "$workers"
-}
-
-WORKERS="$(resolve_worker_ips)"
+WORKERS="$(echo "$WORKER_IPS" | xargs)"
 
 append_port_if_missing() {
   local list="$1"

@@ -4,7 +4,6 @@ set -euo pipefail
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 REPO_ROOT="$(cd "$ROOT_DIR/../.." && pwd)"
 ENV_FILE="$ROOT_DIR/.env"
-LEGACY_CONFIG_FILE="$ROOT_DIR/config/cluster.env"
 ATLASNET_DOCKERFILE="$REPO_ROOT/AtlasNet/docker/dockerfiles/BuildDockerfile"
 ATLASNET_CONTEXT="$REPO_ROOT/AtlasNet"
 
@@ -14,10 +13,6 @@ need_cmd() { command -v "$1" >/dev/null 2>&1 || die "Missing '$1'. Install it fi
 [[ -f "$ENV_FILE" ]] || die "Missing .env at $ENV_FILE"
 # shellcheck disable=SC1090
 source "$ENV_FILE"
-if [[ -f "$LEGACY_CONFIG_FILE" ]]; then
-  # shellcheck disable=SC1090
-  source "$LEGACY_CONFIG_FILE"
-fi
 
 need_cmd docker
 docker info >/dev/null 2>&1 || die "Docker daemon is not reachable."
@@ -26,7 +21,8 @@ docker buildx version >/dev/null 2>&1 || die "Docker buildx is required."
 : "${DOCKERHUB_NAMESPACE:=}"
 : "${ATLASNET_IMAGE_TAG:=latest}"
 : "${ATLASNET_MULTIARCH_PLATFORMS:=linux/amd64,linux/arm64}"
-: "${ATLASNET_MULTIARCH_BUILDER_NAME:=atlasnet-multiarch}"
+# If ATLASNET_MULTIARCH_BUILDER_NAME is empty, the current default buildx builder is used.
+: "${ATLASNET_MULTIARCH_BUILDER_NAME:=}"
 : "${DOCKERHUB_USERNAME:=}"
 : "${DOCKERHUB_TOKEN:=}"
 
@@ -39,14 +35,19 @@ docker buildx version >/dev/null 2>&1 || die "Docker buildx is required."
 : "${ATLASNET_CARTOGRAPH_IMAGE:=${DOCKERHUB_NAMESPACE}/cartograph:${ATLASNET_IMAGE_TAG}}"
 
 ensure_buildx_builder() {
-  if ! docker buildx inspect "$ATLASNET_MULTIARCH_BUILDER_NAME" >/dev/null 2>&1; then
-    echo "Creating buildx builder '$ATLASNET_MULTIARCH_BUILDER_NAME' ..."
-    docker buildx create --name "$ATLASNET_MULTIARCH_BUILDER_NAME" --driver docker-container --use >/dev/null
-  else
+  if [[ -n "$ATLASNET_MULTIARCH_BUILDER_NAME" ]]; then
+    # Use an explicitly configured builder; do NOT create a new one.
+    if ! docker buildx inspect "$ATLASNET_MULTIARCH_BUILDER_NAME" >/dev/null 2>&1; then
+      die "ATLASNET_MULTIARCH_BUILDER_NAME='$ATLASNET_MULTIARCH_BUILDER_NAME' does not exist. Run 'docker buildx ls' and either create it or unset the variable to use the current default builder."
+    fi
     docker buildx use "$ATLASNET_MULTIARCH_BUILDER_NAME" >/dev/null
+    docker buildx inspect "$ATLASNET_MULTIARCH_BUILDER_NAME" --bootstrap >/dev/null
+  else
+    # Reuse whatever default builder your dev environment is already using
+    # (e.g. your shared buildx container with warm cache).
+    docker buildx inspect >/dev/null 2>&1 || die "No default buildx builder configured. Run 'docker buildx create --use' once, or set ATLASNET_MULTIARCH_BUILDER_NAME in .env."
+    docker buildx inspect --bootstrap >/dev/null
   fi
-
-  docker buildx inspect "$ATLASNET_MULTIARCH_BUILDER_NAME" --bootstrap >/dev/null
 }
 
 build_push_target() {

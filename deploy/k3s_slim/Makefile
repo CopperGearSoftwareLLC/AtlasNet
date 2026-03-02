@@ -1,18 +1,15 @@
 SHELL := /usr/bin/env bash
 
 ENV_FILE ?= .env
-ENV_EXPORTS := SERVER_IP SERVER_SSH_USER LINUX_WORKER_IP PI_WORKER_IP WORKER_IPS WORKER_SSH_USER SSH_KEY K3S_API_ENDPOINT K3SUP_USE_SUDO SERVER_NODE_NAME ATLASNET_K8S_NAMESPACE DOCKERHUB_NAMESPACE ATLASNET_IMAGE_TAG ATLASNET_WATCHDOG_IMAGE ATLASNET_PROXY_IMAGE ATLASNET_SHARD_IMAGE ATLASNET_CARTOGRAPH_IMAGE ATLASNET_IMAGE_PULL_POLICY DOCKERHUB_REQUIRE_AUTH DOCKERHUB_USERNAME DOCKERHUB_TOKEN DOCKERHUB_EMAIL DOCKERHUB_SECRET_NAME ATLASNET_MULTIARCH_PLATFORMS ATLASNET_MULTIARCH_BUILDER_NAME
+ENV_EXPORTS := SERVER_IP SERVER_SSH_USER WORKER_IPS WORKER_SSH_USER SSH_KEY K3S_API_ENDPOINT K3SUP_USE_SUDO SERVER_NODE_NAME ATLASNET_K8S_NAMESPACE DOCKERHUB_NAMESPACE ATLASNET_IMAGE_TAG ATLASNET_WATCHDOG_IMAGE ATLASNET_PROXY_IMAGE ATLASNET_SHARD_IMAGE ATLASNET_CARTOGRAPH_IMAGE ATLASNET_IMAGE_PULL_POLICY DOCKERHUB_REQUIRE_AUTH DOCKERHUB_USERNAME DOCKERHUB_TOKEN DOCKERHUB_EMAIL DOCKERHUB_SECRET_NAME ATLASNET_MULTIARCH_PLATFORMS ATLASNET_MULTIARCH_BUILDER_NAME
 
 -include $(ENV_FILE)
 export $(ENV_EXPORTS)
 
-.PHONY: bootstrap platform nodes linux-pi ssh-setup sudo-setup port-cleanup cleanup-cluster atlasnet-push atlasnet-deploy atlasnet-status
+.PHONY: bootstrap nodes linux-pi ssh-setup sudo-setup port-cleanup cleanup-cluster atlasnet-push atlasnet-deploy atlasnet-status
 
 bootstrap:
 	./scripts/bootstrap.sh
-
-platform:
-	./scripts/platform.sh
 
 nodes:
 	KUBECONFIG="$(CURDIR)/config/kubeconfig" kubectl get nodes -o wide
@@ -32,9 +29,8 @@ cleanup-cluster:
 linux-pi:
 	@: "$${SERVER_IP:?Set SERVER_IP in .env or pass SERVER_IP=...}"
 	@: "$${SERVER_SSH_USER:?Set SERVER_SSH_USER in .env or pass SERVER_SSH_USER=...}"
-	@workers="$${WORKER_IPS:-$${LINUX_WORKER_IP:-} $${PI_WORKER_IP:-}}"; \
-	  workers="$$(echo "$$workers" | xargs)"; \
-	  test -n "$$workers" || { echo "Set WORKER_IPS (or LINUX_WORKER_IP/PI_WORKER_IP) in .env." >&2; exit 1; }; \
+	@: "$${WORKER_IPS:?Set WORKER_IPS in .env or pass WORKER_IPS=\"ip1 ip2\" ...}"; \
+	  workers="$$(echo "$$WORKER_IPS" | xargs)"; \
 	  ./scripts/port_cleanup.sh; \
 	  ./scripts/bootstrap.sh \
 	    --server-ip "$$SERVER_IP" \

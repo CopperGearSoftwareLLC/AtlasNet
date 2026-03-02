@@ -91,14 +91,6 @@ If images are private, set:
 If your cluster has both `amd64` (Linux) and `arm64` (Pi) workers, Docker Hub images must be multi-arch manifests.
 If not, pods may fail with `ImagePullBackOff` or architecture errors.
 
-## Optional add-ons
-```bash
-make platform
-```
-
-This uses `.env` flags for metrics-server / MetalLB / ingress / cert-manager.
-Legacy `config/cluster.env` values are also supported if the file exists.
-
 ## Make targets
 - `make ssh-setup`: create SSH key (if missing) and copy to server + worker.
 - `make sudo-setup`: enable passwordless sudo for SSH users on server + workers.
@@ -108,7 +100,6 @@ Legacy `config/cluster.env` values are also supported if the file exists.
 - `make atlasnet-push`: build and push multi-arch runtime images to Docker Hub.
 - `make atlasnet-deploy`: apply AtlasNet runtime workloads using Docker Hub images.
 - `make atlasnet-status`: show node/pod/service status for AtlasNet namespace.
-- `make platform`: install optional platform add-ons.
 - `make cleanup-cluster`: uninstall k3s from worker/server and remove local project kubeconfig.
 
 ## Troubleshooting

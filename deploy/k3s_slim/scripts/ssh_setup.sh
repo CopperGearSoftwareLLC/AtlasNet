@@ -8,18 +8,9 @@ need_cmd() { command -v "$1" >/dev/null 2>&1 || die "Missing '$1'. Install opens
 : "${SERVER_SSH_USER:?Set SERVER_SSH_USER in .env or pass SERVER_SSH_USER=...}"
 : "${WORKER_SSH_USER:=pi}"
 : "${SSH_KEY:=$HOME/.ssh/id_ed25519}"
+: "${WORKER_IPS:?Set WORKER_IPS in .env or pass WORKER_IPS=\"ip1 ip2\" ...}"
 
-resolve_worker_ips() {
-  local workers="${WORKER_IPS:-}"
-  if [[ -z "${workers// }" ]]; then
-    workers="${LINUX_WORKER_IP:-} ${PI_WORKER_IP:-}"
-  fi
-  workers="$(echo "$workers" | xargs)"
-  [[ -n "$workers" ]] || die "Set WORKER_IPS (or LINUX_WORKER_IP/PI_WORKER_IP) in .env."
-  echo "$workers"
-}
-
-WORKERS="$(resolve_worker_ips)"
+WORKERS="$(echo "$WORKER_IPS" | xargs)"
 
 SSH_KEY="${SSH_KEY/#\~/$HOME}"
 KEY_DIR="$(dirname "$SSH_KEY")"

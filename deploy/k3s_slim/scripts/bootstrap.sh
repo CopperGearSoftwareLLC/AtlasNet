@@ -2,38 +2,12 @@
 set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-CONFIG_FILE="$ROOT_DIR/config/cluster.env"
 PROJECT_KUBECONFIG_PATH="$ROOT_DIR/config/kubeconfig"
 TARGET_KUBECONFIG_PATH="${K3S_KUBECONFIG_PATH:-$HOME/.kube/config}"
 CONTEXT_NAME="k3s-homelab"
 
 die() { echo "ERROR: $*" >&2; exit 1; }
 need_cmd() { command -v "$1" >/dev/null 2>&1 || die "Missing '$1'. Install it first."; }
-
-print_usage() {
-  cat <<EOF2
-Usage:
-  ./scripts/bootstrap.sh [options]
-
-Options (CLI flags override config values):
-  --server-ip <ip>             k3s server node IP (required)
-  --server-user <user>         SSH user for the server node (required)
-  --ssh-key <path>             SSH private key path (required)
-  --use-sudo <true|false>      Use sudo on remote nodes (default: true)
-  --worker-ip <ip>             Worker IP (repeatable)
-  --worker-ips "<ip1 ip2>"      Space-separated worker IP list
-  --worker-user <user>         SSH user for workers (default: pi)
-  --api-endpoint <host-or-ip>  TLS SAN endpoint for kube-apiserver (default: server IP)
-  --k3s-extra-args "<args>"     Extra args passed to k3s server install
-  --k3s-version <version>      Pin k3s version (optional)
-  --k3sup-version <version>    Pin k3sup installer version (optional)
-  --help                       Show this help
-
-Config fallback:
-  If config/cluster.env exists, values are loaded from it.
-  Any CLI option overrides config values.
-EOF2
-}
 
 CLI_SERVER_IP=""
 CLI_SERVER_SSH_USER=""
@@ -103,20 +77,11 @@ while [[ $# -gt 0 ]]; do
       CLI_K3SUP_VERSION="$2"
       shift 2
       ;;
-    --help|-h)
-      print_usage
-      exit 0
-      ;;
     *)
       die "Unknown option: $1 (run with --help)"
       ;;
   esac
 done
-
-if [[ -f "$CONFIG_FILE" ]]; then
-  # shellcheck disable=SC1090
-  source "$CONFIG_FILE"
-fi
 
 [[ -n "$CLI_SERVER_IP" ]] && SERVER_IP="$CLI_SERVER_IP"
 [[ -n "$CLI_SERVER_SSH_USER" ]] && SERVER_SSH_USER="$CLI_SERVER_SSH_USER"
@@ -129,9 +94,9 @@ fi
 [[ -n "$CLI_K3SUP_VERSION" ]] && K3SUP_VERSION="$CLI_K3SUP_VERSION"
 [[ -n "$CLI_K3SUP_USE_SUDO" ]] && K3SUP_USE_SUDO="$CLI_K3SUP_USE_SUDO"
 
-: "${SERVER_IP:?SERVER_IP is required (set in config/cluster.env or via --server-ip)}"
-: "${SERVER_SSH_USER:?SERVER_SSH_USER is required (set in config/cluster.env or via --server-user)}"
-: "${SSH_KEY:?SSH_KEY is required (set in config/cluster.env or via --ssh-key)}"
+: "${SERVER_IP:?SERVER_IP is required (pass --server-ip from Makefile/linux-pi)}"
+: "${SERVER_SSH_USER:?SERVER_SSH_USER is required (pass --server-user from Makefile/linux-pi)}"
+: "${SSH_KEY:?SSH_KEY is required (pass --ssh-key from Makefile/linux-pi)}"
 : "${WORKER_SSH_USER:=pi}"
 : "${WORKER_IPS:=}"
 : "${K3S_EXTRA_ARGS:=}"
