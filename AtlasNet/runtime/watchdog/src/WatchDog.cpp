@@ -295,18 +295,16 @@ void WatchDog::Init()
 	// Legacy grid-cell heuristic is still available as a separate heuristic,
 	// but WatchDog now defaults to the Quadtree heuristic. For Voronoi
 	// testing, you can switch to eVoronoi below.
-	SwitchHeuristic(IHeuristic::Type::eQuadtree);
-	if (auto quadtree =
-			std::dynamic_pointer_cast<QuadtreeHeuristic>(Heuristic))
-	{
-		// For now, configure Quadtree to produce 16 cells over the same
-		// net area as the legacy grid heuristic.
-		quadtree->SetTargetLeafCount(13);
-	}
+	SwitchHeuristic(IHeuristic::Type::eVoronoi);
 	if (auto voronoi =
 			std::dynamic_pointer_cast<VoronoiHeuristic>(Heuristic))
 	{
-		voronoi->SetTargetCellCount(5);
+		// Seed count == number of Voronoi regions / bounds.
+		voronoi->SetSeedCount(5);
+	}
+	else
+	{
+		logger->Error("Expected VoronoiHeuristic after SwitchHeuristic(eVoronoi).");
 	}
 	ComputeHeuristic();	 // compute once
 	// HeuristicThread = std::jthread([this](std::stop_token st)

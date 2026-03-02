@@ -13,6 +13,7 @@
 #include "Heuristic/GridHeuristic/GridHeuristic.hpp"
 #include "Heuristic/Quadtree/QuadtreeHeuristic.hpp"
 #include "Heuristic/Voronoi/VoronoiHeuristic.hpp"
+#include "Heuristic/Voronoi/VoronoiBounds.hpp"
 #include "Heuristic/IHeuristic.hpp"
 #include "InternalDB/InternalDB.hpp"
 #include "Network/NetworkIdentity.hpp"
@@ -107,7 +108,8 @@ void HeuristicManifest::StorePendingBoundsFromByteWriters(
 		ByteWriter bw_id;
 		bw_id.u32(ID);
 		s_id = bw_id.as_string_view();
-		PendingBoundStruct p{.ID = ID, .BoundsDataBase64 = std::string(writer.as_string_base_64())};
+		PendingBoundStruct p{.ID = ID,
+							 .BoundsDataBase64 = std::string(writer.as_string_base_64())};
 		Internal_InsertPendingBound(p);
 	}
 }
@@ -560,9 +562,11 @@ std::unique_ptr<IBounds> HeuristicManifest::Internal_CreateIBoundInst()
 	{
 		case IHeuristic::Type::eGridCell:
 		case IHeuristic::Type::eQuadtree:
-		case IHeuristic::Type::eVoronoi:
 			// Both grid and quadtree heuristics currently use GridShape bounds.
 			return std::make_unique<GridShape>();
+			break;
+		case IHeuristic::Type::eVoronoi:
+			return std::make_unique<VoronoiBounds>();
 			break;
 		case IHeuristic::Type::eOctree:
 		case IHeuristic::Type::eInvalid:

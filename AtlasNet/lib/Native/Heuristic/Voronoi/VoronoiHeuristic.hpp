@@ -7,36 +7,33 @@
 #include "Global/pch.hpp"
 #include "Heuristic/IBounds.hpp"
 #include "Heuristic/IHeuristic.hpp"
-#include "Heuristic/GridHeuristic/GridHeuristic.hpp"
+#include "Heuristic/Voronoi/VoronoiBounds.hpp"
 
-// Voronoi-like heuristic used for testing.
-// Partitions the world into a random, but axis-aligned, tiling by
-// constructing random stripe boundaries along X and Y within a fixed
-// net area. The resulting bounds are still GridShape AABBs so they
-// remain wire-compatible with existing tooling.
-class VoronoiHeuristic : public THeuristic<GridShape>
+// Voronoi heuristic used for testing.
+// Partitions the world into N convex polygon regions using standard Voronoi
+// half-plane clipping within a fixed bounding box.
+class VoronoiHeuristic : public THeuristic<VoronoiBounds>
 {
    public:
 	struct Options
 	{
 		// Half-extent of the total region in X/Y, matching the legacy grid.
 		vec2 NetHalfExtent = {100.0f, 100.0f};
-		// Desired number of regions. For now this is assumed to be a
-		// perfect square (side*side).
-		uint32_t TargetCellCount = 16;
+		// Number of Voronoi seeds / regions.
+		uint32_t SeedCount = 16;
 	} options;
 
 	VoronoiHeuristic();
 
-	// Allows callers (e.g. WatchDog) to request a specific number of cells.
-	void SetTargetCellCount(uint32_t count);
+	// Allows callers (e.g. WatchDog) to request a seed count.
+	void SetSeedCount(uint32_t count);
 
 	// IHeuristic interface
 	void Compute(const std::span<const AtlasEntityMinimal>& span) override;
 	uint32_t GetBoundsCount() const override;
-	void GetBounds(std::vector<GridShape>& out_bounds) const override;
+	void GetBounds(std::vector<VoronoiBounds>& out_bounds) const override;
 	void GetBoundDeltas(
-		std::vector<TBoundDelta<GridShape>>& out_deltas) const override;
+		std::vector<TBoundDelta<VoronoiBounds>>& out_deltas) const override;
 	IHeuristic::Type GetType() const override;
 	void SerializeBounds(
 		std::unordered_map<IBounds::BoundsID, ByteWriter>& bws) override;
@@ -48,6 +45,7 @@ class VoronoiHeuristic : public THeuristic<GridShape>
 	std::unique_ptr<IBounds> GetBound(IBounds::BoundsID id) override;
 
    private:
-	std::vector<GridShape> _cells;
+	std::vector<glm::vec2> _seeds;
+	std::vector<VoronoiBounds> _cells;
 };
 

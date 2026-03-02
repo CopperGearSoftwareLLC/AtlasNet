@@ -8,96 +8,125 @@
 
 VoronoiHeuristic::VoronoiHeuristic() = default;
 
-void VoronoiHeuristic::SetTargetCellCount(uint32_t count)
+void VoronoiHeuristic::SetSeedCount(uint32_t count)
 {
 	if (count == 0)
 	{
 		count = 1;
 	}
-	options.TargetCellCount = count;
+	options.SeedCount = count;
 }
 
 void VoronoiHeuristic::Compute(const std::span<const AtlasEntityMinimal>&)
 {
-	// Build a random, but axis-aligned, tiling over the same net area
-	// as the grid/quadtree heuristics. We generate random interior
-	// cut positions along X and Y and use them to define non-uniform
-	// stripes; their cartesian product yields a set of rectangular
-	// GridShape bounds that fully cover the region.
+	// Build Voronoi cells by clipping a bounding box polygon with the
+	// perpendicular bisector half-planes of all other seeds.
 
-	const uint32_t requestedCells = std::max<uint32_t>(1, options.TargetCellCount);
-	const float rootWidthX = options.NetHalfExtent.x * 2.0f;
-	const float rootWidthY = options.NetHalfExtent.y * 2.0f;
-
-	// Choose an integer grid dimension N such that N^2 ~= requestedCells.
-	const float sideF = std::sqrt(static_cast<float>(requestedCells));
-	uint32_t side = static_cast<uint32_t>(std::round(sideF));
-	if (side == 0)
-	{
-		side = 1;
-	}
-	const uint32_t actualCells = side * side;
-
-	logger.DebugFormatted(
-		"VoronoiHeuristic::Compute: requested_cells={} -> grid={}x{} ({} cells)",
-		requestedCells, side, side, actualCells);
+	const uint32_t seedCount = std::max<uint32_t>(1, options.SeedCount);
 
 	const float minX = -options.NetHalfExtent.x;
 	const float maxX = options.NetHalfExtent.x;
 	const float minY = -options.NetHalfExtent.y;
 	const float maxY = options.NetHalfExtent.y;
 
-	// Random stripe boundaries along X and Y.
-	std::mt19937 rng(std::random_device{}());
+	// Deterministic RNG so WatchDog recompute doesn't reshuffle regions.
+	std::mt19937 rng(0x9E3779B9u ^ seedCount);
 	std::uniform_real_distribution<float> distX(minX, maxX);
 	std::uniform_real_distribution<float> distY(minY, maxY);
 
-	std::vector<float> xCuts;
-	std::vector<float> yCuts;
-	xCuts.reserve(side + 1);
-	yCuts.reserve(side + 1);
-
-	xCuts.push_back(minX);
-	yCuts.push_back(minY);
-	for (uint32_t i = 1; i < side; ++i)
+	_seeds.clear();
+	_seeds.reserve(seedCount);
+	for (uint32_t i = 0; i < seedCount; ++i)
 	{
-		xCuts.push_back(distX(rng));
-		yCuts.push_back(distY(rng));
+		_seeds.emplace_back(distX(rng), distY(rng));
 	}
-	xCuts.push_back(maxX);
-	yCuts.push_back(maxY);
 
-	std::sort(xCuts.begin(), xCuts.end());
-	std::sort(yCuts.begin(), yCuts.end());
+	auto clipPolygon = [](const std::vector<glm::vec2>& poly,
+						  const glm::vec2& n, const float c)
+		-> std::vector<glm::vec2>
+	{
+		if (poly.empty())
+		{
+			return {};
+		}
+
+		auto inside = [&](const glm::vec2& p) -> bool
+		{ return glm::dot(p, n) <= c + 1e-5f; };
+
+		auto intersect = [&](const glm::vec2& a, const glm::vec2& b) -> glm::vec2
+		{
+			const glm::vec2 ab = b - a;
+			const float denom = glm::dot(ab, n);
+			if (std::abs(denom) < 1e-8f)
+			{
+				return a;
+			}
+			const float t = (c - glm::dot(a, n)) / denom;
+			return a + glm::clamp(t, 0.0f, 1.0f) * ab;
+		};
+
+		std::vector<glm::vec2> out;
+		out.reserve(poly.size() + 4);
+		for (size_t i = 0; i < poly.size(); ++i)
+		{
+			const glm::vec2 curr = poly[i];
+			const glm::vec2 prev = poly[(i + poly.size() - 1) % poly.size()];
+			const bool currIn = inside(curr);
+			const bool prevIn = inside(prev);
+
+			if (currIn)
+			{
+				if (!prevIn)
+				{
+					out.push_back(intersect(prev, curr));
+				}
+				out.push_back(curr);
+			}
+			else if (prevIn)
+			{
+				out.push_back(intersect(prev, curr));
+			}
+		}
+		return out;
+	};
 
 	_cells.clear();
-	_cells.resize(actualCells);
+	_cells.reserve(seedCount);
 
-	IBounds::BoundsID nextId = 0;
-	for (uint32_t row = 0; row < side; ++row)
+	for (uint32_t i = 0; i < seedCount; ++i)
 	{
-		const float stripeYMin = yCuts[row];
-		const float stripeYMax = yCuts[row + 1];
-		const float centerY = 0.5f * (stripeYMin + stripeYMax);
-		const float halfHeight = 0.5f * std::max(stripeYMax - stripeYMin, 0.001f);
+		const glm::vec2 si = _seeds[i];
+		std::vector<glm::vec2> poly = {
+			{minX, minY},
+			{maxX, minY},
+			{maxX, maxY},
+			{minX, maxY},
+		};
 
-		for (uint32_t col = 0; col < side; ++col)
+		for (uint32_t j = 0; j < seedCount; ++j)
 		{
-			const float stripeXMin = xCuts[col];
-			const float stripeXMax = xCuts[col + 1];
-			const float centerX = 0.5f * (stripeXMin + stripeXMax);
-			const float halfWidth = 0.5f * std::max(stripeXMax - stripeXMin, 0.001f);
-
-			GridShape cell;
-			cell.ID = nextId++;
-			cell.aabb.SetCenterExtents(
-				vec3(centerX, centerY, 0.0f),
-				vec3(halfWidth, halfHeight, 5.0f));
-
-			const size_t index = static_cast<size_t>(row * side + col);
-			_cells[index] = cell;
+			if (j == i)
+			{
+				continue;
+			}
+			const glm::vec2 sj = _seeds[j];
+			const glm::vec2 n = sj - si;
+			const float c = (glm::dot(sj, sj) - glm::dot(si, si)) * 0.5f;
+			poly = clipPolygon(poly, n, c);
+			if (poly.size() < 3)
+			{
+				break;
+			}
 		}
+
+		VoronoiBounds bound;
+		bound.ID = static_cast<IBounds::BoundsID>(i);
+		bound.vertices = std::move(poly);
+		_cells.push_back(std::move(bound));
 	}
+
+	logger.DebugFormatted("VoronoiHeuristic::Compute: seed_count={} bounds={}",
+						  seedCount, _cells.size());
 }
 
 uint32_t VoronoiHeuristic::GetBoundsCount() const
@@ -105,13 +134,13 @@ uint32_t VoronoiHeuristic::GetBoundsCount() const
 	return static_cast<uint32_t>(_cells.size());
 }
 
-void VoronoiHeuristic::GetBounds(std::vector<GridShape>& out_bounds) const
+void VoronoiHeuristic::GetBounds(std::vector<VoronoiBounds>& out_bounds) const
 {
 	out_bounds = _cells;
 }
 
 void VoronoiHeuristic::GetBoundDeltas(
-	std::vector<TBoundDelta<GridShape>>& out_deltas) const
+	std::vector<TBoundDelta<VoronoiBounds>>& out_deltas) const
 {
 	out_deltas.clear();
 }
@@ -125,7 +154,7 @@ void VoronoiHeuristic::SerializeBounds(
 	std::unordered_map<IBounds::BoundsID, ByteWriter>& bws)
 {
 	bws.clear();
-	for (const GridShape& cell : _cells)
+	for (const VoronoiBounds& cell : _cells)
 	{
 		auto [it, inserted] = bws.emplace(cell.ID, ByteWriter{});
 		(void)inserted;
@@ -146,6 +175,7 @@ void VoronoiHeuristic::Deserialize(ByteReader& br)
 {
 	const size_t cellCount = br.u64();
 	_cells.resize(cellCount);
+	_seeds.clear();
 	for (size_t i = 0; i < _cells.size(); ++i)
 	{
 		_cells[i].Deserialize(br);
@@ -156,7 +186,7 @@ std::optional<IBounds::BoundsID> VoronoiHeuristic::QueryPosition(vec3 p)
 {
 	for (const auto& cell : _cells)
 	{
-		if (cell.aabb.contains(p))
+		if (cell.Contains(p))
 		{
 			return cell.ID;
 		}
@@ -170,7 +200,7 @@ std::unique_ptr<IBounds> VoronoiHeuristic::GetBound(IBounds::BoundsID id)
 	{
 		if (cell.ID == id)
 		{
-			return std::make_unique<GridShape>(cell);
+			return std::make_unique<VoronoiBounds>(cell);
 		}
 	}
 	return nullptr;

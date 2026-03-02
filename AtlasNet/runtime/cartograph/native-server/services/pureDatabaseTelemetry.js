@@ -260,6 +260,82 @@ function toRectangleShape(bounds, ownerId, color) {
   };
 }
 
+function decodeVoronoiBounds(base64Value) {
+  if (typeof base64Value !== 'string' || base64Value.length === 0) {
+    return null;
+  }
+  let raw = null;
+  try {
+    raw = Buffer.from(base64Value, 'base64');
+  } catch {
+    return null;
+  }
+  if (!raw || raw.length < 8) {
+    return null;
+  }
+  try {
+    const id = raw.readUInt32BE(0);
+    const count = raw.readUInt32BE(4);
+    if (!Number.isFinite(count) || count < 3 || count > 2048) {
+      return null;
+    }
+    let offset = 8;
+    const points = [];
+    for (let i = 0; i < count; i += 1) {
+      if (offset + 8 > raw.length) {
+        return null;
+      }
+      const x = raw.readFloatBE(offset);
+      const y = raw.readFloatBE(offset + 4);
+      offset += 8;
+      if (!Number.isFinite(x) || !Number.isFinite(y)) {
+        return null;
+      }
+      points.push({ x, y });
+    }
+    return { id, points };
+  } catch {
+    return null;
+  }
+}
+
+function toPolygonShape(id, points, ownerId, color) {
+  if (!Array.isArray(points) || points.length < 3) {
+    return null;
+  }
+  let minX = Infinity;
+  let minY = Infinity;
+  let maxX = -Infinity;
+  let maxY = -Infinity;
+  let cx = 0;
+  let cy = 0;
+  for (const p of points) {
+    const x = Number(p?.x);
+    const y = Number(p?.y);
+    if (!Number.isFinite(x) || !Number.isFinite(y)) {
+      return null;
+    }
+    cx += x;
+    cy += y;
+    minX = Math.min(minX, x);
+    minY = Math.min(minY, y);
+    maxX = Math.max(maxX, x);
+    maxY = Math.max(maxY, y);
+  }
+  cx /= points.length;
+  cy /= points.length;
+  return {
+    id: String(id),
+    ownerId: ownerId || '',
+    type: 3,
+    position: { x: cx, y: cy },
+    radius: 0,
+    size: { x: Math.abs(maxX - minX), y: Math.abs(maxY - minY) },
+    color,
+    points,
+  };
+}
+
 function getManifestEntryValues(section) {
   if (Array.isArray(section)) {
     return section;
@@ -590,17 +666,36 @@ async function readHeuristicShapesFromDatabase() {
         return [];
       }
 
+      const heuristicType =
+        typeof manifest.HeuristicType === 'string'
+          ? manifest.HeuristicType.trim()
+          : null;
+
       const shapes = [];
 
       for (const value of getManifestEntryValues(manifest.Pending)) {
         if (!value || typeof value !== 'object') {
           continue;
         }
-        const bounds = decodeGridShapeBounds(value.BoundsData64);
-        if (!bounds) {
-          continue;
+        let shape = null;
+        if (heuristicType === 'Voronoi') {
+          const decoded = decodeVoronoiBounds(value.BoundsData64);
+          if (decoded) {
+            shape = toPolygonShape(
+              decoded.id,
+              decoded.points,
+              '',
+              'rgba(255, 149, 100, 1)'
+            );
+          }
         }
-        const shape = toRectangleShape(bounds, '', 'rgba(255, 149, 100, 1)');
+        if (!shape) {
+          const bounds = decodeGridShapeBounds(value.BoundsData64);
+          if (!bounds) {
+            continue;
+          }
+          shape = toRectangleShape(bounds, '', 'rgba(255, 149, 100, 1)');
+        }
         if (shape) {
           shapes.push(shape);
         }
@@ -610,11 +705,6 @@ async function readHeuristicShapesFromDatabase() {
         if (!value || typeof value !== 'object') {
           continue;
         }
-        const bounds = decodeGridShapeBounds(value.BoundsData64);
-        if (!bounds) {
-          continue;
-        }
-
         let ownerId =
           typeof value.OwnerName === 'string' ? value.OwnerName : '';
         if (!ownerId && typeof value.Owner64 === 'string') {
@@ -624,12 +714,25 @@ async function readHeuristicShapesFromDatabase() {
             ownerId = '';
           }
         }
-
-        const shape = toRectangleShape(
-          bounds,
-          ownerId,
-          'rgba(100, 255, 149, 1)'
-        );
+        let shape = null;
+        if (heuristicType === 'Voronoi') {
+          const decoded = decodeVoronoiBounds(value.BoundsData64);
+          if (decoded) {
+            shape = toPolygonShape(
+              decoded.id,
+              decoded.points,
+              ownerId,
+              'rgba(100, 255, 149, 1)'
+            );
+          }
+        }
+        if (!shape) {
+          const bounds = decodeGridShapeBounds(value.BoundsData64);
+          if (!bounds) {
+            continue;
+          }
+          shape = toRectangleShape(bounds, ownerId, 'rgba(100, 255, 149, 1)');
+        }
         if (shape) {
           shapes.push(shape);
         }
