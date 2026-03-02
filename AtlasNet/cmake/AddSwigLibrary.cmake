@@ -72,7 +72,6 @@ function(add_swig_library_for_target TARGET_NAME)
     set_property(TARGET ${TARGET_NAME}_swig PROPERTY
         SWIG_COMPILE_OPTIONS
             -c++
-            -javascript
             -napi
             -DSWIG
     )
