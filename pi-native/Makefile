@@ -33,6 +33,7 @@ deps:
 	  python3 python3-pip \
 	  uuid-dev libuv1-dev libssl-dev zlib1g-dev \
 	  protobuf-compiler libprotobuf-dev \
+	  autoconf automake libtool m4 \
 	  swig nodejs npm \
 	  docker.io
 	@echo "==> Ensuring current user is in 'docker' group (may require re-login)..."
