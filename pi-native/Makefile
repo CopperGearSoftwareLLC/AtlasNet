@@ -22,6 +22,11 @@ ATLASNET_ROOT := $(abspath ..)
 # Separate build dir for Pi native builds (keeps devcontainer build tree separate).
 BUILD_DIR ?= $(ATLASNET_ROOT)/build-pi
 
+# Docker Hub / image publishing settings (edit these or override via env)
+# NAMESPACE and TAG are required for push-docker.
+DOCKERHUB_NAMESPACE ?=
+ATLASNET_IMAGE_TAG ?= latest
+
 all: build-core
 
 deps:
@@ -90,29 +95,24 @@ build-docker: build-core
 
 push-docker:
 	@echo "==> Preparing to push arm64 images to Docker Hub..."
-	@if [ -z "$$DOCKERHUB_NAMESPACE" ]; then \
+	@if [ -z "$(DOCKERHUB_NAMESPACE)" ]; then \
 	  echo "ERROR: DOCKERHUB_NAMESPACE must be set in the environment (e.g. your Docker Hub username)."; \
 	  exit 1; \
 	fi
-	@if [ -z "$$ATLASNET_IMAGE_TAG" ]; then \
+	@if [ -z "$(ATLASNET_IMAGE_TAG)" ]; then \
 	  echo "ERROR: ATLASNET_IMAGE_TAG must be set in the environment (e.g. latest or v0.1.0)."; \
 	  exit 1; \
 	fi
-	@if [ -z "$$DOCKERHUB_USERNAME" ] || [ -z "$$DOCKERHUB_TOKEN" ]; then \
-	  echo "ERROR: DOCKERHUB_USERNAME and DOCKERHUB_TOKEN must be set in the environment for docker login."; \
-	  exit 1; \
-	fi
-	@echo "==> Logging into Docker Hub as $$DOCKERHUB_USERNAME ..."
-	@printf '%s' "$$DOCKERHUB_TOKEN" | docker login --username "$$DOCKERHUB_USERNAME" --password-stdin
-	@echo "==> Tagging local images for $$DOCKERHUB_NAMESPACE with tag $$ATLASNET_IMAGE_TAG ..."
-	docker tag watchdog:latest   "$$DOCKERHUB_NAMESPACE/watchdog:$$ATLASNET_IMAGE_TAG"
-	docker tag proxy:latest      "$$DOCKERHUB_NAMESPACE/proxy:$$ATLASNET_IMAGE_TAG"
-	docker tag shard:latest      "$$DOCKERHUB_NAMESPACE/shard:$$ATLASNET_IMAGE_TAG"
-	docker tag cartograph:latest "$$DOCKERHUB_NAMESPACE/cartograph:$$ATLASNET_IMAGE_TAG"
+	@echo "==> Using existing Docker credentials (make sure you are logged in with 'docker login')."
+	@echo "==> Tagging local images for $(DOCKERHUB_NAMESPACE) with tag $(ATLASNET_IMAGE_TAG) ..."
+	docker tag watchdog:latest   "$(DOCKERHUB_NAMESPACE)/watchdog:$(ATLASNET_IMAGE_TAG)"
+	docker tag proxy:latest      "$(DOCKERHUB_NAMESPACE)/proxy:$(ATLASNET_IMAGE_TAG)"
+	docker tag shard:latest      "$(DOCKERHUB_NAMESPACE)/shard:$(ATLASNET_IMAGE_TAG)"
+	docker tag cartograph:latest "$(DOCKERHUB_NAMESPACE)/cartograph:$(ATLASNET_IMAGE_TAG)"
 	@echo "==> Pushing images to Docker Hub..."
-	docker push "$$DOCKERHUB_NAMESPACE/watchdog:$$ATLASNET_IMAGE_TAG"
-	docker push "$$DOCKERHUB_NAMESPACE/proxy:$$ATLASNET_IMAGE_TAG"
-	docker push "$$DOCKERHUB_NAMESPACE/shard:$$ATLASNET_IMAGE_TAG"
-	docker push "$$DOCKERHUB_NAMESPACE/cartograph:$$ATLASNET_IMAGE_TAG"
-	@echo "==> Done. Published arm64 images to Docker Hub namespace '$$DOCKERHUB_NAMESPACE' with tag '$$ATLASNET_IMAGE_TAG'."
+	docker push "$(DOCKERHUB_NAMESPACE)/watchdog:$(ATLASNET_IMAGE_TAG)"
+	docker push "$(DOCKERHUB_NAMESPACE)/proxy:$(ATLASNET_IMAGE_TAG)"
+	docker push "$(DOCKERHUB_NAMESPACE)/shard:$(ATLASNET_IMAGE_TAG)"
+	docker push "$(DOCKERHUB_NAMESPACE)/cartograph:$(ATLASNET_IMAGE_TAG)"
+	@echo "==> Done. Published arm64 images to Docker Hub namespace '$(DOCKERHUB_NAMESPACE)' with tag '$(ATLASNET_IMAGE_TAG)'."
 
