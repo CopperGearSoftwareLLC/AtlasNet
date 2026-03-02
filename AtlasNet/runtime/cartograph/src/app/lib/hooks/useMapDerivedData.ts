@@ -17,6 +17,7 @@ import {
   computeProjectedShardPositions,
   computeShardAnchorPositions,
   computeShardBoundsById,
+  computeShardPolygonsById,
   computeShardHoverBoundsById,
   type HoveredShardEdgeLabel,
   type ShardHoverBounds,
@@ -40,6 +41,7 @@ interface MapDerivedData {
   networkNodeIds: string[];
   networkNodeIdSet: Set<string>;
   shardHoverBoundsById: Map<string, ShardHoverBounds>;
+  shardPolygonsById: Map<string, { x: number; y: number }[][]>;
   shardTelemetryById: Map<string, ShardTelemetry>;
 }
 
@@ -70,6 +72,11 @@ export function useMapDerivedData({
 
   const shardBoundsById = useMemo(
     () => computeShardBoundsById(baseShapes),
+    [baseShapes]
+  );
+
+  const shardPolygonsById = useMemo(
+    () => computeShardPolygonsById(baseShapes),
     [baseShapes]
   );
 
@@ -164,6 +171,7 @@ export function useMapDerivedData({
     networkNodeIds,
     networkNodeIdSet,
     shardHoverBoundsById,
+    shardPolygonsById,
     shardTelemetryById,
   };
 }

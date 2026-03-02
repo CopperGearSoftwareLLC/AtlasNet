@@ -156,6 +156,34 @@ export function computeShardBoundsById(baseShapes: ShapeJS[]): Map<string, Shard
   return out;
 }
 
+export function computeShardPolygonsById(baseShapes: ShapeJS[]): Map<string, Point2[][]> {
+  const out = new Map<string, Point2[][]>();
+
+  for (const shape of baseShapes) {
+    if (shape.type !== 'polygon' || !shape.points || shape.points.length < 3) {
+      continue;
+    }
+    const ownerId = normalizeShardId(shape.ownerId ?? '');
+    if (!isShardIdentity(ownerId)) {
+      continue;
+    }
+
+    const points = getShapeAnchorPoints(shape);
+    if (points.length < 3) {
+      continue;
+    }
+
+    const existing = out.get(ownerId);
+    if (existing) {
+      existing.push(points);
+    } else {
+      out.set(ownerId, [points]);
+    }
+  }
+
+  return out;
+}
+
 export function computeProjectedShardPositions(args: {
   networkNodeIds: string[];
   shardAnchorPositions: Map<string, Point2>;

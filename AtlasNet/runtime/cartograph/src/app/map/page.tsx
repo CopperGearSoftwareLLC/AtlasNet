@@ -644,6 +644,7 @@ export default function MapPage() {
     networkNodeIds,
     networkNodeIdSet,
     shardHoverBoundsById,
+    shardPolygonsById,
     shardTelemetryById,
   } = useMapDerivedData({
     baseShapes,
@@ -662,6 +663,7 @@ export default function MapPage() {
     setHoveredShardAnchor,
     setHoveredShardId,
     shardHoverBoundsById,
+    shardHoverPolygonsById: shardPolygonsById,
     showGnsConnections,
     showShardHoverDetails,
   });
