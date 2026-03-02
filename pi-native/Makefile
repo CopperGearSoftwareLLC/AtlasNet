@@ -10,7 +10,7 @@
 #   make build-docker   # (optional) build local Docker images via CopyDockerfile
 #
 
-.PHONY: deps vcpkg configure build-core build-docker push-docker all
+.PHONY: deps vcpkg configure build-core build-docker push-docker fix-docker-dns all
 
 # Adjust if you prefer a different install location on the Pi.
 VCPKG_ROOT ?= /opt/vcpkg
@@ -40,6 +40,16 @@ deps:
 	@echo "==> Ensuring current user is in 'docker' group (may require re-login)..."
 	sudo usermod -aG docker "$$USER" || true
 	@echo "==> System dependencies + Docker installed (or already present)."
+
+fix-docker-dns:
+	@echo "==> Configuring Docker daemon DNS to use public resolvers (requires sudo)..."
+	sudo mkdir -p /etc/docker
+	printf '%s\n' '{' '"dns": ["1.1.1.1", "8.8.8.8"]' '}' | sed '2s/^/  /' | sudo tee /etc/docker/daemon.json >/dev/null
+	sudo systemctl restart docker
+	@echo "==> Docker daemon restarted with updated DNS settings."
+	@echo "==> Removing atlasnet-builder buildx builder so it can be recreated with new DNS..."
+	docker buildx rm atlasnet-builder >/dev/null 2>&1 || true
+	@echo "==> Done. Next build will recreate the buildx builder with updated DNS."
 
 vcpkg:
 	@echo "==> Ensuring vcpkg exists at $(VCPKG_ROOT)..."
