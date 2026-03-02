@@ -17,55 +17,92 @@ void QuadtreeHeuristic::SetTargetLeafCount(uint32_t count)
 
 void QuadtreeHeuristic::Compute(const std::span<const AtlasEntityMinimal>&)
 {
-	// For now we ignore entities and build a uniform quadtree-style grid that
-	// subdivides the legacy grid area into N x N cells where N^2 ~= TargetLeafCount.
+	// Quadtree-style subdivision: start from a single root region covering the
+	// legacy grid area and repeatedly subdivide nodes into 4 children until we
+	// reach a leaf count >= requested. We round the requested leaf count up to
+	// the nearest value of the form (1 + 3*k), since each subdivision replaces
+	// 1 node with 4 children (+3 leaves).
 
 	const uint32_t requestedLeaves = std::max<uint32_t>(1, options.TargetLeafCount);
-	const float rootWidthX = options.NetHalfExtent.x * 2.0f;
-	const float rootWidthY = options.NetHalfExtent.y * 2.0f;
 
-	// Choose an integer grid dimension N such that N^2 ~= requestedLeaves.
-	const float sideF = std::sqrt(static_cast<float>(requestedLeaves));
-	uint32_t side = static_cast<uint32_t>(std::round(sideF));
-	if (side == 0)
+	uint32_t targetLeaves = requestedLeaves;
+	if (targetLeaves == 1)
 	{
-		side = 1;
+		// Degenerate case: a single region equal to the whole area.
+		targetLeaves = 1;
 	}
-	const uint32_t actualLeaves = side * side;
-
-	logger.DebugFormatted(
-		"QuadtreeHeuristic::Compute: requested_leaves={} -> grid={}x{} ({} cells)",
-		requestedLeaves, side, side, actualLeaves);
-
-	_cells.clear();
-	_cells.resize(actualLeaves);
-
-	const float cellWidthX = rootWidthX / static_cast<float>(side);
-	const float cellWidthY = rootWidthY / static_cast<float>(side);
+	else
+	{
+		// Ensure targetLeaves = 1 (mod 3) so it is reachable by repeated splits.
+		while ((targetLeaves - 1U) % 3U != 0U)
+		{
+			++targetLeaves;
+		}
+	}
 
 	const float minX = -options.NetHalfExtent.x;
+	const float maxX = options.NetHalfExtent.x;
 	const float minY = -options.NetHalfExtent.y;
+	const float maxY = options.NetHalfExtent.y;
+
+	struct Node
+	{
+		glm::vec2 min;
+		glm::vec2 max;
+	};
+
+	std::vector<Node> leaves;
+	leaves.reserve(targetLeaves);
+	leaves.push_back(Node{glm::vec2(minX, minY), glm::vec2(maxX, maxY)});
+
+	while (leaves.size() < targetLeaves)
+	{
+		// Always split the last leaf; the exact ordering does not matter for
+		// correctness, but this keeps behaviour deterministic.
+		const Node node = leaves.back();
+		leaves.pop_back();
+
+		const float midX = 0.5f * (node.min.x + node.max.x);
+		const float midY = 0.5f * (node.min.y + node.max.y);
+
+		// Bottom-left
+		leaves.push_back(
+			Node{glm::vec2(node.min.x, node.min.y), glm::vec2(midX, midY)});
+		// Bottom-right
+		leaves.push_back(
+			Node{glm::vec2(midX, node.min.y), glm::vec2(node.max.x, midY)});
+		// Top-left
+		leaves.push_back(
+			Node{glm::vec2(node.min.x, midY), glm::vec2(midX, node.max.y)});
+		// Top-right
+		leaves.push_back(
+			Node{glm::vec2(midX, midY), glm::vec2(node.max.x, node.max.y)});
+	}
+
+	logger.DebugFormatted(
+		"QuadtreeHeuristic::Compute: requested_leaves={} -> target_leaves={} "
+		"({} nodes)",
+		requestedLeaves, targetLeaves, leaves.size());
+
+	_cells.clear();
+	_cells.resize(leaves.size());
 
 	IBounds::BoundsID nextId = 0;
-
-	for (uint32_t row = 0; row < side; ++row)
+	for (size_t i = 0; i < leaves.size(); ++i)
 	{
-		for (uint32_t col = 0; col < side; ++col)
-		{
-			const float centerX =
-				minX + (static_cast<float>(col) + 0.5f) * cellWidthX;
-			const float centerY =
-				minY + (static_cast<float>(row) + 0.5f) * cellWidthY;
+		const Node& n = leaves[i];
+		const float centerX = 0.5f * (n.min.x + n.max.x);
+		const float centerY = 0.5f * (n.min.y + n.max.y);
+		const float halfWidth = 0.5f * std::max(n.max.x - n.min.x, 0.001f);
+		const float halfHeight = 0.5f * std::max(n.max.y - n.min.y, 0.001f);
 
-			GridShape cell;
-			cell.ID = nextId++;
-			cell.aabb.SetCenterExtents(
-				vec3(centerX, centerY, 0.0f),
-				vec3(cellWidthX * 0.5f, cellWidthY * 0.5f, 5.0f));
+		GridShape cell;
+		cell.ID = nextId++;
+		cell.aabb.SetCenterExtents(
+			vec3(centerX, centerY, 0.0f),
+			vec3(halfWidth, halfHeight, 5.0f));
 
-			const size_t index = static_cast<size_t>(row * side + col);
-			_cells[index] = cell;
-		}
+		_cells[i] = cell;
 	}
 }
 

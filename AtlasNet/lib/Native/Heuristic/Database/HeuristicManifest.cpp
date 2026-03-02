@@ -12,6 +12,7 @@
 #include "Global/pch.hpp"
 #include "Heuristic/GridHeuristic/GridHeuristic.hpp"
 #include "Heuristic/Quadtree/QuadtreeHeuristic.hpp"
+#include "Heuristic/Voronoi/VoronoiHeuristic.hpp"
 #include "Heuristic/IHeuristic.hpp"
 #include "InternalDB/InternalDB.hpp"
 #include "Network/NetworkIdentity.hpp"
@@ -397,6 +398,9 @@ std::unique_ptr<IHeuristic> HeuristicManifest::PullHeuristic()
 		case IHeuristic::Type::eQuadtree:
 			heuristic = std::make_unique<QuadtreeHeuristic>();
 			break;
+		case IHeuristic::Type::eVoronoi:
+			heuristic = std::make_unique<VoronoiHeuristic>();
+			break;
 		case IHeuristic::Type::eOctree:
 			break;
 
@@ -556,6 +560,7 @@ std::unique_ptr<IBounds> HeuristicManifest::Internal_CreateIBoundInst()
 	{
 		case IHeuristic::Type::eGridCell:
 		case IHeuristic::Type::eQuadtree:
+		case IHeuristic::Type::eVoronoi:
 			// Both grid and quadtree heuristics currently use GridShape bounds.
 			return std::make_unique<GridShape>();
 			break;

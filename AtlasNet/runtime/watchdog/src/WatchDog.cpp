@@ -24,6 +24,7 @@
 #include "Events/Events/Debug/LogEvent.hpp"
 #include "Heuristic/GridHeuristic/GridHeuristic.hpp"
 #include "Heuristic/Quadtree/QuadtreeHeuristic.hpp"
+#include "Heuristic/Voronoi/VoronoiHeuristic.hpp"
 #include "Heuristic/IHeuristic.hpp"
 #include "Interlink/Interlink.hpp"
 #include "Interlink/InterlinkEnums.hpp"
@@ -292,14 +293,20 @@ void WatchDog::Init()
 	EventSystem::Get().Init();
 
 	// Legacy grid-cell heuristic is still available as a separate heuristic,
-	// but WatchDog now defaults to the Quadtree heuristic.
+	// but WatchDog now defaults to the Quadtree heuristic. For Voronoi
+	// testing, you can switch to eVoronoi below.
 	SwitchHeuristic(IHeuristic::Type::eQuadtree);
 	if (auto quadtree =
 			std::dynamic_pointer_cast<QuadtreeHeuristic>(Heuristic))
 	{
 		// For now, configure Quadtree to produce 16 cells over the same
 		// net area as the legacy grid heuristic.
-		quadtree->SetTargetLeafCount(16);
+		quadtree->SetTargetLeafCount(13);
+	}
+	if (auto voronoi =
+			std::dynamic_pointer_cast<VoronoiHeuristic>(Heuristic))
+	{
+		voronoi->SetTargetCellCount(5);
 	}
 	ComputeHeuristic();	 // compute once
 	// HeuristicThread = std::jthread([this](std::stop_token st)
@@ -466,6 +473,11 @@ void WatchDog::SwitchHeuristic(IHeuristic::Type newHeuristic)
 		case IHeuristic::Type::eQuadtree:
 		{
 			Heuristic = std::make_shared<QuadtreeHeuristic>();
+			break;
+		}
+		case IHeuristic::Type::eVoronoi:
+		{
+			Heuristic = std::make_shared<VoronoiHeuristic>();
 			break;
 		}
 		case IHeuristic::Type::eOctree:
