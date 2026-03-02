@@ -18,6 +18,7 @@ const {
   collectAuthorityTelemetry,
   collectHeuristicShapes,
   collectTransferManifest,
+  collectTransferStateQueue,
 } = require('./services/telemetryCollection');
 const {
   readHeuristicTypeFromDatabase,
@@ -178,6 +179,24 @@ app.get('/transfermanifest', async (req, res) => {
     }
     console.error(err);
     res.status(500).json({ error: 'Transfer manifest fetch failed' });
+  }
+});
+
+app.get('/transferstatequeue', async (req, res) => {
+  try {
+    const requestedMode = getRequestedCollectionMode(req.query);
+    const mode = resolveCollectionMode(requestedMode);
+    const { modeUsed, data } = await collectTransferStateQueue({
+      requestedMode: mode,
+    });
+    res.set('x-cartograph-collection-mode', String(modeUsed));
+    res.json(data);
+  } catch (err) {
+    if (addonLoadError) {
+      console.error(addonLoadError);
+    }
+    console.error(err);
+    res.status(500).json({ error: 'Transfer state queue fetch failed' });
   }
 });
 

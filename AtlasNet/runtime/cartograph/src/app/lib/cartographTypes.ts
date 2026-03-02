@@ -78,6 +78,16 @@ export interface TransferManifestTelemetry {
   entityIds: string[];
 }
 
+export interface TransferStateQueueTelemetry {
+  transferId: string;
+  fromId: string;
+  toId: string;
+  stage: TransferManifestStage;
+  state: TransferLinkState;
+  entityIds: string[];
+  timestampMs: number;
+}
+
 export interface DatabaseRecord {
   source: string;
   key: string;

@@ -8,6 +8,7 @@ import type {
   ShardPlacementTelemetry,
   ShardTelemetry,
   TransferManifestTelemetry,
+  TransferStateQueueTelemetry,
 } from '../lib/cartographTypes';
 import { useMapDerivedData } from '../lib/hooks/useMapDerivedData';
 import { useShardHoverState } from '../lib/hooks/useShardHoverState';
@@ -16,7 +17,7 @@ import {
   useHeuristicShapes,
   useNetworkTelemetry,
   useShardPlacement,
-  useTransferManifest,
+  useTransferStateQueue,
 } from '../lib/hooks/useTelemetryFeeds';
 import {
   createMapRenderer,
@@ -45,6 +46,7 @@ const DEFAULT_INTERACTION_SENSITIVITY = 1;
 const SNAPSHOT_WINDOW_MS = 30_000;
 const SNAPSHOT_RECORD_SPACING_MS = 10;
 const PLAYBACK_TICK_INTERVAL_MS = 16;
+const TRANSFER_STATE_REPLAY_STEP_MS = 2;
 
 const EMPTY_DETAILS_STATE: EntityDatabaseDetailsState = {
   loading: false,
@@ -60,6 +62,11 @@ interface PlaybackFrame {
   transferManifest: TransferManifestTelemetry[];
   shardPlacement: ShardPlacementTelemetry[];
   entityDetailsByEntityId: Record<string, EntityDatabaseDetailsState>;
+}
+
+interface ActiveTransferQueueEvent {
+  event: TransferStateQueueTelemetry;
+  startedAtMs: number;
 }
 
 function clonePlaybackPayload(
@@ -120,6 +127,9 @@ export default function MapPage() {
   const rendererRef = useRef<ReturnType<typeof createMapRenderer> | null>(null);
   const historyRef = useRef<PlaybackFrame[]>([]);
   const playbackLastTickMsRef = useRef<number | null>(null);
+  const transferQueueByEntityRef = useRef<Map<string, TransferStateQueueTelemetry[]>>(
+    new Map()
+  );
   const [showGnsConnections, setShowGnsConnections] = useState(true);
   const [showAuthorityEntities, setShowAuthorityEntities] = useState(true);
   const [authorityLinkMode, setAuthorityLinkMode] =
@@ -146,6 +156,9 @@ export default function MapPage() {
   const [playbackCursorMs, setPlaybackCursorMs] = useState(0);
   const [playbackPaused, setPlaybackPaused] = useState(true);
   const [playbackDirection, setPlaybackDirection] = useState<1 | -1>(1);
+  const [activeTransferQueueByEntity, setActiveTransferQueueByEntity] = useState<
+    Record<string, ActiveTransferQueueEvent>
+  >({});
 
   const telemetryPollIntervalMs =
     pollIntervalMs >= POLL_DISABLED_AT_MS ? 0 : pollIntervalMs;
@@ -164,7 +177,7 @@ export default function MapPage() {
     resetOnException: true,
     resetOnHttpError: false,
   });
-  const transferManifestLive = useTransferManifest({
+  const transferStateQueueLive = useTransferStateQueue({
     intervalMs: telemetryPollIntervalMs,
     resetOnException: true,
     resetOnHttpError: false,
@@ -176,6 +189,104 @@ export default function MapPage() {
     resetOnException: false,
     resetOnHttpError: false,
   });
+
+  useEffect(() => {
+    if (!Array.isArray(transferStateQueueLive) || transferStateQueueLive.length === 0) {
+      return;
+    }
+
+    const queues = transferQueueByEntityRef.current;
+    for (const event of transferStateQueueLive) {
+      const entityIds = Array.isArray(event.entityIds) ? event.entityIds : [];
+      for (const rawEntityId of entityIds) {
+        const entityId = String(rawEntityId || '').trim();
+        if (!entityId) {
+          continue;
+        }
+
+        const perEntityEvent: TransferStateQueueTelemetry = {
+          ...event,
+          entityIds: [entityId],
+        };
+
+        const queue = queues.get(entityId);
+        if (queue) {
+          queue.push(perEntityEvent);
+        } else {
+          queues.set(entityId, [perEntityEvent]);
+        }
+      }
+    }
+  }, [transferStateQueueLive]);
+
+  useEffect(() => {
+    const intervalId = setInterval(() => {
+      const nowMs = Date.now();
+      const queues = transferQueueByEntityRef.current;
+
+      setActiveTransferQueueByEntity((previous) => {
+        let next = previous;
+        let changed = false;
+
+        for (const [entityId, active] of Object.entries(next)) {
+          if (nowMs - active.startedAtMs < TRANSFER_STATE_REPLAY_STEP_MS) {
+            continue;
+          }
+
+          if (next === previous) {
+            next = { ...previous };
+          }
+          delete next[entityId];
+          changed = true;
+        }
+
+        for (const [entityId, queue] of queues.entries()) {
+          if (next[entityId]) {
+            continue;
+          }
+
+          const event = queue.shift();
+          if (queue.length === 0) {
+            queues.delete(entityId);
+          }
+          if (!event) {
+            continue;
+          }
+
+          if (next === previous) {
+            next = { ...previous };
+          }
+          next[entityId] = {
+            event,
+            startedAtMs: nowMs,
+          };
+          changed = true;
+        }
+
+        return changed ? next : previous;
+      });
+    }, 1);
+
+    return () => {
+      clearInterval(intervalId);
+    };
+  }, []);
+
+  const transferManifestLiveResolved = useMemo(() => {
+    const rows: TransferManifestTelemetry[] = [];
+    for (const [entityId, active] of Object.entries(activeTransferQueueByEntity)) {
+      const event = active.event;
+      rows.push({
+        transferId: `${event.transferId}:${entityId}:${event.timestampMs}`,
+        fromId: event.fromId,
+        toId: event.toId,
+        stage: event.stage,
+        state: event.state,
+        entityIds: [entityId],
+      });
+    }
+    return rows;
+  }, [activeTransferQueueByEntity]);
 
   const playbackStartMs =
     playbackFrames && playbackFrames.length > 0
@@ -260,7 +371,7 @@ export default function MapPage() {
       baseShapes: baseShapesLive,
       networkTelemetry: networkTelemetryLive,
       authorityEntities: authorityEntitiesLive,
-      transferManifest: transferManifestLive,
+      transferManifest: transferManifestLiveResolved,
       shardPlacement: shardPlacementLive,
       entityDetailsByEntityId: snapshotDetailsByEntityId(
         liveEntityDetailsCacheRef.current
@@ -270,7 +381,7 @@ export default function MapPage() {
     baseShapesLive,
     networkTelemetryLive,
     authorityEntitiesLive,
-    transferManifestLive,
+    transferManifestLiveResolved,
     shardPlacementLive,
     liveEntityDetails,
     activeEntityLive,
@@ -446,7 +557,7 @@ export default function MapPage() {
   const authorityEntities =
     playbackFrame?.authorityEntities ?? authorityEntitiesLive;
   const transferManifest =
-    playbackFrame?.transferManifest ?? transferManifestLive;
+    playbackFrame?.transferManifest ?? transferManifestLiveResolved;
   const shardPlacement = playbackFrame?.shardPlacement ?? shardPlacementLive;
 
   const {

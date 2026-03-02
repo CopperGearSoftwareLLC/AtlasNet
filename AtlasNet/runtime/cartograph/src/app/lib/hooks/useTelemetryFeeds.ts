@@ -7,10 +7,12 @@ import type {
   ShapeJS,
   ShardTelemetry,
   TransferManifestTelemetry,
+  TransferStateQueueTelemetry,
   WorkersSnapshotResponse,
 } from '../cartographTypes';
 import { parseAuthorityRows } from '../authorityTelemetryTypes';
 import { parseTransferManifestRows } from '../transferManifestTypes';
+import { parseTransferStateQueueRows } from '../transferStateQueueTypes';
 
 interface PolledResourceOptions<T> {
   url: string;
@@ -235,6 +237,27 @@ export function useTransferManifest({
     enabled,
     createInitialValue: () => [],
     mapResponse: parseTransferManifestRows,
+    resetOnException,
+    resetOnHttpError,
+    onException,
+    onHttpError,
+  });
+}
+
+export function useTransferStateQueue({
+  intervalMs,
+  enabled = true,
+  resetOnException = false,
+  resetOnHttpError = false,
+  onException,
+  onHttpError,
+}: TelemetryPollingOptions): TransferStateQueueTelemetry[] {
+  return usePolledResource<TransferStateQueueTelemetry[]>({
+    url: '/api/transferstatequeue',
+    intervalMs,
+    enabled,
+    createInitialValue: () => [],
+    mapResponse: parseTransferStateQueueRows,
     resetOnException,
     resetOnHttpError,
     onException,
