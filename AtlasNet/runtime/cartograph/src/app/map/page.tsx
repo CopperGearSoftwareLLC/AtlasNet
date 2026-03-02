@@ -47,6 +47,7 @@ const SNAPSHOT_WINDOW_MS = 30_000;
 const SNAPSHOT_RECORD_SPACING_MS = 10;
 const PLAYBACK_TICK_INTERVAL_MS = 16;
 const TRANSFER_STATE_REPLAY_STEP_MS = 2;
+const TRANSFER_STATE_PLAYBACK_DISPLAY_MS = 20;
 
 const EMPTY_DETAILS_STATE: EntityDatabaseDetailsState = {
   loading: false,
@@ -122,6 +123,46 @@ function snapshotDetailsByEntityId(
   return out;
 }
 
+function resolveTransferManifestAtCursor(
+  events: TransferStateQueueTelemetry[],
+  cursorMs: number,
+  holdMs: number
+): TransferManifestTelemetry[] {
+  if (!Array.isArray(events) || events.length === 0) {
+    return [];
+  }
+
+  const latestByEntity = new Map<string, TransferStateQueueTelemetry>();
+  for (const event of events) {
+    if (!event || event.timestampMs > cursorMs) {
+      break;
+    }
+
+    if (cursorMs - event.timestampMs > holdMs) {
+      continue;
+    }
+
+    const entityId = String(event.entityIds?.[0] || '').trim();
+    if (!entityId) {
+      continue;
+    }
+    latestByEntity.set(entityId, event);
+  }
+
+  const rows: TransferManifestTelemetry[] = [];
+  for (const [entityId, event] of latestByEntity.entries()) {
+    rows.push({
+      transferId: `${event.transferId}:${entityId}:${event.timestampMs}`,
+      fromId: event.fromId,
+      toId: event.toId,
+      stage: event.stage,
+      state: event.state,
+      entityIds: [entityId],
+    });
+  }
+  return rows;
+}
+
 export default function MapPage() {
   const containerRef = useRef<HTMLDivElement>(null);
   const rendererRef = useRef<ReturnType<typeof createMapRenderer> | null>(null);
@@ -130,6 +171,7 @@ export default function MapPage() {
   const transferQueueByEntityRef = useRef<Map<string, TransferStateQueueTelemetry[]>>(
     new Map()
   );
+  const transferTimelineRef = useRef<TransferStateQueueTelemetry[]>([]);
   const [showGnsConnections, setShowGnsConnections] = useState(true);
   const [showAuthorityEntities, setShowAuthorityEntities] = useState(true);
   const [authorityLinkMode, setAuthorityLinkMode] =
@@ -153,6 +195,9 @@ export default function MapPage() {
   const [playbackFrames, setPlaybackFrames] = useState<PlaybackFrame[] | null>(
     null
   );
+  const [playbackTransferEvents, setPlaybackTransferEvents] = useState<
+    TransferStateQueueTelemetry[] | null
+  >(null);
   const [playbackCursorMs, setPlaybackCursorMs] = useState(0);
   const [playbackPaused, setPlaybackPaused] = useState(true);
   const [playbackDirection, setPlaybackDirection] = useState<1 | -1>(1);
@@ -195,7 +240,10 @@ export default function MapPage() {
       return;
     }
 
+    const ingestStartedAtMs = Date.now();
+    let ingestOffsetMs = 0;
     const queues = transferQueueByEntityRef.current;
+    const timeline = transferTimelineRef.current;
     for (const event of transferStateQueueLive) {
       const entityIds = Array.isArray(event.entityIds) ? event.entityIds : [];
       for (const rawEntityId of entityIds) {
@@ -207,7 +255,10 @@ export default function MapPage() {
         const perEntityEvent: TransferStateQueueTelemetry = {
           ...event,
           entityIds: [entityId],
+          // Use local ingest time so playback cursor and event timeline share one clock.
+          timestampMs: ingestStartedAtMs + ingestOffsetMs,
         };
+        ingestOffsetMs += 1;
 
         const queue = queues.get(entityId);
         if (queue) {
@@ -215,7 +266,13 @@ export default function MapPage() {
         } else {
           queues.set(entityId, [perEntityEvent]);
         }
+        timeline.push(perEntityEvent);
       }
+    }
+
+    const cutoffMs = Date.now() - SNAPSHOT_WINDOW_MS;
+    while (timeline.length > 0 && timeline[0].timestampMs < cutoffMs) {
+      timeline.shift();
     }
   }, [transferStateQueueLive]);
 
@@ -479,7 +536,12 @@ export default function MapPage() {
     }
     const snapshot = [...frames];
     const endMs = snapshot[snapshot.length - 1].capturedAtMs;
+    const transferEvents = transferTimelineRef.current.filter(
+      (event) =>
+        event.timestampMs >= endMs - SNAPSHOT_WINDOW_MS && event.timestampMs <= endMs
+    );
     setPlaybackFrames(snapshot);
+    setPlaybackTransferEvents(transferEvents);
     setPlaybackCursorMs(endMs);
     setPlaybackDirection(1);
     setPlaybackPaused(true);
@@ -488,6 +550,7 @@ export default function MapPage() {
 
   function resumeLive(): void {
     setPlaybackFrames(null);
+    setPlaybackTransferEvents(null);
     setPlaybackPaused(true);
     playbackLastTickMsRef.current = null;
   }
@@ -556,8 +619,20 @@ export default function MapPage() {
   const networkTelemetry = playbackFrame?.networkTelemetry ?? networkTelemetryLive;
   const authorityEntities =
     playbackFrame?.authorityEntities ?? authorityEntitiesLive;
-  const transferManifest =
-    playbackFrame?.transferManifest ?? transferManifestLiveResolved;
+  const playbackTransferManifest = useMemo(
+    () =>
+      playbackActive && playbackTransferEvents
+        ? resolveTransferManifestAtCursor(
+            playbackTransferEvents,
+            playbackCursorMs,
+            TRANSFER_STATE_PLAYBACK_DISPLAY_MS
+          )
+        : [],
+    [playbackActive, playbackCursorMs, playbackTransferEvents]
+  );
+  const transferManifest = playbackActive
+    ? playbackTransferManifest
+    : transferManifestLiveResolved;
   const shardPlacement = playbackFrame?.shardPlacement ?? shardPlacementLive;
 
   const {
