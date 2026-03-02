@@ -10,6 +10,9 @@ K3D_SERVER_COUNT="${ATLASNET_K3D_SERVERS:-1}"
 K3D_AGENT_COUNT="${ATLASNET_K3D_AGENTS:-2}"
 PORT_WAIT_TIMEOUT="${ATLASNET_K3D_PORT_WAIT_TIMEOUT:-15}"
 SERVER_NODE_NAME="${ATLASNET_SERVER_NODE_NAME:-k3d-${CLUSTER_NAME}-server-0}"
+SKIP_RESTART_ON_FRESH_CLUSTER="${ATLASNET_K3D_SKIP_RESTART_ON_FRESH_CLUSTER:-1}"
+CORE_ROLLOUT_MODE="${ATLASNET_K3D_CORE_ROLLOUT_MODE:-parallel}"
+WAIT_FOR_SHARD_READY="${ATLASNET_K3D_WAIT_FOR_SHARD_READY:-1}"
 HOST_KUBECONFIG_PATH=""
 
 is_nonnegative_int() {
@@ -455,6 +458,31 @@ wait_for_app_rollout() {
     fi
 }
 
+wait_for_apps_rollout_parallel() {
+    local timeout="${1:-180s}"
+    shift
+    local -a apps=("$@")
+    local -a pids=()
+    local -a names=()
+    local idx
+
+    for app in "${apps[@]}"; do
+        [[ -z "$app" ]] && continue
+        (
+            wait_for_app_rollout "$app" "$timeout"
+        ) &
+        pids+=("$!")
+        names+=("$app")
+    done
+
+    for idx in "${!pids[@]}"; do
+        if ! wait "${pids[$idx]}"; then
+            echo "Error: rollout wait failed for app '${names[$idx]}'." >&2
+            exit 1
+        fi
+    done
+}
+
 echo "==> Importing local Docker images into k3d..."
 declare -a IMAGES=(
     "watchdog:latest"
@@ -564,37 +592,54 @@ kctl -n "$NAMESPACE" delete daemonset atlasnet-watchdog --ignore-not-found >/dev
 kctl -n "$NAMESPACE" delete deployment atlasnet-cartograph --ignore-not-found >/dev/null || true
 kctl -n "$NAMESPACE" delete deployment atlasnet-proxy --ignore-not-found >/dev/null || true
 # Shard deployment is declared with replicas=0 and is expected to be scaled by Watchdog.
-# Always restart watchdog so it recomputes shard target each run.
-add_restart_app "atlasnet-watchdog"
-echo "==> Restarting updated workloads..."
-restart_marked_apps
+# On a fresh cluster, initial apply already starts the latest pods; skip extra rollout restarts by default.
+if ((CLUSTER_EXISTS == 0)) && [[ "$SKIP_RESTART_ON_FRESH_CLUSTER" == "1" ]]; then
+    echo "==> Fresh cluster detected; skipping post-apply rollout restarts."
+else
+    # Always restart watchdog on non-fresh runs so it recomputes shard target each run.
+    add_restart_app "atlasnet-watchdog"
+    echo "==> Restarting updated workloads..."
+    restart_marked_apps
+fi
 # Remove legacy resources from earlier k3d migration iterations.
 kctl -n "$NAMESPACE" delete svc atlasnet-internaldb --ignore-not-found >/dev/null || true
 
 echo "==> Waiting for core workloads..."
-wait_for_app_rollout "atlasnet-internaldb" "180s"
-wait_for_app_rollout "atlasnet-watchdog" "180s"
-wait_for_app_rollout "atlasnet-proxy" "180s"
-wait_for_app_rollout "atlasnet-cartograph" "180s"
+if [[ "$CORE_ROLLOUT_MODE" == "parallel" ]]; then
+    wait_for_apps_rollout_parallel "180s" \
+        "atlasnet-internaldb" \
+        "atlasnet-watchdog" \
+        "atlasnet-proxy" \
+        "atlasnet-cartograph"
+else
+    wait_for_app_rollout "atlasnet-internaldb" "180s"
+    wait_for_app_rollout "atlasnet-watchdog" "180s"
+    wait_for_app_rollout "atlasnet-proxy" "180s"
+    wait_for_app_rollout "atlasnet-cartograph" "180s"
+fi
 
-echo "==> Waiting for watchdog-driven shard scale-up..."
-shard_ready=false
-for _attempt in {1..90}; do
-    desired="$(kctl -n "$NAMESPACE" get deployment atlasnet-shard -o jsonpath='{.spec.replicas}' 2>/dev/null || echo 0)"
-    ready="$(kctl -n "$NAMESPACE" get deployment atlasnet-shard -o jsonpath='{.status.readyReplicas}' 2>/dev/null || echo 0)"
-    desired="${desired:-0}"
-    ready="${ready:-0}"
+if [[ "$WAIT_FOR_SHARD_READY" == "1" ]]; then
+    echo "==> Waiting for watchdog-driven shard scale-up..."
+    shard_ready=false
+    for _attempt in {1..90}; do
+        desired="$(kctl -n "$NAMESPACE" get deployment atlasnet-shard -o jsonpath='{.spec.replicas}' 2>/dev/null || echo 0)"
+        ready="$(kctl -n "$NAMESPACE" get deployment atlasnet-shard -o jsonpath='{.status.readyReplicas}' 2>/dev/null || echo 0)"
+        desired="${desired:-0}"
+        ready="${ready:-0}"
 
-    if [[ "$desired" =~ ^[0-9]+$ && "$ready" =~ ^[0-9]+$ && "$desired" -gt 0 && "$ready" -ge 1 ]]; then
-        echo "   - shard deployment desired=${desired}, ready=${ready}"
-        shard_ready=true
-        break
+        if [[ "$desired" =~ ^[0-9]+$ && "$ready" =~ ^[0-9]+$ && "$desired" -gt 0 && "$ready" -ge 1 ]]; then
+            echo "   - shard deployment desired=${desired}, ready=${ready}"
+            shard_ready=true
+            break
+        fi
+        sleep 2
+    done
+
+    if [[ "$shard_ready" != true ]]; then
+        echo "Warning: shard deployment did not report a ready replica within timeout."
     fi
-    sleep 2
-done
-
-if [[ "$shard_ready" != true ]]; then
-    echo "Warning: shard deployment did not report a ready replica within timeout."
+else
+    echo "==> Skipping watchdog-driven shard scale-up wait (ATLASNET_K3D_WAIT_FOR_SHARD_READY=$WAIT_FOR_SHARD_READY)."
 fi
 
 sync_headlamp_default_kubeconfig
