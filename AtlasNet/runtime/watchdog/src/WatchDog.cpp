@@ -299,7 +299,7 @@ void WatchDog::Init()
 	{
 		// For now, configure Quadtree to produce 16 cells over the same
 		// net area as the legacy grid heuristic.
-		quadtree->SetTargetLeafCount(4);
+		quadtree->SetTargetLeafCount(16);
 	}
 	ComputeHeuristic();	 // compute once
 	// HeuristicThread = std::jthread([this](std::stop_token st)
