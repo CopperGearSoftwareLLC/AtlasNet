@@ -6,6 +6,7 @@
 #include "Command/NetCommand.hpp"
 #include "Command/Packet/CommandPayloadPacket.hpp"
 #include "Debug/Log.hpp"
+#include "Entity/EntityLedger.hpp"
 #include "Interlink/Interlink.hpp"
 #include "Network/Packet/Packet.hpp"
 #include "Network/Packet/PacketManager.hpp"
@@ -38,6 +39,7 @@ class ServerCommandBus : public ICommandBus<ClientID, NetClientIntentHeader, Net
 		command->Deserialize(br);
 		NetClientIntentHeader header;
 		header.clientID = packet.Sender;
-		ExecCallback(header,*command);
+		header.entityID = EntityLedger::Get().GetClientEntityID(header.clientID);
+		ExecCallback(header, *command);
 	}
 };

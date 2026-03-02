@@ -5,6 +5,8 @@
 #include <thread>
 
 #include "AtlasNetServer.hpp"
+#include "Client/Database/ClientManifest.hpp"
+#include "Client/Shard/ClientLedger.hpp"
 #include "Command/NetCommand.hpp"
 #include "Commands/GameClientInputCommand.hpp"
 #include "Commands/GameStateCommand.hpp"
@@ -17,6 +19,7 @@
 #include "Global/Misc/UUID.hpp"
 #include "Global/Serialize/ByteReader.hpp"
 #include "Global/Serialize/ByteWriter.hpp"
+#include "Global/pch.hpp"
 #include "Heuristic/BoundLeaser.hpp"
 
 void SandboxServer::Run()
@@ -162,11 +165,25 @@ void SandboxServer::Run()
 void SandboxServer::OnClientSpawn(const ClientSpawnInfo& c, const AtlasEntityMinimal& entity,
 								  AtlasEntityPayload& payload)
 {
+	GameStateCommand setPosCommand;
+	setPosCommand.yourPosition = c.spawnLocation.position;
+	GetCommandBus().Dispatch(c.client.ID, setPosCommand);
+	logger.DebugFormatted("Sending a GameServerState to {} Setting initial pos to {}",
+						  UUIDGen::ToString(c.client.ID), glm::to_string(c.spawnLocation.position));
 }
 void SandboxServer::OnGameClientInputCommand(const NetClientIntentHeader& header,
 											 const GameClientInputCommand& command)
 {
-	logger.DebugFormatted("Received a GameClientInputCommand from {}",
-						  UUIDGen::ToString(header.clientID));
-	GetCommandBus().Dispatch(header.clientID, GameStateCommand{});
+	logger.DebugFormatted("Received a GameClientInputCommand from {} requesting to move to {}",
+						  UUIDGen::ToString(header.clientID),
+						  glm::to_string(command.myDesiredDestination));
+
+	EntityLedger::Get().GetEntity(header.entityID, [&](AtlasEntity& e)
+								  { e.transform.position = command.myDesiredDestination; });
+	GameStateCommand response;
+	response.yourPosition = command.myDesiredDestination;
+	logger.DebugFormatted("Responding a GameServerState to {} approving move to {}",
+						  UUIDGen::ToString(header.clientID),
+						  glm::to_string(command.myDesiredDestination));
+	GetCommandBus().Dispatch(header.clientID, response);
 }

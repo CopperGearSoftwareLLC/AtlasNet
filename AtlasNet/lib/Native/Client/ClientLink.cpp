@@ -118,7 +118,7 @@ void ClientLink::Init()
 				auto now = clock::now();
 				if (now - last < std::chrono::milliseconds(2))
 				{
-					std::this_thread::sleep_for(std::chrono::milliseconds(50));
+					std::this_thread::sleep_for(std::chrono::milliseconds(1));
 				}
 				last = now;
 			}

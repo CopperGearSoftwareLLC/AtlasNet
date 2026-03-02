@@ -21,7 +21,7 @@ class ICommandBus
 	virtual void implFlushCommands() = 0;
 
    protected:
-	void ExecCallback(const NetClientIntentHeader& header, const INetCommand& command)
+	void ExecCallback(const RecvHeader& header, const INetCommand& command)
 	{
 		const std::vector<CallbackFunc>& Callbacks = subscriptions.at(command.GetCommandID());
 

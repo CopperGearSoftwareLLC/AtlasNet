@@ -20,7 +20,7 @@ class SandboxClient
     void SetImGui();
     void RenderView();
 	void OnGameStateCommand(const NetServerStateHeader& header, const GameStateCommand& command);
-
+    bool waitingOnResponse = false;
    public:
 
     void Run(const IPAddress& address);

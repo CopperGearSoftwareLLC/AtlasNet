@@ -6,6 +6,7 @@
 #include "Command/NetCommand.hpp"
 #include "Commands/GameClientInputCommand.hpp"
 #include "Commands/GameStateCommand.hpp"
+#include "Global/pch.hpp"
 #include "Network/IPAddress.hpp"
 #include "imgui.h"
 #include "imgui_impl_glfw.h"
@@ -86,13 +87,26 @@ void SandboxClient::RenderView()
 			((ImGui::IsKeyDown(ImGuiKey_Q) ? 1.0f : 0.0f) +
 			 (ImGui::IsKeyDown(ImGuiKey_E) ? -1.0f : 0.0f) - ImGui::GetIO().MouseWheel);
 		CameraSizeX = glm::max(1.0f, CameraSizeX + s_v);
-		const bool wPressed = ImGui::IsKeyDown(ImGuiKey_W);
-		const bool sPressed = ImGui::IsKeyDown(ImGuiKey_S);
-		const bool aPressed = ImGui::IsKeyDown(ImGuiKey_A);
-		const bool dPressed = ImGui::IsKeyDown(ImGuiKey_D);
-		const float x_v = dPressed + (aPressed ? -1.0f : 0.0f);
-		const float y_v = wPressed + (sPressed ? -1.0f : 0.0f);
-		CameraPos += vec2(x_v, y_v) * 0.02f * CameraSizeX;
+		if (!waitingOnResponse)
+		{
+			const bool wPressed = ImGui::IsKeyDown(ImGuiKey_W);
+			const bool sPressed = ImGui::IsKeyDown(ImGuiKey_S);
+			const bool aPressed = ImGui::IsKeyDown(ImGuiKey_A);
+			const bool dPressed = ImGui::IsKeyDown(ImGuiKey_D);
+			if (wPressed || sPressed || aPressed || dPressed)
+			{
+				const float x_v = dPressed + (aPressed ? -1.0f : 0.0f);
+				const float y_v = wPressed + (sPressed ? -1.0f : 0.0f);
+				vec2 desiredPos = CameraPos + vec2(x_v, y_v) * 0.02f * CameraSizeX;
+				GameClientInputCommand c;
+				c.myDesiredDestination = vec3(desiredPos, 0);
+				AtlasNetClient::Get().GetCommandBus().Dispatch(c);
+				waitingOnResponse = true;
+				logger.DebugFormatted("Sending request to move to {}",
+									  glm::to_string(c.myDesiredDestination));
+			}
+		}
+
 		ImPlot::GetPlotDrawList()->AddCircleFilled(
 			ImPlot::PlotToPixels(ImVec2(CameraPos.x, CameraPos.y)), 100.0f * 1 / CameraSizeX,
 			ImGui::ColorConvertFloat4ToU32(ImVec4(0, 0, 1, 1)));
@@ -121,8 +135,8 @@ void SandboxClient::Run(const IPAddress &address)
 		ShouldDisconnect = ShouldDisconnect || glfwWindowShouldClose(*window);
 	}
 	AtlasNetClient::Get().GetCommandBus().Subscribe<GameStateCommand>(
-		[this](const NetServerStateHeader &, const GameStateCommand &c)
-		{ logger.Debug("Received a command of GameStateCommand"); });
+		[this](const NetServerStateHeader &h, const GameStateCommand &c)
+		{ OnGameStateCommand(h, c); });
 	while (!ShouldDisconnect)
 	{
 		auto now = clock::now();
@@ -166,4 +180,8 @@ void SandboxClient::Run(const IPAddress &address)
 void SandboxClient::OnGameStateCommand(const NetServerStateHeader &header,
 									   const GameStateCommand &command)
 {
+	logger.DebugFormatted("Received server state setting my position to {}",
+						  glm::to_string(command.yourPosition));
+	CameraPos = command.yourPosition;
+	waitingOnResponse = false;
 }

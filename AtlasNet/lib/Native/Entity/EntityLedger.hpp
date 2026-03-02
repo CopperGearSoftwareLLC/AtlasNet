@@ -11,6 +11,7 @@
 #include <unordered_map>
 #include <unordered_set>
 
+#include "Client/Client.hpp"
 #include "Client/Packet/ClientTransferPacket.hpp"
 #include "Debug/Log.hpp"
 #include "Entity/Entity.hpp"
@@ -22,6 +23,7 @@
 class EntityLedger : public Singleton<EntityLedger>
 {
 	std::unordered_map<AtlasEntityID, AtlasEntity> entities;
+	std::unordered_map<ClientID, AtlasEntityID> clients;
 	PacketManager::Subscription sub_EntityListRequestPacket;
 	Log logger = Log("EntityLedger");
 	std::jthread LoopThread;
@@ -29,6 +31,8 @@ class EntityLedger : public Singleton<EntityLedger>
 
    private:
 	const AtlasEntity& _GetEntity(AtlasEntityID ID) const { return entities.at(ID); }
+	AtlasEntity& _GetEntity(AtlasEntityID ID) { return entities.at(ID); }
+	const AtlasEntityID& _GetClientEntityID(const ClientID& cid) const { return clients.at(cid); }
 	void _EraseEntity(AtlasEntityID ID) { entities.erase(ID); }
 	bool _ExistsEntity(AtlasEntityID ID) const { return entities.contains(ID); }
 
@@ -85,6 +89,15 @@ class EntityLedger : public Singleton<EntityLedger>
 	{
 		_ReadLock([&]() { std::forward<FN>(f)(_GetEntity(ID)); });
 	}
+	template <typename FN>
+	void GetEntity(AtlasEntityID ID, FN&& f)
+	{
+		_WriteLock([&]() { std::forward<FN>(f)(_GetEntity(ID)); });
+	}
+	AtlasEntityID GetClientEntityID(const ClientID& cid) const
+	{
+		return _ReadLock([&]() { return _GetClientEntityID(cid); });
+	}
 	[[nodiscard]] AtlasEntityMinimal GetEntityMinimal(AtlasEntityID ID) const
 	{
 		return _ReadLock([&]() { return (AtlasEntityMinimal)_GetEntity(ID); });
@@ -110,7 +123,15 @@ class EntityLedger : public Singleton<EntityLedger>
 
 	void AddEntity(const AtlasEntity& e)
 	{
-		_WriteLock([&]() { entities.insert(std::make_pair(e.Entity_ID, e)); });
+		_WriteLock(
+			[&]()
+			{
+				entities.insert(std::make_pair(e.Entity_ID, e));
+				if (e.IsClient)
+				{
+					clients.insert(std::make_pair(e.Client_ID, e.Entity_ID));
+				}
+			});
 	}
 
    private:
