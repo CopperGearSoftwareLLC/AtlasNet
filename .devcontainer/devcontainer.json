@@ -1,10 +1,19 @@
 {
   "name": "AtlasNet + DooD + WebDesktop (LLVMpipe)",
   "build": {
-    "dockerfile": "Dockerfile"
+    "dockerfile": "Dockerfile",
+    "args": {
+      "http_proxy": "${localEnv:http_proxy}",
+      "https_proxy": "${localEnv:https_proxy}",
+      "no_proxy": "${localEnv:no_proxy}",
+      "HTTP_PROXY": "${localEnv:HTTP_PROXY}",
+      "HTTPS_PROXY": "${localEnv:HTTPS_PROXY}",
+      "NO_PROXY": "${localEnv:NO_PROXY}"
+    }
   },
   "overrideCommand": false,
   "remoteUser": "vscode",
+  "initializeCommand": "bash -lc 'mkdir -p ~/.kube'",
   "postStartCommand": "/bin/bash .devcontainer/post-start.sh",
   "runArgs": [
     "--init",
