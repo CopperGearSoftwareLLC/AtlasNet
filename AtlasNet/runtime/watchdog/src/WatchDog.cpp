@@ -267,6 +267,8 @@ void WatchDog::Init()
 {
 	logger->Debug("Init");
 	NetworkCredentials::Make(NetworkIdentity::MakeIDWatchDog());
+	logger->DebugFormatted("WatchDog Init: NetworkCredentials ID={}",
+						   NetworkCredentials::Get().GetID().ToString());
 	NetworkManifest::Get().ScheduleNetworkPings();
 	HealthManifest::Get().ScheduleHealthPings();
 	HealthManifest::Get().ScheduleHealthChecks(
@@ -320,9 +322,12 @@ void WatchDog::SetShardCount(uint32 NewCount)
 {
 	ShardCount = NewCount;
 
+	logger->DebugFormatted("WatchDog::SetShardCount requested={}", NewCount);
+
 	if (const char* k8sHost = std::getenv("KUBERNETES_SERVICE_HOST");
 		k8sHost && *k8sHost)
 	{
+		logger->Debug("WatchDog::SetShardCount detected Kubernetes environment; using K8s scaling.");
 		const bool scaled = ScaleK8sShardDeployment(logger, NewCount);
 		if (scaled)
 		{

@@ -455,13 +455,18 @@ void Interlink::ReceiveMessages()
 void Interlink::Init()
 {
 	logger.Debug("Interlink init");
-	ASSERT(NetworkCredentials::Get().GetID().Type != NetworkIdentityType::eInvalid,
-		   "Invalid Interlink Type");
-	ASSERT(NetworkCredentials::Get().GetID().IsInternal(), "Interlink is for internal only");
+	const auto id = NetworkCredentials::Get().GetID();
+	logger.DebugFormatted("Interlink Init: NetworkCredentials ID={} Type={}",
+						  id.ToString(), (int)id.Type);
+	ASSERT(id.Type != NetworkIdentityType::eInvalid, "Invalid Interlink Type");
+	ASSERT(id.IsInternal(), "Interlink is for internal only");
 
 	// Single init per process (no repeated warnings)
 	if (!EnsureGNSInitialized())
+	{
+		logger.Error("[Interlink] EnsureGNSInitialized() failed; skipping Interlink init.");
 		return;
+	}
 
 	SteamNetworkingUtils()->SetDebugOutputFunction(
 		k_ESteamNetworkingSocketsDebugOutputType_Warning,

@@ -3,6 +3,7 @@
 #include "Global/Misc/String_utils.hpp"
 #include "Global/Serialize/ByteReader.hpp"
 #include "Global/Serialize/ByteWriter.hpp"
+#include "Debug/Log.hpp"
 
 namespace
 {
@@ -48,20 +49,31 @@ std::optional<NodeManifestEntry> ParseNodeManifestEntry(const std::string& raw)
 void NodeManifest::RegisterShardNode(const NetworkIdentity& shardID,
 									 const NodeManifestEntry& entry)
 {
+	Log logger("NodeManifest");
+	logger.DebugFormatted("RegisterShardNode: {} nodeName={} podName={} podIP={}",
+						  shardID.ToString(),
+						  entry.nodeName,
+						  entry.podName,
+						  entry.podIP);
 	InternalDB::Get()->HSet(HashTableNameShardNode, GetKeyOfIdentifier(shardID),
 							NukeString(SerializeNodeManifestEntry(entry)));
 }
 
 void NodeManifest::DeregisterShard(const NetworkIdentity& shardID)
 {
+	Log logger("NodeManifest");
+	logger.DebugFormatted("DeregisterShard: {}", shardID.ToString());
 	InternalDB::Get()->HDel(HashTableNameShardNode, {GetKeyOfIdentifier(shardID)});
 }
 
 std::optional<NodeManifestEntry> NodeManifest::GetShardNode(const NetworkIdentity& shardID)
 {
+	Log logger("NodeManifest");
+	logger.DebugFormatted("GetShardNode: {}", shardID.ToString());
 	const auto ret = InternalDB::Get()->HGet(HashTableNameShardNode, GetKeyOfIdentifier(shardID));
 	if (!ret.has_value() || ret->empty())
 	{
+		logger.WarningFormatted("GetShardNode: no entry found for {}", shardID.ToString());
 		return std::nullopt;
 	}
 	return ParseNodeManifestEntry(*ret);
@@ -69,8 +81,10 @@ std::optional<NodeManifestEntry> NodeManifest::GetShardNode(const NetworkIdentit
 
 std::unordered_map<NetworkIdentity, NodeManifestEntry> NodeManifest::GetAllShardNodes()
 {
+	Log logger("NodeManifest");
 	std::unordered_map<NetworkIdentity, NodeManifestEntry> out;
 	const auto entries = InternalDB::Get()->HGetAll(HashTableNameShardNode);
+	logger.DebugFormatted("GetAllShardNodes: {} raw entries", entries.size());
 
 	for (const auto& rawEntry : entries)
 	{
@@ -79,12 +93,14 @@ std::unordered_map<NetworkIdentity, NodeManifestEntry> NodeManifest::GetAllShard
 		shardID.Deserialize(br);
 		if (shardID.Type != NetworkIdentityType::eShard)
 		{
+			logger.Warning("GetAllShardNodes: skipping non-shard identity");
 			continue;
 		}
 
 		const auto parsed = ParseNodeManifestEntry(rawEntry.second);
 		if (!parsed.has_value())
 		{
+			logger.Warning("GetAllShardNodes: failed to parse NodeManifestEntry; skipping");
 			continue;
 		}
 
@@ -95,6 +111,8 @@ std::unordered_map<NetworkIdentity, NodeManifestEntry> NodeManifest::GetAllShard
 
 void NodeManifest::ClearAll()
 {
+	Log logger("NodeManifest");
+	logger.Debug("ClearAll called; deleting all NodeManifest keys");
 	InternalDB::Get()->DelKey(HashTableNameShardNode);
 }
 

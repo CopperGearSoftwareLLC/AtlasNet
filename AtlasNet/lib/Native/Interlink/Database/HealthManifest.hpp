@@ -10,6 +10,7 @@
 #include "Global/Serialize/ByteReader.hpp"
 #include "Global/Serialize/ByteWriter.hpp"
 #include "Global/pch.hpp"
+#include "Debug/Log.hpp"
 class HealthManifest : public Singleton<HealthManifest>
 {
 	const std::string HealthPingTable = "Health_Ping";
@@ -22,29 +23,40 @@ class HealthManifest : public Singleton<HealthManifest>
    public:
 	void ScheduleHealthPings()
 	{
+		Log logger("HealthManifest");
+		logger.DebugFormatted("ScheduleHealthPings: interval_ms={}", _HEALTH_PING_INTERVAL_MS);
 		HealthPingIntervalFunc = std::jthread(
-			[ ](std::stop_token st)
+			[logger](std::stop_token st) mutable
 			{
+				logger.Debug("Health ping thread started");
 				while (!st.stop_requested())
 				{
+					const auto id = NetworkCredentials::Get().GetID();
+					logger.DebugFormatted("Health ping for {}", id.ToString());
 					HealthManifest::Get().HealthUpdate(NetworkCredentials::Get().GetID());
 					std::this_thread::sleep_for(
 						std::chrono::milliseconds(_HEALTH_PING_INTERVAL_MS));
 				}
+				logger.Debug("Health ping thread stopping");
 			});
 	}
 
 	void ScheduleHealthChecks(std::function<void(const NetworkIdentity&,const std::string&)> onHealthCheckFail)
 	{
+		Log logger("HealthManifest");
+		logger.DebugFormatted("ScheduleHealthChecks: interval_ms={}", _HEALTH_CHECK_INTERVAL_MS);
 		HealthCheckOnFailureFunc = std::jthread(
-			[onHealthCheckFail = std::move(onHealthCheckFail)](std::stop_token st)
+			[onHealthCheckFail = std::move(onHealthCheckFail), logger](std::stop_token st) mutable
 			{
+				logger.Debug("Health check thread started");
 				while (!st.stop_requested())
 				{
 					static std::vector<std::string> expired_pings;
 					HealthManifest::Get().GetExpiredPings(expired_pings);
 					if (!expired_pings.empty())
 					{
+						logger.DebugFormatted("Health check: {} expired ping(s) detected",
+											   expired_pings.size());
 						for (const auto expired_key : expired_pings)
 						{
 							ByteReader br(expired_key);
@@ -54,12 +66,15 @@ class HealthManifest : public Singleton<HealthManifest>
 							//	expired_ID.has_value(),
 							//	std::format("Failed to parse key in expired pings: {}", expired_key)
 							//		.c_str());
-							onHealthCheckFail(id,expired_key);
+							logger.WarningFormatted("Health check fail for {} (key={})",
+													id.ToString(), expired_key);
+							onHealthCheckFail(id, expired_key);
 						}
 					}
 					std::this_thread::sleep_for(
 						std::chrono::milliseconds(_HEALTH_CHECK_INTERVAL_MS));
 				}
+				logger.Debug("Health check thread stopping");
 			});
 	}
 	//=================================

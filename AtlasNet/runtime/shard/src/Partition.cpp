@@ -10,6 +10,7 @@
 #include "Heuristic/GridHeuristic/GridHeuristic.hpp"
 #include "Interlink/Interlink.hpp"
 #include "Interlink/Telemetry/NetworkManifest.hpp"
+#include "Network/NetworkCredentials.hpp"
 Partition::Partition() {}
 Partition::~Partition() {}
 
@@ -24,6 +25,12 @@ void Partition::Init()
 	NetworkIdentity partitionIdentifier(NetworkIdentityType::eShard, UUIDGen::Gen());
 
 	logger = std::make_shared<Log>(partitionIdentifier.ToString());
+
+	logger->DebugFormatted("Partition Init: created shard NetworkIdentity {}", partitionIdentifier.ToString());
+
+	// Ensure NetworkCredentials singleton is constructed before any Interlink usage.
+	NetworkCredentials::Make(partitionIdentifier);
+	logger->DebugFormatted("Partition Init: NetworkCredentials ID {}", NetworkCredentials::Get().GetID().ToString());
 
 	HealthManifest::Get().ScheduleHealthPings();
 	NetworkManifest::Get().ScheduleNetworkPings();

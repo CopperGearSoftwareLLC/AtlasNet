@@ -1,28 +1,37 @@
 #include "NetworkManifest.hpp"
 #include "Network/NetworkCredentials.hpp"
+#include "Debug/Log.hpp"
 void NetworkManifest::ScheduleNetworkPings()
 {
-	//
+	Log logger("NetworkManifest");
+	logger.DebugFormatted("ScheduleNetworkPings: interval_ms={}", _NETWORK_TELEMETRY_PING_INTERVAL_MS);
 	HealthPingIntervalFunc = std::jthread(
-		[](std::stop_token st)
+		[logger](std::stop_token st) mutable
 		{
+			logger.Debug("Network telemetry thread started");
 			while (!st.stop_requested())
 			{
-				NetworkManifest::Get().TelemetryUpdate(NetworkCredentials::Get().GetID());
+				const auto id = NetworkCredentials::Get().GetID();
+				logger.DebugFormatted("Telemetry ping for {}", id.ToString());
+				NetworkManifest::Get().TelemetryUpdate(id);
 				std::this_thread::sleep_for(
 					std::chrono::milliseconds(_NETWORK_TELEMETRY_PING_INTERVAL_MS));
 			}
+			logger.Debug("Network telemetry thread stopping");
 		});
 }
 void NetworkManifest::TelemetryUpdate(const NetworkIdentity& identifier)
 {
+	Log logger("NetworkManifest");
+	logger.DebugFormatted("TelemetryUpdate for {}", identifier.ToString());
+
 	// Gather telemetry
 	std::vector<ConnectionTelemetry> connections;
 	Interlink::Get().GetConnectionTelemetry(connections);
 
 	if (connections.empty())
 	{
-		// std::cout << "No connections found" << std::endl;
+		logger.Debug("TelemetryUpdate: no connections found");
 		return;
 	}
 
@@ -60,8 +69,10 @@ void NetworkManifest::TelemetryUpdate(const NetworkIdentity& identifier)
 
 	if (writeResult != 0)
 	{
-		std::printf("Failed to update network telemetry. HSET result: %lli\n",
-					static_cast<long long>(writeResult));
+		logger.ErrorFormatted(
+			"Failed to update network telemetry for {}. HSET result: {}",
+			identifier.ToString(),
+			static_cast<long long>(writeResult));
 	}
 }
 
