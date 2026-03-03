@@ -359,6 +359,8 @@ SERVER_IPS_ARR=($SERVER_IPS)
 if [[ ${#SERVER_IPS_ARR[@]} -gt 1 ]]; then
   echo
   echo "Joining additional server(s) ..."
+  join_pids=()
+  join_labels=()
   for ip in "${SERVER_IPS_ARR[@]:1}"; do
     [[ -n "$ip" ]] || continue
     ip="${ip//\"/}"
@@ -377,8 +379,23 @@ if [[ ${#SERVER_IPS_ARR[@]} -gt 1 ]]; then
       --user "$join_user" \
       --server \
       --sudo "$K3SUP_USE_SUDO" \
-      --ssh-key "$SSH_KEY"
+      --ssh-key "$SSH_KEY" &
+    join_pids+=($!)
+    join_labels+=("server $join_user@$join_host")
   done
+
+  join_failed=0
+  for i in "${!join_pids[@]}"; do
+    pid="${join_pids[$i]}"
+    label="${join_labels[$i]}"
+    if ! wait "$pid"; then
+      echo "ERROR: k3sup join failed for ${label}" >&2
+      join_failed=1
+    fi
+  done
+  if [[ "$join_failed" -ne 0 ]]; then
+    die "One or more additional server joins failed."
+  fi
 fi
 
 echo
@@ -386,6 +403,8 @@ echo "Joining workers (if any) ..."
 if [[ -z "${WORKER_IPS// }" ]]; then
   echo " - no workers configured"
 else
+  worker_pids=()
+  worker_labels=()
   for entry in $WORKER_IPS; do
     [[ -n "$entry" ]] || continue
     entry="${entry//\"/}"
@@ -403,8 +422,23 @@ else
       --ip "$worker_host" \
       --user "$worker_user" \
       --sudo "$K3SUP_USE_SUDO" \
-      --ssh-key "$SSH_KEY"
+      --ssh-key "$SSH_KEY" &
+    worker_pids+=($!)
+    worker_labels+=("worker $worker_user@$worker_host")
   done
+
+  worker_failed=0
+  for i in "${!worker_pids[@]}"; do
+    pid="${worker_pids[$i]}"
+    label="${worker_labels[$i]}"
+    if ! wait "$pid"; then
+      echo "ERROR: k3sup join failed for ${label}" >&2
+      worker_failed=1
+    fi
+  done
+  if [[ "$worker_failed" -ne 0 ]]; then
+    die "One or more worker joins failed."
+  fi
 fi
 
 echo "Cluster context: $CONTEXT_NAME"
