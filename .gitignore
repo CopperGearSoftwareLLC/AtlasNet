@@ -10,3 +10,4 @@ Dev/.kube/
 deploy/k3s_slim/.env
 /AtlasNet/.vcpkg-temp
 /AtlasNet/build/vcpkg_installed
+.DS_Store
