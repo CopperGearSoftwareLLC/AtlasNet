@@ -268,9 +268,25 @@ void Interlink::CallbackOnConnecting(SteamCBInfo info)
 	if (identityByteStream &&
 		info->m_info.m_identityRemote.m_eType == k_ESteamNetworkingIdentityType_GenericBytes)
 	{
-		ByteReader br(std::span(identityByteStream, identityByteStreamSize));
+		try
+		{
+			ByteReader br(std::span(identityByteStream, identityByteStreamSize));
+			ID.Deserialize(br);
+		}
+		catch (...)
+		{
+			logger.WarningFormatted("Incoming connection from {} had malformed identity payload",
+									address.ToString());
+		}
+	}
 
-		ID.Deserialize(br);
+	if (ID.Type == NetworkIdentityType::eInvalid)
+	{
+		logger.WarningFormatted(
+			"Rejecting connection from {} due to missing/invalid network identity",
+			address.ToString());
+		networkInterface->CloseConnection(info->m_hConn, 0, "invalid identity", false);
+		return;
 	}
 
 	// If connection is internal?
@@ -369,6 +385,17 @@ void Interlink::CallbackOnConnected(SteamCBInfo info)
 		if (!v->IsInternal())
 		{
 			logger.DebugFormatted(" - External client Connected from {}", v->address.ToString());
+			if (v->target.Type != NetworkIdentityType::eGameClient)
+			{
+				logger.WarningFormatted(
+					"Rejecting external connection from {} with unsupported identity type {}",
+					v->address.ToString(),
+					boost::describe::enum_to_string(v->target.Type, "unknown"));
+				networkInterface->CloseConnection(v->SteamConnection, 0,
+												  "unsupported external identity", false);
+				indiciesBySteamConn.erase(v);
+				return;
+			}
 			OnClientConnected(*v);
 		}
 		else
@@ -387,22 +414,29 @@ void Interlink::CallbackOnConnected(SteamCBInfo info)
 	else
 	{
 		IPAddress address(info->m_info.m_addrRemote);
-		logger.ErrorFormatted("FUcking idiot. connection not stored internally. {}",
-							  address.ToString(true));
+		logger.WarningFormatted(
+			"Connected callback for unknown connection handle {} from {}. Closing.",
+			(uint64)info->m_hConn, address.ToString(true));
 		int identityByteStreamSize = 0;
 		const uint8_t *identityByteStream =
 			(const uint8_t *)info->m_info.m_identityRemote.GetGenericBytes(identityByteStreamSize);
 		if (identityByteStream)
 		{
-			auto sp = std::span(identityByteStream, identityByteStreamSize);
-			ByteReader br(sp);
-			NetworkIdentity id;
-			id.Deserialize(br);
-			logger.ErrorFormatted("fucking idoit #2. Identity of remote {}", id.ToString());
+			try
+			{
+				auto sp = std::span(identityByteStream, identityByteStreamSize);
+				ByteReader br(sp);
+				NetworkIdentity id;
+				id.Deserialize(br);
+				logger.WarningFormatted("Unknown connection remote identity: {}", id.ToString());
+			}
+			catch (...)
+			{
+				logger.Warning("Unknown connection remote identity payload could not be parsed.");
+			}
 		}
-		ASSERT(false,
-			   "Connected? to non existent connection?, HSteamNetConnection "
-			   "was not found");
+		networkInterface->CloseConnection(info->m_hConn, 0, "unknown connection handle", false);
+		return;
 	}
 }
 
@@ -435,7 +469,15 @@ void Interlink::ReceiveMessages()
 	{
 		ISteamNetworkingMessage *msg = pIncomingMessages[i];
 
-		const Connection &sender = *Connections.get<IndexByHSteamNetConnection>().find(msg->m_conn);
+		auto& bySteamConnection = Connections.get<IndexByHSteamNetConnection>();
+		auto senderIt = bySteamConnection.find(msg->m_conn);
+		if (senderIt == bySteamConnection.end())
+		{
+			logger.Warning("Dropping message from unknown connection handle.");
+			msg->Release();
+			continue;
+		}
+		const Connection& sender = *senderIt;
 
 		const void *data = msg->m_pData;
 		size_t size = msg->m_cbSize;
@@ -443,6 +485,13 @@ void Interlink::ReceiveMessages()
 		// Normal internal dispatch
 		std::span<const uint8_t> span = std::span<const uint8_t>((uint8_t *)data, size);
 		const auto packet = PacketRegistry::Get().CreateFromBytes(span);
+		if (!packet)
+		{
+			logger.WarningFormatted("Dropping invalid or unknown packet from {}",
+									sender.target.ToString());
+			msg->Release();
+			continue;
+		}
 		// logger.DebugFormatted("Arrived Packet of type {} from {}",
 		//					  packet->GetPacketName(), sender.target.ToString());
 		packet_manager.Dispatch(*packet, packet->GetPacketType(),
@@ -820,7 +869,13 @@ void Interlink::GetConnectionTelemetry(std::vector<ConnectionTelemetry> &out)
 }
 void Interlink::OnClientConnected(const Connection &c)
 {
-	ASSERT(c.target.Type == NetworkIdentityType::eGameClient, "Invalid Target");
+	if (c.target.Type != NetworkIdentityType::eGameClient)
+	{
+		logger.WarningFormatted(
+			"Ignoring external connection with unsupported identity type {} from {}",
+			boost::describe::enum_to_string(c.target.Type, "unknown"), c.address.ToString());
+		return;
+	}
 	if (c.target.ID.is_nil())
 	{
 		NetworkIdentity newIdentity = c.target;

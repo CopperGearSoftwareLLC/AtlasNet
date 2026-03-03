@@ -55,7 +55,19 @@ struct NetworkIdentity
 		Type = br.read_scalar<NetworkIdentityType>();
 		ID = br.uuid();
 	}
-	[[nodiscard]] constexpr bool IsInternal() const {return Type != NetworkIdentityType::eGameClient;}
+	[[nodiscard]] constexpr bool IsInternal() const
+	{
+		switch (Type)
+		{
+			case NetworkIdentityType::eShard:
+			case NetworkIdentityType::eWatchDog:
+			case NetworkIdentityType::eCartograph:
+			case NetworkIdentityType::eProxy:
+				return true;
+			default:
+				return false;
+		}
+	}
 };
 namespace std
 {

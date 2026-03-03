@@ -151,7 +151,12 @@ void ClientLink::ReceiveMessages()
 		ISteamNetworkingMessage *msg = pIncomingMessages[i];
 
 		auto &BySteamCon = Connections.get<IndexByHSteamNetConnection>();
-		ASSERT(BySteamCon.contains(msg->m_conn), "Received message from unregistered connection?");
+		if (!BySteamCon.contains(msg->m_conn))
+		{
+			logger.Warning("Dropping message from unregistered connection.");
+			msg->Release();
+			continue;
+		}
 		const auto it = BySteamCon.find(msg->m_conn);
 
 		const Connection &connection = *it;
@@ -162,6 +167,12 @@ void ClientLink::ReceiveMessages()
 		// Normal internal dispatch
 		std::span<const uint8_t> span = std::span<const uint8_t>((uint8_t *)data, size);
 		const auto packet = PacketRegistry::Get().CreateFromBytes(span);
+		if (!packet)
+		{
+			logger.Warning("Dropping invalid packet from proxy.");
+			msg->Release();
+			continue;
+		}
 		logger.DebugFormatted("Arrived Packet of type {}. Dispatching...", packet->GetPacketName());
 		packet_manager.Dispatch(*packet, packet->GetPacketType(),
 								PacketManager::PacketInfo{.sender = connection.target});
@@ -186,7 +197,11 @@ void ClientLink::Update()
 void ClientLink::OnConnected(SteamNetConnectionStatusChangedCallback_t *pInfo)
 {
 	auto &bySteamConn = Connections.get<IndexByHSteamNetConnection>();
-	ASSERT(bySteamConn.contains(pInfo->m_hConn), "Invalid connection?");
+	if (!bySteamConn.contains(pInfo->m_hConn))
+	{
+		logger.Warning("Connected callback for unknown connection handle.");
+		return;
+	}
 
 	const auto it = bySteamConn.find(pInfo->m_hConn);
 
@@ -194,15 +209,22 @@ void ClientLink::OnConnected(SteamNetConnectionStatusChangedCallback_t *pInfo)
 	const uint8_t *identityByteStream =
 		(const uint8_t *)pInfo->m_info.m_identityRemote.GetGenericBytes(identityByteStreamSize);
 
-	ASSERT(identityByteStream, "Connection with no identity?");
 	if (identityByteStream)
 	{
 		NetworkIdentity realIdentity;
 
-		auto sp = std::span(identityByteStream, identityByteStreamSize);
-		ByteReader br(sp);
+		try
+		{
+			auto sp = std::span(identityByteStream, identityByteStreamSize);
+			ByteReader br(sp);
 
-		realIdentity.Deserialize(br);
+			realIdentity.Deserialize(br);
+		}
+		catch (...)
+		{
+			logger.Warning("Connected peer identity payload was malformed.");
+			return;
+		}
 		bySteamConn.modify(it,
 						   [realIdentity = realIdentity](Connection &c)
 						   {
@@ -210,6 +232,10 @@ void ClientLink::OnConnected(SteamNetConnectionStatusChangedCallback_t *pInfo)
 							   c.target = realIdentity;
 						   });
 		ManagingProxy = realIdentity;
+	}
+	else
+	{
+		logger.Warning("Connected peer did not provide identity bytes.");
 	}
 }
 void ClientLink::SendMessage(const std::shared_ptr<IPacket> &packet,

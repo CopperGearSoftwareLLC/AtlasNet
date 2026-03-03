@@ -31,13 +31,17 @@ Edit `.env`:
 ```bash
 make ssh-setup
 make sudo-setup
+make dependency-setup
 make linux-pi
+make cluster-dependencies
 ```
 
 `make linux-pi` automatically runs a port cleanup step first (`scripts/port_cleanup.sh`).
 By default it frees `7946` on server/worker (common Docker Swarm vs MetalLB conflict).
 You can override with `SERVER_PORT_CLEANUP_PORTS` / `WORKER_PORT_CLEANUP_PORTS` in `.env`.
 Port cleanup will stop a systemd service if it owns the port, otherwise it terminates the process.
+`make dependency-setup` also enables required forwarding/sysctl settings and (by default) disables `ufw` (`K3S_DISABLE_UFW=true`) to prevent CNI/service routing drops.
+`make cluster-dependencies` installs platform add-ons from `.env` toggles (`INSTALL_METRICS_SERVER`, `INSTALL_METALLB`, `INSTALL_INGRESS_NGINX`, `INSTALL_CERT_MANAGER`) and must be run after `make linux-pi`.
 
 ## 3) Verify
 ```bash
@@ -94,6 +98,7 @@ Use a single multi-arch image tag (e.g. `ATLASNET_IMAGE_TAG=latest` with a manif
 - `make ssh-setup`: create SSH key (if missing) and copy to server(s) + worker(s).
 - `make sudo-setup`: enable passwordless sudo for SSH users on server(s) + worker(s).
 - `make dependency-setup`: install iptables and set cgroup flags on all nodes (run once; reboot nodes if cmdline changed).
+- `make cluster-dependencies`: install optional cluster add-ons (metrics-server, MetalLB, ingress-nginx, cert-manager) using `.env` flags.
 - `make port-cleanup`: free configured required ports on server(s) + worker(s).
 - `make linux-pi`: install k3s on first server, join additional servers (HA) and workers.
 - `make nodes`: quick `kubectl get nodes -o wide` using project kubeconfig.
@@ -110,3 +115,5 @@ Use a single multi-arch image tag (e.g. `ATLASNET_IMAGE_TAG=latest` with a manif
   run `make sudo-setup`, or use root SSH users and set `K3SUP_USE_SUDO=false`.
 - `kubectl` tries `localhost:8080`:
   your kubeconfig is not active; rerun `make linux-pi` or check `~/.kube/config`.
+- CoreDNS / service DNS failures (`Temporary failure in name resolution`, `connect: no route to host`):
+  run `make dependency-setup` and ensure `ufw` is disabled on all k3s nodes (or set equivalent forward/masquerade allow rules).

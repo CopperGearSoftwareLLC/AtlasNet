@@ -6,7 +6,9 @@ SHELL := /usr/bin/env bash
 # atlasnet-merge-manifests
 # ssh-setup
 # sudo-setup
+# dependency-setup
 # linux-pi
+# cluster-dependencies
 # atlasnet-deploy
 
 
@@ -18,7 +20,7 @@ ENV_EXPORTS := SERVER_IPS SERVER_SSH_USER WORKER_IPS WORKER_SSH_USER SSH_KEY K3S
 -include $(ENV_FILE)
 export $(ENV_EXPORTS)
 
-.PHONY: bootstrap nodes linux-pi ssh-setup sudo-setup port-cleanup cleanup-cluster dependency-setup atlasnet-push atlasnet-deploy atlasnet-status atlasnet-merge-manifests
+.PHONY: bootstrap nodes linux-pi ssh-setup sudo-setup port-cleanup cleanup-cluster dependency-setup platform cluster-dependencies atlasnet-push atlasnet-deploy atlasnet-status atlasnet-merge-manifests
 
 bootstrap:
 	./scripts/bootstrap.sh
@@ -34,6 +36,11 @@ sudo-setup:
 
 dependency-setup:
 	./scripts/dependency_setup.sh
+
+platform:
+	./scripts/platform.sh
+
+cluster-dependencies: platform
 
 port-cleanup:
 	./scripts/port_cleanup.sh
@@ -69,4 +76,3 @@ atlasnet-merge-manifests:
 atlasnet-status:
 	KUBECONFIG="$(CURDIR)/config/kubeconfig" kubectl get nodes -o wide
 	KUBECONFIG="$(CURDIR)/config/kubeconfig" kubectl get pods,svc -n "$${ATLASNET_K8S_NAMESPACE:-atlasnet}" -o wide
-

@@ -17,6 +17,7 @@ source "$ENV_FILE"
 : "${SSH_KEY:=${HOME}/.ssh/id_ed25519}"
 : "${WORKER_IPS:=}"
 : "${WORKER_SSH_USER:=pi}"
+: "${K3S_DISABLE_UFW:=true}"
 
 SSH_KEY="${SSH_KEY/#\~/$HOME}"
 [[ -f "$SSH_KEY" ]] || die "SSH key file does not exist: $SSH_KEY"
@@ -30,8 +31,26 @@ run_on_node() {
   local host="$2"
   echo "==> Setting up dependencies on ${user}@${host} ..."
 
-  ssh -o StrictHostKeyChecking=accept-new -i "$SSH_KEY" "${user}@${host}" bash -s -- <<'REMOTE'
+  ssh -o StrictHostKeyChecking=accept-new -i "$SSH_KEY" "${user}@${host}" "K3S_DISABLE_UFW='${K3S_DISABLE_UFW}' bash -s --" <<'REMOTE'
 set -euo pipefail
+
+# Ensure required kernel modules/sysctls are present for k3s CNI + service routing.
+sudo modprobe overlay || true
+sudo modprobe br_netfilter || true
+
+sudo tee /etc/modules-load.d/k3s.conf >/dev/null <<'EOF'
+overlay
+br_netfilter
+EOF
+
+sudo tee /etc/sysctl.d/90-k3s.conf >/dev/null <<'EOF'
+net.ipv4.ip_forward=1
+net.ipv6.conf.all.forwarding=1
+net.bridge.bridge-nf-call-iptables=1
+net.bridge.bridge-nf-call-ip6tables=1
+EOF
+
+sudo sysctl --system >/dev/null
 
 # Install iptables if missing (required by k3s)
 if ! command -v iptables-save >/dev/null 2>&1; then
@@ -55,6 +74,20 @@ for cmdline in /boot/firmware/cmdline.txt /boot/cmdline.txt; do
     break
   fi
 done
+
+if command -v ufw >/dev/null 2>&1; then
+  ufw_status="$(sudo ufw status | head -n1 || true)"
+  if [[ "${K3S_DISABLE_UFW:-true}" == "true" ]]; then
+    if [[ "$ufw_status" =~ [Ss]tatus:\ active ]]; then
+      echo "  Disabling UFW to avoid CNI/service forwarding drops."
+      sudo ufw --force disable >/dev/null
+    else
+      echo "  UFW already inactive."
+    fi
+  else
+    echo "  K3S_DISABLE_UFW=false; leaving UFW unchanged (${ufw_status:-unknown})."
+  fi
+fi
 
 echo "  Done. Reboot this node for cgroup changes to take effect (e.g. sudo reboot)."
 REMOTE

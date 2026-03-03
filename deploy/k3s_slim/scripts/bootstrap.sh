@@ -104,6 +104,7 @@ done
 : "${K3S_VERSION:=}"
 : "${K3SUP_VERSION:=}"
 : "${K3SUP_USE_SUDO:=true}"
+: "${K3S_REQUIRE_UFW_DISABLED:=true}"
 
 # Derive primary server entry (may be \"user@ip\" or just \"ip\")
 PRIMARY_SERVER_ENTRY="${SERVER_IPS%% *}"
@@ -154,6 +155,39 @@ check_sudo_access() {
     -o ConnectTimeout=5 \
     "${host_user}@${host_ip}" 'sudo -n true' >/dev/null 2>&1; then
     die "Passwordless sudo is required for ${host_user}@${host_ip}. Run 'make sudo-setup', or set it manually in /etc/sudoers.d, or set K3SUP_USE_SUDO=false and use root SSH."
+  fi
+}
+
+check_ufw_inactive() {
+  local host_ip="$1"
+  local host_user="$2"
+  local host_role="$3"
+
+  [[ "$K3S_REQUIRE_UFW_DISABLED" == "true" ]] || return 0
+
+  local status_line
+  status_line="$(
+    ssh -i "$SSH_KEY" \
+      -o BatchMode=yes \
+      -o StrictHostKeyChecking=accept-new \
+      -o ConnectTimeout=5 \
+      "${host_user}@${host_ip}" \
+      'if command -v ufw >/dev/null 2>&1; then sudo -n ufw status | head -n1; else echo "Status: inactive"; fi' \
+      2>/dev/null || true
+  )"
+
+  if [[ "$status_line" =~ [Ss]tatus:\ active ]]; then
+    cat >&2 <<EOF2
+ERROR: UFW is active on ${host_role} ${host_user}@${host_ip}.
+Active UFW commonly blocks k3s pod/service forwarding and causes CoreDNS/service DNS failures.
+
+Run:
+  make dependency-setup
+or disable UFW manually on that node, then rerun 'make linux-pi'.
+
+To intentionally bypass this check, set K3S_REQUIRE_UFW_DISABLED=false in .env.
+EOF2
+    exit 1
   fi
 }
 
@@ -319,6 +353,32 @@ for entry in $WORKER_IPS; do
     host="$entry"
   fi
   check_sudo_access "$host" "$user"
+done
+
+echo "Checking firewall state on nodes ..."
+for entry in $SERVER_IPS; do
+  [[ -n "$entry" ]] || continue
+  entry="${entry//\"/}"
+  if [[ "$entry" == *@* ]]; then
+    user="${entry%@*}"
+    host="${entry#*@}"
+  else
+    user="$SERVER_SSH_USER"
+    host="$entry"
+  fi
+  check_ufw_inactive "$host" "$user" "server"
+done
+for entry in $WORKER_IPS; do
+  [[ -n "$entry" ]] || continue
+  entry="${entry//\"/}"
+  if [[ "$entry" == *@* ]]; then
+    user="${entry%@*}"
+    host="${entry#*@}"
+  else
+    user="$WORKER_SSH_USER"
+    host="$entry"
+  fi
+  check_ufw_inactive "$host" "$user" "worker"
 done
 
 check_server_api_port_conflict "$PRIMARY_SERVER_IP"
