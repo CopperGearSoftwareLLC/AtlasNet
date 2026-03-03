@@ -182,6 +182,22 @@ kubectl -n "$ATLASNET_K8S_NAMESPACE" delete deployment atlasnet-cartograph --ign
 kubectl -n "$ATLASNET_K8S_NAMESPACE" delete deployment atlasnet-proxy --ignore-not-found >/dev/null || true
 kubectl -n "$ATLASNET_K8S_NAMESPACE" delete svc atlasnet-internaldb --ignore-not-found >/dev/null || true
 
+# Workaround: some environments (notably certain arm64 images) fail DNS lookups
+# for the internaldb service from proxy/shard. To unblock, inject hostAliases
+# pointing internaldb -> its current ClusterIP so Redis can be reached even if
+# libc DNS resolution is misbehaving. This is safe to run repeatedly.
+echo "Configuring hostAliases for internaldb on proxy/shard pods (workaround for DNS issues) ..."
+INTERNALDB_IP="$(kubectl -n "$ATLASNET_K8S_NAMESPACE" get svc internaldb -o jsonpath='{.spec.clusterIP}' 2>/dev/null || true)"
+if [[ -n "$INTERNALDB_IP" ]]; then
+  kubectl -n "$ATLASNET_K8S_NAMESPACE" patch statefulset atlasnet-proxy --type merge \
+    -p "{\"spec\":{\"template\":{\"spec\":{\"hostAliases\":[{\"ip\":\"${INTERNALDB_IP}\",\"hostnames\":[\"internaldb\",\"internaldb.${ATLASNET_K8S_NAMESPACE}.svc.cluster.local\"]}]}}}}" >/dev/null || true
+
+  kubectl -n "$ATLASNET_K8S_NAMESPACE" patch deployment atlasnet-shard --type merge \
+    -p "{\"spec\":{\"template\":{\"spec\":{\"hostAliases\":[{\"ip\":\"${INTERNALDB_IP}\",\"hostnames\":[\"internaldb\",\"internaldb.${ATLASNET_K8S_NAMESPACE}.svc.cluster.local\"]}]}}}}" >/dev/null || true
+else
+  echo "Warning: could not determine ClusterIP for internaldb service; skipping hostAliases workaround."
+fi
+
 echo "Waiting for core workloads ..."
 kubectl -n "$ATLASNET_K8S_NAMESPACE" rollout status deployment/atlasnet-internaldb --timeout=180s
 kubectl -n "$ATLASNET_K8S_NAMESPACE" rollout status deployment/atlasnet-watchdog --timeout=180s

@@ -55,7 +55,9 @@ linux-pi:
 	  --worker-user "$${WORKER_SSH_USER:-pi}" \
 	  --ssh-key "$${SSH_KEY:-$$HOME/.ssh/id_ed25519}" \
 	  --use-sudo "$${K3SUP_USE_SUDO:-true}" \
-	  --api-endpoint "$${K3S_API_ENDPOINT:-$$primary}"
+	  --api-endpoint "$${K3S_API_ENDPOINT:-$$primary}"; \
+	echo "Running platform add-ons (MetalLB, metrics server, ingress, cert-manager as configured) ..."; \
+	./scripts/platform.sh
 
 atlasnet-deploy:
 	./scripts/deploy_atlasnet.sh
