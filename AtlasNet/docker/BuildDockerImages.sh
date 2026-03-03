@@ -52,8 +52,8 @@ create_builder() {
         --driver docker-container \
         --driver-opt network=host \
         --buildkitd-config "$BUILDKITD_CONFIG" \
-        --buildkitd-flags '--allow-insecure-entitlement=network.host' \
         --use
+        #--buildkitd-flags '--allow-insecure-entitlement=network.host' \
 }
 
 recreate_builder() {
@@ -69,20 +69,7 @@ else
     docker buildx use "$BUILDER_NAME"
 fi
 
-# Bootstrap builder (enables QEMU for cross-arch)
-docker buildx inspect "$BUILDER_NAME" --bootstrap
-
-# Self-heal if builder config drifted (common after Dev Container reopen).
-if ! docker buildx inspect "$BUILDER_NAME" | grep -q 'network="host"'; then
-    recreate_builder
-    docker buildx inspect "$BUILDER_NAME" --bootstrap
-fi
-
-if ! docker buildx inspect "$BUILDER_NAME" | grep -q "File#$(basename "$BUILDKITD_CONFIG"):"; then
-    recreate_builder
-    docker buildx inspect "$BUILDER_NAME" --bootstrap
-fi
-
+recreate_builder
 echo "==> Building images in parallel with BuildKit..."
 
 # Conditionally include platforms if specified

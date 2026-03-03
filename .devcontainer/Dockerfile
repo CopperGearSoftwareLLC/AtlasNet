@@ -26,7 +26,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     docker.io iptables uidmap docker-buildx \
 
     # Hotspot
-    hotspot linux-tools-generic linux-cloud-tools-generic \
+    hotspot linux-tools-generic \
 
     # Java
     openjdk-21-jdk\
