@@ -38,6 +38,7 @@ add_custom_target(SandboxServerStage
 add_custom_target(SandboxServerDockerBuild
     COMMAND ${CMAKE_COMMAND} -E chdir ${SANDBOX_ROOT}
         docker build
+        --network=host
         -f SandboxServer.dockerfile
         -t ${SANDBOX_SERVER_IMAGE_NAME}
         .
