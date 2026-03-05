@@ -119,7 +119,9 @@ export function parseTransferStateQueueRows(raw: unknown): TransferStateQueueTel
       stage,
       state,
       entityIds,
-      timestampMs: normalizeTimestampMs(obj.timestampMs ?? obj.tsMs),
+      timestampMs: normalizeTimestampMs(
+        obj.timestampMs ?? obj.tsMs ?? obj.timestamp ?? obj.TimestampMs ?? obj.TimestampMS
+      ),
     });
   }
 

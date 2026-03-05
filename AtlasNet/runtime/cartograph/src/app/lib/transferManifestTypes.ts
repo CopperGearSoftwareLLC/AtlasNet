@@ -86,6 +86,14 @@ function fallbackTransferId(
   return `${fromId}->${toId}:${stage}`;
 }
 
+function normalizeTimestampMs(value: unknown): number | undefined {
+  const parsed = Number(value);
+  if (!Number.isFinite(parsed) || parsed <= 0) {
+    return undefined;
+  }
+  return Math.floor(parsed);
+}
+
 export function parseTransferManifestRows(raw: unknown): TransferManifestTelemetry[] {
   if (!Array.isArray(raw)) {
     return [];
@@ -120,6 +128,9 @@ export function parseTransferManifestRows(raw: unknown): TransferManifestTelemet
       stage,
       state,
       entityIds,
+      timestampMs: normalizeTimestampMs(
+        obj.timestampMs ?? obj.tsMs ?? obj.timestamp ?? obj.TimestampMs ?? obj.TimestampMS
+      ),
     });
   }
 

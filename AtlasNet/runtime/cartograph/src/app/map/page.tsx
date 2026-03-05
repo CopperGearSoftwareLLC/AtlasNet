@@ -132,34 +132,42 @@ function resolveTransferManifestAtCursor(
     return [];
   }
 
-  const latestByEntity = new Map<string, TransferStateQueueTelemetry>();
-  for (const event of events) {
-    if (!event || event.timestampMs > cursorMs) {
-      break;
-    }
-
-    if (cursorMs - event.timestampMs > holdMs) {
-      continue;
-    }
-
-    const entityId = String(event.entityIds?.[0] || '').trim();
-    if (!entityId) {
-      continue;
-    }
-    latestByEntity.set(entityId, event);
-  }
-
+  const minTimestampMs = cursorMs - Math.max(0, holdMs);
   const rows: TransferManifestTelemetry[] = [];
-  for (const [entityId, event] of latestByEntity.entries()) {
-    rows.push({
-      transferId: `${event.transferId}:${entityId}:${event.timestampMs}`,
-      fromId: event.fromId,
-      toId: event.toId,
-      stage: event.stage,
-      state: event.state,
-      entityIds: [entityId],
-    });
+
+  for (const event of events) {
+    if (!event) {
+      continue;
+    }
+
+    const timestampMsRaw = Number(event.timestampMs);
+    if (!Number.isFinite(timestampMsRaw) || timestampMsRaw <= 0) {
+      continue;
+    }
+    const timestampMs = Math.floor(timestampMsRaw);
+    if (timestampMs < minTimestampMs || timestampMs > cursorMs) {
+      continue;
+    }
+
+    const entityIds = Array.isArray(event.entityIds) ? event.entityIds : [];
+    for (const rawEntityId of entityIds) {
+      const entityId = String(rawEntityId || '').trim();
+      if (!entityId) {
+        continue;
+      }
+
+      rows.push({
+        transferId: `${event.transferId}:${entityId}:${timestampMs}`,
+        fromId: event.fromId,
+        toId: event.toId,
+        stage: event.stage,
+        state: event.state,
+        entityIds: [entityId],
+        timestampMs,
+      });
+    }
   }
+
   return rows;
 }
 
@@ -240,11 +248,14 @@ export default function MapPage() {
       return;
     }
 
-    const ingestStartedAtMs = Date.now();
-    let ingestOffsetMs = 0;
     const queues = transferQueueByEntityRef.current;
     const timeline = transferTimelineRef.current;
     for (const event of transferStateQueueLive) {
+      const rawTimestampMs = Number(event.timestampMs);
+      const timestampMs =
+        Number.isFinite(rawTimestampMs) && rawTimestampMs > 0
+          ? Math.floor(rawTimestampMs)
+          : Date.now();
       const entityIds = Array.isArray(event.entityIds) ? event.entityIds : [];
       for (const rawEntityId of entityIds) {
         const entityId = String(rawEntityId || '').trim();
@@ -255,11 +266,8 @@ export default function MapPage() {
         const perEntityEvent: TransferStateQueueTelemetry = {
           ...event,
           entityIds: [entityId],
-          // Use local ingest time so playback cursor and event timeline share one clock.
-          timestampMs: ingestStartedAtMs + ingestOffsetMs,
+          timestampMs,
         };
-        ingestOffsetMs += 1;
-
         const queue = queues.get(entityId);
         if (queue) {
           queue.push(perEntityEvent);
@@ -340,6 +348,7 @@ export default function MapPage() {
         stage: event.stage,
         state: event.state,
         entityIds: [entityId],
+        timestampMs: event.timestampMs,
       });
     }
     return rows;
@@ -538,10 +547,17 @@ export default function MapPage() {
     }
     const snapshot = [...frames];
     const endMs = snapshot[snapshot.length - 1].capturedAtMs;
-    const transferEvents = transferTimelineRef.current.filter(
+    const timeline = transferTimelineRef.current;
+    let transferEvents = timeline.filter(
       (event) =>
         event.timestampMs >= endMs - SNAPSHOT_WINDOW_MS && event.timestampMs <= endMs
     );
+    if (transferEvents.length === 0 && timeline.length > 0) {
+      const latestEventTimestampMs = timeline[timeline.length - 1].timestampMs;
+      transferEvents = timeline.filter(
+        (event) => event.timestampMs >= latestEventTimestampMs - SNAPSHOT_WINDOW_MS
+      );
+    }
     setPlaybackFrames(snapshot);
     setPlaybackTransferEvents(transferEvents);
     setPlaybackCursorMs(endMs);

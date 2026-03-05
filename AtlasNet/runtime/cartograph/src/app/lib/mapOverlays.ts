@@ -62,24 +62,6 @@ function resolveTransferStageName(stage: string): TransferStageName {
   }
 }
 
-function transferStageRank(stage: string): number {
-  switch (resolveTransferStageName(stage)) {
-    case 'none':
-      return 0;
-    case 'prepare':
-      return 1;
-    case 'ready':
-      return 2;
-    case 'commit':
-      return 3;
-    case 'complete':
-      return 4;
-    case 'unknown':
-    default:
-      return -1;
-  }
-}
-
 function resolveTransferStageColor(stage: string): string {
   return TRANSFER_STAGE_COLOR_BY_NAME[resolveTransferStageName(stage)];
 }
@@ -90,8 +72,8 @@ function formatTransferStageLabel(stage: string): string {
 
 function indexHandoffLinksByEntity(
   transferManifest: TransferManifestTelemetry[]
-): Map<string, HandoffEntityLink> {
-  const byEntity = new Map<string, HandoffEntityLink>();
+): Map<string, HandoffEntityLink[]> {
+  const byEntity = new Map<string, HandoffEntityLink[]>();
 
   for (const transfer of transferManifest) {
     const fromId = normalizeShardId(transfer.fromId);
@@ -106,7 +88,6 @@ function indexHandoffLinksByEntity(
       stage: String(transfer.stage || '').trim(),
       state: String(transfer.state || '').trim(),
     };
-    const candidateRank = transferStageRank(candidate.stage);
     for (const rawEntityId of transfer.entityIds) {
       const entityId = String(rawEntityId).trim();
       if (!entityId) {
@@ -114,8 +95,10 @@ function indexHandoffLinksByEntity(
       }
 
       const current = byEntity.get(entityId);
-      if (!current || transferStageRank(current.stage) <= candidateRank) {
-        byEntity.set(entityId, candidate);
+      if (current) {
+        current.push(candidate);
+      } else {
+        byEntity.set(entityId, [candidate]);
       }
     }
   }
@@ -123,6 +106,133 @@ function indexHandoffLinksByEntity(
   return byEntity;
 }
 
+function resolveHandoffTargetShardId(link: HandoffEntityLink): string {
+  const normalizedState = normalizeEnumText(link.state);
+  if (normalizedState === 'target') {
+    return link.toId;
+  }
+  if (normalizedState === 'source') {
+    return link.fromId;
+  }
+  if (resolveTransferStageName(link.stage) === 'complete') {
+    return link.toId;
+  }
+  return link.fromId;
+}
+
+function resolveHandoffLineColor(link: HandoffEntityLink): string {
+  return resolveTransferStageColor(link.stage);
+}
+
+function resolveHandoffLineLabel(link: HandoffEntityLink): string {
+  return formatTransferStageLabel(link.stage);
+}
+
+function buildHandoffEntityLinkOverlays(args: {
+  entity: AuthorityEntityTelemetry;
+  handoffLinks: HandoffEntityLink[];
+  projectedShardPositions: Map<string, Point2>;
+}): ShapeJS[] {
+  const { entity, handoffLinks, projectedShardPositions } = args;
+  const overlays: ShapeJS[] = [];
+
+  for (const handoffLink of handoffLinks) {
+    const targetShardId = resolveHandoffTargetShardId(handoffLink);
+    const linkTarget = projectedShardPositions.get(normalizeShardId(targetShardId));
+    if (!linkTarget) {
+      continue;
+    }
+
+    overlays.push({
+      type: 'line',
+      position: { x: 0, y: 0 },
+      points: [
+        { x: entity.x, y: entity.y },
+        { x: linkTarget.x, y: linkTarget.y },
+      ],
+      color: resolveHandoffLineColor(handoffLink),
+      label: resolveHandoffLineLabel(handoffLink),
+    });
+  }
+
+  return overlays;
+}
+
+function buildOwnerLinkOverlay(args: {
+  entity: AuthorityEntityTelemetry;
+  projectedShardPositions: Map<string, Point2>;
+}): ShapeJS | null {
+  const { entity, projectedShardPositions } = args;
+  const ownerPos = projectedShardPositions.get(normalizeShardId(entity.ownerId));
+  if (!ownerPos) {
+    return null;
+  }
+
+  const isClient = Boolean(entity.isClient);
+  return {
+    type: 'line',
+    position: { x: 0, y: 0 },
+    points: [
+      { x: entity.x, y: entity.y },
+      { x: ownerPos.x, y: ownerPos.y },
+    ],
+    color: isClient ? 'rgba(255, 96, 96, 0.9)' : 'rgba(255, 255, 0, 0.9)',
+  };
+}
+
+function buildAuthorityEntityNodeOverlay(entity: AuthorityEntityTelemetry): ShapeJS {
+  const isClient = Boolean(entity.isClient);
+  return {
+    type: 'circle',
+    position: { x: entity.x, y: entity.y },
+    radius: 1.8,
+    color: isClient ? 'rgba(255, 72, 72, 1)' : 'rgba(255, 240, 80, 1)',
+  };
+}
+
+function buildAuthorityEntityOverlays(
+  authorityEntities: AuthorityEntityTelemetry[],
+  authorityLinkMode: AuthorityLinkMode,
+  projectedShardPositions: Map<string, Point2>,
+  transferManifest: TransferManifestTelemetry[]
+): ShapeJS[] {
+  const overlays: ShapeJS[] = [];
+  const handoffLinksByEntity =
+    authorityLinkMode === 'handoff'
+      ? indexHandoffLinksByEntity(transferManifest)
+      : null;
+
+  for (const entity of authorityEntities) {
+    overlays.push(buildAuthorityEntityNodeOverlay(entity));
+
+    if (authorityLinkMode === 'owner') {
+      const ownerLine = buildOwnerLinkOverlay({ entity, projectedShardPositions });
+      if (ownerLine) {
+        overlays.push(ownerLine);
+      }
+      continue;
+    }
+
+    const entityId = String(entity.entityId).trim();
+    if (!entityId) {
+      continue;
+    }
+    const handoffLinks = handoffLinksByEntity?.get(entityId) ?? [];
+    if (handoffLinks.length === 0) {
+      continue;
+    }
+
+    overlays.push(
+      ...buildHandoffEntityLinkOverlays({
+        entity,
+        handoffLinks,
+        projectedShardPositions,
+      })
+    );
+  }
+
+  return overlays;
+}
 export function buildOverlayShapes(args: {
   authorityEntities: AuthorityEntityTelemetry[];
   authorityLinkMode: AuthorityLinkMode;
@@ -163,71 +273,6 @@ export function buildOverlayShapes(args: {
     );
   }
 
-  return overlays;
-}
-
-function buildAuthorityEntityOverlays(
-  authorityEntities: AuthorityEntityTelemetry[],
-  authorityLinkMode: AuthorityLinkMode,
-  projectedShardPositions: Map<string, Point2>,
-  transferManifest: TransferManifestTelemetry[]
-): ShapeJS[] {
-  const overlays: ShapeJS[] = [];
-  const handoffLinksByEntity =
-    authorityLinkMode === 'handoff'
-      ? indexHandoffLinksByEntity(transferManifest)
-      : null;
-
-  for (const entity of authorityEntities) {
-    const isClient = Boolean(entity.isClient);
-    overlays.push({
-      type: 'circle',
-      position: { x: entity.x, y: entity.y },
-      radius: 1.8,
-      color: isClient ? 'rgba(255, 72, 72, 1)' : 'rgba(255, 240, 80, 1)',
-    });
-
-    if (authorityLinkMode === 'owner') {
-      const ownerPos = projectedShardPositions.get(normalizeShardId(entity.ownerId));
-      if (!ownerPos) {
-        continue;
-      }
-
-      overlays.push({
-        type: 'line',
-        position: { x: 0, y: 0 },
-        points: [
-          { x: entity.x, y: entity.y },
-          { x: ownerPos.x, y: ownerPos.y },
-        ],
-        color: isClient ? 'rgba(255, 96, 96, 0.9)' : 'rgba(255, 255, 0, 0.9)',
-      });
-      continue;
-    }
-
-    const handoffLink = handoffLinksByEntity?.get(String(entity.entityId).trim());
-    if (!handoffLink) {
-      continue;
-    }
-
-    const linkTargetShardId =
-      handoffLink.state === 'target' ? handoffLink.toId : handoffLink.fromId;
-    const linkTarget = projectedShardPositions.get(normalizeShardId(linkTargetShardId));
-    if (!linkTarget) {
-      continue;
-    }
-
-    overlays.push({
-      type: 'line',
-      position: { x: 0, y: 0 },
-      points: [
-        { x: entity.x, y: entity.y },
-        { x: linkTarget.x, y: linkTarget.y },
-      ],
-      color: resolveTransferStageColor(handoffLink.stage),
-      label: formatTransferStageLabel(handoffLink.stage),
-    });
-  }
   return overlays;
 }
 

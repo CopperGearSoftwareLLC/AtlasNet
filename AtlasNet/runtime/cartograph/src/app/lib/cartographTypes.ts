@@ -76,6 +76,7 @@ export interface TransferManifestTelemetry {
   stage: TransferManifestStage;
   state: TransferLinkState;
   entityIds: string[];
+  timestampMs?: number;
 }
 
 export interface TransferStateQueueTelemetry {
