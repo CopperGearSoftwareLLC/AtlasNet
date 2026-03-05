@@ -12,10 +12,10 @@ interface MapPlaybackBarProps {
   onPause: () => void;
   onStepForward: () => void;
   onStepReverse: () => void;
-  onStepTickForward: () => void;
-  onStepTickReverse: () => void;
-  canStepTickForward: boolean;
-  canStepTickReverse: boolean;
+  timeTickMs: number;
+  minTimeTickMs: number;
+  maxTimeTickMs: number;
+  onTimeTickChange: (nextTickMs: number) => void;
   onSeek: (nextCursorMs: number) => void;
   onResumeLive: () => void;
 }
@@ -40,10 +40,10 @@ export function MapPlaybackBar({
   onPlayReverse,
   onResumeLive,
   onSeek,
-  onStepTickForward,
-  onStepTickReverse,
-  canStepTickForward,
-  canStepTickReverse,
+  timeTickMs,
+  minTimeTickMs,
+  maxTimeTickMs,
+  onTimeTickChange,
   onStepForward,
   onStepReverse,
   paused,
@@ -161,40 +161,6 @@ export function MapPlaybackBar({
         {'>|'}
       </button>
 
-      <button
-        type="button"
-        onClick={onStepTickReverse}
-        disabled={!canStepTickReverse}
-        title="Step back one tick (1 ms)"
-        style={{
-          border: '1px solid rgba(148, 163, 184, 0.45)',
-          borderRadius: 6,
-          padding: '4px 9px',
-          background: 'rgba(15, 23, 42, 0.72)',
-          color: '#e2e8f0',
-          opacity: canStepTickReverse ? 1 : 0.45,
-        }}
-      >
-        {'T<'}
-      </button>
-
-      <button
-        type="button"
-        onClick={onStepTickForward}
-        disabled={!canStepTickForward}
-        title="Step forward one tick (1 ms)"
-        style={{
-          border: '1px solid rgba(148, 163, 184, 0.45)',
-          borderRadius: 6,
-          padding: '4px 9px',
-          background: 'rgba(15, 23, 42, 0.72)',
-          color: '#e2e8f0',
-          opacity: canStepTickForward ? 1 : 0.45,
-        }}
-      >
-        {'T>'}
-      </button>
-
       <span
         style={{
           fontSize: 11.5,
@@ -211,7 +177,7 @@ export function MapPlaybackBar({
         type="range"
         min={0}
         max={durationMs}
-        step={1}
+        step={Math.max(1, Math.floor(timeTickMs))}
         value={relativeMs}
         onChange={(event) =>
           onSeek(
@@ -231,6 +197,37 @@ export function MapPlaybackBar({
       >
         {formatSeconds(durationMs)}
       </span>
+
+      <label
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          gap: 6,
+          fontSize: 11,
+          opacity: 0.85,
+          minWidth: 180,
+        }}
+      >
+        tick
+        <input
+          type="range"
+          min={minTimeTickMs}
+          max={maxTimeTickMs}
+          step={10}
+          value={timeTickMs}
+          onChange={(event) => onTimeTickChange(Number(event.target.value))}
+          style={{ width: 86 }}
+        />
+        <span
+          style={{
+            minWidth: 42,
+            textAlign: 'right',
+            fontVariantNumeric: 'tabular-nums',
+          }}
+        >
+          {(timeTickMs / 1000).toFixed(2)}s
+        </span>
+      </label>
 
       <button
         type="button"

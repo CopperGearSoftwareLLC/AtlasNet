@@ -46,7 +46,11 @@ const DEFAULT_INTERACTION_SENSITIVITY = 1;
 const SNAPSHOT_WINDOW_MS = 30_000;
 const SNAPSHOT_RECORD_SPACING_MS = 10;
 const PLAYBACK_TICK_INTERVAL_MS = 16;
-const TRANSFER_STATE_PLAYBACK_DISPLAY_MS = 20;
+const TRANSFER_STATE_TIMESTAMP_SLOT_MS = 10;
+const DEFAULT_PLAYBACK_TIME_TICK_MS = 10;
+const MIN_PLAYBACK_TIME_TICK_MS = 10;
+const MAX_PLAYBACK_TIME_TICK_MS = 100;
+const PLAYBACK_TIME_TICK_STEP_MS = 10;
 const TRANSFER_EVENT_MAX_AGE_MS = 1;
 
 const EMPTY_DETAILS_STATE: EntityDatabaseDetailsState = {
@@ -135,6 +139,11 @@ function normalizeTimestampMs(value: unknown, fallbackMs: number): number {
   return Math.floor(timestampMsRaw);
 }
 
+function snapToNearestTickMs(valueMs: number, tickMs: number): number {
+  const safeTickMs = Math.max(1, Math.floor(tickMs));
+  return Math.round(valueMs / safeTickMs) * safeTickMs;
+}
+
 function resolveTransferManifestAtCursor(
   events: TransferStateQueueTelemetry[],
   cursorMs: number,
@@ -194,7 +203,6 @@ export default function MapPage() {
   const containerRef = useRef<HTMLDivElement>(null);
   const rendererRef = useRef<ReturnType<typeof createMapRenderer> | null>(null);
   const historyRef = useRef<PlaybackFrame[]>([]);
-  const playbackLastTickMsRef = useRef<number | null>(null);
   const transferLastTimestampByEntityRef = useRef<Map<string, number>>(new Map());
   const transferTimelineRef = useRef<TransferStateQueueTelemetry[]>([]);
   const transferPollStartedAtMsRef = useRef<number>(0);
@@ -225,6 +233,9 @@ export default function MapPage() {
     TransferStateQueueTelemetry[] | null
   >(null);
   const [playbackCursorMs, setPlaybackCursorMs] = useState(0);
+  const [playbackTimeTickMs, setPlaybackTimeTickMs] = useState(
+    DEFAULT_PLAYBACK_TIME_TICK_MS
+  );
   const [playbackPaused, setPlaybackPaused] = useState(true);
   const [playbackDirection, setPlaybackDirection] = useState<1 | -1>(1);
   const [activeTransferQueueByEntity, setActiveTransferQueueByEntity] = useState<
@@ -281,6 +292,10 @@ export default function MapPage() {
 
     for (const event of events) {
       const baseTimestampMs = normalizeTimestampMs(event?.timestampMs, nowMs);
+      const snappedTimestampMs = snapToNearestTickMs(
+        baseTimestampMs,
+        TRANSFER_STATE_TIMESTAMP_SLOT_MS
+      );
       const entityIds = Array.isArray(event?.entityIds) ? event.entityIds : [];
       for (const rawEntityId of entityIds) {
         const entityId = String(rawEntityId || '').trim();
@@ -289,10 +304,10 @@ export default function MapPage() {
         }
 
         const previousTimestampMs = lastTimestampByEntity.get(entityId) ?? -1;
-        const adjustedTimestampMs =
-          baseTimestampMs <= previousTimestampMs
-            ? previousTimestampMs + 1
-            : baseTimestampMs;
+        let adjustedTimestampMs = snappedTimestampMs;
+        while (adjustedTimestampMs <= previousTimestampMs) {
+          adjustedTimestampMs += TRANSFER_STATE_TIMESTAMP_SLOT_MS;
+        }
         lastTimestampByEntity.set(entityId, adjustedTimestampMs);
 
         const perEntityEvent: TransferStateQueueTelemetry = {
@@ -479,18 +494,12 @@ export default function MapPage() {
 
   useEffect(() => {
     if (!playbackActive || playbackPaused) {
-      playbackLastTickMsRef.current = null;
       return;
     }
 
     const intervalId = setInterval(() => {
-      const now = performance.now();
-      const previousTick = playbackLastTickMsRef.current ?? now;
-      playbackLastTickMsRef.current = now;
-      const elapsedMs = Math.max(0, now - previousTick);
-
       setPlaybackCursorMs((prev) => {
-        const next = prev + playbackDirection * elapsedMs;
+        const next = prev + playbackDirection * playbackTimeTickMs;
         if (playbackDirection < 0) {
           return Math.max(playbackStartMs, next);
         }
@@ -507,6 +516,7 @@ export default function MapPage() {
     playbackEndMs,
     playbackPaused,
     playbackStartMs,
+    playbackTimeTickMs,
   ]);
 
   useEffect(() => {
@@ -558,14 +568,12 @@ export default function MapPage() {
     setPlaybackCursorMs(endMs);
     setPlaybackDirection(1);
     setPlaybackPaused(true);
-    playbackLastTickMsRef.current = null;
   }
 
   function resumeLive(): void {
     setPlaybackFrames(null);
     setPlaybackTransferEvents(null);
     setPlaybackPaused(true);
-    playbackLastTickMsRef.current = null;
   }
 
   function seekPlayback(nextCursorMs: number): void {
@@ -575,8 +583,8 @@ export default function MapPage() {
     const minMs = playbackStartMs;
     const maxMs = playbackEndMs;
     const clamped = Math.max(minMs, Math.min(maxMs, nextCursorMs));
-    setPlaybackCursorMs(clamped);
-    playbackLastTickMsRef.current = null;
+    const snapped = snapToNearestTickMs(clamped, playbackTimeTickMs);
+    setPlaybackCursorMs(Math.max(minMs, Math.min(maxMs, snapped)));
   }
 
   function playForward(): void {
@@ -585,7 +593,6 @@ export default function MapPage() {
     }
     setPlaybackDirection(1);
     setPlaybackPaused(false);
-    playbackLastTickMsRef.current = null;
   }
 
   function playReverse(): void {
@@ -594,7 +601,6 @@ export default function MapPage() {
     }
     setPlaybackDirection(-1);
     setPlaybackPaused(false);
-    playbackLastTickMsRef.current = null;
   }
 
   function pausePlayback(): void {
@@ -602,7 +608,6 @@ export default function MapPage() {
       return;
     }
     setPlaybackPaused(true);
-    playbackLastTickMsRef.current = null;
   }
 
   function stepPlaybackFrame(direction: 1 | -1): void {
@@ -611,7 +616,6 @@ export default function MapPage() {
     }
 
     setPlaybackPaused(true);
-    playbackLastTickMsRef.current = null;
 
     setPlaybackCursorMs((previousCursorMs) => {
       const currentIndex = getFrameIndexAtCursor(playbackFrames, previousCursorMs);
@@ -628,16 +632,23 @@ export default function MapPage() {
     });
   }
 
-  function stepPlaybackTick(direction: 1 | -1): void {
+  function updatePlaybackTimeTickMs(nextTickMs: number): void {
+    if (!Number.isFinite(nextTickMs)) {
+      return;
+    }
+    const roundedToStepMs =
+      Math.round(nextTickMs / PLAYBACK_TIME_TICK_STEP_MS) * PLAYBACK_TIME_TICK_STEP_MS;
+    const clampedTickMs = Math.max(
+      MIN_PLAYBACK_TIME_TICK_MS,
+      Math.min(MAX_PLAYBACK_TIME_TICK_MS, roundedToStepMs)
+    );
+    setPlaybackTimeTickMs(clampedTickMs);
     if (!playbackActive) {
       return;
     }
-
-    setPlaybackPaused(true);
-    playbackLastTickMsRef.current = null;
     setPlaybackCursorMs((previousCursorMs) => {
-      const next = previousCursorMs + direction;
-      return Math.max(playbackStartMs, Math.min(playbackEndMs, next));
+      const snapped = snapToNearestTickMs(previousCursorMs, clampedTickMs);
+      return Math.max(playbackStartMs, Math.min(playbackEndMs, snapped));
     });
   }
 
@@ -645,18 +656,16 @@ export default function MapPage() {
   const networkTelemetry = playbackFrame?.networkTelemetry ?? networkTelemetryLive;
   const authorityEntities =
     playbackFrame?.authorityEntities ?? authorityEntitiesLive;
-  const canStepPlaybackTickBackward = playbackActive && playbackCursorMs > playbackStartMs;
-  const canStepPlaybackTickForward = playbackActive && playbackCursorMs < playbackEndMs;
   const playbackTransferManifest = useMemo(
     () =>
       playbackActive && playbackTransferEvents
         ? resolveTransferManifestAtCursor(
             playbackTransferEvents,
             playbackCursorMs,
-            TRANSFER_STATE_PLAYBACK_DISPLAY_MS
+            playbackTimeTickMs
           )
         : [],
-    [playbackActive, playbackCursorMs, playbackTransferEvents]
+    [playbackActive, playbackCursorMs, playbackTimeTickMs, playbackTransferEvents]
   );
   const transferManifest = playbackActive
     ? playbackTransferManifest
@@ -884,10 +893,10 @@ export default function MapPage() {
           onPause={pausePlayback}
           onStepForward={() => stepPlaybackFrame(1)}
           onStepReverse={() => stepPlaybackFrame(-1)}
-          onStepTickForward={() => stepPlaybackTick(1)}
-          onStepTickReverse={() => stepPlaybackTick(-1)}
-          canStepTickForward={canStepPlaybackTickForward}
-          canStepTickReverse={canStepPlaybackTickBackward}
+          timeTickMs={playbackTimeTickMs}
+          minTimeTickMs={MIN_PLAYBACK_TIME_TICK_MS}
+          maxTimeTickMs={MAX_PLAYBACK_TIME_TICK_MS}
+          onTimeTickChange={updatePlaybackTimeTickMs}
           onSeek={seekPlayback}
           onResumeLive={resumeLive}
         />
