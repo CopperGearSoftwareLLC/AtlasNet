@@ -38,6 +38,7 @@ add_custom_target(SandboxServerStage
 add_custom_target(SandboxServerDockerBuild
     COMMAND ${CMAKE_COMMAND} -E echo "Starting Docker build..."
     COMMAND docker build
+        --network=host
         --progress=plain
         -f ${SANDBOX_ROOT}/SandboxServer.dockerfile
         -t ${SANDBOX_SERVER_IMAGE_NAME}

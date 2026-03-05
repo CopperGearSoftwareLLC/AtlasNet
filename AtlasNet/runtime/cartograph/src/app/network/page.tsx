@@ -16,6 +16,7 @@ const ENABLE_NETWORK_TELEMETRY = true;
 const DEFAULT_POLL_INTERVAL_MS = 200;
 const MIN_POLL_INTERVAL_MS = 50;
 const MAX_POLL_INTERVAL_MS = 1000;
+const POLL_DISABLED_AT_MS = MAX_POLL_INTERVAL_MS;
 const SERVER_BOUNDS_POLL_INTERVAL_MS = 1000;
 
 type ShardState = {
@@ -41,8 +42,10 @@ export default function NetworkTelemetryPage() {
   const [selectedShardId, setSelectedShardId] = useState<string | null>(null);
   const [pollIntervalMs, setPollIntervalMs] = useState(DEFAULT_POLL_INTERVAL_MS);
   const [showServerBoundsMinimap, setShowServerBoundsMinimap] = useState(true);
+  const telemetryPollIntervalMs =
+    pollIntervalMs >= POLL_DISABLED_AT_MS ? 0 : pollIntervalMs;
   const latestTelemetry = useNetworkTelemetry({
-    intervalMs: pollIntervalMs,
+    intervalMs: telemetryPollIntervalMs,
     enabled: ENABLE_NETWORK_TELEMETRY,
     resetOnException: false,
     resetOnHttpError: false,
@@ -115,7 +118,9 @@ export default function NetworkTelemetryPage() {
           fontSize: 13,
         }}
       >
-        <span>poll: {pollIntervalMs}ms</span>
+        <span>
+          poll: {pollIntervalMs >= POLL_DISABLED_AT_MS ? 'off' : `${pollIntervalMs}ms`}
+        </span>
         <input
           type="range"
           min={MIN_POLL_INTERVAL_MS}

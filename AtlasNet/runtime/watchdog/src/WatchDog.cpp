@@ -3,23 +3,29 @@
 #include <boost/describe/enum_to_string.hpp>
 #include <chrono>
 #include <cstdlib>
+#include <fstream>
+#include <iterator>
 #include <stop_token>
+#include <string_view>
 #include <thread>
 #include <unordered_set>
+
+#include <curl/curl.h>
 
 //#include "Entity/EntityHandoff/Telemetry/HandoffTransferManifest.hpp"
 #include "Global/Serialize/ByteReader.hpp"
 #include "Interlink/Database/HealthManifest.hpp"
+#include "Interlink/Database/ServerRegistry.hpp"
 #include "Heuristic/Database/HeuristicManifest.hpp"
 #include "Docker/DockerIO.hpp"
 #include "Entity/Entity.hpp"
 #include "Entity/Transform.hpp"
 #include "Events/EventSystem.hpp"
 #include "Events/Events/Debug/LogEvent.hpp"
-#include "Heuristic/Database/HeuristicManifest.hpp"
 #include "Heuristic/GridHeuristic/GridHeuristic.hpp"
+#include "Heuristic/Quadtree/QuadtreeHeuristic.hpp"
+#include "Heuristic/Voronoi/VoronoiHeuristic.hpp"
 #include "Heuristic/IHeuristic.hpp"
-#include "Interlink/Database/HealthManifest.hpp"
 #include "Interlink/Interlink.hpp"
 #include "Interlink/InterlinkEnums.hpp"
 #include "Interlink/Telemetry/NetworkManifest.hpp"
@@ -64,6 +70,171 @@ std::unordered_set<std::string> GetLiveShardIds()
 }
 }  // namespace */
 
+namespace
+{
+std::string ReadTextFile(const char* path)
+{
+	std::ifstream file(path, std::ios::in | std::ios::binary);
+	if (!file)
+	{
+		return {};
+	}
+
+	return std::string(std::istreambuf_iterator<char>(file),
+					   std::istreambuf_iterator<char>());
+}
+
+void TrimTrailingWhitespace(std::string& value)
+{
+	while (!value.empty() &&
+		   (value.back() == '\n' || value.back() == '\r' || value.back() == '\t' ||
+			value.back() == ' '))
+	{
+		value.pop_back();
+	}
+}
+
+size_t CurlWriteCallback(char* ptr, size_t size, size_t nmemb, void* userdata)
+{
+	if (!userdata || !ptr)
+	{
+		return 0;
+	}
+	auto* out = static_cast<std::string*>(userdata);
+	out->append(ptr, size * nmemb);
+	return size * nmemb;
+}
+
+std::string ResolvePodNamespace()
+{
+	if (const char* podNamespace = std::getenv("POD_NAMESPACE");
+		podNamespace && *podNamespace)
+	{
+		return std::string(podNamespace);
+	}
+
+	std::string namespaceFromFile =
+		ReadTextFile("/var/run/secrets/kubernetes.io/serviceaccount/namespace");
+	TrimTrailingWhitespace(namespaceFromFile);
+	return namespaceFromFile;
+}
+
+bool ScaleK8sShardDeployment(const std::shared_ptr<Log>& logger,
+							 const uint32_t replicaCount)
+{
+	const char* host = std::getenv("KUBERNETES_SERVICE_HOST");
+	if (!host || !*host)
+	{
+		return false;
+	}
+
+	const std::string port = [&]() -> std::string
+	{
+		const char* envPort = std::getenv("KUBERNETES_SERVICE_PORT_HTTPS");
+		if (envPort && *envPort)
+		{
+			return std::string(envPort);
+		}
+		return "443";
+	}();
+
+	const std::string tokenPath =
+		"/var/run/secrets/kubernetes.io/serviceaccount/token";
+	std::string token = ReadTextFile(tokenPath.c_str());
+	TrimTrailingWhitespace(token);
+	if (token.empty())
+	{
+		logger->Error("Kubernetes service account token is missing.");
+		return false;
+	}
+
+	const std::string podNamespace = ResolvePodNamespace();
+	if (podNamespace.empty())
+	{
+		logger->Error("Unable to resolve pod namespace for Kubernetes scaling.");
+		return false;
+	}
+
+	const std::string deploymentName = [&]() -> std::string
+	{
+		const char* envDeployment = std::getenv("ATLASNET_SHARD_DEPLOYMENT");
+		if (envDeployment && *envDeployment)
+		{
+			return std::string(envDeployment);
+		}
+		return "atlasnet-shard";
+	}();
+
+	const std::string requestUrl = std::format(
+		"https://{}:{}/apis/apps/v1/namespaces/{}/deployments/{}/scale", host,
+		port, podNamespace, deploymentName);
+
+	Json payload;
+	payload["spec"]["replicas"] = replicaCount;
+	const std::string payloadText = payload.dump();
+
+	static const bool curlInitialized =
+		(curl_global_init(CURL_GLOBAL_DEFAULT) == CURLE_OK);
+	if (!curlInitialized)
+	{
+		logger->Error("libcurl initialization failed for Kubernetes scaling.");
+		return false;
+	}
+
+	CURL* curl = curl_easy_init();
+	if (!curl)
+	{
+		logger->Error("Failed to initialize CURL handle for Kubernetes scaling.");
+		return false;
+	}
+
+	std::string responseBody;
+	struct curl_slist* headers = nullptr;
+	const std::string authHeader = "Authorization: Bearer " + token;
+	headers = curl_slist_append(headers, authHeader.c_str());
+	headers = curl_slist_append(headers, "Content-Type: application/merge-patch+json");
+
+	const std::string caPath =
+		"/var/run/secrets/kubernetes.io/serviceaccount/ca.crt";
+	curl_easy_setopt(curl, CURLOPT_URL, requestUrl.c_str());
+	curl_easy_setopt(curl, CURLOPT_HTTPHEADER, headers);
+	curl_easy_setopt(curl, CURLOPT_CUSTOMREQUEST, "PATCH");
+	curl_easy_setopt(curl, CURLOPT_POSTFIELDS, payloadText.c_str());
+	curl_easy_setopt(curl, CURLOPT_POSTFIELDSIZE,
+					 static_cast<long>(payloadText.size()));
+	curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, CurlWriteCallback);
+	curl_easy_setopt(curl, CURLOPT_WRITEDATA, &responseBody);
+	curl_easy_setopt(curl, CURLOPT_TIMEOUT, 8L);
+	curl_easy_setopt(curl, CURLOPT_SSL_VERIFYPEER, 1L);
+	curl_easy_setopt(curl, CURLOPT_SSL_VERIFYHOST, 2L);
+	curl_easy_setopt(curl, CURLOPT_CAINFO, caPath.c_str());
+
+	const CURLcode curlCode = curl_easy_perform(curl);
+	long responseCode = 0;
+	curl_easy_getinfo(curl, CURLINFO_RESPONSE_CODE, &responseCode);
+
+	curl_slist_free_all(headers);
+	curl_easy_cleanup(curl);
+
+	if (curlCode != CURLE_OK)
+	{
+		logger->ErrorFormatted("Kubernetes scale request failed: {}",
+							   curl_easy_strerror(curlCode));
+		return false;
+	}
+
+	if (responseCode < 200 || responseCode >= 300)
+	{
+		logger->ErrorFormatted(
+			"Kubernetes scale request returned HTTP {}. Body: {}",
+			responseCode, responseBody);
+		return false;
+	}
+
+	return true;
+}
+}  // namespace
+
 WatchDog::WatchDog() {}
 
 WatchDog::~WatchDog() {}
@@ -91,7 +262,6 @@ void WatchDog::Run()
 	}
 	logger->Debug("Shutting down");
 	Cleanup();
-	Interlink::Get().Shutdown();
 }
 void WatchDog::Init()
 {
@@ -113,11 +283,29 @@ void WatchDog::Init()
 									   ID_fail.ToString());
 			}
 			HealthManifest::Get().RemovePing(key);
+			if (ID_fail.IsInternal() &&
+				ID_fail != NetworkCredentials::Get().GetID())
+			{
+				ServerRegistry::Get().DeRegisterSelf(ID_fail);
+			}
 		});
 	Interlink::Get().Init();
 	EventSystem::Get().Init();
 
-	SwitchHeuristic(IHeuristic::Type::eGridCell);
+	// Legacy grid-cell heuristic is still available as a separate heuristic,
+	// but WatchDog now defaults to the Quadtree heuristic. For Voronoi
+	// testing, you can switch to eVoronoi below.
+	SwitchHeuristic(IHeuristic::Type::eVoronoi);
+	if (auto voronoi =
+			std::dynamic_pointer_cast<VoronoiHeuristic>(Heuristic))
+	{
+		// Seed count == number of Voronoi regions / bounds.
+		voronoi->SetSeedCount(5);
+	}
+	else
+	{
+		logger->Error("Expected VoronoiHeuristic after SwitchHeuristic(eVoronoi).");
+	}
 	ComputeHeuristic();	 // compute once
 	// HeuristicThread = std::jthread([this](std::stop_token st)
 	//							   { this->HeurristicThreadEntry(st); });
@@ -130,33 +318,61 @@ void WatchDog::Cleanup()
 
 void WatchDog::SetShardCount(uint32 NewCount)
 {
+	ShardCount = NewCount;
+
+	if (const char* k8sHost = std::getenv("KUBERNETES_SERVICE_HOST");
+		k8sHost && *k8sHost)
+	{
+		const bool scaled = ScaleK8sShardDeployment(logger, NewCount);
+		if (scaled)
+		{
+			logger->DebugFormatted("Scaled k8s shard deployment to {} replicas",
+								   NewCount);
+		}
+		else
+		{
+			logger->ErrorFormatted(
+				"Unable to scale k8s shard deployment to {} replicas", NewCount);
+		}
+		return;
+	}
+
+	const char* swarmFallback = std::getenv("ATLASNET_ENABLE_SWARM_FALLBACK");
+	if (!swarmFallback || std::string(swarmFallback) != "1")
+	{
+		logger->Warning(
+			"Legacy Swarm scaling is disabled (set ATLASNET_ENABLE_SWARM_FALLBACK=1 to enable).");
+		return;
+	}
+
 	const std::string filter =
 		"%7B%22label%22%3A%5B%22atlasnet.role%3Dshard%22%5D%7D";
 
-	std::string listResp =
-		DockerIO::Get().request("GET", "/services?filters=" + filter);
-
-	auto services = Json::parse(listResp);
-
-	if (!services.is_array() || services.empty())
-	{
-		throw std::runtime_error("No shard service found via label");
-	}
-
-	// If you expect exactly one shard service:
-	const std::string serviceId = services[0]["ID"];
-
-	// 2️⃣ Inspect service by ID
-	std::string inspectResp =
-		DockerIO::Get().request("GET", "/services/" + serviceId);
-
-	auto inspectJson = Json::parse(inspectResp);
-
 	try
 	{
+		std::string listResp =
+			DockerIO::Get().request("GET", "/services?filters=" + filter);
+		auto services = Json::parse(listResp, nullptr, false);
+
+		if (services.is_discarded() || !services.is_array() || services.empty())
+		{
+			logger->Warning(
+				"No Swarm shard service found (legacy mode); skipping scale operation.");
+			return;
+		}
+
+		const std::string serviceId = services[0]["ID"];
+		std::string inspectResp =
+			DockerIO::Get().request("GET", "/services/" + serviceId);
+		auto inspectJson = Json::parse(inspectResp, nullptr, false);
+		if (inspectJson.is_discarded())
+		{
+			logger->Warning("Swarm service inspect response was invalid JSON.");
+			return;
+		}
+
 		int version = inspectJson["Version"]["Index"];
 		auto spec = inspectJson["Spec"];
-
 		spec["Mode"]["Replicated"]["Replicas"] = NewCount;
 
 		std::string updatePath = "/services/" + serviceId +
@@ -170,15 +386,16 @@ void WatchDog::SetShardCount(uint32 NewCount)
 			logger->DebugFormatted("Service update responded with\n{}",
 								   Json::parse(updateResp).dump(4));
 		}
-	}
-	catch (const std::exception &e)
-	{
-		logger->ErrorFormatted("Inspect response:\n{}", inspectJson.dump(4));
-		throw;
-	}
 
-	logger->DebugFormatted("Scaled shard service to {} replicas", NewCount);
-	ShardCount = NewCount;
+		logger->DebugFormatted("Scaled swarm shard service to {} replicas",
+							   NewCount);
+	}
+	catch (const std::exception& e)
+	{
+		logger->WarningFormatted(
+			"Legacy Swarm scaling failed, continuing without autoscale: {}",
+			e.what());
+	}
 }
 void WatchDog::ComputeHeuristic()
 {
@@ -242,12 +459,26 @@ void WatchDog::SwitchHeuristic(IHeuristic::Type newHeuristic)
 	{
 		case IHeuristic::Type::eNone:
 			Heuristic = nullptr;
+			break;
+		case IHeuristic::Type::eInvalid:
+			Heuristic = nullptr;
+			break;
 		case IHeuristic::Type::eGridCell:
 		{
 			Heuristic = std::make_shared<GridHeuristic>();
+			break;
+		}
+		case IHeuristic::Type::eQuadtree:
+		{
+			Heuristic = std::make_shared<QuadtreeHeuristic>();
+			break;
+		}
+		case IHeuristic::Type::eVoronoi:
+		{
+			Heuristic = std::make_shared<VoronoiHeuristic>();
+			break;
 		}
 		case IHeuristic::Type::eOctree:
-		case IHeuristic::Type::eQuadtree:
 			break;
 	}
 }

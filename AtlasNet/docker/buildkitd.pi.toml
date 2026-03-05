@@ -1,0 +1,7 @@
+# Pi-native BuildKit config
+#
+# Intentionally empty: we let Docker's daemon DNS configuration
+# (e.g. /etc/docker/daemon.json) control DNS for BuildKit,
+# instead of overriding it with a hard-coded 127.0.0.53 resolver
+# that may not work on Raspberry Pi OS.
+

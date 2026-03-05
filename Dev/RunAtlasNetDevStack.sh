@@ -1,5 +1,5 @@
-#!/bin/bash
-set -e  # Exit on error
+#!/usr/bin/env bash
+set -euo pipefail
 
 # Stack name (first argument)
 STACK_NAME=${1:-atlasnet_dev}
@@ -9,6 +9,26 @@ SHARD_IMAGE_NAME=${2:-"shard:latest"}
 
 # Path to the stack file
 STACK_FILE="./docker-stack-dev.yml"
+
+if ! command -v docker >/dev/null 2>&1; then
+    echo "Error: docker CLI is not available."
+    exit 1
+fi
+
+if ! docker info >/dev/null 2>&1; then
+    echo "Error: docker daemon is not reachable (check /var/run/docker.sock mount/permissions)."
+    exit 1
+fi
+
+SWARM_STATE="$(docker info --format '{{.Swarm.LocalNodeState}}' 2>/dev/null || echo inactive)"
+if [ "$SWARM_STATE" != "active" ]; then
+    echo "Docker Swarm is not active. Initializing single-node swarm..."
+    if [ -n "${SWARM_ADVERTISE_ADDR:-}" ]; then
+        docker swarm init --advertise-addr "${SWARM_ADVERTISE_ADDR}"
+    else
+        docker swarm init
+    fi
+fi
 
 # Check if stack file exists
 if [ ! -f "$STACK_FILE" ]; then
@@ -75,7 +95,15 @@ remove_networks() {
 remove_networks
 
 echo "Deploying Docker stack '$STACK_NAME' with shard image '$SHARD_IMAGE_NAME'..."
+set +e  # temporarily allow failure
 docker stack deploy -c "$TEMP_STACK_FILE" "$STACK_NAME" --detach=true
+DEPLOY_EXIT=$?
+set -e
+if [ $DEPLOY_EXIT -ne 0 ]; then
+    echo "docker stack deploy failed with exit code $DEPLOY_EXIT"
+    docker stack ps "$STACK_NAME"
+    exit $DEPLOY_EXIT
+fi
 
 # Clean up
 rm "$TEMP_STACK_FILE"

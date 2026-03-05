@@ -33,3 +33,33 @@ add_custom_target(AtlasnetDockerBuild_Fast
     USES_TERMINAL
 )
 add_dependencies(AtlasnetDockerBuild_Fast AtlasnetDockerBuild_Fast_Stage)
+
+set(
+    ATLASNET_HOST_CONTAINER_NAME
+    "atlasnet-dev-watchdog"
+    CACHE STRING
+    "Container name for AtlasnetDockerRun_Host"
+)
+set(
+    ATLASNET_HOST_CONTAINER_IMAGE
+    "watchdog:latest"
+    CACHE STRING
+    "Image for AtlasnetDockerRun_Host"
+)
+set(
+    ATLASNET_HOST_CONTAINER_RUN_ARGS
+    "-v /var/run/docker.sock:/var/run/docker.sock"
+    CACHE STRING
+    "Extra docker run arguments for AtlasnetDockerRun_Host"
+)
+
+add_custom_target(AtlasnetDockerRun_Host
+    COMMAND ${ATLASNET_ROOT}/docker/SpawnHostContainer.sh
+            ${ATLASNET_HOST_CONTAINER_NAME}
+            ${ATLASNET_HOST_CONTAINER_IMAGE}
+            "${ATLASNET_HOST_CONTAINER_RUN_ARGS}"
+    WORKING_DIRECTORY ${ATLASNET_ROOT}
+    USES_TERMINAL
+    COMMENT "Spawning AtlasNet container on the host Docker daemon"
+)
+add_dependencies(AtlasnetDockerRun_Host AtlasnetDockerBuild_Fast)

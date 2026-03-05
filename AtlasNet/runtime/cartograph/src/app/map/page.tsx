@@ -1,12 +1,23 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import type {
+  AuthorityEntityTelemetry,
+  AuthorityLinkMode,
+  ShapeJS,
+  ShardPlacementTelemetry,
+  ShardTelemetry,
+  TransferManifestTelemetry,
+  TransferStateQueueTelemetry,
+} from '../lib/cartographTypes';
 import { useMapDerivedData } from '../lib/hooks/useMapDerivedData';
 import { useShardHoverState } from '../lib/hooks/useShardHoverState';
 import {
   useAuthorityEntities,
   useHeuristicShapes,
   useNetworkTelemetry,
+  useShardPlacement,
+  useTransferStateQueue,
 } from '../lib/hooks/useTelemetryFeeds';
 import {
   createMapRenderer,
@@ -14,24 +25,157 @@ import {
   type MapViewMode,
 } from '../lib/mapRenderer';
 import { EntityInspectorPanel } from './entityInspector/EntityInspectorPanel';
+import {
+  useEntityDatabaseDetails,
+  type EntityDatabaseDetailsState,
+} from './entityInspector/useEntityDatabaseDetails';
 import { useCtrlDragEntitySelection } from './entityInspector/useCtrlDragEntitySelection';
 import { MapHud } from './components/MapHud';
+import { MapPlaybackBar } from './components/MapPlaybackBar';
 import { ShardHoverTooltip } from './components/ShardHoverTooltip';
 
 const DEFAULT_POLL_INTERVAL_MS = 50;
 const MIN_POLL_INTERVAL_MS = 1;
 const MAX_POLL_INTERVAL_MS = 1000;
+const POLL_DISABLED_AT_MS = MAX_POLL_INTERVAL_MS;
 const DEFAULT_ENTITY_DETAIL_POLL_INTERVAL_MS = 1000;
 const MIN_ENTITY_DETAIL_POLL_INTERVAL_MS = 250;
 const MAX_ENTITY_DETAIL_POLL_INTERVAL_MS = 5000;
 const ENTITY_DETAIL_POLL_DISABLED_AT_MS = MAX_ENTITY_DETAIL_POLL_INTERVAL_MS;
 const DEFAULT_INTERACTION_SENSITIVITY = 1;
+const SNAPSHOT_WINDOW_MS = 30_000;
+const SNAPSHOT_RECORD_SPACING_MS = 10;
+const PLAYBACK_TICK_INTERVAL_MS = 16;
+const TRANSFER_STATE_REPLAY_STEP_MS = 2;
+const TRANSFER_STATE_PLAYBACK_DISPLAY_MS = 20;
+
+const EMPTY_DETAILS_STATE: EntityDatabaseDetailsState = {
+  loading: false,
+  error: null,
+  data: null,
+};
+
+interface PlaybackFrame {
+  capturedAtMs: number;
+  baseShapes: ShapeJS[];
+  networkTelemetry: ShardTelemetry[];
+  authorityEntities: AuthorityEntityTelemetry[];
+  transferManifest: TransferManifestTelemetry[];
+  shardPlacement: ShardPlacementTelemetry[];
+  entityDetailsByEntityId: Record<string, EntityDatabaseDetailsState>;
+}
+
+interface ActiveTransferQueueEvent {
+  event: TransferStateQueueTelemetry;
+  startedAtMs: number;
+}
+
+function clonePlaybackPayload(
+  payload: Omit<PlaybackFrame, 'capturedAtMs'>
+): Omit<PlaybackFrame, 'capturedAtMs'> {
+  if (typeof structuredClone === 'function') {
+    return structuredClone(payload);
+  }
+  return JSON.parse(JSON.stringify(payload)) as Omit<PlaybackFrame, 'capturedAtMs'>;
+}
+
+function getFrameIndexAtCursor(frames: PlaybackFrame[], cursorMs: number): number {
+  if (frames.length === 0) {
+    return -1;
+  }
+
+  let lo = 0;
+  let hi = frames.length - 1;
+  let best = 0;
+
+  while (lo <= hi) {
+    const mid = (lo + hi) >> 1;
+    const value = frames[mid].capturedAtMs;
+    if (value <= cursorMs) {
+      best = mid;
+      lo = mid + 1;
+    } else {
+      hi = mid - 1;
+    }
+  }
+
+  return best;
+}
+
+function getFrameAtCursor(
+  frames: PlaybackFrame[],
+  cursorMs: number
+): PlaybackFrame | null {
+  const index = getFrameIndexAtCursor(frames, cursorMs);
+  if (index < 0) {
+    return null;
+  }
+  return frames[index] ?? null;
+}
+
+function snapshotDetailsByEntityId(
+  cache: Map<string, EntityDatabaseDetailsState>
+): Record<string, EntityDatabaseDetailsState> {
+  const out: Record<string, EntityDatabaseDetailsState> = {};
+  for (const [entityId, state] of cache.entries()) {
+    out[entityId] = state;
+  }
+  return out;
+}
+
+function resolveTransferManifestAtCursor(
+  events: TransferStateQueueTelemetry[],
+  cursorMs: number,
+  holdMs: number
+): TransferManifestTelemetry[] {
+  if (!Array.isArray(events) || events.length === 0) {
+    return [];
+  }
+
+  const latestByEntity = new Map<string, TransferStateQueueTelemetry>();
+  for (const event of events) {
+    if (!event || event.timestampMs > cursorMs) {
+      break;
+    }
+
+    if (cursorMs - event.timestampMs > holdMs) {
+      continue;
+    }
+
+    const entityId = String(event.entityIds?.[0] || '').trim();
+    if (!entityId) {
+      continue;
+    }
+    latestByEntity.set(entityId, event);
+  }
+
+  const rows: TransferManifestTelemetry[] = [];
+  for (const [entityId, event] of latestByEntity.entries()) {
+    rows.push({
+      transferId: `${event.transferId}:${entityId}:${event.timestampMs}`,
+      fromId: event.fromId,
+      toId: event.toId,
+      stage: event.stage,
+      state: event.state,
+      entityIds: [entityId],
+    });
+  }
+  return rows;
+}
 
 export default function MapPage() {
   const containerRef = useRef<HTMLDivElement>(null);
   const rendererRef = useRef<ReturnType<typeof createMapRenderer> | null>(null);
+  const historyRef = useRef<PlaybackFrame[]>([]);
+  const playbackLastTickMsRef = useRef<number | null>(null);
+  const transferQueueByEntityRef = useRef<Map<string, TransferStateQueueTelemetry[]>>(
+    new Map()
+  );
+  const transferTimelineRef = useRef<TransferStateQueueTelemetry[]>([]);
   const [showGnsConnections, setShowGnsConnections] = useState(true);
   const [showAuthorityEntities, setShowAuthorityEntities] = useState(true);
+  const [authorityLinkMode, setAuthorityLinkMode] =
+    useState<AuthorityLinkMode>('owner');
   const [showShardHoverDetails, setShowShardHoverDetails] = useState(true);
   const [hoveredShardId, setHoveredShardId] = useState<string | null>(null);
   const [hoveredShardAnchor, setHoveredShardAnchor] = useState<{
@@ -48,22 +192,178 @@ export default function MapPage() {
   const [entityDetailPollIntervalMs, setEntityDetailPollIntervalMs] = useState(
     DEFAULT_ENTITY_DETAIL_POLL_INTERVAL_MS
   );
+  const [playbackFrames, setPlaybackFrames] = useState<PlaybackFrame[] | null>(
+    null
+  );
+  const [playbackTransferEvents, setPlaybackTransferEvents] = useState<
+    TransferStateQueueTelemetry[] | null
+  >(null);
+  const [playbackCursorMs, setPlaybackCursorMs] = useState(0);
+  const [playbackPaused, setPlaybackPaused] = useState(true);
+  const [playbackDirection, setPlaybackDirection] = useState<1 | -1>(1);
+  const [activeTransferQueueByEntity, setActiveTransferQueueByEntity] = useState<
+    Record<string, ActiveTransferQueueEvent>
+  >({});
 
-  const baseShapes = useHeuristicShapes({
-    intervalMs: pollIntervalMs,
+  const telemetryPollIntervalMs =
+    pollIntervalMs >= POLL_DISABLED_AT_MS ? 0 : pollIntervalMs;
+  const baseShapesLive = useHeuristicShapes({
+    intervalMs: telemetryPollIntervalMs,
     resetOnException: true,
     resetOnHttpError: false,
   });
-  const networkTelemetry = useNetworkTelemetry({
-    intervalMs: pollIntervalMs,
+  const networkTelemetryLive = useNetworkTelemetry({
+    intervalMs: telemetryPollIntervalMs,
     resetOnException: true,
     resetOnHttpError: false,
   });
-  const authorityEntities = useAuthorityEntities({
-    intervalMs: pollIntervalMs,
+  const authorityEntitiesLive = useAuthorityEntities({
+    intervalMs: telemetryPollIntervalMs,
     resetOnException: true,
     resetOnHttpError: false,
   });
+  const transferStateQueueLive = useTransferStateQueue({
+    intervalMs: telemetryPollIntervalMs,
+    resetOnException: true,
+    resetOnHttpError: false,
+  });
+  const shardPlacementLive = useShardPlacement({
+    intervalMs:
+      telemetryPollIntervalMs <= 0 ? 0 : Math.max(1000, telemetryPollIntervalMs),
+    enabled: true,
+    resetOnException: false,
+    resetOnHttpError: false,
+  });
+
+  useEffect(() => {
+    if (!Array.isArray(transferStateQueueLive) || transferStateQueueLive.length === 0) {
+      return;
+    }
+
+    const ingestStartedAtMs = Date.now();
+    let ingestOffsetMs = 0;
+    const queues = transferQueueByEntityRef.current;
+    const timeline = transferTimelineRef.current;
+    for (const event of transferStateQueueLive) {
+      const entityIds = Array.isArray(event.entityIds) ? event.entityIds : [];
+      for (const rawEntityId of entityIds) {
+        const entityId = String(rawEntityId || '').trim();
+        if (!entityId) {
+          continue;
+        }
+
+        const perEntityEvent: TransferStateQueueTelemetry = {
+          ...event,
+          entityIds: [entityId],
+          // Use local ingest time so playback cursor and event timeline share one clock.
+          timestampMs: ingestStartedAtMs + ingestOffsetMs,
+        };
+        ingestOffsetMs += 1;
+
+        const queue = queues.get(entityId);
+        if (queue) {
+          queue.push(perEntityEvent);
+        } else {
+          queues.set(entityId, [perEntityEvent]);
+        }
+        timeline.push(perEntityEvent);
+      }
+    }
+
+    const cutoffMs = Date.now() - SNAPSHOT_WINDOW_MS;
+    while (timeline.length > 0 && timeline[0].timestampMs < cutoffMs) {
+      timeline.shift();
+    }
+  }, [transferStateQueueLive]);
+
+  useEffect(() => {
+    const intervalId = setInterval(() => {
+      const nowMs = Date.now();
+      const queues = transferQueueByEntityRef.current;
+
+      setActiveTransferQueueByEntity((previous) => {
+        let next = previous;
+        let changed = false;
+
+        for (const [entityId, active] of Object.entries(next)) {
+          if (nowMs - active.startedAtMs < TRANSFER_STATE_REPLAY_STEP_MS) {
+            continue;
+          }
+
+          if (next === previous) {
+            next = { ...previous };
+          }
+          delete next[entityId];
+          changed = true;
+        }
+
+        for (const [entityId, queue] of queues.entries()) {
+          if (next[entityId]) {
+            continue;
+          }
+
+          const event = queue.shift();
+          if (queue.length === 0) {
+            queues.delete(entityId);
+          }
+          if (!event) {
+            continue;
+          }
+
+          if (next === previous) {
+            next = { ...previous };
+          }
+          next[entityId] = {
+            event,
+            startedAtMs: nowMs,
+          };
+          changed = true;
+        }
+
+        return changed ? next : previous;
+      });
+    }, 1);
+
+    return () => {
+      clearInterval(intervalId);
+    };
+  }, []);
+
+  const transferManifestLiveResolved = useMemo(() => {
+    const rows: TransferManifestTelemetry[] = [];
+    for (const [entityId, active] of Object.entries(activeTransferQueueByEntity)) {
+      const event = active.event;
+      rows.push({
+        transferId: `${event.transferId}:${entityId}:${event.timestampMs}`,
+        fromId: event.fromId,
+        toId: event.toId,
+        stage: event.stage,
+        state: event.state,
+        entityIds: [entityId],
+      });
+    }
+    return rows;
+  }, [activeTransferQueueByEntity]);
+
+  const playbackStartMs =
+    playbackFrames && playbackFrames.length > 0
+      ? playbackFrames[0].capturedAtMs
+      : 0;
+  const playbackEndMs =
+    playbackFrames && playbackFrames.length > 0
+      ? playbackFrames[playbackFrames.length - 1].capturedAtMs
+      : 0;
+  const playbackFrame = useMemo(
+    () =>
+      playbackFrames && playbackFrames.length > 0
+        ? getFrameAtCursor(playbackFrames, playbackCursorMs)
+        : null,
+    [playbackFrames, playbackCursorMs]
+  );
+  const playbackActive = playbackFrame != null;
+
+  const authorityEntitiesForSelection =
+    playbackFrame?.authorityEntities ?? authorityEntitiesLive;
   const {
     selectedEntities,
     activeEntityId,
@@ -74,13 +374,268 @@ export default function MapPage() {
     onPointerMoveCapture,
     onPointerUpCapture,
     onPointerCancelCapture,
+    onContextMenuCapture,
     setActiveEntityId,
     setHoveredEntityId,
   } = useCtrlDragEntitySelection({
     containerRef,
     rendererRef,
-    entities: authorityEntities,
+    entities: authorityEntitiesForSelection,
+    viewMode,
   });
+  const activeSelectedEntity = useMemo(
+    () =>
+      selectedEntities.find((entity) => entity.entityId === activeEntityId) ?? null,
+    [activeEntityId, selectedEntities]
+  );
+
+  const activeEntityLive = useMemo(
+    () =>
+      authorityEntitiesLive.find((entity) => entity.entityId === activeEntityId) ??
+      null,
+    [activeEntityId, authorityEntitiesLive]
+  );
+  const liveEntityDetails = useEntityDatabaseDetails(
+    activeEntityLive,
+    entityDetailPollIntervalMs
+  );
+  const playbackLookupDetails = useEntityDatabaseDetails(
+    playbackActive ? activeSelectedEntity : null,
+    0
+  );
+  const liveEntityDetailsCacheRef = useRef<Map<string, EntityDatabaseDetailsState>>(
+    new Map()
+  );
+
+  useEffect(() => {
+    const entityId = activeEntityLive?.entityId ?? '';
+    if (!entityId) {
+      return;
+    }
+
+    const previous = liveEntityDetailsCacheRef.current.get(entityId) ?? null;
+    liveEntityDetailsCacheRef.current.set(entityId, {
+      loading: liveEntityDetails.loading,
+      error: liveEntityDetails.error,
+      data: liveEntityDetails.data ?? previous?.data ?? null,
+    });
+  }, [activeEntityLive, liveEntityDetails]);
+
+  const latestLiveFrameDataRef = useRef<Omit<PlaybackFrame, 'capturedAtMs'> | null>(
+    null
+  );
+
+  useEffect(() => {
+    latestLiveFrameDataRef.current = {
+      baseShapes: baseShapesLive,
+      networkTelemetry: networkTelemetryLive,
+      authorityEntities: authorityEntitiesLive,
+      transferManifest: transferManifestLiveResolved,
+      shardPlacement: shardPlacementLive,
+      entityDetailsByEntityId: snapshotDetailsByEntityId(
+        liveEntityDetailsCacheRef.current
+      ),
+    };
+  }, [
+    baseShapesLive,
+    networkTelemetryLive,
+    authorityEntitiesLive,
+    transferManifestLiveResolved,
+    shardPlacementLive,
+    liveEntityDetails,
+    activeEntityLive,
+  ]);
+
+  useEffect(() => {
+    const intervalId = setInterval(() => {
+      const latest = latestLiveFrameDataRef.current;
+      if (!latest) {
+        return;
+      }
+
+      const nowMs = Date.now();
+      const frozen = clonePlaybackPayload(latest);
+      const frame: PlaybackFrame = {
+        capturedAtMs: nowMs,
+        ...frozen,
+      };
+      const frames = historyRef.current;
+      frames.push(frame);
+
+      const cutoffMs = nowMs - SNAPSHOT_WINDOW_MS;
+      while (frames.length > 0 && frames[0].capturedAtMs < cutoffMs) {
+        frames.shift();
+      }
+    }, SNAPSHOT_RECORD_SPACING_MS);
+
+    return () => {
+      clearInterval(intervalId);
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!playbackActive || playbackPaused) {
+      playbackLastTickMsRef.current = null;
+      return;
+    }
+
+    const intervalId = setInterval(() => {
+      const now = performance.now();
+      const previousTick = playbackLastTickMsRef.current ?? now;
+      playbackLastTickMsRef.current = now;
+      const elapsedMs = Math.max(0, now - previousTick);
+
+      setPlaybackCursorMs((prev) => {
+        const next = prev + playbackDirection * elapsedMs;
+        if (playbackDirection < 0) {
+          return Math.max(playbackStartMs, next);
+        }
+        return Math.min(playbackEndMs, next);
+      });
+    }, PLAYBACK_TICK_INTERVAL_MS);
+
+    return () => {
+      clearInterval(intervalId);
+    };
+  }, [
+    playbackActive,
+    playbackDirection,
+    playbackEndMs,
+    playbackPaused,
+    playbackStartMs,
+  ]);
+
+  useEffect(() => {
+    if (!playbackActive || playbackPaused) {
+      return;
+    }
+    if (
+      playbackCursorMs <= playbackStartMs ||
+      playbackCursorMs >= playbackEndMs
+    ) {
+      setPlaybackPaused(true);
+    }
+  }, [
+    playbackActive,
+    playbackCursorMs,
+    playbackEndMs,
+    playbackPaused,
+    playbackStartMs,
+  ]);
+
+  const playbackEntityDetails =
+    playbackActive && activeEntityId
+      ? playbackFrame?.entityDetailsByEntityId[activeEntityId] ?? null
+      : null;
+  const entityDetails = playbackActive
+    ? playbackEntityDetails ?? playbackLookupDetails
+    : liveEntityDetails;
+
+  function takeSnapshot(): void {
+    const frames = historyRef.current;
+    if (frames.length === 0) {
+      return;
+    }
+    const snapshot = [...frames];
+    const endMs = snapshot[snapshot.length - 1].capturedAtMs;
+    const transferEvents = transferTimelineRef.current.filter(
+      (event) =>
+        event.timestampMs >= endMs - SNAPSHOT_WINDOW_MS && event.timestampMs <= endMs
+    );
+    setPlaybackFrames(snapshot);
+    setPlaybackTransferEvents(transferEvents);
+    setPlaybackCursorMs(endMs);
+    setPlaybackDirection(1);
+    setPlaybackPaused(true);
+    playbackLastTickMsRef.current = null;
+  }
+
+  function resumeLive(): void {
+    setPlaybackFrames(null);
+    setPlaybackTransferEvents(null);
+    setPlaybackPaused(true);
+    playbackLastTickMsRef.current = null;
+  }
+
+  function seekPlayback(nextCursorMs: number): void {
+    if (!playbackActive) {
+      return;
+    }
+    const minMs = playbackStartMs;
+    const maxMs = playbackEndMs;
+    const clamped = Math.max(minMs, Math.min(maxMs, nextCursorMs));
+    setPlaybackCursorMs(clamped);
+    playbackLastTickMsRef.current = null;
+  }
+
+  function playForward(): void {
+    if (!playbackActive) {
+      return;
+    }
+    setPlaybackDirection(1);
+    setPlaybackPaused(false);
+    playbackLastTickMsRef.current = null;
+  }
+
+  function playReverse(): void {
+    if (!playbackActive) {
+      return;
+    }
+    setPlaybackDirection(-1);
+    setPlaybackPaused(false);
+    playbackLastTickMsRef.current = null;
+  }
+
+  function pausePlayback(): void {
+    if (!playbackActive) {
+      return;
+    }
+    setPlaybackPaused(true);
+    playbackLastTickMsRef.current = null;
+  }
+
+  function stepPlaybackFrame(direction: 1 | -1): void {
+    if (!playbackFrames || playbackFrames.length === 0) {
+      return;
+    }
+
+    setPlaybackPaused(true);
+    playbackLastTickMsRef.current = null;
+
+    setPlaybackCursorMs((previousCursorMs) => {
+      const currentIndex = getFrameIndexAtCursor(playbackFrames, previousCursorMs);
+      if (currentIndex < 0) {
+        return previousCursorMs;
+      }
+
+      const nextIndex =
+        direction > 0
+          ? Math.min(playbackFrames.length - 1, currentIndex + 1)
+          : Math.max(0, currentIndex - 1);
+      const nextFrame = playbackFrames[nextIndex];
+      return nextFrame ? nextFrame.capturedAtMs : previousCursorMs;
+    });
+  }
+
+  const baseShapes = playbackFrame?.baseShapes ?? baseShapesLive;
+  const networkTelemetry = playbackFrame?.networkTelemetry ?? networkTelemetryLive;
+  const authorityEntities =
+    playbackFrame?.authorityEntities ?? authorityEntitiesLive;
+  const playbackTransferManifest = useMemo(
+    () =>
+      playbackActive && playbackTransferEvents
+        ? resolveTransferManifestAtCursor(
+            playbackTransferEvents,
+            playbackCursorMs,
+            TRANSFER_STATE_PLAYBACK_DISPLAY_MS
+          )
+        : [],
+    [playbackActive, playbackCursorMs, playbackTransferEvents]
+  );
+  const transferManifest = playbackActive
+    ? playbackTransferManifest
+    : transferManifestLiveResolved;
+  const shardPlacement = playbackFrame?.shardPlacement ?? shardPlacementLive;
 
   const {
     combinedShapes,
@@ -89,11 +644,14 @@ export default function MapPage() {
     networkNodeIds,
     networkNodeIdSet,
     shardHoverBoundsById,
+    shardPolygonsById,
     shardTelemetryById,
   } = useMapDerivedData({
     baseShapes,
     networkTelemetry,
     authorityEntities,
+    authorityLinkMode,
+    transferManifest,
     showAuthorityEntities,
     showGnsConnections,
     hoveredShardId,
@@ -105,6 +663,7 @@ export default function MapPage() {
     setHoveredShardAnchor,
     setHoveredShardId,
     shardHoverBoundsById,
+    shardHoverPolygonsById: shardPolygonsById,
     showGnsConnections,
     showShardHoverDetails,
   });
@@ -170,17 +729,20 @@ export default function MapPage() {
       selectedPoints: selectedEntities.map((entity) => ({
         x: entity.x,
         y: entity.y,
+        isClient: entity.isClient,
       })),
       inspectedPoint: inspectedEntity
         ? {
             x: inspectedEntity.x,
             y: inspectedEntity.y,
+            isClient: inspectedEntity.isClient,
           }
         : null,
       hoveredPoint: hoveredEntity
         ? {
             x: hoveredEntity.x,
             y: hoveredEntity.y,
+            isClient: hoveredEntity.isClient,
           }
         : null,
     });
@@ -189,6 +751,21 @@ export default function MapPage() {
   const hoveredTelemetry = hoveredShardId
     ? shardTelemetryById.get(hoveredShardId)
     : undefined;
+  const shardWorkerNodeById = useMemo(() => {
+    const out = new Map<string, string>();
+    for (const row of shardPlacement) {
+      const shardId = String(row.shardId || '').trim();
+      const nodeName = String(row.nodeName || '').trim();
+      if (!shardId || !nodeName || out.has(shardId)) {
+        continue;
+      }
+      out.set(shardId, nodeName);
+    }
+    return out;
+  }, [shardPlacement]);
+  const hoveredShardWorkerNode = hoveredShardId
+    ? shardWorkerNodeById.get(String(hoveredShardId).trim()) ?? null
+    : null;
 
   return (
     <div
@@ -218,6 +795,7 @@ export default function MapPage() {
         onPointerMoveCapture={onPointerMoveCapture}
         onPointerUpCapture={onPointerUpCapture}
         onPointerCancelCapture={onPointerCancelCapture}
+        onContextMenuCapture={onContextMenuCapture}
         onMouseLeave={clearHoveredShard}
       >
         {showShardHoverDetails && selectedEntities.length === 0 && (
@@ -227,6 +805,7 @@ export default function MapPage() {
             downloadBytesPerSec={hoveredTelemetry?.downloadKbps ?? 0}
             uploadBytesPerSec={hoveredTelemetry?.uploadKbps ?? 0}
             outgoingConnectionCount={hoveredShardEdgeLabels.length}
+            workerNodeName={hoveredShardWorkerNode}
           />
         )}
 
@@ -245,7 +824,9 @@ export default function MapPage() {
               pointerEvents: 'none',
             }}
           >
-            hold Ctrl + drag to select entities
+            {viewMode === '2d'
+              ? 'right-click + drag to select entities'
+              : 'hold Ctrl + drag to select entities'}
           </div>
         )}
 
@@ -265,14 +846,31 @@ export default function MapPage() {
           />
         )}
 
+        <MapPlaybackBar
+          visible={playbackActive}
+          startMs={playbackStartMs}
+          endMs={playbackEndMs}
+          cursorMs={playbackCursorMs}
+          paused={playbackPaused}
+          direction={playbackDirection}
+          onPlayForward={playForward}
+          onPlayReverse={playReverse}
+          onPause={pausePlayback}
+          onStepForward={() => stepPlaybackFrame(1)}
+          onStepReverse={() => stepPlaybackFrame(-1)}
+          onSeek={seekPlayback}
+          onResumeLive={resumeLive}
+        />
       </div>
 
       <MapHud
         showGnsConnections={showGnsConnections}
         showAuthorityEntities={showAuthorityEntities}
+        authorityLinkMode={authorityLinkMode}
         showShardHoverDetails={showShardHoverDetails}
         onToggleGnsConnections={() => setShowGnsConnections((value) => !value)}
         onToggleAuthorityEntities={() => setShowAuthorityEntities((value) => !value)}
+        onSetAuthorityLinkMode={setAuthorityLinkMode}
         onToggleShardHoverDetails={() => setShowShardHoverDetails((value) => !value)}
         entityCount={authorityEntities.length}
         shardCount={networkNodeIds.length}
@@ -284,6 +882,9 @@ export default function MapPage() {
         onSetProjectionMode={setProjectionMode}
         interactionSensitivity={interactionSensitivity}
         onSetInteractionSensitivity={setInteractionSensitivity}
+        playbackActive={playbackActive}
+        onTakeSnapshot={takeSnapshot}
+        onResumeLive={resumeLive}
         pollIntervalMs={pollIntervalMs}
         minPollIntervalMs={MIN_POLL_INTERVAL_MS}
         maxPollIntervalMs={MAX_POLL_INTERVAL_MS}
@@ -294,16 +895,22 @@ export default function MapPage() {
         selectedEntities={selectedEntities}
         activeEntityId={activeEntityId}
         hoveredEntityId={hoveredSelectedEntityId}
+        detailsState={entityDetails || EMPTY_DETAILS_STATE}
+        playbackMode={playbackActive}
         pollIntervalMs={entityDetailPollIntervalMs}
         minPollIntervalMs={MIN_ENTITY_DETAIL_POLL_INTERVAL_MS}
         maxPollIntervalMs={MAX_ENTITY_DETAIL_POLL_INTERVAL_MS}
         pollDisabledAtMs={ENTITY_DETAIL_POLL_DISABLED_AT_MS}
         onSetPollIntervalMs={setEntityDetailPollIntervalMs}
-        onSelectEntity={(entityId) =>
-          setActiveEntityId(activeEntityId === entityId ? null : entityId)
-        }
-        onHoverEntity={setHoveredEntityId}
-        onClearSelection={clearSelection}
+        onSelectEntity={(entityId) => {
+          setActiveEntityId(activeEntityId === entityId ? null : entityId);
+        }}
+        onHoverEntity={(entityId) => {
+          setHoveredEntityId(entityId);
+        }}
+        onClearSelection={() => {
+          clearSelection();
+        }}
       />
     </div>
   );

@@ -3,7 +3,7 @@ FROM mcr.microsoft.com/devcontainers/base:ubuntu-24.04
 ENV DEBIAN_FRONTEND=noninteractive
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    tini less coreutils \
+    tini less coreutils acl \
     iproute2 iputils-ping net-tools dnsutils tcpdump nmap socat \
     curl wget jq openssh-client \
     build-essential g++ binutils \
@@ -22,8 +22,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     xorg-dev libxmu-dev libxi-dev libxinerama-dev libxcursor-dev \
     libgl-dev libglu1-mesa-dev mesa-utils libgl1-mesa-dri libglx-mesa0 \
     \
-    # DinD
-    docker.io iptables uidmap docker-buildx \
+    # Docker CLI / Buildx (host daemon via mounted socket)
+    docker.io docker-buildx \
 
     # Hotspot
     hotspot linux-tools-generic \

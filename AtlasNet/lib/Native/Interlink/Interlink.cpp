@@ -6,12 +6,15 @@
 #include <atomic>
 #include <boost/describe/enum_to_string.hpp>
 #include <chrono>
+#include <cstdlib>
 #include <stop_token>
+#include <string_view>
 #include <thread>
 
 // #include "Database/ProxyRegistry.hpp"
 #include "Client/Client.hpp"
 #include "Client/Database/ClientManifest.hpp"
+#include "Database/NodeManifest.hpp"
 #include "Database/ServerRegistry.hpp"
 #include "Docker/DockerIO.hpp"
 #include "Events/EventSystem.hpp"
@@ -54,6 +57,40 @@ static void SteamNetConnectionStatusChanged(SteamNetConnectionStatusChangedCallb
 {
 	Interlink::Get().OnSteamNetConnectionStatusChanged(info);
 }
+
+namespace
+{
+std::optional<std::string> GetNonEmptyEnv(const char* key)
+{
+	const char* value = std::getenv(key);
+	if (!value || !*value)
+	{
+		return std::nullopt;
+	}
+	return std::string(value);
+}
+
+std::string ResolveInterlinkAdvertiseIp()
+{
+	if (const auto explicitIp = GetNonEmptyEnv("INTERLINK_ADVERTISE_IP");
+		explicitIp.has_value())
+	{
+		return *explicitIp;
+	}
+	if (const auto podIp = GetNonEmptyEnv("POD_IP"); podIp.has_value())
+	{
+		return *podIp;
+	}
+	return DockerIO::Get().GetSelfContainerIP();
+}
+
+IPAddress BuildInterlinkAddress(const std::string& ip, const PortType port)
+{
+	IPAddress address;
+	address.Parse(ip + ":" + std::to_string(port));
+	return address;
+}
+}  // namespace
 
 // ===== Interlink implementation =============================================
 void Interlink::OnSteamNetConnectionStatusChanged(SteamNetConnectionStatusChangedCallback_t *pInfo)
@@ -538,44 +575,74 @@ void Interlink::Init()
 	PollGroup = networkInterface->CreatePollGroup();
 
 	// grab public address
-	std::optional<std::string> pubIP;
-	std::optional<uint32_t> pubPort;
-	IPAddress pub;
 	OpenListenSocket(_PORT_INTERLINK);
 
 	// registering to database + opening listen sockets
-	IPAddress ipAddress;
+	const std::string advertiseIp = ResolveInterlinkAdvertiseIp();
+	if (advertiseIp.empty())
+	{
+		logger.Error(
+			"[Interlink] Could not resolve local advertise IP (env INTERLINK_ADVERTISE_IP/POD_IP or eth0).");
+		return;
+	}
+	IPAddress ipAddress = BuildInterlinkAddress(advertiseIp, _PORT_INTERLINK);
+	logger.DebugFormatted("[Interlink] Advertising address {}", ipAddress.ToString());
 	if (NetworkCredentials::Get().GetID().Type == NetworkIdentityType::eProxy)
 	{
-		// Register Demigod in ProxyRegistry
-		ipAddress.Parse(DockerIO::Get().GetSelfContainerIP() + ":" +
-						std::to_string(_PORT_INTERLINK));
-		// ProxyRegistry::Get().RegisterSelf(NetworkCredentials::Get().GetID(), ipAddress);
 		ServerRegistry::Get().RegisterSelf(NetworkCredentials::Get().GetID(), ipAddress);
 
-		// Register public address
-		// pubIP =
-		// DockerIO::Get().GetServiceNodePublicIP(_PROXY_SERVICE_NAME);
-		// pubPort = _PORT_PROXY;
-		// pub.Parse(*pubIP + ":" + std::to_string(*pubPort));
-		// ProxyRegistry::Get().RegisterPublicAddress(NetworkCredentials::Get().GetID(), pub);
-		ServerRegistry::Get().RegisterPublicAddress(NetworkCredentials::Get().GetID(), pub);
-
-		logger.DebugFormatted("[Demigod] Public Swarm address = {}", pub.ToString());
-
-		// logger.DebugFormatted("[Interlink]Registered in ProxyRegistry as
-		// {}:{}",
-		//					   NetworkCredentials::Get().GetID().ToString(), ipAddress.ToString());
+		IPAddress publicAddress = ipAddress;
+		if (const auto publicIp = GetNonEmptyEnv("INTERLINK_PUBLIC_IP");
+			publicIp.has_value())
+		{
+			uint32_t publicPort = _PORT_PROXY;
+			if (const auto publicPortText = GetNonEmptyEnv("INTERLINK_PUBLIC_PORT");
+				publicPortText.has_value())
+			{
+				try
+				{
+					publicPort = static_cast<uint32_t>(std::stoul(*publicPortText));
+				}
+				catch (...)
+				{
+					publicPort = _PORT_PROXY;
+				}
+			}
+			publicAddress = BuildInterlinkAddress(*publicIp, static_cast<PortType>(publicPort));
+		}
+		ServerRegistry::Get().RegisterPublicAddress(NetworkCredentials::Get().GetID(),
+													publicAddress);
+		logger.DebugFormatted("[Interlink] Registered proxy public address {}",
+							  publicAddress.ToString());
 	}
 	else
 	{
-		// Register internal (container) address
-		IPAddress ipAddress;
-		ipAddress.Parse(DockerIO::Get().GetSelfContainerIP() + ":" +
-						std::to_string(_PORT_INTERLINK));
 		ServerRegistry::Get().RegisterSelf(NetworkCredentials::Get().GetID(), ipAddress);
 		logger.DebugFormatted("[Interlink]Registered in ServerRegistry as {}:{}",
 							  NetworkCredentials::Get().GetID().ToString(), ipAddress.ToString());
+	}
+
+	if (NetworkCredentials::Get().GetID().Type == NetworkIdentityType::eShard)
+	{
+		NodeManifestEntry entry;
+		if (const auto nodeName = GetNonEmptyEnv("NODE_NAME"); nodeName.has_value())
+		{
+			entry.nodeName = *nodeName;
+		}
+		if (const auto podName = GetNonEmptyEnv("POD_NAME"); podName.has_value())
+		{
+			entry.podName = *podName;
+		}
+		if (const auto podIp = GetNonEmptyEnv("POD_IP"); podIp.has_value())
+		{
+			entry.podIP = *podIp;
+		}
+		else
+		{
+			entry.podIP = advertiseIp;
+		}
+
+		NodeManifest::Get().RegisterShardNode(NetworkCredentials::Get().GetID(), entry);
 	}
 
 	// Existing post-init behavior (unchanged)

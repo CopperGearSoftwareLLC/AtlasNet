@@ -14,6 +14,7 @@ import { HardcodedDecodeToggle } from '../database/RevertByteOptimation/Hardcode
 const DEFAULT_AUTHORITY_POLL_INTERVAL_MS = 250;
 const MIN_AUTHORITY_POLL_INTERVAL_MS = 50;
 const MAX_AUTHORITY_POLL_INTERVAL_MS = 1000;
+const AUTHORITY_POLL_DISABLED_AT_MS = MAX_AUTHORITY_POLL_INTERVAL_MS;
 const DEFAULT_DATABASE_POLL_INTERVAL_MS = 1000;
 const MIN_DATABASE_POLL_INTERVAL_MS = 250;
 const MAX_DATABASE_POLL_INTERVAL_MS = 5000;
@@ -208,8 +209,12 @@ export default function ClientsPage() {
   const [databaseErrorText, setDatabaseErrorText] = useState<string | null>(null);
   const decodeSerializedRef = useRef(decodeSerialized);
 
+  const authorityTelemetryPollIntervalMs =
+    authorityPollIntervalMs >= AUTHORITY_POLL_DISABLED_AT_MS
+      ? 0
+      : authorityPollIntervalMs;
   const authorityRows = useAuthorityEntities({
-    intervalMs: authorityPollIntervalMs,
+    intervalMs: authorityTelemetryPollIntervalMs,
     enabled: true,
     resetOnException: false,
     resetOnHttpError: false,
@@ -394,7 +399,9 @@ export default function ClientsPage() {
                 )
               }
             />
-            {authorityPollIntervalMs}ms
+            {authorityPollIntervalMs >= AUTHORITY_POLL_DISABLED_AT_MS
+              ? 'off'
+              : `${authorityPollIntervalMs}ms`}
           </label>
 
           <label className="flex items-center gap-2">

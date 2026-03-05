@@ -13,6 +13,7 @@ interface ShardHoverTooltipProps {
   downloadBytesPerSec: number;
   uploadBytesPerSec: number;
   outgoingConnectionCount: number;
+  workerNodeName: string | null;
 }
 
 export function ShardHoverTooltip({
@@ -21,6 +22,7 @@ export function ShardHoverTooltip({
   hoveredShardId,
   outgoingConnectionCount,
   uploadBytesPerSec,
+  workerNodeName,
 }: ShardHoverTooltipProps) {
   if (!hoveredShardId || !hoveredShardAnchor) {
     return null;
@@ -61,6 +63,9 @@ export function ShardHoverTooltip({
       </div>
       <div style={{ color: '#cbd5e1', marginBottom: 4 }}>
         Down {formatRate(downloadBytesPerSec)} B/s {' • '}Up {formatRate(uploadBytesPerSec)} B/s
+      </div>
+      <div style={{ color: '#cbd5e1', marginBottom: 4 }}>
+        Worker node: {workerNodeName || 'unknown'}
       </div>
       <div style={{ color: '#94a3b8' }}>{outgoingConnectionCount} outgoing connections</div>
     </div>

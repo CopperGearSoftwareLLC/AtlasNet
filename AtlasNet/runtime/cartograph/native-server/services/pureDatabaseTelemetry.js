@@ -7,11 +7,22 @@ const AUTHORITY_TELEMETRY_KEY = 'Authority_Telemetry';
 const HEALTH_PING_KEY = 'Health_Ping';
 const NETWORK_TELEMETRY_KEY = 'Network_Telemetry';
 const HEURISTIC_MANIFEST_KEY = 'HeuristicManifest';
+const NODE_MANIFEST_SHARD_NODE_KEY = 'Node Manifest Shard_Node';
+const TRANSFER_MANIFEST_KEY = 'Transfer::TransferManifest';
+const TRANSFER_STATE_QUEUE_KEY = 'Transfer::TransferStateQueue';
 
 const AUTHORITY_TELEMETRY_COLUMN_COUNT = 7;
 const NETWORK_TELEMETRY_COLUMN_COUNT = 13;
 const GRID_SHAPE_SERIALIZED_SIZE_BYTES = 28;
 const CLAIMED_OWNER_MAP_CACHE_TTL_MS = 500;
+const TRANSFER_STAGE_SOURCE_STATES = new Set(['eNone', 'ePrepare', 'eUnknown']);
+const VALID_TRANSFER_STAGES = new Set([
+  'eNone',
+  'ePrepare',
+  'eReady',
+  'eCommit',
+  'eComplete',
+]);
 
 const NETWORK_IDENTITY_TYPE_BY_CODE = {
   0: 'eInvalid',
@@ -142,6 +153,46 @@ function normalizeRedisJsonPayload(payload) {
   }
 }
 
+function parseNodeManifestPayload(payload) {
+  if (payload == null) {
+    return null;
+  }
+
+  let parsed = null;
+  if (Buffer.isBuffer(payload)) {
+    try {
+      parsed = JSON.parse(payload.toString('utf8'));
+    } catch {
+      return null;
+    }
+  } else if (typeof payload === 'string') {
+    try {
+      parsed = JSON.parse(payload);
+    } catch {
+      return null;
+    }
+  } else if (payload && typeof payload === 'object') {
+    parsed = payload;
+  }
+
+  if (!parsed || typeof parsed !== 'object') {
+    return null;
+  }
+
+  const nodeName = typeof parsed.nodeName === 'string' ? parsed.nodeName.trim() : '';
+  const podName = typeof parsed.podName === 'string' ? parsed.podName.trim() : '';
+  const podIp = typeof parsed.podIp === 'string' ? parsed.podIp.trim() : '';
+  if (!nodeName && !podName && !podIp) {
+    return null;
+  }
+
+  return {
+    nodeName: nodeName || null,
+    podName: podName || null,
+    podIp: podIp || null,
+  };
+}
+
 function decodeGridShapeBounds(base64Value) {
   if (typeof base64Value !== 'string' || base64Value.length === 0) {
     return null;
@@ -209,6 +260,89 @@ function toRectangleShape(bounds, ownerId, color) {
   };
 }
 
+function decodeVoronoiBounds(base64Value) {
+  if (typeof base64Value !== 'string' || base64Value.length === 0) {
+    return null;
+  }
+  let raw = null;
+  try {
+    raw = Buffer.from(base64Value, 'base64');
+  } catch {
+    return null;
+  }
+  if (!raw || raw.length < 8) {
+    return null;
+  }
+  try {
+    const id = raw.readUInt32BE(0);
+    const count = raw.readUInt32BE(4);
+    if (!Number.isFinite(count) || count < 3 || count > 2048) {
+      return null;
+    }
+    let offset = 8;
+    const points = [];
+    for (let i = 0; i < count; i += 1) {
+      if (offset + 8 > raw.length) {
+        return null;
+      }
+      const x = raw.readFloatBE(offset);
+      const y = raw.readFloatBE(offset + 4);
+      offset += 8;
+      if (!Number.isFinite(x) || !Number.isFinite(y)) {
+        return null;
+      }
+      points.push({ x, y });
+    }
+    return { id, points };
+  } catch {
+    return null;
+  }
+}
+
+function toPolygonShape(id, points, ownerId, color) {
+  if (!Array.isArray(points) || points.length < 3) {
+    return null;
+  }
+  let minX = Infinity;
+  let minY = Infinity;
+  let maxX = -Infinity;
+  let maxY = -Infinity;
+  let cx = 0;
+  let cy = 0;
+  for (const p of points) {
+    const x = Number(p?.x);
+    const y = Number(p?.y);
+    if (!Number.isFinite(x) || !Number.isFinite(y)) {
+      return null;
+    }
+    cx += x;
+    cy += y;
+    minX = Math.min(minX, x);
+    minY = Math.min(minY, y);
+    maxX = Math.max(maxX, x);
+    maxY = Math.max(maxY, y);
+  }
+  cx /= points.length;
+  cy /= points.length;
+
+  // Cartograph expects polygon points to be local offsets from `position`.
+  const localPoints = points.map((p) => ({
+    x: Number(p.x) - cx,
+    y: Number(p.y) - cy,
+  }));
+
+  return {
+    id: String(id),
+    ownerId: ownerId || '',
+    type: 3,
+    position: { x: cx, y: cy },
+    radius: 0,
+    size: { x: Math.abs(maxX - minX), y: Math.abs(maxY - minY) },
+    color,
+    points: localPoints,
+  };
+}
+
 function getManifestEntryValues(section) {
   if (Array.isArray(section)) {
     return section;
@@ -217,6 +351,125 @@ function getManifestEntryValues(section) {
     return Object.values(section);
   }
   return [];
+}
+
+function normalizeTransferStage(value) {
+  const stage = typeof value === 'string' ? value.trim() : '';
+  return VALID_TRANSFER_STAGES.has(stage) ? stage : 'eUnknown';
+}
+
+function deriveTransferLinkState(stage) {
+  return TRANSFER_STAGE_SOURCE_STATES.has(stage) ? 'source' : 'target';
+}
+
+function toTrimmedString(value) {
+  return typeof value === 'string' ? value.trim() : '';
+}
+
+function decodeIdentityFromBase64(value) {
+  const base64 = toTrimmedString(value);
+  if (!base64) {
+    return '';
+  }
+  try {
+    return decodeNetworkIdentity(Buffer.from(base64, 'base64')).trim();
+  } catch {
+    return '';
+  }
+}
+
+function resolveTransferIdentity(record, plainKey, encodedKey) {
+  const plain = toTrimmedString(record?.[plainKey]);
+  if (plain) {
+    return plain;
+  }
+  return decodeIdentityFromBase64(record?.[encodedKey]);
+}
+
+function parseTransferEntityIds(raw) {
+  const values = Array.isArray(raw)
+    ? raw
+    : raw && typeof raw === 'object'
+    ? Object.values(raw)
+    : [];
+
+  const out = [];
+  const seen = new Set();
+  for (const value of values) {
+    const id = toTrimmedString(value);
+    if (!id || seen.has(id)) {
+      continue;
+    }
+    seen.add(id);
+    out.push(id);
+  }
+  return out;
+}
+
+function normalizeTransferState(value, stage) {
+  const raw = toTrimmedString(value).toLowerCase();
+  if (raw === 'source' || raw === 'target') {
+    return raw;
+  }
+  return deriveTransferLinkState(stage);
+}
+
+function normalizeTransferStateQueueEventPayload(payload) {
+  if (payload == null) {
+    return null;
+  }
+
+  let parsed = null;
+  if (Buffer.isBuffer(payload)) {
+    try {
+      parsed = JSON.parse(payload.toString('utf8'));
+    } catch {
+      return null;
+    }
+  } else if (typeof payload === 'string') {
+    const raw = payload.trim();
+    if (!raw) {
+      return null;
+    }
+    try {
+      parsed = JSON.parse(raw);
+    } catch {
+      return null;
+    }
+  } else if (payload && typeof payload === 'object') {
+    parsed = payload;
+  }
+
+  if (!parsed || typeof parsed !== 'object') {
+    return null;
+  }
+
+  const stage = normalizeTransferStage(parsed.stage ?? parsed.Stage);
+  const fromId = resolveTransferIdentity(parsed, 'fromId', 'From(64)');
+  const toId = resolveTransferIdentity(parsed, 'toId', 'To(64)');
+  const entityIds = parseTransferEntityIds(parsed.entityIds ?? parsed.EntityIDs);
+  if (!fromId || !toId || entityIds.length === 0) {
+    return null;
+  }
+
+  const transferId =
+    toTrimmedString(parsed.transferId ?? parsed.id ?? parsed.TransferID) ||
+    `${fromId}->${toId}:${stage}`;
+
+  const timestampMsRaw = Number(parsed.timestampMs ?? parsed.tsMs);
+  const timestampMs = Number.isFinite(timestampMsRaw)
+    ? Math.floor(timestampMsRaw)
+    : Date.now();
+
+  return {
+    transferId,
+    fromId,
+    toId,
+    stage,
+    state: normalizeTransferState(parsed.state ?? parsed.linkState ?? parsed.State, stage),
+    entityIds,
+    timestampMs,
+  };
 }
 
 async function readAuthorityTelemetryFromDatabase() {
@@ -237,6 +490,78 @@ async function readAuthorityTelemetryFromDatabase() {
       }
 
       rows.sort((left, right) => left[0].localeCompare(right[0]));
+      return rows;
+    })) || []
+  );
+}
+
+async function readTransferManifestFromDatabase() {
+  return (
+    (await withInternalDatabase(async (client) => {
+      const payload = await client.call('JSON.GET', TRANSFER_MANIFEST_KEY, '.');
+      const manifest = normalizeRedisJsonPayload(payload);
+      if (!manifest || typeof manifest !== 'object') {
+        return [];
+      }
+
+      const transfers = manifest.EntityTransfers;
+      if (!transfers || typeof transfers !== 'object') {
+        return [];
+      }
+
+      const rows = [];
+      for (const [transferId, entry] of Object.entries(transfers)) {
+        if (!entry || typeof entry !== 'object') {
+          continue;
+        }
+
+        const stage = normalizeTransferStage(entry.Stage);
+        const fromId = resolveTransferIdentity(entry, 'From', 'From(64)');
+        const toId = resolveTransferIdentity(entry, 'To', 'To(64)');
+        const entityIds = parseTransferEntityIds(entry.EntityIDs);
+        if (!fromId || !toId || entityIds.length === 0) {
+          continue;
+        }
+
+        rows.push({
+          transferId: String(transferId).trim() || `${fromId}->${toId}:${stage}`,
+          fromId,
+          toId,
+          stage,
+          state: deriveTransferLinkState(stage),
+          entityIds,
+        });
+      }
+
+      rows.sort((left, right) => left.transferId.localeCompare(right.transferId));
+      return rows;
+    })) || []
+  );
+}
+
+async function readTransferStateQueueFromDatabase() {
+  return (
+    (await withInternalDatabase(async (client) => {
+      const results = await client
+        .multi()
+        .lrange(TRANSFER_STATE_QUEUE_KEY, 0, -1)
+        .del(TRANSFER_STATE_QUEUE_KEY)
+        .exec();
+
+      const [lrangeErr, rawEntries] = Array.isArray(results) ? results[0] || [] : [];
+      if (lrangeErr || !Array.isArray(rawEntries)) {
+        return [];
+      }
+
+      const rows = [];
+      for (const rawEntry of rawEntries) {
+        const row = normalizeTransferStateQueueEventPayload(rawEntry);
+        if (!row) {
+          continue;
+        }
+        rows.push(row);
+      }
+
       return rows;
     })) || []
   );
@@ -284,6 +609,61 @@ async function readNetworkTelemetryFromDatabase() {
   );
 }
 
+async function readShardPlacementFromDatabase() {
+  return (
+    (await withInternalDatabase(async (client) => {
+      const liveIdsRaw =
+        typeof client.hkeysBuffer === 'function'
+          ? await client.hkeysBuffer(HEALTH_PING_KEY)
+          : await client.hkeys(HEALTH_PING_KEY);
+      const liveShardSet = new Set();
+      if (Array.isArray(liveIdsRaw)) {
+        for (const rawId of liveIdsRaw) {
+          const shardId = decodeNetworkIdentity(rawId).trim();
+          if (shardId.startsWith('eShard ')) {
+            liveShardSet.add(shardId);
+          }
+        }
+      }
+
+      const fieldKeys =
+        typeof client.hkeysBuffer === 'function'
+          ? await client.hkeysBuffer(NODE_MANIFEST_SHARD_NODE_KEY)
+          : await client.hkeys(NODE_MANIFEST_SHARD_NODE_KEY);
+      if (!Array.isArray(fieldKeys) || fieldKeys.length === 0) {
+        return [];
+      }
+
+      const rows = [];
+      for (const rawField of fieldKeys) {
+        const shardId = decodeNetworkIdentity(rawField).trim();
+        if (!shardId.startsWith('eShard ') || !liveShardSet.has(shardId)) {
+          continue;
+        }
+
+        const rawPayload =
+          typeof client.hgetBuffer === 'function'
+            ? await client.hgetBuffer(NODE_MANIFEST_SHARD_NODE_KEY, rawField)
+            : await client.hget(NODE_MANIFEST_SHARD_NODE_KEY, rawField);
+        const placement = parseNodeManifestPayload(rawPayload);
+        if (!placement) {
+          continue;
+        }
+
+        rows.push({
+          shardId,
+          nodeName: placement.nodeName,
+          podName: placement.podName,
+          podIp: placement.podIp,
+        });
+      }
+
+      rows.sort((left, right) => left.shardId.localeCompare(right.shardId));
+      return rows;
+    })) || []
+  );
+}
+
 async function readHeuristicShapesFromDatabase() {
   return (
     (await withInternalDatabase(async (client) => {
@@ -293,17 +673,36 @@ async function readHeuristicShapesFromDatabase() {
         return [];
       }
 
+      const heuristicType =
+        typeof manifest.HeuristicType === 'string'
+          ? manifest.HeuristicType.trim()
+          : null;
+
       const shapes = [];
 
       for (const value of getManifestEntryValues(manifest.Pending)) {
         if (!value || typeof value !== 'object') {
           continue;
         }
-        const bounds = decodeGridShapeBounds(value.BoundsData64);
-        if (!bounds) {
-          continue;
+        let shape = null;
+        if (heuristicType === 'Voronoi') {
+          const decoded = decodeVoronoiBounds(value.BoundsData64);
+          if (decoded) {
+            shape = toPolygonShape(
+              decoded.id,
+              decoded.points,
+              '',
+              'rgba(255, 149, 100, 1)'
+            );
+          }
         }
-        const shape = toRectangleShape(bounds, '', 'rgba(255, 149, 100, 1)');
+        if (!shape) {
+          const bounds = decodeGridShapeBounds(value.BoundsData64);
+          if (!bounds) {
+            continue;
+          }
+          shape = toRectangleShape(bounds, '', 'rgba(255, 149, 100, 1)');
+        }
         if (shape) {
           shapes.push(shape);
         }
@@ -313,11 +712,6 @@ async function readHeuristicShapesFromDatabase() {
         if (!value || typeof value !== 'object') {
           continue;
         }
-        const bounds = decodeGridShapeBounds(value.BoundsData64);
-        if (!bounds) {
-          continue;
-        }
-
         let ownerId =
           typeof value.OwnerName === 'string' ? value.OwnerName : '';
         if (!ownerId && typeof value.Owner64 === 'string') {
@@ -327,12 +721,25 @@ async function readHeuristicShapesFromDatabase() {
             ownerId = '';
           }
         }
-
-        const shape = toRectangleShape(
-          bounds,
-          ownerId,
-          'rgba(100, 255, 149, 1)'
-        );
+        let shape = null;
+        if (heuristicType === 'Voronoi') {
+          const decoded = decodeVoronoiBounds(value.BoundsData64);
+          if (decoded) {
+            shape = toPolygonShape(
+              decoded.id,
+              decoded.points,
+              ownerId,
+              'rgba(100, 255, 149, 1)'
+            );
+          }
+        }
+        if (!shape) {
+          const bounds = decodeGridShapeBounds(value.BoundsData64);
+          if (!bounds) {
+            continue;
+          }
+          shape = toRectangleShape(bounds, ownerId, 'rgba(100, 255, 149, 1)');
+        }
         if (shape) {
           shapes.push(shape);
         }
@@ -435,7 +842,10 @@ async function readHeuristicTypeFromDatabase() {
 
 module.exports = {
   readAuthorityTelemetryFromDatabase,
+  readTransferManifestFromDatabase,
+  readTransferStateQueueFromDatabase,
   readNetworkTelemetryFromDatabase,
+  readShardPlacementFromDatabase,
   readHeuristicShapesFromDatabase,
   readHeuristicClaimedOwnersFromDatabase,
   readHeuristicTypeFromDatabase,

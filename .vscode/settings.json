@@ -37,5 +37,12 @@
   "java.compile.nullAnalysis.mode": "disabled",
   "java.configuration.updateBuildConfiguration": "automatic",
   "cmake.useCMakePresets": "never",
-  "explorer.compactFolders": false
+  "explorer.compactFolders": false,
+  "remote.autoForwardPorts": false,
+  "remote.restoreForwardedPorts": false,
+  "remote.portsAttributes": {
+    "6443": {
+      "onAutoForward": "ignore"
+    }
+  }
 }

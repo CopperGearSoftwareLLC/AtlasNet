@@ -11,6 +11,9 @@
 #include "Global/Serialize/ByteReader.hpp"
 #include "Global/pch.hpp"
 #include "Heuristic/GridHeuristic/GridHeuristic.hpp"
+#include "Heuristic/Quadtree/QuadtreeHeuristic.hpp"
+#include "Heuristic/Voronoi/VoronoiHeuristic.hpp"
+#include "Heuristic/Voronoi/VoronoiBounds.hpp"
 #include "Heuristic/IHeuristic.hpp"
 #include "InternalDB/InternalDB.hpp"
 #include "Network/NetworkIdentity.hpp"
@@ -79,7 +82,7 @@ void HeuristicManifest::GetPendingBoundsAsByteReaders(
 		return;
 	}
 	auto pendingIt = manifestJson->find(JSONPendingEntry);
-	if (pendingIt == manifestJson->end() || !pendingIt->is_object())
+	if (pendingIt == manifestJson->end() || !pendingIt->is_array())
 	{
 		return;
 	}
@@ -105,7 +108,8 @@ void HeuristicManifest::StorePendingBoundsFromByteWriters(
 		ByteWriter bw_id;
 		bw_id.u32(ID);
 		s_id = bw_id.as_string_view();
-		PendingBoundStruct p{.ID = ID, .BoundsDataBase64 = std::string(writer.as_string_base_64())};
+		PendingBoundStruct p{.ID = ID,
+							 .BoundsDataBase64 = std::string(writer.as_string_base_64())};
 		Internal_InsertPendingBound(p);
 	}
 }
@@ -120,7 +124,7 @@ long long HeuristicManifest::GetPendingBoundsCount() const
 		return 0;
 	}
 	auto pendingIt = manifestJson->find(JSONPendingEntry);
-	if (pendingIt == manifestJson->end() || !pendingIt->is_object())
+	if (pendingIt == manifestJson->end() || !pendingIt->is_array())
 	{
 		return 0;
 	}
@@ -137,7 +141,7 @@ long long HeuristicManifest::GetClaimedBoundsCount() const
 		return 0;
 	}
 	auto claimedIt = manifestJson->find(JSONClaimedEntry);
-	if (claimedIt == manifestJson->end() || !claimedIt->is_object())
+	if (claimedIt == manifestJson->end() || !claimedIt->is_array())
 	{
 		return 0;
 	}
@@ -225,7 +229,11 @@ IHeuristic::Type HeuristicManifest::GetActiveHeuristicType() const
 std::optional<NetworkIdentity> HeuristicManifest::ShardFromPosition(const Transform& t)
 {
 	const auto heuristic = PullHeuristic();
-	ASSERT(heuristic, "Pull heuristic returned nothing");
+	if (!heuristic)
+	{
+		logger.Warning("ShardFromPosition called before heuristic data is ready.");
+		return std::nullopt;
+	}
 	const auto boundID = heuristic->QueryPosition(t.position);
 	if (!boundID.has_value()) return std::nullopt;
 	logger.DebugFormatted("found bound for position {}", *boundID);
@@ -256,7 +264,7 @@ void HeuristicManifest::GetClaimedBoundsAsByteReaders(
 		return;
 	}
 	auto claimedIt = manifestJson->find(JSONClaimedEntry);
-	if (claimedIt == manifestJson->end() || !claimedIt->is_object())
+	if (claimedIt == manifestJson->end() || !claimedIt->is_array())
 	{
 		return;
 	}
@@ -389,14 +397,18 @@ std::unique_ptr<IHeuristic> HeuristicManifest::PullHeuristic()
 		case IHeuristic::Type::eGridCell:
 			heuristic = std::make_unique<GridHeuristic>();
 			break;
-		case IHeuristic::Type::eOctree:
-			break;
 		case IHeuristic::Type::eQuadtree:
+			heuristic = std::make_unique<QuadtreeHeuristic>();
+			break;
+		case IHeuristic::Type::eVoronoi:
+			heuristic = std::make_unique<VoronoiHeuristic>();
+			break;
+		case IHeuristic::Type::eOctree:
 			break;
 
 		default:
 		case IHeuristic::Type::eNone:
-			throw std::runtime_error("Invalid Heuristic?");
+			return nullptr;
 			break;
 	}
 	const auto serializedData64 = InternalDB::Get()->WithSync(
@@ -412,14 +424,30 @@ std::unique_ptr<IHeuristic> HeuristicManifest::PullHeuristic()
 
 			return r.template command<std::optional<std::string>>(get_cmd.begin(), get_cmd.end());
 		});
-	ASSERT(serializedData64.has_value(), "Heuristic Serialize data has no data?");
+	if (!serializedData64.has_value())
+	{
+		return nullptr;
+	}
 	std::string encoded = serializedData64.value();
 	if (encoded.size() >= 2 && encoded.front() == '"' && encoded.back() == '"')
 	{
 		encoded = encoded.substr(1, encoded.size() - 2);
 	}
-	ByteReader br(encoded, true);
-	heuristic->Deserialize(br);
+	try
+	{
+		ByteReader br(encoded, true);
+		heuristic->Deserialize(br);
+	}
+	catch (const std::exception& e)
+	{
+		logger.WarningFormatted("Failed to deserialize heuristic payload: {}", e.what());
+		return nullptr;
+	}
+	catch (...)
+	{
+		logger.Warning("Failed to deserialize heuristic payload due to unknown error.");
+		return nullptr;
+	}
 
 	return heuristic;
 }
@@ -510,8 +538,18 @@ return tonumber(id)
 	if (claimedID.has_value())
 	{
 		const auto BoundData = GetClaimedBound(*claimedID);
+		if (!BoundData.has_value())
+		{
+			logger.WarningFormatted("Claimed bound ID {} could not be reloaded from manifest.",
+								   *claimedID);
+			return nullptr;
+		}
 		ByteReader br(BoundData->BoundsDataBase64, true);
 		auto bound = Internal_CreateIBoundInst();
+		if (!bound)
+		{
+			return nullptr;
+		}
 		bound->Deserialize(br);
 		return bound;
 	}
@@ -523,10 +561,14 @@ std::unique_ptr<IBounds> HeuristicManifest::Internal_CreateIBoundInst()
 	switch (hType)
 	{
 		case IHeuristic::Type::eGridCell:
+		case IHeuristic::Type::eQuadtree:
+			// Both grid and quadtree heuristics currently use GridShape bounds.
 			return std::make_unique<GridShape>();
 			break;
+		case IHeuristic::Type::eVoronoi:
+			return std::make_unique<VoronoiBounds>();
+			break;
 		case IHeuristic::Type::eOctree:
-		case IHeuristic::Type::eQuadtree:
 		case IHeuristic::Type::eInvalid:
 		case IHeuristic::Type::eNone:
 			logger.ErrorFormatted("Unrecognized HeuristicType {}", IHeuristic::TypeToString(hType));

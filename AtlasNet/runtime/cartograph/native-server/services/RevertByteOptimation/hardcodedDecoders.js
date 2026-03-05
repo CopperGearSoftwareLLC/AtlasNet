@@ -11,6 +11,7 @@ const {
 const AUTHORITY_ENTITY_SNAPSHOTS_KEY = 'Authority_EntitySnapshots';
 const SERVER_REGISTRY_KEY = 'Server Registry ID_IP';
 const SERVER_REGISTRY_PUBLIC_KEY = 'Server Registry ID_IP_public';
+const NODE_MANIFEST_SHARD_NODE_KEY = 'Node Manifest Shard_Node';
 const HEALTH_PING_KEY = 'Health_Ping';
 const CLIENT_ID_TO_IP_KEY = 'ClientID to IP';
 const CLIENT_ID_TO_PROXY_ID_KEY = 'ClientID to ProxyID';
@@ -193,6 +194,10 @@ const HARDCODED_HASH_DECODERS = {
     decodeValue: (value) => decodeRedisDisplayValue(value),
   },
   [SERVER_REGISTRY_PUBLIC_KEY]: {
+    decodeField: (field) => decodeNetworkIdentityValue(field),
+    decodeValue: (value) => decodeRedisDisplayValue(value),
+  },
+  [NODE_MANIFEST_SHARD_NODE_KEY]: {
     decodeField: (field) => decodeNetworkIdentityValue(field),
     decodeValue: (value) => decodeRedisDisplayValue(value),
   },

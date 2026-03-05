@@ -1,8 +1,10 @@
 import { useMemo } from 'react';
 import type {
+  AuthorityLinkMode,
   AuthorityEntityTelemetry,
   ShapeJS,
   ShardTelemetry,
+  TransferManifestTelemetry,
 } from '../cartographTypes';
 import {
   buildHoveredShardEdgeLabels,
@@ -15,6 +17,7 @@ import {
   computeProjectedShardPositions,
   computeShardAnchorPositions,
   computeShardBoundsById,
+  computeShardPolygonsById,
   computeShardHoverBoundsById,
   type HoveredShardEdgeLabel,
   type ShardHoverBounds,
@@ -24,6 +27,8 @@ interface UseMapDerivedDataArgs {
   baseShapes: ShapeJS[];
   networkTelemetry: ShardTelemetry[];
   authorityEntities: AuthorityEntityTelemetry[];
+  authorityLinkMode: AuthorityLinkMode;
+  transferManifest: TransferManifestTelemetry[];
   showAuthorityEntities: boolean;
   showGnsConnections: boolean;
   hoveredShardId: string | null;
@@ -36,14 +41,17 @@ interface MapDerivedData {
   networkNodeIds: string[];
   networkNodeIdSet: Set<string>;
   shardHoverBoundsById: Map<string, ShardHoverBounds>;
+  shardPolygonsById: Map<string, { x: number; y: number }[][]>;
   shardTelemetryById: Map<string, ShardTelemetry>;
 }
 
 export function useMapDerivedData({
   authorityEntities,
+  authorityLinkMode,
   baseShapes,
   hoveredShardId,
   networkTelemetry,
+  transferManifest,
   showAuthorityEntities,
   showGnsConnections,
 }: UseMapDerivedDataArgs): MapDerivedData {
@@ -64,6 +72,11 @@ export function useMapDerivedData({
 
   const shardBoundsById = useMemo(
     () => computeShardBoundsById(baseShapes),
+    [baseShapes]
+  );
+
+  const shardPolygonsById = useMemo(
+    () => computeShardPolygonsById(baseShapes),
     [baseShapes]
   );
 
@@ -122,21 +135,25 @@ export function useMapDerivedData({
     () =>
       buildOverlayShapes({
         authorityEntities,
+        authorityLinkMode,
         networkTelemetry,
         networkNodeIds,
         networkNodeIdSet,
         ownerPositions,
         projectedShardPositions,
+        transferManifest,
         showAuthorityEntities,
         showGnsConnections,
       }),
     [
       authorityEntities,
+      authorityLinkMode,
       networkTelemetry,
       networkNodeIds,
       networkNodeIdSet,
       ownerPositions,
       projectedShardPositions,
+      transferManifest,
       showAuthorityEntities,
       showGnsConnections,
     ]
@@ -154,6 +171,7 @@ export function useMapDerivedData({
     networkNodeIds,
     networkNodeIdSet,
     shardHoverBoundsById,
+    shardPolygonsById,
     shardTelemetryById,
   };
 }

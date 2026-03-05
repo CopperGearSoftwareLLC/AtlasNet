@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 import { normalizeDatabaseSnapshot } from '../../lib/server/databaseSnapshot';
 import { fetchNativeJson } from '../../lib/server/nativeClient';
 
-const TIMEOUT_MS = 1000;
+const TIMEOUT_MS = 5000;
 
 function parseOptionalBooleanFlag(raw: string): boolean | undefined {
   const normalized = raw.trim().toLowerCase();
@@ -50,5 +50,12 @@ export async function GET(req: Request) {
     timeoutMs: TIMEOUT_MS,
     query,
   });
+  if (payload == null) {
+    return NextResponse.json(
+      { error: 'Database snapshot unavailable' },
+      { status: 502 }
+    );
+  }
+
   return NextResponse.json(normalizeDatabaseSnapshot(payload), { status: 200 });
 }

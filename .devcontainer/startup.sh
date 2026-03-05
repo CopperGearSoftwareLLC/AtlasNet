@@ -77,12 +77,19 @@ case "$MODE" in
     #
     # In noVNC UI, set Scaling mode to "Remote Resizing" to have it request
     # desktop size changes as your browser window changes.
-    # (noVNC calls this "resizeSession", disabled by default.) :contentReference[oaicite:1]{index=1}
+    # (noVNC calls this "resizeSession", disabled by default.)
     exec websockify --web=/usr/share/novnc/ 6080 127.0.0.1:5901
     ;;
 
+  hostproxy)
+    LISTEN_PORT="${2:?usage: $0 hostproxy <listen-port> [target-host] [target-port]}"
+    TARGET_HOST="${3:-host.docker.internal}"
+    TARGET_PORT="${4:-$LISTEN_PORT}"
+    exec socat "TCP-LISTEN:${LISTEN_PORT},fork,reuseaddr" "TCP:${TARGET_HOST}:${TARGET_PORT}"
+    ;;
+
   *)
-    echo "usage: $0 {dockerd|tigervnc|fluxbox|novnc}"
+    echo "usage: $0 {dockerd|tigervnc|fluxbox|novnc|hostproxy}"
     exit 2
     ;;
 esac

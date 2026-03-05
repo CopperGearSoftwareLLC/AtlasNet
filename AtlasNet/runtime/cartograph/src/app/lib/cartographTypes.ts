@@ -12,6 +12,7 @@ export interface ShapeJS {
   size?: Vec2;
   points?: Vec2[];
   color?: string;
+  label?: string;
 }
 
 export interface ConnectionTelemetry {
@@ -38,6 +39,13 @@ export interface ShardTelemetry {
   connections: ConnectionTelemetry[];
 }
 
+export interface ShardPlacementTelemetry {
+  shardId: string;
+  nodeName: string | null;
+  podName: string | null;
+  podIp: string | null;
+}
+
 export interface AuthorityEntityTelemetry {
   entityId: string;
   ownerId: string;
@@ -47,6 +55,37 @@ export interface AuthorityEntityTelemetry {
   z: number;
   isClient: boolean;
   clientId: string;
+}
+
+export type AuthorityLinkMode = 'owner' | 'handoff';
+
+export type TransferManifestStage =
+  | 'eNone'
+  | 'ePrepare'
+  | 'eReady'
+  | 'eCommit'
+  | 'eComplete'
+  | 'eUnknown';
+
+export type TransferLinkState = 'source' | 'target';
+
+export interface TransferManifestTelemetry {
+  transferId: string;
+  fromId: string;
+  toId: string;
+  stage: TransferManifestStage;
+  state: TransferLinkState;
+  entityIds: string[];
+}
+
+export interface TransferStateQueueTelemetry {
+  transferId: string;
+  fromId: string;
+  toId: string;
+  stage: TransferManifestStage;
+  state: TransferLinkState;
+  entityIds: string[];
+  timestampMs: number;
 }
 
 export interface DatabaseRecord {
@@ -101,6 +140,15 @@ export interface WorkerSwarmNodeTelemetry {
   managerStatus: string | null;
   engineVersion: string;
   tlsStatus: string | null;
+  address?: string | null;
+  cpuUsageCores?: number | null;
+  cpuCapacityCores?: number | null;
+  cpuUsagePct?: number | null;
+  memoryUsageBytes?: number | null;
+  memoryCapacityBytes?: number | null;
+  memoryUsagePct?: number | null;
+  containers?: WorkerContainerTelemetry[];
+  aggregateLogs?: string;
 }
 
 export interface WorkerContainerTelemetry {
@@ -113,6 +161,14 @@ export interface WorkerContainerTelemetry {
   runningFor: string;
   createdAt: string;
   ports: string;
+  nodeId?: string;
+  logs?: string;
+  cpuUsageCores?: number | null;
+  cpuCapacityCores?: number | null;
+  cpuUsagePct?: number | null;
+  memoryUsageBytes?: number | null;
+  memoryCapacityBytes?: number | null;
+  memoryUsagePct?: number | null;
 }
 
 export interface WorkerContextTelemetry {

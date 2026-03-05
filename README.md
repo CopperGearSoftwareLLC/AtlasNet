@@ -218,15 +218,36 @@ networks:
     name: AtlasNet
 ```
 ### <img src="docs/assets/Kubernetes_logo.svg" width="24" height="24"/> Kubernetes
----
+Local k3d dev deployment is available via:
+
+```bash
+cmake --build build --target sandbox_atlasnet_run
+```
+
+This now:
+- prunes unused Docker images and volumes after deployment finishes (set `ATLASNET_SKIP_DOCKER_PRUNE=1` to skip)
+- frees AtlasNet runtime ports
+- creates/uses k3d cluster `atlasnet-dev`
+- imports locally built images (`watchdog`, `proxy`, `cartograph`, `sandbox-server`)
+- deploys Kubernetes manifests from `deploy/k8s/overlays/k3d/`
+
+Default host endpoints:
+- Cartograph: `http://127.0.0.1:3000`
+- Proxy: `127.0.0.1:2555` (TCP/UDP)
 
 ## Dev container
 
 The repo includes a **dev container** (`.devcontainer/`) with:
 
-- vcpkg, Docker-in-Docker, Node.js (LTS)
+- vcpkg, Docker-outside-of-Docker (host socket), Node.js (LTS)
 - Extensions: CMake, Clangd, Docker, etc.
 
 Use it in VS Code/Cursor with “Reopen in Container” to get a consistent build and run environment.
 
+When running DooD from the dev container, application ports are published by the host Docker daemon directly.
+Portainer is auto-started on post-start and available on host `http://localhost:9000`.
 
+To build images and spawn a runtime container on the host daemon from CMake:
+```bash
+cmake --build build --target AtlasnetDockerRun_Host
+```

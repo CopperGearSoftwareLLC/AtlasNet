@@ -37,6 +37,7 @@ interface ProjectedPoint {
 interface MapPoint {
   x: number;
   y: number;
+  isClient?: boolean;
 }
 
 interface EntityFocusOverlay {
@@ -419,6 +420,7 @@ export function createMapRenderer({
     basis?: CameraBasis
   ): void {
     const isFocus = tone === 'focus';
+    const isClientSelected = !isFocus && point.isClient === true;
     const outerRadius =
       viewMode === '2d'
         ? AUTHORITY_ENTITY_WORLD_RADIUS * Math.max(scale2D, 0.0001)
@@ -430,10 +432,14 @@ export function createMapRenderer({
         : clamp(outerRadius * 0.2, 1.4, 3.2);
     const strokeColor = isFocus
       ? 'rgba(59, 130, 246, 0.95)'
-      : 'rgba(251, 191, 36, 0.95)';
+      : isClientSelected
+        ? 'rgba(239, 68, 68, 0.95)'
+        : 'rgba(251, 191, 36, 0.95)';
     const fillColor = isFocus
       ? 'rgba(59, 130, 246, 0.36)'
-      : 'rgba(251, 191, 36, 0.3)';
+      : isClientSelected
+        ? 'rgba(239, 68, 68, 0.3)'
+        : 'rgba(251, 191, 36, 0.3)';
 
     ctx.save();
     ctx.beginPath();
@@ -537,6 +543,28 @@ export function createMapRenderer({
     ctx.restore();
   }
 
+  function offsetLineLabelPosition(
+    from: { x: number; y: number },
+    to: { x: number; y: number }
+  ): { x: number; y: number } {
+    const midX = (from.x + to.x) / 2;
+    const midY = (from.y + to.y) / 2;
+    const dx = to.x - from.x;
+    const dy = to.y - from.y;
+    const len = Math.hypot(dx, dy);
+    if (!Number.isFinite(len) || len < 1e-4) {
+      return { x: midX, y: midY - 10 };
+    }
+
+    const nx = -dy / len;
+    const ny = dx / len;
+    const offsetPx = 12;
+    return {
+      x: midX + nx * offsetPx,
+      y: midY + ny * offsetPx,
+    };
+  }
+
   function drawHoverEdgeLabels2D(): void {
     if (hoverEdgeLabels.length === 0) {
       return;
@@ -562,6 +590,54 @@ export function createMapRenderer({
         continue;
       }
       drawEdgeLabel((from.x + to.x) / 2, (from.y + to.y) / 2 - 10, label.text);
+    }
+  }
+
+  function drawShapeLineLabels2D(): void {
+    if (shapes.length === 0) {
+      return;
+    }
+
+    for (const shape of shapes) {
+      if (shape.type !== 'line') {
+        continue;
+      }
+      const text = String(shape.label ?? '').trim();
+      const pts = shape.points ?? [];
+      if (!text || pts.length < 2) {
+        continue;
+      }
+
+      const from = worldToScreen2D(pts[0].x, pts[0].y);
+      const to = worldToScreen2D(pts[pts.length - 1].x, pts[pts.length - 1].y);
+      const position = offsetLineLabelPosition(from, to);
+      drawEdgeLabel(position.x, position.y, text);
+    }
+  }
+
+  function drawShapeLineLabels3D(): void {
+    if (shapes.length === 0) {
+      return;
+    }
+
+    const basis = getCameraBasis();
+    for (const shape of shapes) {
+      if (shape.type !== 'line') {
+        continue;
+      }
+      const text = String(shape.label ?? '').trim();
+      const pts = shape.points ?? [];
+      if (!text || pts.length < 2) {
+        continue;
+      }
+
+      const from = projectMapPoint3D(pts[0], basis);
+      const to = projectMapPoint3D(pts[pts.length - 1], basis);
+      if (!from || !to) {
+        continue;
+      }
+      const position = offsetLineLabelPosition(from, to);
+      drawEdgeLabel(position.x, position.y, text);
     }
   }
 
@@ -1119,6 +1195,7 @@ export function createMapRenderer({
       ctx.restore();
       drawAxisGizmo2D();
       drawHoverEdgeLabels2D();
+      drawShapeLineLabels2D();
       drawEntityFocusOverlay();
       if (lastPointerScreen) {
         onPointerWorldPosition?.(
@@ -1133,6 +1210,7 @@ export function createMapRenderer({
     drawAxes3D();
     drawShapes3D();
     drawHoverEdgeLabels3D();
+    drawShapeLineLabels3D();
     drawEntityFocusOverlay();
 
     if (lastPointerScreen) {

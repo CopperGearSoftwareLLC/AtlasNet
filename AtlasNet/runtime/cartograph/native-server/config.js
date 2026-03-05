@@ -10,7 +10,7 @@ function getDatabaseTargets() {
     {
       id: 'internal',
       name: 'InternalDB',
-      host: process.env.INTERNAL_REDIS_SERVICE_NAME || 'InternalDB',
+      host: process.env.INTERNAL_REDIS_SERVICE_NAME || 'internaldb',
       port: Number(process.env.INTERNAL_REDIS_PORT || 6379),
     },
     {

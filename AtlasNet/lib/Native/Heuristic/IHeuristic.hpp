@@ -22,6 +22,7 @@ class IHeuristic
 		eGridCell,
 		eOctree,
 		eQuadtree,
+		eVoronoi,
 		eInvalid
 	};
 	static constexpr const char* TypeToString(Type type) noexcept
@@ -36,6 +37,8 @@ class IHeuristic
 				return "Octree";
 			case Type::eQuadtree:
 				return "Quadtree";
+			case Type::eVoronoi:
+				return "Voronoi";
 			case Type::eInvalid:
 				return "Invalid";
 			default:
@@ -63,6 +66,11 @@ class IHeuristic
 		if (str == "Quadtree")
 		{
 			outType = Type::eQuadtree;
+			return true;
+		}
+		if (str == "Voronoi")
+		{
+			outType = Type::eVoronoi;
 			return true;
 		}
 		if (str == "Invalid")

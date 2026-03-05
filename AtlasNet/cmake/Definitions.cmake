@@ -3,6 +3,7 @@ add_library(atlasnet_defs INTERFACE)
 target_compile_definitions(atlasnet_defs INTERFACE
     _PORT_INTERLINK=25555
     _PORT_GAMECLIENT=25566
+    _PORT_PROXY=2555
     _PORT_PROXY_PUBLISHED=2555
     _DOCKER_OS_="ubuntu:24.04"
     _DOCKER_WORKDIR_="/atlasnet"

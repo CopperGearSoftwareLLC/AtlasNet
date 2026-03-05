@@ -17,8 +17,13 @@ const {
   collectNetworkTelemetry,
   collectAuthorityTelemetry,
   collectHeuristicShapes,
+  collectTransferManifest,
+  collectTransferStateQueue,
 } = require('./services/telemetryCollection');
-const { readHeuristicTypeFromDatabase } = require('./services/pureDatabaseTelemetry');
+const {
+  readHeuristicTypeFromDatabase,
+  readShardPlacementFromDatabase,
+} = require('./services/pureDatabaseTelemetry');
 const { readWorkersSnapshot } = require('./services/workersSnapshot');
 
 const app = express();
@@ -159,6 +164,42 @@ app.get('/authoritytelemetry', async (req, res) => {
   }
 });
 
+app.get('/transfermanifest', async (req, res) => {
+  try {
+    const requestedMode = getRequestedCollectionMode(req.query);
+    const mode = resolveCollectionMode(requestedMode);
+    const { modeUsed, data } = await collectTransferManifest({
+      requestedMode: mode,
+    });
+    res.set('x-cartograph-collection-mode', String(modeUsed));
+    res.json(data);
+  } catch (err) {
+    if (addonLoadError) {
+      console.error(addonLoadError);
+    }
+    console.error(err);
+    res.status(500).json({ error: 'Transfer manifest fetch failed' });
+  }
+});
+
+app.get('/transferstatequeue', async (req, res) => {
+  try {
+    const requestedMode = getRequestedCollectionMode(req.query);
+    const mode = resolveCollectionMode(requestedMode);
+    const { modeUsed, data } = await collectTransferStateQueue({
+      requestedMode: mode,
+    });
+    res.set('x-cartograph-collection-mode', String(modeUsed));
+    res.json(data);
+  } catch (err) {
+    if (addonLoadError) {
+      console.error(addonLoadError);
+    }
+    console.error(err);
+    res.status(500).json({ error: 'Transfer state queue fetch failed' });
+  }
+});
+
 app.get('/heuristic', async (req, res) => {
   try {
     const requestedMode = getRequestedCollectionMode(req.query);
@@ -230,6 +271,16 @@ app.get('/workers', async (_req, res) => {
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: 'Workers snapshot failed' });
+  }
+});
+
+app.get('/shard-placement', async (_req, res) => {
+  try {
+    const placement = await readShardPlacementFromDatabase();
+    res.json(placement);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Shard placement fetch failed' });
   }
 });
 

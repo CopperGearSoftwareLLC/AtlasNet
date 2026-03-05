@@ -11,6 +11,8 @@ const {
   readHeuristicClaimedOwnersFromDatabase,
   readNetworkTelemetryFromDatabase,
   readHeuristicShapesFromDatabase,
+  readTransferManifestFromDatabase,
+  readTransferStateQueueFromDatabase,
 } = require('./pureDatabaseTelemetry');
 
 async function collectNetworkTelemetry({
@@ -111,8 +113,38 @@ async function collectHeuristicShapes({ addon, requestedMode }) {
   return { modeUsed: mode, data: [] };
 }
 
+async function collectTransferManifest({ requestedMode }) {
+  const mode = resolveCollectionMode(requestedMode);
+  if (
+    mode === COLLECTION_MODE_PURE_DATABASE ||
+    mode === COLLECTION_MODE_INTERLINK_HYBRID
+  ) {
+    return {
+      modeUsed: COLLECTION_MODE_PURE_DATABASE,
+      data: await readTransferManifestFromDatabase(),
+    };
+  }
+  return { modeUsed: mode, data: [] };
+}
+
+async function collectTransferStateQueue({ requestedMode }) {
+  const mode = resolveCollectionMode(requestedMode);
+  if (
+    mode === COLLECTION_MODE_PURE_DATABASE ||
+    mode === COLLECTION_MODE_INTERLINK_HYBRID
+  ) {
+    return {
+      modeUsed: COLLECTION_MODE_PURE_DATABASE,
+      data: await readTransferStateQueueFromDatabase(),
+    };
+  }
+  return { modeUsed: mode, data: [] };
+}
+
 module.exports = {
   collectNetworkTelemetry,
   collectAuthorityTelemetry,
   collectHeuristicShapes,
+  collectTransferManifest,
+  collectTransferStateQueue,
 };

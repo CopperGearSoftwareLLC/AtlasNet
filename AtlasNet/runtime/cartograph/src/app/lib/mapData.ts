@@ -13,6 +13,7 @@ export {
   computeProjectedShardPositions,
   computeShardAnchorPositions,
   computeShardBoundsById,
+  computeShardPolygonsById,
   computeShardHoverBoundsById,
 } from './mapGeometry';
 export type { HoveredShardEdgeLabel } from './mapNetwork';

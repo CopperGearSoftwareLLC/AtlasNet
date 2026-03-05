@@ -2,6 +2,7 @@
 
 #include <sw/redis++/redis.h>
 
+#include <chrono>
 #include <boost/describe/enum_to_string.hpp>
 
 #include "Transfer/TransferData.hpp"
@@ -14,6 +15,7 @@
 class TransferManifest : public Singleton<TransferManifest>
 {
 	const std::string TransferManifestTableName = "Transfer::TransferManifest";
+	const std::string TransferStateQueueTableName = "Transfer::TransferStateQueue";
 
 	void EnsureJsonTable()
 	{
@@ -29,6 +31,53 @@ class TransferManifest : public Singleton<TransferManifest>
 	}
 
    public:
+	void QueueEntityTransferStage(const EntityTransferData& data, EntityTransferStage stage)
+	{
+		Json event;
+		const NetworkIdentity localID = NetworkCredentials::Get().GetID();
+		const NetworkIdentity fromID =
+			data.transferMode == TransferMode::eSending ? localID : data.shard;
+		const NetworkIdentity toID =
+			data.transferMode == TransferMode::eSending ? data.shard : localID;
+
+		event["transferId"] = UUIDGen::ToString(data.ID);
+		event["fromId"] = fromID.ToString();
+		event["toId"] = toID.ToString();
+		event["stage"] = boost::describe::enum_to_string(stage, "INVALID");
+		switch (stage)
+		{
+			case EntityTransferStage::eReady:
+			case EntityTransferStage::eCommit:
+			case EntityTransferStage::eComplete:
+				event["state"] = "target";
+				break;
+			case EntityTransferStage::eNone:
+			case EntityTransferStage::ePrepare:
+			default:
+				event["state"] = "source";
+				break;
+		}
+
+		Json entityIDs = Json::array();
+		for (const AtlasEntityID entityID : data.entityIDs)
+		{
+			entityIDs.push_back(UUIDGen::ToString(entityID));
+		}
+		event["entityIds"] = std::move(entityIDs);
+		event["timestampMs"] =
+			std::chrono::duration_cast<std::chrono::milliseconds>(
+				std::chrono::system_clock::now().time_since_epoch())
+				.count();
+
+		(void)InternalDB::Get()->WithSync(
+			[&](auto& r)
+			{
+				std::array<std::string, 3> cmd = {"RPUSH", TransferStateQueueTableName,
+												  event.dump()};
+				return r.command(cmd.begin(), cmd.end());
+			});
+	}
+
 	void UpdateEntityTransferStage(TransferID ID, EntityTransferStage stage)
 	{
 		const std::string path = ".EntityTransfers." + UUIDGen::ToString(ID) + "." + "Stage";

@@ -14,6 +14,7 @@ interface UseShardHoverStateArgs {
   showGnsConnections: boolean;
   networkNodeIdSet: Set<string>;
   shardHoverBoundsById: Map<string, ShardHoverBounds>;
+  shardHoverPolygonsById: Map<string, Point2[][]>;
   hoveredShardId: string | null;
   setHoveredShardId: Dispatch<SetStateAction<string | null>>;
   setHoveredShardAnchor: Dispatch<SetStateAction<Point2 | null>>;
@@ -33,18 +34,52 @@ function pointWithinBounds(point: Point2, bounds: ShardHoverBounds): boolean {
   );
 }
 
+function pointInPolygon(point: Point2, polygon: Point2[]): boolean {
+  if (polygon.length < 3) {
+    return false;
+  }
+
+  // Ray casting: count edge crossings to the right.
+  let inside = false;
+  for (let i = 0, j = polygon.length - 1; i < polygon.length; j = i, i += 1) {
+    const xi = polygon[i].x;
+    const yi = polygon[i].y;
+    const xj = polygon[j].x;
+    const yj = polygon[j].y;
+
+    const intersects =
+      yi > point.y !== yj > point.y &&
+      point.x < ((xj - xi) * (point.y - yi)) / (yj - yi + 1e-12) + xi;
+    if (intersects) {
+      inside = !inside;
+    }
+  }
+  return inside;
+}
+
+function pointWithinAnyPolygon(point: Point2, polygons: Point2[][]): boolean {
+  for (const polygon of polygons) {
+    if (pointInPolygon(point, polygon)) {
+      return true;
+    }
+  }
+  return false;
+}
+
 export function useShardHoverState({
   hoveredShardId,
   networkNodeIdSet,
   setHoveredShardAnchor,
   setHoveredShardId,
   shardHoverBoundsById,
+  shardHoverPolygonsById,
   showGnsConnections,
   showShardHoverDetails,
 }: UseShardHoverStateArgs): UseShardHoverStateResult {
   const showShardHoverDetailsRef = useRef(showShardHoverDetails);
   const showGnsConnectionsRef = useRef(showGnsConnections);
   const shardHoverBoundsByIdRef = useRef<Map<string, ShardHoverBounds>>(new Map());
+  const shardHoverPolygonsByIdRef = useRef<Map<string, Point2[][]>>(new Map());
   const networkNodeIdSetRef = useRef<Set<string>>(new Set());
 
   const clearHoveredShard = useCallback(() => {
@@ -70,6 +105,10 @@ export function useShardHoverState({
   useEffect(() => {
     shardHoverBoundsByIdRef.current = shardHoverBoundsById;
   }, [shardHoverBoundsById]);
+
+  useEffect(() => {
+    shardHoverPolygonsByIdRef.current = shardHoverPolygonsById;
+  }, [shardHoverPolygonsById]);
 
   useEffect(() => {
     if (!showGnsConnections) {
@@ -103,6 +142,14 @@ export function useShardHoverState({
         if (!pointWithinBounds(point, bounds)) {
           continue;
         }
+
+        const polygons = shardHoverPolygonsByIdRef.current.get(shardId);
+        if (polygons && polygons.length > 0) {
+          if (!pointWithinAnyPolygon(point, polygons)) {
+            continue;
+          }
+        }
+
         if (bounds.area < smallestArea) {
           smallestArea = bounds.area;
           nextHoveredId = shardId;

@@ -3,11 +3,16 @@
 import { useEffect, useRef, useState } from 'react';
 import type {
   AuthorityEntityTelemetry,
+  ShardPlacementTelemetry,
   ShapeJS,
   ShardTelemetry,
+  TransferManifestTelemetry,
+  TransferStateQueueTelemetry,
   WorkersSnapshotResponse,
 } from '../cartographTypes';
 import { parseAuthorityRows } from '../authorityTelemetryTypes';
+import { parseTransferManifestRows } from '../transferManifestTypes';
+import { parseTransferStateQueueRows } from '../transferStateQueueTypes';
 
 interface PolledResourceOptions<T> {
   url: string;
@@ -51,6 +56,10 @@ function toWorkersSnapshot(raw: unknown): WorkersSnapshotResponse {
       : null,
     contexts: Array.isArray(payload.contexts) ? payload.contexts : [],
   };
+}
+
+function toShardPlacementArray(raw: unknown): ShardPlacementTelemetry[] {
+  return Array.isArray(raw) ? (raw as ShardPlacementTelemetry[]) : [];
 }
 
 function usePolledResource<T>({
@@ -214,6 +223,48 @@ export function useAuthorityEntities({
   });
 }
 
+export function useTransferManifest({
+  intervalMs,
+  enabled = true,
+  resetOnException = false,
+  resetOnHttpError = false,
+  onException,
+  onHttpError,
+}: TelemetryPollingOptions): TransferManifestTelemetry[] {
+  return usePolledResource<TransferManifestTelemetry[]>({
+    url: '/api/transfermanifest',
+    intervalMs,
+    enabled,
+    createInitialValue: () => [],
+    mapResponse: parseTransferManifestRows,
+    resetOnException,
+    resetOnHttpError,
+    onException,
+    onHttpError,
+  });
+}
+
+export function useTransferStateQueue({
+  intervalMs,
+  enabled = true,
+  resetOnException = false,
+  resetOnHttpError = false,
+  onException,
+  onHttpError,
+}: TelemetryPollingOptions): TransferStateQueueTelemetry[] {
+  return usePolledResource<TransferStateQueueTelemetry[]>({
+    url: '/api/transferstatequeue',
+    intervalMs,
+    enabled,
+    createInitialValue: () => [],
+    mapResponse: parseTransferStateQueueRows,
+    resetOnException,
+    resetOnHttpError,
+    onException,
+    onHttpError,
+  });
+}
+
 export function useWorkersSnapshot({
   intervalMs,
   enabled = true,
@@ -233,6 +284,27 @@ export function useWorkersSnapshot({
       contexts: [],
     }),
     mapResponse: toWorkersSnapshot,
+    resetOnException,
+    resetOnHttpError,
+    onException,
+    onHttpError,
+  });
+}
+
+export function useShardPlacement({
+  intervalMs,
+  enabled = true,
+  resetOnException = false,
+  resetOnHttpError = false,
+  onException,
+  onHttpError,
+}: TelemetryPollingOptions): ShardPlacementTelemetry[] {
+  return usePolledResource<ShardPlacementTelemetry[]>({
+    url: '/api/shard-placement',
+    intervalMs,
+    enabled,
+    createInitialValue: () => [],
+    mapResponse: toShardPlacementArray,
     resetOnException,
     resetOnHttpError,
     onException,

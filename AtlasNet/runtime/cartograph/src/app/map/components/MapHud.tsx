@@ -1,6 +1,7 @@
 'use client';
 
 import type { CSSProperties } from 'react';
+import type { AuthorityLinkMode } from '../../lib/cartographTypes';
 import type {
   MapProjectionMode,
   MapViewMode,
@@ -9,9 +10,11 @@ import type {
 interface MapHudProps {
   showGnsConnections: boolean;
   showAuthorityEntities: boolean;
+  authorityLinkMode: AuthorityLinkMode;
   showShardHoverDetails: boolean;
   onToggleGnsConnections: () => void;
   onToggleAuthorityEntities: () => void;
+  onSetAuthorityLinkMode: (mode: AuthorityLinkMode) => void;
   onToggleShardHoverDetails: () => void;
   entityCount: number;
   shardCount: number;
@@ -23,6 +26,9 @@ interface MapHudProps {
   onSetProjectionMode: (mode: MapProjectionMode) => void;
   interactionSensitivity: number;
   onSetInteractionSensitivity: (value: number) => void;
+  playbackActive: boolean;
+  onTakeSnapshot: () => void;
+  onResumeLive: () => void;
   pollIntervalMs: number;
   minPollIntervalMs: number;
   maxPollIntervalMs: number;
@@ -75,9 +81,14 @@ export function MapHud({
   onSetPollIntervalMs,
   onSetProjectionMode,
   onSetViewMode,
+  onResumeLive,
+  onSetAuthorityLinkMode,
+  onTakeSnapshot,
   onToggleAuthorityEntities,
   onToggleGnsConnections,
   onToggleShardHoverDetails,
+  authorityLinkMode,
+  playbackActive,
   pollIntervalMs,
   projectionMode,
   shardCount,
@@ -90,6 +101,27 @@ export function MapHud({
     2,
     Math.ceil(interactionSensitivity + INTERACTION_SENSITIVITY_SLIDER_HEADROOM)
   );
+  const pollDisabled = pollIntervalMs >= maxPollIntervalMs;
+  const pollSupportsOneMsSpecialCase = minPollIntervalMs === 1;
+  const pollSliderMin = pollSupportsOneMsSpecialCase ? 0 : minPollIntervalMs;
+  const pollSliderStep = 5;
+  const pollSliderValue =
+    pollSupportsOneMsSpecialCase && pollIntervalMs <= minPollIntervalMs
+      ? 0
+      : pollIntervalMs;
+  function handlePollIntervalChange(rawValue: string): void {
+    const nextValue = parseBoundedNumber(
+      rawValue,
+      pollSliderMin,
+      maxPollIntervalMs,
+      pollSliderMin
+    );
+    if (pollSupportsOneMsSpecialCase && nextValue <= pollSliderMin) {
+      onSetPollIntervalMs(minPollIntervalMs);
+      return;
+    }
+    onSetPollIntervalMs(nextValue);
+  }
 
   return (
     <div
@@ -121,8 +153,34 @@ export function MapHud({
           checked={showAuthorityEntities}
           onChange={() => onToggleAuthorityEntities()}
         />
-        entities + owner links
+        entities
       </label>
+      <div
+        style={{
+          display: 'inline-flex',
+          alignItems: 'center',
+          gap: 4,
+          opacity: showAuthorityEntities ? 1 : 0.65,
+        }}
+      >
+        <span style={{ fontSize: 12, opacity: 0.9 }}>links:</span>
+        <button
+          type="button"
+          style={hudButtonStyle(authorityLinkMode === 'owner')}
+          onClick={() => onSetAuthorityLinkMode('owner')}
+          disabled={!showAuthorityEntities}
+        >
+          owner
+        </button>
+        <button
+          type="button"
+          style={hudButtonStyle(authorityLinkMode === 'handoff')}
+          onClick={() => onSetAuthorityLinkMode('handoff')}
+          disabled={!showAuthorityEntities}
+        >
+          handoff
+        </button>
+      </div>
       <label style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
         <input
           type="checkbox"
@@ -131,6 +189,24 @@ export function MapHud({
         />
         shard hover details
       </label>
+      <button
+        type="button"
+        style={hudButtonStyle(playbackActive)}
+        onClick={onTakeSnapshot}
+        title="Snapshot and pause last 30 seconds"
+      >
+        snapshot 30s
+      </button>
+      {playbackActive && (
+        <button
+          type="button"
+          style={hudButtonStyle(false)}
+          onClick={onResumeLive}
+          title="Exit snapshot playback"
+        >
+          resume live
+        </button>
+      )}
       <span style={{ opacity: 0.8 }}>
         entities: {entityCount} | shards: {shardCount}
       </span>
@@ -230,22 +306,13 @@ export function MapHud({
       >
         <input
           type="range"
-          min={minPollIntervalMs}
+          min={pollSliderMin}
           max={maxPollIntervalMs}
-          step={50}
-          value={pollIntervalMs}
-          onChange={(event) =>
-            onSetPollIntervalMs(
-              parseBoundedNumber(
-                event.target.value,
-                minPollIntervalMs,
-                maxPollIntervalMs,
-                minPollIntervalMs
-              )
-            )
-          }
+          step={pollSliderStep}
+          value={pollSliderValue}
+          onChange={(event) => handlePollIntervalChange(event.target.value)}
         />
-        poll: {pollIntervalMs}ms
+        poll: {pollDisabled ? 'off' : `${pollIntervalMs}ms`}
       </label>
     </div>
   );

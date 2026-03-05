@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useMemo, useRef, useState } from 'react';
-import type { PointerEventHandler, RefObject } from 'react';
+import type { MouseEventHandler, PointerEventHandler, RefObject } from 'react';
 import type { AuthorityEntityTelemetry } from '../../lib/cartographTypes';
 
 interface MapPoint {
@@ -28,6 +28,7 @@ interface UseCtrlDragEntitySelectionArgs {
   containerRef: RefObject<HTMLDivElement | null>;
   rendererRef: RefObject<MapProjector | null>;
   entities: AuthorityEntityTelemetry[];
+  viewMode: '2d' | '3d';
 }
 
 interface UseCtrlDragEntitySelectionResult {
@@ -39,6 +40,7 @@ interface UseCtrlDragEntitySelectionResult {
   clearSelection: () => void;
   setActiveEntityId: (entityId: string | null) => void;
   setHoveredEntityId: (entityId: string | null) => void;
+  onContextMenuCapture: MouseEventHandler<HTMLDivElement>;
   onPointerDownCapture: PointerEventHandler<HTMLDivElement>;
   onPointerMoveCapture: PointerEventHandler<HTMLDivElement>;
   onPointerUpCapture: PointerEventHandler<HTMLDivElement>;
@@ -89,6 +91,7 @@ export function useCtrlDragEntitySelection({
   containerRef,
   entities,
   rendererRef,
+  viewMode,
 }: UseCtrlDragEntitySelectionArgs): UseCtrlDragEntitySelectionResult {
   const [dragState, setDragState] = useState<DragState | null>(null);
   const [selectedEntityIds, setSelectedEntityIds] = useState<string[]>([]);
@@ -220,7 +223,9 @@ export function useCtrlDragEntitySelection({
   }
 
   const onPointerDownCapture: PointerEventHandler<HTMLDivElement> = (event) => {
-    if (!event.ctrlKey || event.button !== 0) {
+    const isSelectionGesture =
+      viewMode === '2d' ? event.button === 2 : event.ctrlKey && event.button === 0;
+    if (!isSelectionGesture) {
       return;
     }
 
@@ -307,6 +312,14 @@ export function useCtrlDragEntitySelection({
     event.stopPropagation();
   };
 
+  const onContextMenuCapture: MouseEventHandler<HTMLDivElement> = (event) => {
+    if (viewMode !== '2d') {
+      return;
+    }
+    event.preventDefault();
+    event.stopPropagation();
+  };
+
   return {
     selectedEntities,
     selectedEntityIds,
@@ -316,6 +329,7 @@ export function useCtrlDragEntitySelection({
     clearSelection,
     setActiveEntityId,
     setHoveredEntityId,
+    onContextMenuCapture,
     onPointerDownCapture,
     onPointerMoveCapture,
     onPointerUpCapture,

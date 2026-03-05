@@ -44,7 +44,15 @@ export function getShapeAnchorPoints(shape: ShapeJS): Point2[] {
   const cx = shape.position.x ?? 0;
   const cy = shape.position.y ?? 0;
 
-  if ((shape.type === 'polygon' || shape.type === 'line') && shape.points) {
+  if (shape.type === 'polygon' && shape.points) {
+    // Polygons are stored as local offsets from `position`.
+    if (shape.points.length > 0) {
+      return shape.points.map((point) => ({ x: cx + point.x, y: cy + point.y }));
+    }
+  }
+
+  if (shape.type === 'line' && shape.points) {
+    // Lines are stored as absolute world points.
     if (shape.points.length > 0) {
       return shape.points.map((point) => ({ x: point.x, y: point.y }));
     }

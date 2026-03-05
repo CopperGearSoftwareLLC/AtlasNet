@@ -11,6 +11,7 @@
 #include "Global/Misc/UUID.hpp"
 #include "Heuristic/BoundLeaser.hpp"
 #include "Heuristic/Database/HeuristicManifest.hpp"
+#include "Network/NetworkCredentials.hpp"
 #include "Interlink/Interlink.hpp"
 #include "Network/NetworkEnums.hpp"
 #include "Network/Packet/PacketManager.hpp"
@@ -71,12 +72,6 @@ void EntityLedger::LoopThreadEntry(std::stop_token st)
 	while (!st.stop_requested())
 	{
 		boost::container::small_vector<AtlasEntityID, 32> EntitiesNewlyOutOfBounds;
-		if (!BoundLeaser::Get().HasBound())
-		{
-			std::this_thread::sleep_for(std::chrono::milliseconds(50));
-			continue;
-		}
-
 		// copy entity IDs + positions under lock, then release
 		std::vector<std::pair<AtlasEntityID, glm::vec3>> snapshot;
 		_ReadLock(
@@ -87,20 +82,27 @@ void EntityLedger::LoopThreadEntry(std::stop_token st)
 					snapshot.emplace_back(ID, entity.transform.position);
 			});
 
-		const auto& Bound = BoundLeaser::Get().GetBound();
+		const NetworkIdentity selfId = NetworkCredentials::Get().GetID();
 		for (const auto& [ID, pos] : snapshot)
 		{
-			if (!Bound.Contains(pos))
+			// Skip entities already in an active transfer.
+			if (TransferCoordinator::Get().IsEntityInTransfer(ID))
 			{
-				// we call IsEntityInTransfer *without* holding EntityListMutex
-				if (TransferCoordinator::Get().IsEntityInTransfer(ID))
-					continue;
-
-				EntitiesNewlyOutOfBounds.push_back(ID);
-				logger.DebugFormatted(
-					"Entity out of bounds:\n - ID {}\n - EntityPos: {}\n - bounds {}",
-					UUIDGen::ToString(ID), glm::to_string(pos), Bound.ToDebugString());
+				continue;
 			}
+
+			Transform t;
+			t.position = pos;
+			const auto targetShard = HeuristicManifest::Get().ShardFromPosition(t);
+			if (!targetShard.has_value() || *targetShard == selfId)
+			{
+				continue;
+			}
+
+			EntitiesNewlyOutOfBounds.push_back(ID);
+			logger.DebugFormatted(
+				"Entity scheduled for transfer:\n - ID {}\n - EntityPos: {}\n - targetShard {}",
+				UUIDGen::ToString(ID), glm::to_string(pos), targetShard->ToString());
 		}
 
 		if (!EntitiesNewlyOutOfBounds.empty())
