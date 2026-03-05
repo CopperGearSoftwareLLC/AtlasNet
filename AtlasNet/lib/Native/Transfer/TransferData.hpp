@@ -38,15 +38,24 @@ struct EntityTransferData
 enum class ClientTransferStage
 {
 	eNone,			 // Nothing done yet
+
 	ePrepare,		 // A -> B notify to prepare to receive certain clients
 	eReady,			 // B -> A acknowledged
+	eDrained,		 // A -> B, Transmit the serialized client entities.
+
+};
+BOOST_DESCRIBE_ENUM(ClientTransferStage, eNone, ePrepare, eReady, eDrained);
+
+enum class ClientSwitchStage
+{
+	eNone,			 // Nothing done yet
+
 	eRequestSwitch,	 // A -> Proxy, request to switch routing from A to B for client.
 	eFreeze,		 // Proxy -> A Acknowledged, Freezing incoming commands for client.
-	eDrained,		 // A -> B, Transmit the serialized client entities.
 	eActivate,		 // B -> Proxy Start routing commands for client to me.
 
 };
-BOOST_DESCRIBE_ENUM(ClientTransferStage, eNone, ePrepare, eReady, eRequestSwitch, eFreeze, eDrained,
+BOOST_DESCRIBE_ENUM(ClientSwitchStage, eNone, eRequestSwitch, eFreeze,
 					eActivate);
 
 struct ClientTransferData

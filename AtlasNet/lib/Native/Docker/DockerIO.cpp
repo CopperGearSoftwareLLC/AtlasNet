@@ -5,6 +5,7 @@
 #include <arpa/inet.h>
 #include <fstream>
 #include <iostream>
+#include "Global/pch.hpp"
 static size_t WriteCallback(void* contents, size_t size, size_t nmemb, void* userp)
 {
 	((std::string*)userp)->append((char*)contents, size * nmemb);
@@ -91,34 +92,36 @@ std::string DockerIO::GetSelfContainerName() const
 
 	return id;
 }
-
 std::string DockerIO::GetSelfContainerIP() const
 {
-	struct ifaddrs* ifaddr = nullptr;
-	if (getifaddrs(&ifaddr) != 0 || !ifaddr)
-		return "";
+    struct ifaddrs* ifaddr = nullptr;
+    if (getifaddrs(&ifaddr) != 0 || !ifaddr)
+        return "";
 
-	std::string out;
-	for (auto* ifa = ifaddr; ifa != nullptr; ifa = ifa->ifa_next)
-	{
-		if (!ifa->ifa_name || !ifa->ifa_addr)
-			continue;
-		if (std::strcmp(ifa->ifa_name, "eth0") != 0)
-			continue;
-		if (ifa->ifa_addr->sa_family != AF_INET)
-			continue;
+    std::string out;
+    for (auto* ifa = ifaddr; ifa != nullptr; ifa = ifa->ifa_next)
+    {
+        if (!ifa->ifa_addr)
+            continue;
+        if (ifa->ifa_addr->sa_family != AF_INET)
+            continue;
 
-		char buf[INET_ADDRSTRLEN] = {};
-		auto* sin = reinterpret_cast<sockaddr_in*>(ifa->ifa_addr);
-		if (inet_ntop(AF_INET, &sin->sin_addr, buf, sizeof(buf)))
-		{
-			out = buf;
-			break;
-		}
-	}
+        char buf[INET_ADDRSTRLEN] = {};
+        auto* sin = reinterpret_cast<sockaddr_in*>(ifa->ifa_addr);
+        if (inet_ntop(AF_INET, &sin->sin_addr, buf, sizeof(buf)))
+        {
+            std::string ip = buf;
+            if (ip.rfind("10.10", 0) == 0) // starts with "10.10"
+            {
+                out = ip;
+                break;
+            }
+        }
+    }
 
-	freeifaddrs(ifaddr);
-	return out;
+    freeifaddrs(ifaddr);
+	ASSERT(!out.empty(), "IP RESOLUTION FAILURE");
+    return out;
 }
 
 std::vector<std::pair<uint32_t, uint32_t>> DockerIO::GetSelfExposedPorts() const

@@ -1,9 +1,20 @@
 version: "3.8"
-
+networks:
+  AtlasNet:
+    driver: overlay
+    attachable: true   # allows standalone containers to attach if needed
+    ipam:
+      driver: default
+      config:
+        - subnet: 10.10.0.0/24   # choose a subnet you control
 services:
   WatchDog:
     image: watchdog
     networks: [AtlasNet]
+    cap_add:
+      - SYS_PTRACE
+    security_opt:
+      - seccomp=unconfined
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock # REQUIRED
     deploy:
@@ -20,6 +31,11 @@ services:
   Shard:
     image: SHARD_IMAGE_NAME
     networks: [AtlasNet]
+
+    cap_add:
+      - SYS_PTRACE
+    security_opt:
+      - seccomp=unconfined
     deploy:
      labels:
         atlasnet.role: shard # REQUIRED
@@ -50,6 +66,7 @@ services:
       - "9229:9229"   # Node inspector
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock # REQUIRED
+
     deploy:
       placement:
           constraints:
@@ -61,9 +78,10 @@ services:
   Proxy:
     image: proxy:latest
     networks: [AtlasNet]
-    environment:
-      HANDSHAKE_SERVICE_ENABLE: 1
-      HANDSHAKE_SERVICE_IP: "postgres"
+    cap_add:
+      - SYS_PTRACE
+    security_opt:
+      - seccomp=unconfined
     ports:
       - target: 25555
         published: 2555
@@ -105,10 +123,3 @@ services:
 #    volumes:
 #      - pgdata:/var/lib/postgresql/data
 #    networks: [AtlasNet]
-volumes:
-  pgdata:
-    driver: local
-
-networks:
-  AtlasNet:
-      external: true

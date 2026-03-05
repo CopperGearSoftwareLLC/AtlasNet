@@ -4,7 +4,7 @@
 #include <cstdint>
 
 #include "Entity/Entity.hpp"
-#include "Entity/Transfer/TransferData.hpp"
+#include "Transfer/TransferData.hpp"
 #include "Global/Misc/UUID.hpp"
 #include "Network/Packet/Packet.hpp"
 class EntityTransferPacket : public TPacket<EntityTransferPacket, "EntityTransferPacket">

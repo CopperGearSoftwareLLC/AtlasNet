@@ -36,12 +36,15 @@ add_custom_target(SandboxServerStage
     COMMENT "Staging AtlasNetServer"
 )
 add_custom_target(SandboxServerDockerBuild
-    COMMAND ${CMAKE_COMMAND} -E chdir ${SANDBOX_ROOT}
-        docker build
-        -f SandboxServer.dockerfile
+    COMMAND ${CMAKE_COMMAND} -E echo "Starting Docker build..."
+    COMMAND docker build
+        --progress=plain
+        -f ${SANDBOX_ROOT}/SandboxServer.dockerfile
         -t ${SANDBOX_SERVER_IMAGE_NAME}
-        .
-    COMMAND ${CMAKE_COMMAND} -E rm -rf {SANDBOX_ROOT}/.stage
-    COMMENT "Staging AtlasNetServer"
+        ${SANDBOX_ROOT}
+    COMMAND ${CMAKE_COMMAND} -E rm -rf ${SANDBOX_ROOT}/.stage
+    WORKING_DIRECTORY ${SANDBOX_ROOT}
+    USES_TERMINAL
+    COMMENT "Building SandboxServer Docker image with live logs"
 )
 add_dependencies(SandboxServerDockerBuild SandboxServerStage)

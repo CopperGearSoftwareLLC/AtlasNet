@@ -49,11 +49,31 @@ if docker stack ls --format '{{.Name}}' | grep -w "$STACK_NAME" > /dev/null; the
     done
 fi
 # Ensure overlay network exists
-if ! docker network ls --format '{{.Name}}' | grep -w AtlasNet > /dev/null; then
-    echo "Creating overlay network 'AtlasNet'..."
-    docker network create --driver overlay AtlasNet
-fi
+#if ! docker network ls --format '{{.Name}}' | grep -w AtlasNet > /dev/null; then
+#    echo "Creating overlay network 'AtlasNet'..."
+#    docker network create --driver overlay AtlasNet
+#fi
 # Deploy the stack using the temporary file
+# Remove any existing networks with "AtlasNet" in the name
+
+NETWORK_NAME_PATTERN="AtlasNet"
+
+# Function to remove networks matching the pattern
+remove_networks() {
+    local net
+    while net=$(docker network ls --format '{{.Name}}' | grep "$NETWORK_NAME_PATTERN" || true); do
+        if [[ -z "$net" ]]; then
+            break
+        fi
+        echo "Removing network: $net"
+        echo "$net" | xargs -r docker network rm || true
+        # Wait a bit for Docker to finalize deletion
+        sleep 1
+    done
+}
+
+remove_networks
+
 echo "Deploying Docker stack '$STACK_NAME' with shard image '$SHARD_IMAGE_NAME'..."
 docker stack deploy -c "$TEMP_STACK_FILE" "$STACK_NAME" --detach=true
 

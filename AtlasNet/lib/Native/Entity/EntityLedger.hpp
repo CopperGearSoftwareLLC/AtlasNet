@@ -12,10 +12,8 @@
 #include <unordered_set>
 
 #include "Client/Client.hpp"
-#include "Client/Packet/ClientTransferPacket.hpp"
 #include "Debug/Log.hpp"
 #include "Entity/Entity.hpp"
-#include "Entity/Packet/EntityTransferPacket.hpp"
 #include "Entity/Packet/LocalEntityListRequestPacket.hpp"
 #include "Global/Misc/Singleton.hpp"
 #include "Global/pch.hpp"
