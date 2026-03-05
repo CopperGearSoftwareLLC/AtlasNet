@@ -222,14 +222,21 @@ Local k3d dev deployment is available via:
 
 ```bash
 cmake --build build --target sandbox_atlasnet_run
+cmake --build build --target sandbox_atlasnet_run_fast
 ```
 
-This now:
+`sandbox_atlasnet_run`:
 - prunes unused Docker images and volumes after deployment finishes (set `ATLASNET_SKIP_DOCKER_PRUNE=1` to skip)
 - frees AtlasNet runtime ports
 - creates/uses k3d cluster `atlasnet-dev`
 - imports locally built images (`watchdog`, `proxy`, `cartograph`, `sandbox-server`)
 - deploys Kubernetes manifests from `deploy/k8s/overlays/k3d/`
+
+`sandbox_atlasnet_run_fast`:
+- still redeploys the full cluster
+- reuses Docker Buildx cache instead of recreating the builder
+- rebuilds only images whose staged inputs changed (`watchdog`, `proxy`, `shard`, `cartograph`, `sandbox-server`)
+- skips post-deploy prune so caches stay warm
 
 Default host endpoints:
 - Cartograph: `http://127.0.0.1:3000`

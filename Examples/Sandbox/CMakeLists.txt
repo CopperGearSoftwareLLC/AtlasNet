@@ -29,3 +29,10 @@ add_custom_target(sandbox_atlasnet_run
      USES_TERMINAL
      DEPENDS AtlasnetDockerBuild_Fast SandboxServerDockerBuild
      )
+
+add_custom_target(sandbox_atlasnet_run_fast
+     COMMAND ${CMAKE_COMMAND} -E chdir ${CMAKE_SOURCE_DIR} bash ${CMAKE_SOURCE_DIR}/Dev/FreePortsAndServices.sh
+     COMMAND ${CMAKE_COMMAND} -E chdir ${CMAKE_SOURCE_DIR}/Dev ${CMAKE_SOURCE_DIR}/Dev/RunAtlasNetK3dDev.sh atlasnet-dev ${SANDBOX_SERVER_IMAGE_NAME}
+     USES_TERMINAL
+     DEPENDS AtlasnetDockerBuild_FastCached SandboxServerDockerBuild_Fast
+     )

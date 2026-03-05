@@ -34,6 +34,18 @@ add_custom_target(AtlasnetDockerBuild_Fast
 )
 add_dependencies(AtlasnetDockerBuild_Fast AtlasnetDockerBuild_Fast_Stage)
 
+add_custom_target(AtlasnetDockerBuild_FastCached
+    COMMAND ${CMAKE_COMMAND} -E env
+            ATLASNET_DOCKER_CHANGED_ONLY=1
+            ${ATLASNET_ROOT}/docker/BuildDockerImages.sh
+            -c
+            -f ${ATLASNET_ROOT}/docker/dockerfiles/docker-bake.copy.json
+    COMMAND ${CMAKE_COMMAND} -E rm -rf ${ATLASNET_ROOT}/.stage
+    WORKING_DIRECTORY ${ATLASNET_ROOT}
+    USES_TERMINAL
+)
+add_dependencies(AtlasnetDockerBuild_FastCached AtlasnetDockerBuild_Fast_Stage)
+
 set(
     ATLASNET_HOST_CONTAINER_NAME
     "atlasnet-dev-watchdog"
