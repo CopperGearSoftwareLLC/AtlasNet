@@ -228,7 +228,7 @@ function decodeGridShapeBounds(base64Value) {
   }
 }
 
-function toRectangleShape(bounds, ownerId, color) {
+function toBoundsPolygonShape(bounds, ownerId, color) {
   const minX = Number(bounds.min?.x);
   const minY = Number(bounds.min?.y);
   const maxX = Number(bounds.max?.x);
@@ -242,22 +242,14 @@ function toRectangleShape(bounds, ownerId, color) {
     return null;
   }
 
-  return {
-    id: String(bounds.id),
-    ownerId: ownerId || '',
-    type: 1,
-    position: {
-      x: (minX + maxX) / 2,
-      y: (minY + maxY) / 2,
-    },
-    radius: 0,
-    size: {
-      x: Math.abs(maxX - minX),
-      y: Math.abs(maxY - minY),
-    },
-    color,
-    vertices: [],
-  };
+  const points = [
+    { x: minX, y: minY },
+    { x: maxX, y: minY },
+    { x: maxX, y: maxY },
+    { x: minX, y: maxY },
+  ];
+
+  return toPolygonShape(bounds.id, points, ownerId, color);
 }
 
 function decodeVoronoiBounds(base64Value) {
@@ -701,7 +693,7 @@ async function readHeuristicShapesFromDatabase() {
           if (!bounds) {
             continue;
           }
-          shape = toRectangleShape(bounds, '', 'rgba(255, 149, 100, 1)');
+          shape = toBoundsPolygonShape(bounds, '', 'rgba(255, 149, 100, 1)');
         }
         if (shape) {
           shapes.push(shape);
@@ -738,7 +730,7 @@ async function readHeuristicShapesFromDatabase() {
           if (!bounds) {
             continue;
           }
-          shape = toRectangleShape(bounds, ownerId, 'rgba(100, 255, 149, 1)');
+          shape = toBoundsPolygonShape(bounds, ownerId, 'rgba(100, 255, 149, 1)');
         }
         if (shape) {
           shapes.push(shape);
