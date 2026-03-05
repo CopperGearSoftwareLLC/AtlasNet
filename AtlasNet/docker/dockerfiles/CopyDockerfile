@@ -1,7 +1,7 @@
 # Minimal atlasnetsdk stage
 FROM ubuntu:24.04 AS runner
 WORKDIR /atlasnet
-RUN apt-get update && apt-get install -y libatomic1 binutils
+RUN apt-get update && apt-get install -y libatomic1 binutils gdb build-essential
 COPY ./.stage /atlasnet
 
 FROM scratch AS atlasnetsdk

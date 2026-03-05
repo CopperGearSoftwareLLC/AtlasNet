@@ -1,5 +1,6 @@
 #pragma once
 #include <memory>
+#include <shared_mutex>
 #include <thread>
 #include <type_traits>
 #include <unordered_map>
@@ -80,6 +81,23 @@ class Interlink : public Singleton<Interlink>
 	PacketManager packet_manager;
 	bool b_InDockerNetwork = true;
 	std::atomic_bool IsInit = false;
+
+	
+	mutable std::shared_mutex mutex_; // protects Connections and QueuedPacketsOnConnect
+
+    // helper lock utilities (use the pattern you provided)
+    template <typename FN>
+    auto _ReadLock(FN&& f) const
+    {
+        std::shared_lock lock(mutex_);
+        return std::forward<FN>(f)();
+    }
+    template <typename FN>
+    auto _WriteLock(FN&& f)
+    {
+        std::unique_lock lock(mutex_);
+        return std::forward<FN>(f)();
+    }
 
    public:
 	bool EstablishConnectionAtIP(const NetworkIdentity &who, const IPAddress &ip);

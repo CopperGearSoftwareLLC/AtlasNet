@@ -55,6 +55,16 @@ void SandboxClient::SetImGui()
 
 void SandboxClient::RenderView()
 {
+	if (waitingOnResponse)
+{
+    auto now = std::chrono::high_resolution_clock::now();
+    std::chrono::duration<float> elapsed = now - lastRequestTime;
+    if (elapsed.count() >= responseTimeout)
+    {
+        waitingOnResponse = false; // reset
+        logger.Warning("Server response timed out, allowing next input.");
+    }
+}
 	ImGuiWindowFlags window_flags = ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoResize |
 									ImGuiWindowFlags_NoMove |
 									ImGuiWindowFlags_NoBringToFrontOnFocus |
@@ -93,23 +103,30 @@ void SandboxClient::RenderView()
 			const bool sPressed = ImGui::IsKeyDown(ImGuiKey_S);
 			const bool aPressed = ImGui::IsKeyDown(ImGuiKey_A);
 			const bool dPressed = ImGui::IsKeyDown(ImGuiKey_D);
-			if (wPressed || sPressed || aPressed || dPressed)
-			{
-				const float x_v = dPressed + (aPressed ? -1.0f : 0.0f);
-				const float y_v = wPressed + (sPressed ? -1.0f : 0.0f);
-				vec2 desiredPos = CameraPos + vec2(x_v, y_v) * 0.02f * CameraSizeX;
-				GameClientInputCommand c;
-				c.myDesiredDestination = vec3(desiredPos, 0);
-				AtlasNetClient::Get().GetCommandBus().Dispatch(c);
-				waitingOnResponse = true;
-				logger.DebugFormatted("Sending request to move to {}",
-									  glm::to_string(c.myDesiredDestination));
-			}
-		}
 
+			const float x_v = dPressed + (aPressed ? -1.0f : 0.0f);
+			const float y_v = wPressed + (sPressed ? -1.0f : 0.0f);
+			vec2 desiredPos = CameraPos + vec2(x_v, y_v) * 0.02f * CameraSizeX;
+
+			GameClientInputCommand c;
+			c.myDesiredDestination = vec3(desiredPos, 0);
+			AtlasNetClient::Get().GetCommandBus().Dispatch(c);
+
+			waitingOnResponse = true;
+			lastRequestTime = std::chrono::high_resolution_clock::now();  // track request time
+			logger.DebugFormatted("Sending request to move to {}",
+								  glm::to_string(c.myDesiredDestination));
+		}
+		for (const vec3 &oep : other_entities)
+		{
+			ImPlot::GetPlotDrawList()->AddCircleFilled(
+				ImPlot::PlotToPixels(ImVec2(oep.x, oep.y)), 1000.0f * 1 / CameraSizeX,
+				ImGui::ColorConvertFloat4ToU32(ImVec4(1, 0, 1, 1)));
+		}
 		ImPlot::GetPlotDrawList()->AddCircleFilled(
-			ImPlot::PlotToPixels(ImVec2(CameraPos.x, CameraPos.y)), 100.0f * 1 / CameraSizeX,
+			ImPlot::PlotToPixels(ImVec2(CameraPos.x, CameraPos.y)), 1000.0f * 1 / CameraSizeX,
 			ImGui::ColorConvertFloat4ToU32(ImVec4(0, 0, 1, 1)));
+
 		ImPlot::EndPlot();
 	}
 	ImGui::EndChild();
@@ -182,6 +199,15 @@ void SandboxClient::OnGameStateCommand(const NetServerStateHeader &header,
 {
 	logger.DebugFormatted("Received server state setting my position to {}",
 						  glm::to_string(command.yourPosition));
+
+	logger.DebugFormatted("It contains info about {} entities", command.entities.size());
 	CameraPos = command.yourPosition;
+
+	other_entities.clear();
+
+	for (const auto &e : command.entities)
+	{
+		other_entities.push_back(e.position);
+	}
 	waitingOnResponse = false;
 }

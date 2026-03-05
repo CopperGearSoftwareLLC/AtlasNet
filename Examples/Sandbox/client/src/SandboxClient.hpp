@@ -12,6 +12,8 @@ class SandboxClient
     std::optional<AtlasEntityID> MyID;
 
     std::optional<GLFWwindow *> window;
+
+    std::vector<vec3> other_entities;
     vec2 CameraPos = {0,0};
     float CameraSizeX = 10;
     bool ShouldDisconnect = false;
@@ -21,6 +23,8 @@ class SandboxClient
     void RenderView();
 	void OnGameStateCommand(const NetServerStateHeader& header, const GameStateCommand& command);
     bool waitingOnResponse = false;
+    std::chrono::high_resolution_clock::time_point lastRequestTime;
+float responseTimeout = 1.0f; // 1 second
    public:
 
     void Run(const IPAddress& address);

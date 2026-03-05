@@ -6,6 +6,7 @@
 #include <boost/multi_index/tag.hpp>
 #include <boost/multi_index_container_fwd.hpp>
 #include <shared_mutex>
+#include <unordered_set>
 
 #include "Client/Client.hpp"
 #include "Client/Database/ClientManifest.hpp"
@@ -18,12 +19,16 @@
 #include "Network/NetworkEnums.hpp"
 #include "Network/NetworkIdentity.hpp"
 #include "Network/Packet/PacketManager.hpp"
+#include "Transfer/Packet/ClientSwitchPacket.hpp"
+#include "Transfer/TransferData.hpp"
 class CommandRouter : public Singleton<CommandRouter>
 {
-	PacketManager::Subscription ServerStatePacketSub, ClientIntentPacketSub;
+	PacketManager::Subscription ServerStatePacketSub, ClientIntentPacketSub, ClientSwitchPacketSub;
 	Log logger = Log("CommandRouter");
 
 	std::unordered_map<ClientID, ShardID> RoutingMap;
+	std::unordered_set<ClientID> RoutesPaused;
+	std::unordered_map<TransferID,std::unordered_set<ClientID>> transferMap;
 	mutable std::shared_mutex mutex;
 
    private:
@@ -41,62 +46,12 @@ class CommandRouter : public Singleton<CommandRouter>
 	}
 
    public:
-	CommandRouter()
-	{
-		ServerStatePacketSub =
-			Interlink::Get().GetPacketManager().Subscribe<ServerStateCommandPacket>(
-				[this](const ServerStateCommandPacket& packet,
-					   const PacketManager::PacketInfo& info)
-				{ OnServerStatePacket(packet, info); });
-
-		ClientIntentPacketSub =
-			Interlink::Get().GetPacketManager().Subscribe<ClientIntentCommandPacket>(
-				[this](const ClientIntentCommandPacket& packet,
-					   const PacketManager::PacketInfo& info)
-				{ OnClientIntentPacket(packet, info); });
-	};
+	CommandRouter();
 
 	void OnServerStatePacket(const ServerStateCommandPacket& packet,
-							 const PacketManager::PacketInfo& info)
-	{
-		NetworkIdentity TargetID = NetworkIdentity::MakeIDGameClient(packet.target);
-		Interlink::Get().SendMessage(TargetID, packet, NetworkMessageSendFlag::eReliableBatched);
-
-		logger.DebugFormatted(
-			"Dispatching ServerState\n - ID: {}\n - From Shard: {}\n - To Client: {}",
-			packet.cmdTypeID, UUIDGen::ToString(info.sender.ID), UUIDGen::ToString(packet.target));
-	};
+							 const PacketManager::PacketInfo& info);
 	void OnClientIntentPacket(const ClientIntentCommandPacket& packet,
-							  const PacketManager::PacketInfo& info)
-	{
-		auto SendPacketFunc = [&](const ShardID& shardID, const ClientIntentCommandPacket& packet)
-		{
-			logger.DebugFormatted(
-				"Dispatching ClientIntent\n - ID: {}\n - From Client: {}\n - To Shard: {}",
-				packet.cmdTypeID, UUIDGen::ToString(info.sender.ID), UUIDGen::ToString(shardID));
-			Interlink::Get().SendMessage(NetworkIdentity::MakeIDShard(shardID), packet,
-										 NetworkMessageSendFlag::eReliableBatched);
-		};
-		const bool success = _ReadLock(
-			[&]()
-			{
-				if (!RoutingMap.contains(info.sender.ID))
-				{
-					return false;
-				}
-
-				SendPacketFunc(RoutingMap.at(info.sender.ID), packet);
-				return true;
-			});
-		if (!success)
-		{
-			const std::optional<NetworkIdentity> Shard =
-				ClientManifest::Get().GetClientShard(info.sender.ID);
-			ASSERT(Shard.has_value(), "INVALID");
-			_WriteLock([&]() { RoutingMap.insert(std::make_pair(info.sender.ID, Shard->ID)); });
-			SendPacketFunc(Shard->ID, packet);
-		}
-
-		// logger.DebugFormatted("Received ClientIntentPacket");
-	};
+							  const PacketManager::PacketInfo& info);
+	void OnClientSwitchPacket(const ClientSwitchPacket& packet,
+							  const PacketManager::PacketInfo& info);
 };

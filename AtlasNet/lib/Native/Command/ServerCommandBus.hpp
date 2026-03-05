@@ -33,7 +33,7 @@ class ServerCommandBus : public ICommandBus<ClientID, NetClientIntentHeader, Net
 									 const PacketManager::PacketInfo& info)
 	{
 		const auto commandID = packet.cmdTypeID;
-		logger.DebugFormatted("Received ClientIntentCommand ID: {}", commandID);
+		/* logger.DebugFormatted("Received ClientIntentCommand ID: {}", commandID); */
 		const auto command = CommandRegistry::Get().MakeFromID(commandID);
 		ByteReader br(packet.commandData);
 		command->Deserialize(br);

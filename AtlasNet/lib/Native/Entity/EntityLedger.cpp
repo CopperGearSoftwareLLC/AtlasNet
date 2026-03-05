@@ -6,9 +6,8 @@
 #include <thread>
 
 #include "Entity/Entity.hpp"
-#include "Entity/Packet/EntityTransferPacket.hpp"
 #include "Entity/Packet/LocalEntityListRequestPacket.hpp"
-#include "Entity/Transfer/TransferCoordinator.hpp"
+#include "Transfer/TransferCoordinator.hpp"
 #include "Global/Misc/UUID.hpp"
 #include "Heuristic/BoundLeaser.hpp"
 #include "Heuristic/Database/HeuristicManifest.hpp"

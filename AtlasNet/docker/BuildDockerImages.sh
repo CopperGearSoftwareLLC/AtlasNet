@@ -30,11 +30,7 @@ while getopts "p:f:h" opt; do
 done
 
 # Determine progress style
-if [ -t 1 ]; then
-    PROGRESS="tty"
-else
-    PROGRESS="plain"
-fi
+PROGRESS=$([ -t 1 ] && echo "tty" || echo "plain")
 
 echo "==> Using bake file: $BAKE_FILE"
 [ -n "$PLATFORMS" ] && echo "==> Using platforms override: $PLATFORMS"
@@ -53,23 +49,35 @@ create_builder() {
         --driver-opt network=host \
         --buildkitd-config "$BUILDKITD_CONFIG" \
         --use
-        #--buildkitd-flags '--allow-insecure-entitlement=network.host' \
 }
 
-recreate_builder() {
-    echo "==> Recreating buildx builder: $BUILDER_NAME"
-    docker buildx rm -f "$BUILDER_NAME" >/dev/null 2>&1 || true
-    create_builder
+# Only create builder if missing or misconfigured
+use_or_create_builder() {
+    if ! docker buildx inspect "$BUILDER_NAME" >/dev/null 2>&1; then
+        echo "==> Builder does not exist, creating..."
+        create_builder
+
+        #echo "==> Builder exists, checking configuration..."
+        #NETWORK_OK=$(docker buildx inspect "$BUILDER_NAME" | grep -q 'network="host"' && echo "yes" || echo "no")
+        #CONFIG_OK=$(docker buildx inspect "$BUILDER_NAME" | grep -q "File#$(basename "$BUILDKITD_CONFIG"):" && echo "yes" || echo "no")
+        #
+        #if [ "$NETWORK_OK" != "yes" ] || [ "$CONFIG_OK" != "yes" ]; then
+        #    echo "==> Builder config drift detected, recreating builder..."
+        #    docker buildx rm -f "$BUILDER_NAME" >/dev/null 2>&1 || true
+        #    create_builder
+        #else
+        #    echo "==> Builder configuration is up to date."
+        #    docker buildx use "$BUILDER_NAME"
+        #fi
+    fi
 }
 
-# Create builder if it doesn't exist
-if ! docker buildx inspect "$BUILDER_NAME" >/dev/null 2>&1; then
-    create_builder
-else
-    docker buildx use "$BUILDER_NAME"
-fi
+# Use builder or create if missing
+use_or_create_builder
 
-recreate_builder
+# Bootstrap builder (enables QEMU for cross-arch)
+docker buildx inspect "$BUILDER_NAME" --bootstrap
+
 echo "==> Building images in parallel with BuildKit..."
 
 # Conditionally include platforms if specified

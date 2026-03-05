@@ -2,8 +2,7 @@
 
 FROM ubuntu:24.04
 WORKDIR /sandbox
-RUN apt update
-RUN apt install -y libatomic1 binutils
+RUN apt update && apt install -y libatomic1 binutils gdb build-essential
 COPY .stage /sandbox/
 RUN ls -a && echo hi
 RUN chmod +x /sandbox/SandboxServer

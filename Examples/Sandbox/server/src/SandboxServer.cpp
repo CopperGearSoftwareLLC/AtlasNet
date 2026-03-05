@@ -46,7 +46,7 @@ void SandboxServer::Run()
 	{
 		std::mt19937 rng(std::random_device{}());
 		std::uniform_real_distribution<float> dist(0.0f, 1.0f);
-		for (int i = 0; i < 0; i++)
+		for (int i = 0; i < 100; i++)
 		{
 			float z = dist(rng) * 2.0f - 1.0f;					// z in [-1, 1]
 			float theta = dist(rng) * 2.0f * glm::pi<float>();	// angle around Z
@@ -174,16 +174,28 @@ void SandboxServer::OnClientSpawn(const ClientSpawnInfo& c, const AtlasEntityMin
 void SandboxServer::OnGameClientInputCommand(const NetClientIntentHeader& header,
 											 const GameClientInputCommand& command)
 {
-	logger.DebugFormatted("Received a GameClientInputCommand from {} requesting to move to {}",
+	/* logger.DebugFormatted("Received a GameClientInputCommand from {} requesting to move to {}",
 						  UUIDGen::ToString(header.clientID),
-						  glm::to_string(command.myDesiredDestination));
-
+						  glm::to_string(command.myDesiredDestination)); */
+	if (!EntityLedger::Get().ExistsEntity(header.entityID)) 
+	{
+		logger.ErrorFormatted("GameClient Input command THROWN AWAY. THIS SHOULD NOT HAPPEN");
+		return;
+	}
 	EntityLedger::Get().GetEntity(header.entityID, [&](AtlasEntity& e)
 								  { e.transform.position = command.myDesiredDestination; });
 	GameStateCommand response;
 	response.yourPosition = command.myDesiredDestination;
-	logger.DebugFormatted("Responding a GameServerState to {} approving move to {}",
+	/* logger.DebugFormatted("Responding a GameServerState to {} approving move to {}",
 						  UUIDGen::ToString(header.clientID),
-						  glm::to_string(command.myDesiredDestination));
+						  glm::to_string(command.myDesiredDestination)); */
+
+	EntityLedger::Get().ForEachEntityRead(
+		std::execution::seq,
+		[&](const AtlasEntity& e)
+		{
+			response.entities.push_back(
+				GameStateCommand::Entity{.position = e.transform.position, .ID = e.Entity_ID});
+		});
 	GetCommandBus().Dispatch(header.clientID, response);
 }

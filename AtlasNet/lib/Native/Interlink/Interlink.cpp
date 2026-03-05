@@ -105,89 +105,140 @@ void Interlink::SendMessage(const NetworkIdentity &who, const std::shared_ptr<IP
 		return;
 	}
 
-	auto QueueMessageOnConnect = [&]()
-	{ QueuedPacketsOnConnect[who].push_back(std::make_pair(packet, sendFlag)); };
+	auto QueueMessageOnConnect = [&]() {
+		_WriteLock([&]()
+				   { QueuedPacketsOnConnect[who].push_back(std::make_pair(packet, sendFlag)); });
+	};
 
-	if (!Connections.get<IndexByTarget>().contains(who))
+	bool contains = _ReadLock([&]() { return Connections.get<IndexByTarget>().contains(who); });
+
+	if (!contains)
 	{
 		logger.DebugFormatted("Connection to \"{}\" was not established, connecting...",
 							  who.ToString());
 		EstablishConnectionTo(who);
 		QueueMessageOnConnect();
+		return;
 	}
-	else if (auto find = Connections.get<IndexByTarget>().find(who);
-			 find->state != ConnectionState::eConnected)
-	{
-		if (find->state == ConnectionState::ePreConnecting ||
-			find->state == ConnectionState::eConnecting)
+
+	// Read the connection state and SteamConnection under read lock,
+	// then operate outside the lock.
+	ConnectionState state;
+	HSteamNetConnection steamConn = k_HSteamNetConnection_Invalid;
+	bool found = _ReadLock(
+		[&]() -> bool
 		{
-			logger.DebugFormatted(
-				"Connection to {} is {} , queuing message...", who.ToString(),
-				boost::describe::enum_to_string(Connections.get<IndexByTarget>().find(who)->state,
-												"unknown"));
+			auto &index = Connections.get<IndexByTarget>();
+			auto it = index.find(who);
+			if (it == index.end())
+				return false;
+			state = it->state;
+			steamConn = it->SteamConnection;
+			return true;
+		});
+
+	if (!found)
+	{
+		// race: connection disappeared after earlier check; queue and attempt reconnect
+		logger.DebugFormatted("Connection {} disappeared, queuing", who.ToString());
+		EstablishConnectionTo(who);
+		QueueMessageOnConnect();
+		return;
+	}
+
+	if (state != ConnectionState::eConnected)
+	{
+		if (state == ConnectionState::ePreConnecting || state == ConnectionState::eConnecting)
+		{
+			logger.DebugFormatted("Connection to {} is {} , queuing message...", who.ToString(),
+								  boost::describe::enum_to_string(state, "unknown"));
 			QueueMessageOnConnect();
+			return;
 		}
 		else
 		{
-			logger.DebugFormatted(
-				"Connection to {} state is {} , connecting...", who.ToString(),
-				boost::describe::enum_to_string(Connections.get<IndexByTarget>().find(who)->state,
-												"unknown"));
+			logger.DebugFormatted("Connection to {} state is {} , connecting...", who.ToString(),
+								  boost::describe::enum_to_string(state, "unknown"));
 			EstablishConnectionTo(who);
 			QueueMessageOnConnect();
+			return;
 		}
 	}
-	else
+
+	// At this point we have a connected steamConn; do serialization and sending outside locks.
+	ByteWriter bw;
+	packet->Serialize(bw);
+	const auto data_span = bw.bytes();
+
+	const auto SendResult = networkInterface->SendMessageToConnection(
+		steamConn, data_span.data(), data_span.size_bytes(), (int)sendFlag, nullptr);
+
+	if (SendResult != k_EResultOK)
 	{
-		const Connection &conn = *Connections.get<IndexByTarget>().find(who);
-
-		ByteWriter bw;
-		packet->Serialize(bw);
-		const auto data_span = bw.bytes();
-		const auto SendResult = networkInterface->SendMessageToConnection(
-			conn.SteamConnection, data_span.data(), data_span.size_bytes(), (int)sendFlag, nullptr);
-
-		if (SendResult != k_EResultOK)
-		{
-			logger.ErrorFormatted(
-				"Unable to send message. SteamNetworkingSockets returned "
-				"result code {}",
-				(int)SendResult);
-		}
-		else
-		{
-			// logger.DebugFormatted("{} Packet sent to {}", packet->GetPacketName(),
-			// who.ToString());
-		}
+		logger.ErrorFormatted(
+			"Unable to send message. SteamNetworkingSockets returned "
+			"result code {}",
+			(int)SendResult);
 	}
 }
 
 void Interlink::GenerateNewConnections()
 {
-	auto &IndiciesByState = Connections.get<IndexByState>();
-	auto PreConnectingConnections = IndiciesByState.equal_range(ConnectionState::ePreConnecting);
+	// 1) Collect a snapshot of pre-connecting targets and their addresses
+	std::vector<std::pair<NetworkIdentity, IPAddress>> toConnect;
+	_ReadLock(
+		[&]()
+		{
+			auto &byState = Connections.get<IndexByState>();
+			auto range = byState.equal_range(ConnectionState::ePreConnecting);
+			for (auto it = range.first; it != range.second; ++it)
+			{
+				toConnect.emplace_back(it->target, it->address);
+			}
+		});
+
+	if (toConnect.empty())
+		return;
 
 	SteamNetworkingConfigValue_t opt[1];
 	opt[0].SetPtr(k_ESteamNetworkingConfig_Callback_ConnectionStatusChanged,
 				  (void *)SteamNetConnectionStatusChanged);
 
-	for (auto it = PreConnectingConnections.first; it != PreConnectingConnections.second; ++it)
+	// 2) For each, perform connect (network call) outside the lock, then update entry under write
+	// lock
+	for (auto &p : toConnect)
 	{
-		const Connection &connection = *it;
-		logger.DebugFormatted("Connecting to {} at {}", connection.target.ToString(),
-							  connection.address.ToString());
+		const auto &target = p.first;
+		const auto &addr = p.second;
 
+		logger.DebugFormatted("Connecting to {} at {}", target.ToString(), addr.ToString());
 		HSteamNetConnection conn =
-			networkInterface->ConnectByIPAddress(connection.address.ToSteamIPAddr(), 1, opt);
+			networkInterface->ConnectByIPAddress(addr.ToSteamIPAddr(), 1, opt);
+
 		if (conn == k_HSteamNetConnection_Invalid)
 		{
-			logger.ErrorFormatted("Failed to Generate New Connection {}",
-								  connection.address.ToString());
+			logger.ErrorFormatted("Failed to Generate New Connection {}", addr.ToString());
+			continue;
 		}
-		else
-		{
-			IndiciesByState.modify(it, [conn = conn](Connection &c) { c.SteamConnection = conn; });
-		}
+
+		// write-back connection handle into Connections if it still exists and still preconnecting
+		_WriteLock(
+			[&]()
+			{
+				auto &indexTarget = Connections.get<IndexByTarget>();
+				auto it = indexTarget.find(target);
+				if (it != indexTarget.end() && it->state == ConnectionState::ePreConnecting)
+				{
+					// modify using IndexByTarget (or find then modify by stable iterator via global
+					// index).
+					indexTarget.modify(it, [conn](Connection &c) { c.SteamConnection = conn; });
+				}
+				else
+				{
+					// entry vanished or changed; close the connection we just opened
+					networkInterface->CloseConnection(conn, 0, "Stale after connect", false);
+				}
+			});
 	}
 }
 
@@ -201,115 +252,115 @@ void Interlink::CallbackOnConnecting(SteamCBInfo info)
 	logger.DebugFormatted("On Connecting");
 
 	auto &IndiciesBySteamConnection = Connections.get<IndexByHSteamNetConnection>();
-	auto ExistingConnection = IndiciesBySteamConnection.find(info->m_hConn);
 
-	// The connection request already exists
-	if (ExistingConnection != IndiciesBySteamConnection.end())
+	// Find existing under read lock
+	bool exists = _ReadLock(
+		[&]() {
+			return IndiciesBySteamConnection.find(info->m_hConn) != IndiciesBySteamConnection.end();
+		});
+
+	if (exists)
 	{
-		IndiciesBySteamConnection.modify(
-			ExistingConnection, [](Connection &c) { c.SetNewState(ConnectionState::eConnecting); });
-		logger.DebugFormatted(
-			"Existing connection to ({}) started by me transitioning to "
-			"CONNECTING state",
-			ExistingConnection->target.ToString());
+		_WriteLock(
+			[&]()
+			{
+				auto it = IndiciesBySteamConnection.find(info->m_hConn);
+				if (it != IndiciesBySteamConnection.end())
+					IndiciesBySteamConnection.modify(
+						it, [](Connection &c) { c.SetNewState(ConnectionState::eConnecting); });
+			});
+		logger.DebugFormatted("Existing connection started by me -> CONNECTING");
 		return;
 	}
 
-	/* ADD CHECK TO CHECK IF THE GIVEN NETWORKING IDENTITY ALREADY EXISTS IN THE
-	CONNECTIONS MAP. IMPLYING THAT THE SAME TARGET TRIED TO CONNECT MULTIPLE
-	TIMES IN A ROW. CAUSES A CRASH*/
-
-	// ----- New incoming connection path (could be internal or external) -----
+	// Extract identity
 	IPAddress address(info->m_info.m_addrRemote);
 
 	int identityByteStreamSize = 0;
 	const uint8 *identityByteStream =
 		(const uint8 *)info->m_info.m_identityRemote.GetGenericBytes(identityByteStreamSize);
 
-	// If no identity or malformed, treat as EXTERNAL client (Unity, tools)
 	NetworkIdentity ID;
 	if (identityByteStream &&
 		info->m_info.m_identityRemote.m_eType == k_ESteamNetworkingIdentityType_GenericBytes)
 	{
 		ByteReader br(std::span(identityByteStream, identityByteStreamSize));
-
 		ID.Deserialize(br);
 	}
 
-	// If connection is internal?
-	if (ID.IsInternal())
-	{
-		bool known = false;
-
-		known = ServerRegistry::Get().ExistsInRegistry(ID);
-
-		logger.DebugFormatted(
-			"Incoming Internal Connection from: {} at {} (In Server Registry? "
-			"{})",
-			ID.ToString(), address.ToString(), known ? "yes" : "no");
-	}
-	else
-	{
-		logger.DebugFormatted("Incoming External Connection from: {} at {} ", ID.ToString(),
-							  address.ToString());
-	}
-	// Accept the connection
+	// Accept the connection before inserting
 	if (EResult result = networkInterface->AcceptConnection(info->m_hConn); result != k_EResultOK)
 	{
 		logger.ErrorFormatted("Error accepting connection: reason: {}", uint64(result));
 		networkInterface->CloseConnection(info->m_hConn, 0, nullptr, false);
 		return;
 	}
-	// Register new connection (mark external if not registry-known)
+
 	Connection newCon;
 	newCon.SteamConnection = info->m_hConn;
 	newCon.SetNewState(ConnectionState::eConnecting);
 	newCon.address = address;
 	newCon.target = ID;
 	newCon.kind = ID.IsInternal() ? ConnectionKind::eInternal : ConnectionKind::eExternal;
-	Connections.insert(newCon);
+
+	// Insert under write lock
+	_WriteLock([&]() { Connections.insert(newCon); });
 }
 
 void Interlink::CallbackOnClosedByPear(SteamCBInfo info)
 {
 	auto &bySteam = Connections.get<IndexByHSteamNetConnection>();
-	auto it = bySteam.find(info->m_hConn);
 
-	if (it == bySteam.end())
+	// find + erase under write lock
+	NetworkIdentity closedID;
+	bool found = _ReadLock([&]() { return bySteam.find(info->m_hConn) != bySteam.end(); });
+
+	if (!found)
 	{
-		logger.Error(
-			"ClosedByPeer received for unknown connection. This should never "
-			"happen");
+		logger.Error("ClosedByPeer received for unknown connection. This should never happen");
 		return;
 	}
 
-	NetworkIdentity closedID = it->target;
-
-	logger.DebugFormatted("Connection closed by peer: {}", closedID.ToString());
-
-	networkInterface->CloseConnection(info->m_hConn, 0, "Connection closed by peer. aka you", true);
-
-	// Remove from internal table BEFORE notifying callbacks.
-	bySteam.erase(it);
+	_WriteLock(
+		[&]()
+		{
+			auto it = bySteam.find(info->m_hConn);
+			if (it == bySteam.end())
+			{
+				// double-checked
+				return;
+			}
+			closedID = it->target;
+			logger.DebugFormatted("Connection closed by peer: {}", closedID.ToString());
+			networkInterface->CloseConnection(info->m_hConn, 0,
+											  "Connection closed by peer. aka you", true);
+			bySteam.erase(it);
+		});
 }
 
 void Interlink::CallbackOnProblemDetectedLocally(SteamCBInfo info)
 {
 	auto &bySteam = Connections.get<IndexByHSteamNetConnection>();
-	auto it = bySteam.find(info->m_hConn);
 
-	if (it == bySteam.end())
+	bool exists = _ReadLock([&]() { return bySteam.find(info->m_hConn) != bySteam.end(); });
+	if (!exists)
 	{
 		logger.Warning("problem detected locally received for unknown connection.");
 		return;
 	}
 
-	NetworkIdentity closedID = it->target;
-
-	logger.DebugFormatted("Connection closed by peer: {}", closedID.ToString());
-
-	// Remove from internal table BEFORE notifying callbacks.
-	bySteam.erase(it);
+	_WriteLock(
+		[&]()
+		{
+			auto it = bySteam.find(info->m_hConn);
+			if (it != bySteam.end())
+			{
+				NetworkIdentity closedID = it->target;
+				logger.DebugFormatted("Connection problem detected locally for: {}",
+									  closedID.ToString());
+				bySteam.erase(it);
+			}
+		});
 }
 
 void Interlink::CallbackOnConnected(SteamCBInfo info)
@@ -317,38 +368,13 @@ void Interlink::CallbackOnConnected(SteamCBInfo info)
 	logger.Debug("OnConnected");
 	auto &indiciesBySteamConn = Connections.get<IndexByHSteamNetConnection>();
 
-	if (auto v = indiciesBySteamConn.find(info->m_hConn); v != indiciesBySteamConn.end())
-	{
-		indiciesBySteamConn.modify(
-			v, [](Connection &c) { c.SetNewState(ConnectionState::eConnected); });
-		bool result =
-			networkInterface->SetConnectionPollGroup(v->SteamConnection, PollGroup.value());
-		if (!result)
-		{
-			logger.ErrorFormatted("Failed to assign connection from {} to pollgroup",
-								  v->target.ToString());
-		}
+	// find under read lock
+	bool found = _ReadLock(
+		[&]() { return indiciesBySteamConn.find(info->m_hConn) != indiciesBySteamConn.end(); });
 
-		if (!v->IsInternal())
-		{
-			logger.DebugFormatted(" - External client Connected from {}", v->address.ToString());
-			OnClientConnected(*v);
-		}
-		else
-			logger.DebugFormatted(" - {} Connected", v->target.ToString());
-
-		if (QueuedPacketsOnConnect.contains(v->target) &&
-			!QueuedPacketsOnConnect.at(v->target).empty())
-		{
-			for (const auto &[msg, sendflag] : QueuedPacketsOnConnect.at(v->target))
-			{
-				SendMessage(v->target, msg, sendflag);
-			}
-			QueuedPacketsOnConnect.erase(v->target);
-		}
-	}
-	else
+	if (!found)
 	{
+		// no internal record; log and assert like before (unchanged)
 		IPAddress address(info->m_info.m_addrRemote);
 		logger.ErrorFormatted("FUcking idiot. connection not stored internally. {}",
 							  address.ToString(true));
@@ -366,6 +392,62 @@ void Interlink::CallbackOnConnected(SteamCBInfo info)
 		ASSERT(false,
 			   "Connected? to non existent connection?, HSteamNetConnection "
 			   "was not found");
+		return;
+	}
+
+	// Change state and get copy of target for further processing (and queued messages)
+	NetworkIdentity target;
+	bool isInternal = false;
+	_WriteLock(
+		[&]()
+		{
+			auto v = indiciesBySteamConn.find(info->m_hConn);
+			if (v != indiciesBySteamConn.end())
+			{
+				indiciesBySteamConn.modify(
+					v, [](Connection &c) { c.SetNewState(ConnectionState::eConnected); });
+				target = v->target;
+				isInternal = v->IsInternal();
+			}
+		});
+
+	// assign to pollgroup (call outside locks)
+	bool result = networkInterface->SetConnectionPollGroup(info->m_hConn, PollGroup.value());
+	if (!result)
+	{
+		logger.ErrorFormatted("Failed to assign connection from {} to pollgroup",
+							  target.ToString());
+	}
+
+	if (!isInternal)
+	{
+		logger.DebugFormatted(" - External client Connected from {}", target.ToString());
+		// call OnClientConnected which modifies connections; do it safely
+		Connection c = _ReadLock(
+			[&]() { return *Connections.get<IndexByHSteamNetConnection>().find(info->m_hConn); });
+		OnClientConnected(c);
+	}
+	else
+	{
+		logger.DebugFormatted(" - {} Connected", target.ToString());
+	}
+
+	// deliver queued messages: move out queued messages under write lock, then release and send
+	std::vector<std::pair<std::shared_ptr<IPacket>, NetworkMessageSendFlag>> queued;
+	_WriteLock(
+		[&]()
+		{
+			auto it = QueuedPacketsOnConnect.find(target);
+			if (it != QueuedPacketsOnConnect.end() && !it->second.empty())
+			{
+				queued = std::move(it->second);
+				QueuedPacketsOnConnect.erase(it);
+			}
+		});
+
+	for (const auto &p : queued)
+	{
+		SendMessage(target, p.first, p.second);
 	}
 }
 
@@ -398,18 +480,27 @@ void Interlink::ReceiveMessages()
 	{
 		ISteamNetworkingMessage *msg = pIncomingMessages[i];
 
-		const Connection &sender = *Connections.get<IndexByHSteamNetConnection>().find(msg->m_conn);
+		// find sender under read-lock and copy its identity
+		NetworkIdentity senderIdentity;
+		{
+			_ReadLock(
+				[&]()
+				{
+					auto it = Connections.get<IndexByHSteamNetConnection>().find(msg->m_conn);
+					if (it != Connections.get<IndexByHSteamNetConnection>().end())
+						senderIdentity = it->target;
+				});
+		}
 
 		const void *data = msg->m_pData;
 		size_t size = msg->m_cbSize;
 
-		// Normal internal dispatch
 		std::span<const uint8_t> span = std::span<const uint8_t>((uint8_t *)data, size);
-		const auto packet = PacketRegistry::Get().CreateFromBytes(span);
-		// logger.DebugFormatted("Arrived Packet of type {} from {}",
-		//					  packet->GetPacketName(), sender.target.ToString());
+		const auto packet = PacketRegistry::Get().CreateFromBytes(span); 
+
+		// Dispatch: we pass the sender we captured
 		packet_manager.Dispatch(*packet, packet->GetPacketType(),
-								PacketManager::PacketInfo{.sender = sender.target});
+								PacketManager::PacketInfo{.sender = senderIdentity});
 
 		msg->Release();
 	}
@@ -493,13 +584,6 @@ void Interlink::Init()
 		case NetworkIdentityType::eShard:
 		{
 			EstablishConnectionTo(NetworkIdentity::MakeIDWatchDog());
-			for (const auto &server : ServerRegistry::Get().GetServers())
-			{
-				if (server.first.Type == NetworkIdentityType::eShard)
-				{
-					EstablishConnectionTo(server.first);
-				}
-			}
 		}
 		break;
 
@@ -542,50 +626,35 @@ void Interlink::Shutdown()
 
 bool Interlink::EstablishConnectionAtIP(const NetworkIdentity &id, const IPAddress &address)
 {
-	// return EstablishConnectionTo(InterLinkIdentifier::MakeIDGod());
-	if (Connections.get<IndexByTarget>().contains(id))
+	// quick check under read lock
+	bool existsAndConnected = _ReadLock(
+		[&]() -> bool
+		{
+			auto &idx = Connections.get<IndexByTarget>();
+			auto it = idx.find(id);
+			if (it == idx.end())
+				return false;
+			if (it->state == ConnectionState::eConnected)
+				return true;
+			if (it->state == ConnectionState::eConnecting ||
+				it->state == ConnectionState::ePreConnecting)
+				return true;
+			return false;
+		});
+
+	if (existsAndConnected)
 	{
-		const Connection &existing = *Connections.get<IndexByTarget>().find(id);
-		if (existing.state == ConnectionState::eConnected)
-		{
-			logger.WarningFormatted("Connection to {} already established", id.ToString());
-			return true;
-		}
-		else if (existing.state == ConnectionState::eConnecting ||
-				 existing.state == ConnectionState::ePreConnecting)
-		{
-			logger.WarningFormatted("Already connecting to {}", id.ToString());
-			return true;
-		}
+		logger.WarningFormatted("Connection to {} already exists/connecting", id.ToString());
+		return true;
 	}
-
-	// Step 1: Build God ID
-	NetworkIdentity godID = NetworkIdentity::MakeIDWatchDog();
-
-	// Step 2: Try to get public IP:port from registry
-	// std::optional<IPAddress> publicAddr =
-	// ServerRegistry::Get().GetPublicAddress(godID); if
-	// (!publicAddr.has_value())
-	//{
-	//  logger.ErrorFormatted("No public address found for {} in Server
-	//  Registry", godID.ToString()); return false;
-	//}
-	// else
-	//{
-	//  std::cout << "God is reachable at " << publicAddr->ToString() <<
-	//  std::endl;
-	//}
-
-	// auto IP = ServerRegistry::Get().GetIPOfID(id);
 
 	Connection conn;
 	conn.address = address;
 	conn.target = id;
-	// conn.address = *publicAddr;
-	// conn.target = godID;
 	conn.SetNewState(ConnectionState::ePreConnecting);
-	conn.kind = ConnectionKind::eExternal;	// external connection path (direct IP)
-	Connections.insert(conn);
+	conn.kind = ConnectionKind::eExternal;
+
+	_WriteLock([&]() { Connections.insert(conn); });
 
 	logger.DebugFormatted("Establishing direct connection to {} at {}", id.ToString(),
 						  address.ToString());
@@ -596,25 +665,30 @@ bool Interlink::EstablishConnectionTo(const NetworkIdentity &id)
 {
 	ASSERT(NetworkCredentials::Get().GetID().Type != NetworkIdentityType::eGameClient,
 		   "Game client must use the ip one");
-	// Prevent duplicate attempts
-	if (Connections.get<IndexByTarget>().contains(id))
+
+	// quick read-lock check
+	bool already = _ReadLock(
+		[&]() -> bool
+		{
+			auto &idx = Connections.get<IndexByTarget>();
+			auto it = idx.find(id);
+			if (it == idx.end())
+				return false;
+			if (it->state == ConnectionState::eConnected)
+				return true;
+			if (it->state == ConnectionState::eConnecting ||
+				it->state == ConnectionState::ePreConnecting)
+				return true;
+			return false;
+		});
+
+	if (already)
 	{
-		const Connection &existing = *Connections.get<IndexByTarget>().find(id);
-		if (existing.state == ConnectionState::eConnected)
-		{
-			logger.WarningFormatted("Connection to {} already established", id.ToString());
-			return true;
-		}
-		if (existing.state == ConnectionState::eConnecting ||
-			existing.state == ConnectionState::ePreConnecting)
-		{
-			logger.WarningFormatted("Already connecting to {}", id.ToString());
-			return true;
-		}
+		logger.WarningFormatted("Connection to {} already established or in progress",
+								id.ToString());
+		return true;
 	}
-	// ---------------------------------------------------------------
-	// INTERNAL: must exist in ServerRegistry
-	// ---------------------------------------------------------------
+
 	if (id.IsInternal())
 	{
 		auto IP = ServerRegistry::Get().GetIPOfID(id);
@@ -622,9 +696,7 @@ bool Interlink::EstablishConnectionTo(const NetworkIdentity &id)
 		for (int i = 0; i < 5 && !IP.has_value(); i++)
 		{
 			logger.ErrorFormatted(
-				"IP not found for {} in Server Registry. Trying again in 1 "
-				"second",
-				id.ToString());
+				"IP not found for {} in Server Registry. Trying again in 1 second", id.ToString());
 			std::this_thread::sleep_for(std::chrono::seconds(1));
 			IP = ServerRegistry::Get().GetIPOfID(id);
 		}
@@ -632,8 +704,7 @@ bool Interlink::EstablishConnectionTo(const NetworkIdentity &id)
 		if (!IP.has_value())
 		{
 			logger.ErrorFormatted(
-				"Failed to establish connection after 5 tries. IP not found in "
-				"Server Registry {}",
+				"Failed to establish connection after 5 tries. IP not found in Server Registry {}",
 				id.ToString());
 			logger.DebugFormatted("All entries in Server Registry:");
 			for (const auto &[SID, Entry] : ServerRegistry::Get().GetServers())
@@ -642,32 +713,27 @@ bool Interlink::EstablishConnectionTo(const NetworkIdentity &id)
 									  Entry.address.ToString());
 			}
 
-			return false;  // no assert crash, just graceful fail
+			return false;
 		}
 
 		Connection conn;
 		conn.address = IP.value();
 		conn.target = id;
 		conn.SetNewState(ConnectionState::ePreConnecting);
-		Connections.insert(conn);
+
+		_WriteLock([&]() { Connections.insert(conn); });
 
 		logger.DebugFormatted("Establishing internal connection to {}", id.ToString());
 		return true;
 	}
 
-	// ---------------------------------------------------------------
-	// EXTERNAL: skip registry (for now, nothing directly connects to clients)
-	// ---------------------------------------------------------------
 	if (id.Type == NetworkIdentityType::eGameClient)
 	{
-		// For now, external clients are expected to connect INBOUND to God.
-		// Outbound from inside to a GameClient is not required.
 		logger.WarningFormatted("Skipping registry lookup for external client {}",
 								NetworkCredentials::Get().GetID().ToString());
 		return true;
 	}
 
-	// Default case (unknown type)
 	logger.WarningFormatted("Unknown interlink type for {} - skipping connection",
 							NetworkCredentials::Get().GetID().ToString());
 	return false;
@@ -677,24 +743,37 @@ void Interlink::CloseConnectionTo(const NetworkIdentity &id, int reason, const c
 {
 	auto &byTarget = Connections.get<IndexByTarget>();
 
-	auto it = byTarget.find(id);
-	if (it == byTarget.end())
+	// find under read lock
+	bool found = _ReadLock([&]() { return byTarget.find(id) != byTarget.end(); });
+
+	if (!found)
 	{
 		logger.WarningFormatted("CloseConnectionTo: No active connection found for {}",
 								id.ToString());
 		return;
 	}
 
-	HSteamNetConnection conn = it->SteamConnection;
+	HSteamNetConnection conn = k_HSteamNetConnection_Invalid;
 
-	logger.DebugFormatted("Closing connection to {} (SteamConn={})", id.ToString(), (uint64)conn);
+	_WriteLock(
+		[&]()
+		{
+			auto it = byTarget.find(id);
+			if (it == byTarget.end())
+				return;
+			conn = it->SteamConnection;
+			logger.DebugFormatted("Closing connection to {} (SteamConn={})", id.ToString(),
+								  (uint64)conn);
+			byTarget.erase(it);
+		});
 
-	// Close on the networking side
-	networkInterface->CloseConnection(conn, reason, debug, false);
-
-	// Remove from table
-	byTarget.erase(it);
+	// Close on the networking side outside the lock
+	if (conn != k_HSteamNetConnection_Invalid)
+	{
+		networkInterface->CloseConnection(conn, reason, debug, false);
+	}
 }
+
 /*
 void Interlink::DebugPrint()
 {
@@ -719,13 +798,18 @@ void Interlink::GetConnectionTelemetry(std::vector<ConnectionTelemetry> &out)
 	if (!sockets)
 		return;
 
-	const auto &byState = Connections.get<IndexByState>();
+	// Snapshot list of connected connections under read lock
+	std::vector<Connection> conns;
+	_ReadLock(
+		[&]()
+		{
+			auto &byState = Connections.get<IndexByState>();
+			auto range = byState.equal_range(ConnectionState::eConnected);
+			for (auto it = range.first; it != range.second; ++it) conns.push_back(*it);
+		});
 
-	auto [it, end] = byState.equal_range(ConnectionState::eConnected);
-	for (; it != end; ++it)
+	for (const auto &conn : conns)
 	{
-		const Connection &conn = *it;
-
 		SteamNetConnectionRealTimeStatus_t status{};
 		sockets->GetConnectionRealTimeStatus(conn.SteamConnection, &status, 0, nullptr);
 
@@ -758,28 +842,40 @@ void Interlink::OnClientConnected(const Connection &c)
 	{
 		NetworkIdentity newIdentity = c.target;
 		newIdentity.ID = UUIDGen::Gen();
-		logger.DebugFormatted("Client Connection with no ID.\n	Assigning {}",
+		logger.DebugFormatted("Client Connection with no ID.\n    Assigning {}",
 							  newIdentity.ToString());
 
 		ClientIDAssignPacket IDAssignPacket;
 		IDAssignPacket.AssignedClientID = newIdentity;
-		Connections.get<IndexByHSteamNetConnection>().modify(
-			Connections.get<IndexByHSteamNetConnection>().find(c.SteamConnection),
-			[newIdentity = newIdentity](Connection &C) { C.target = newIdentity; });
+
+		// Modify the connection target under write lock
+		logger.DebugFormatted("Getting write lock");
+		_WriteLock(
+			[&]()
+			{
+				logger.DebugFormatted("Got write lock");
+
+				auto &bySteam = Connections.get<IndexByHSteamNetConnection>();
+				auto it = bySteam.find(c.SteamConnection);
+				if (it != bySteam.end())
+				{
+					bySteam.modify(it, [newIdentity](Connection &C) { C.target = newIdentity; });
+				}
+			});
 
 		SendMessage(newIdentity, IDAssignPacket, NetworkMessageSendFlag::eReliableNow);
+		logger.DebugFormatted("Sent ID Assign packet");
 		Client client;
 		client.ID = newIdentity.ID;
 		client.ip = c.address;
 		ClientManifest::Get().InsertClient(client);
-		
+
 		ClientHandshakeEvent cce;
 		cce.client = client;
 		cce.ConnectedProxy = NetworkCredentials::Get().GetID();
 		EventSystem::Get().Dispatch(cce);
 
 		HandshakeService::Get().OnClientConnect(client);
-		
 	}
 }
 void Interlink::CloseAllConnections(int reason) {}

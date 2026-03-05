@@ -54,7 +54,7 @@ class HandshakeService : public Singleton<HandshakeService>
 	{
 		std::random_device rd;
 		std::mt19937 gen(rd());
-		std::uniform_real_distribution<float> dist(-100.0f, 100.0f);
+		std::uniform_real_distribution<float> dist(-100.0f, 0.0f);
 		ClientVerifyReply reply;
 		reply.status = ClientVerifyStatus::eAccepted;
 		reply.SpawnWorldLocation.position.x = dist(gen);

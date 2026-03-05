@@ -58,6 +58,7 @@ endif()
 add_subdirectory(lib/Native)
 if (ATLASNET_INCLUDE_WEB)
 include(cmake/SetupNode.cmake)
+#include(cmake/AddSwigLibrary.cmake)
 add_subdirectory(lib/Web)
 endif()
 
