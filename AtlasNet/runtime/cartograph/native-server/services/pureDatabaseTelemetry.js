@@ -7,6 +7,14 @@ const AUTHORITY_TELEMETRY_KEY = 'Authority_Telemetry';
 const HEALTH_PING_KEY = 'Health_Ping';
 const NETWORK_TELEMETRY_KEY = 'Network_Telemetry';
 const HEURISTIC_MANIFEST_KEY = 'HeuristicManifest';
+const HEURISTIC_TYPE_KEY = 'Heuristic:Type';
+const HEURISTIC_VERSION_KEY = 'Heuristic:Version';
+const HEURISTIC_DATA_KEY = 'Heuristic:Data';
+const HEURISTIC_OWNERSHIP_VERSION_KEY = 'Heuristic::Ownership:Version';
+const HEURISTIC_OWNERSHIP_NID_TO_BOUND_MAP_KEY =
+  'Heuristic::Ownership:NetID -> BoundID Map';
+const SNAPSHOT_BOUNDIDS_TO_ENTITY_LIST_KEY = 'Snapshot:BoundIDs -> EntityList';
+const SNAPSHOT_BOUNDIDS_TO_TRANSFORMS_KEY = 'Snapshot:BoundIDs -> Transforms';
 const NODE_MANIFEST_SHARD_NODE_KEY = 'Node Manifest Shard_Node';
 const TRANSFER_MANIFEST_KEY = 'Transfer::TransferManifest';
 const TRANSFER_STATE_QUEUE_KEY = 'Transfer::TransferStateQueue';
@@ -34,11 +42,14 @@ const NETWORK_IDENTITY_TYPE_BY_CODE = {
   6: 'eProxy',
   7: 'eAtlasNetInitial',
 };
+const UUID_PATTERN =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 let internalDbClient = null;
 let internalDbConnectPromise = null;
 let heuristicClaimedOwnerCache = null;
 let heuristicClaimedOwnerCacheAtMs = 0;
+let heuristicClaimedOwnerCacheVersion = null;
 
 function getInternalDatabaseTarget() {
   const targets = getDatabaseTargets();
@@ -131,6 +142,254 @@ function decodeNetworkIdentity(raw) {
   const id = formatUuid(buffer.subarray(4, 20));
   const isNilId = /^0{8}-0{4}-0{4}-0{4}-0{12}$/i.test(id);
   return isNilId ? typeName : `${typeName} ${id}`;
+}
+
+function decodeUtf8Text(raw) {
+  if (raw == null) {
+    return '';
+  }
+  if (Buffer.isBuffer(raw)) {
+    return raw.toString('utf8');
+  }
+  return String(raw);
+}
+
+function normalizeText(raw) {
+  return decodeUtf8Text(raw).replace(/\0/g, '').trim();
+}
+
+function normalizeHeuristicTypeName(raw) {
+  const text = normalizeText(raw).toLowerCase();
+  if (!text) {
+    return null;
+  }
+  if (text === 'voronoi') {
+    return 'Voronoi';
+  }
+  if (text === 'gridcell' || text === 'grid' || text === 'egridcell') {
+    return 'GridCell';
+  }
+  if (text === 'quadtree' || text === 'equadtree') {
+    return 'Quadtree';
+  }
+  return normalizeText(raw) || null;
+}
+
+function parseBoundIdText(raw) {
+  const text = normalizeText(raw);
+  if (!text) {
+    return null;
+  }
+  const match = text.match(/^\d+/);
+  if (!match) {
+    return null;
+  }
+  const parsed = Number(match[0]);
+  if (!Number.isFinite(parsed) || parsed < 0) {
+    return null;
+  }
+  return String(Math.floor(parsed));
+}
+
+function parseOwnerIdFromOwnershipField(rawField) {
+  if (Buffer.isBuffer(rawField) && rawField.length >= 20) {
+    const decoded = decodeNetworkIdentity(rawField).trim();
+    if (decoded.length > 0) {
+      return decoded;
+    }
+  }
+
+  const text = normalizeText(rawField);
+  if (!text) {
+    return '';
+  }
+  if (text.startsWith('eShard ')) {
+    return text;
+  }
+  if (UUID_PATTERN.test(text)) {
+    return `eShard ${text}`;
+  }
+  return text;
+}
+
+function parseGridShapeBoundsRaw(raw, offset) {
+  if (!Buffer.isBuffer(raw) || offset + GRID_SHAPE_SERIALIZED_SIZE_BYTES > raw.length) {
+    return null;
+  }
+  try {
+    return {
+      nextOffset: offset + GRID_SHAPE_SERIALIZED_SIZE_BYTES,
+      bound: {
+        id: raw.readUInt32BE(offset),
+        min: {
+          x: raw.readFloatBE(offset + 4),
+          y: raw.readFloatBE(offset + 8),
+          z: raw.readFloatBE(offset + 12),
+        },
+        max: {
+          x: raw.readFloatBE(offset + 16),
+          y: raw.readFloatBE(offset + 20),
+          z: raw.readFloatBE(offset + 24),
+        },
+      },
+    };
+  } catch {
+    return null;
+  }
+}
+
+function parseVoronoiShapeBoundsRaw(raw, offset) {
+  if (!Buffer.isBuffer(raw) || offset + 8 > raw.length) {
+    return null;
+  }
+  try {
+    const id = raw.readUInt32BE(offset);
+    const pointCount = raw.readUInt32BE(offset + 4);
+    if (!Number.isFinite(pointCount) || pointCount < 3 || pointCount > 8192) {
+      return null;
+    }
+
+    let cursor = offset + 8;
+    const points = [];
+    for (let i = 0; i < pointCount; i += 1) {
+      if (cursor + 8 > raw.length) {
+        return null;
+      }
+      const x = raw.readFloatBE(cursor);
+      const y = raw.readFloatBE(cursor + 4);
+      if (!Number.isFinite(x) || !Number.isFinite(y)) {
+        return null;
+      }
+      points.push({ x, y });
+      cursor += 8;
+    }
+
+    return {
+      nextOffset: cursor,
+      bound: { id, points },
+    };
+  } catch {
+    return null;
+  }
+}
+
+function decodeHeuristicBoundsFromBinary(raw, heuristicType) {
+  if (!Buffer.isBuffer(raw) || raw.length < 8) {
+    return [];
+  }
+
+  let count = 0;
+  try {
+    count = Number(raw.readBigUInt64BE(0));
+  } catch {
+    return [];
+  }
+
+  if (!Number.isFinite(count) || count < 0 || count > 100000) {
+    return [];
+  }
+
+  const type = normalizeHeuristicTypeName(heuristicType);
+  const isVoronoi = type === 'Voronoi';
+  let offset = 8;
+  const bounds = [];
+
+  for (let i = 0; i < count; i += 1) {
+    const parsed = isVoronoi
+      ? parseVoronoiShapeBoundsRaw(raw, offset)
+      : parseGridShapeBoundsRaw(raw, offset);
+    if (!parsed) {
+      return [];
+    }
+    bounds.push(parsed.bound);
+    offset = parsed.nextOffset;
+  }
+
+  if (offset !== raw.length) {
+    return [];
+  }
+  return bounds;
+}
+
+function readVarU32(raw, offset) {
+  let value = 0;
+  let shift = 0;
+  let cursor = offset;
+  while (cursor < raw.length) {
+    const byte = raw[cursor];
+    cursor += 1;
+    value |= (byte & 0x7f) << shift;
+    if ((byte & 0x80) === 0) {
+      return { value: value >>> 0, nextOffset: cursor };
+    }
+    shift += 7;
+    if (shift > 35) {
+      return null;
+    }
+  }
+  return null;
+}
+
+function parseSnapshotEntityRows(rawPayload, ownerId, boundId) {
+  const raw = Buffer.isBuffer(rawPayload) ? rawPayload : Buffer.from(String(rawPayload || ''), 'utf8');
+  if (!raw || raw.length === 0) {
+    return [];
+  }
+
+  const rows = [];
+  let offset = 0;
+  while (offset < raw.length) {
+    if (offset + 87 > raw.length) {
+      break;
+    }
+    try {
+      const entityId = formatUuid(raw.subarray(offset, offset + 16));
+      offset += 16;
+      const world = raw.readUInt16BE(offset);
+      offset += 2;
+      const x = raw.readFloatBE(offset);
+      const y = raw.readFloatBE(offset + 4);
+      const z = raw.readFloatBE(offset + 8);
+      offset += 12;
+
+      // Skip transform bounding box min/max.
+      offset += 24;
+
+      const isClient = raw.readUInt8(offset) !== 0;
+      offset += 1;
+      const clientId = formatUuid(raw.subarray(offset, offset + 16));
+      offset += 16;
+
+      // Skip PacketSeq + TransferGeneration.
+      offset += 16;
+
+      const metadataLenInfo = readVarU32(raw, offset);
+      if (!metadataLenInfo) {
+        break;
+      }
+      offset = metadataLenInfo.nextOffset;
+      const metadataLen = metadataLenInfo.value;
+      if (offset + metadataLen > raw.length) {
+        break;
+      }
+      offset += metadataLen;
+
+      rows.push([
+        entityId,
+        ownerId || (boundId ? `bound:${boundId}` : 'unknown'),
+        String(world),
+        String(x),
+        String(y),
+        String(z),
+        isClient ? '1' : '0',
+        clientId,
+      ]);
+    } catch {
+      break;
+    }
+  }
+
+  return rows;
 }
 
 function normalizeRedisJsonPayload(payload) {
@@ -465,6 +724,46 @@ function normalizeTransferStateQueueEventPayload(payload) {
   };
 }
 
+async function readHeuristicOwnershipMapFromDatabase(client) {
+  const versionRaw =
+    typeof client.getBuffer === 'function'
+      ? await client.getBuffer(HEURISTIC_OWNERSHIP_VERSION_KEY)
+      : await client.get(HEURISTIC_OWNERSHIP_VERSION_KEY);
+  const version = normalizeText(versionRaw) || null;
+
+  const fieldKeys =
+    typeof client.hkeysBuffer === 'function'
+      ? await client.hkeysBuffer(HEURISTIC_OWNERSHIP_NID_TO_BOUND_MAP_KEY)
+      : await client.hkeys(HEURISTIC_OWNERSHIP_NID_TO_BOUND_MAP_KEY);
+
+  const ownerByBoundId = {};
+  if (Array.isArray(fieldKeys)) {
+    for (const rawField of fieldKeys) {
+      const rawBoundId =
+        typeof client.hgetBuffer === 'function'
+          ? await client.hgetBuffer(HEURISTIC_OWNERSHIP_NID_TO_BOUND_MAP_KEY, rawField)
+          : await client.hget(
+              HEURISTIC_OWNERSHIP_NID_TO_BOUND_MAP_KEY,
+              Buffer.isBuffer(rawField) ? rawField : String(rawField)
+            );
+
+      const boundId = parseBoundIdText(rawBoundId);
+      const ownerId = parseOwnerIdFromOwnershipField(rawField);
+      if (!boundId || !ownerId) {
+        continue;
+      }
+      ownerByBoundId[boundId] = ownerId;
+    }
+  }
+
+  return { version, ownerByBoundId };
+}
+
+async function readLegacyHeuristicManifest(client) {
+  const payload = await client.call('JSON.GET', HEURISTIC_MANIFEST_KEY, '.');
+  return normalizeRedisJsonPayload(payload);
+}
+
 async function readAuthorityTelemetryFromDatabase() {
   return (
     (await withInternalDatabase(async (client) => {
@@ -483,7 +782,51 @@ async function readAuthorityTelemetryFromDatabase() {
       }
 
       rows.sort((left, right) => left[0].localeCompare(right[0]));
-      return rows;
+      if (rows.length > 0) {
+        return rows;
+      }
+
+      let ownerByBoundId = {};
+      try {
+        const ownership = await readHeuristicOwnershipMapFromDatabase(client);
+        ownerByBoundId = ownership.ownerByBoundId || {};
+      } catch {
+        ownerByBoundId = {};
+      }
+      if (Object.keys(ownerByBoundId).length === 0) {
+        ownerByBoundId = await readHeuristicClaimedOwnersFromDatabase();
+      }
+      const boundFieldKeys =
+        typeof client.hkeysBuffer === 'function'
+          ? await client.hkeysBuffer(SNAPSHOT_BOUNDIDS_TO_ENTITY_LIST_KEY)
+          : await client.hkeys(SNAPSHOT_BOUNDIDS_TO_ENTITY_LIST_KEY);
+
+      const snapshotRows = [];
+      if (Array.isArray(boundFieldKeys)) {
+        for (const rawField of boundFieldKeys) {
+          const boundId = parseBoundIdText(rawField);
+          if (!boundId) {
+            continue;
+          }
+
+          const payload =
+            typeof client.hgetBuffer === 'function'
+              ? await client.hgetBuffer(SNAPSHOT_BOUNDIDS_TO_ENTITY_LIST_KEY, rawField)
+              : await client.hget(
+                  SNAPSHOT_BOUNDIDS_TO_ENTITY_LIST_KEY,
+                  Buffer.isBuffer(rawField) ? rawField : String(rawField)
+                );
+          if (!payload) {
+            continue;
+          }
+
+          const ownerId = ownerByBoundId[boundId] || `bound:${boundId}`;
+          snapshotRows.push(...parseSnapshotEntityRows(payload, ownerId, boundId));
+        }
+      }
+
+      snapshotRows.sort((left, right) => left[0].localeCompare(right[0]));
+      return snapshotRows;
     })) || []
   );
 }
@@ -664,25 +1007,78 @@ async function readShardPlacementFromDatabase() {
 async function readHeuristicShapesFromDatabase() {
   return (
     (await withInternalDatabase(async (client) => {
-      const payload = await client.call('JSON.GET', HEURISTIC_MANIFEST_KEY, '.');
-      const manifest = normalizeRedisJsonPayload(payload);
+      const heuristicTypeRaw =
+        typeof client.getBuffer === 'function'
+          ? await client.getBuffer(HEURISTIC_TYPE_KEY)
+          : await client.get(HEURISTIC_TYPE_KEY);
+      const heuristicType = normalizeHeuristicTypeName(heuristicTypeRaw);
+
+      const heuristicDataRaw =
+        typeof client.getBuffer === 'function'
+          ? await client.getBuffer(HEURISTIC_DATA_KEY)
+          : await client.get(HEURISTIC_DATA_KEY);
+
+      let ownersByBoundId = {};
+      try {
+        const ownership = await readHeuristicOwnershipMapFromDatabase(client);
+        ownersByBoundId = ownership.ownerByBoundId || {};
+      } catch {
+        ownersByBoundId = {};
+      }
+      if (Object.keys(ownersByBoundId).length === 0) {
+        ownersByBoundId = await readHeuristicClaimedOwnersFromDatabase();
+      }
+      const decodedBounds = decodeHeuristicBoundsFromBinary(
+        Buffer.isBuffer(heuristicDataRaw)
+          ? heuristicDataRaw
+          : Buffer.from(String(heuristicDataRaw || ''), 'utf8'),
+        heuristicType
+      );
+
+      const shapes = [];
+      if (decodedBounds.length > 0) {
+        const isVoronoi = heuristicType === 'Voronoi';
+        for (const bound of decodedBounds) {
+          const boundId = String(bound?.id ?? '').trim();
+          if (!boundId) {
+            continue;
+          }
+          const ownerId = ownersByBoundId[boundId] || '';
+          const color = ownerId
+            ? 'rgba(100, 255, 149, 1)'
+            : 'rgba(255, 149, 100, 1)';
+
+          let shape = null;
+          if (isVoronoi && Array.isArray(bound.points)) {
+            shape = toPolygonShape(bound.id, bound.points, ownerId, color);
+          } else if (bound.min && bound.max) {
+            shape = toBoundsPolygonShape(bound, ownerId, color);
+          }
+          if (shape) {
+            shapes.push(shape);
+          }
+        }
+      }
+
+      if (shapes.length > 0) {
+        return shapes;
+      }
+
+      const manifest = await readLegacyHeuristicManifest(client);
       if (!manifest) {
         return [];
       }
-
-      const heuristicType =
+      const legacyHeuristicType =
         typeof manifest.HeuristicType === 'string'
           ? manifest.HeuristicType.trim()
           : null;
-
-      const shapes = [];
 
       for (const value of getManifestEntryValues(manifest.Pending)) {
         if (!value || typeof value !== 'object') {
           continue;
         }
         let shape = null;
-        if (heuristicType === 'Voronoi') {
+        if (legacyHeuristicType === 'Voronoi') {
           const decoded = decodeVoronoiBounds(value.BoundsData64);
           if (decoded) {
             shape = toPolygonShape(
@@ -719,7 +1115,7 @@ async function readHeuristicShapesFromDatabase() {
           }
         }
         let shape = null;
-        if (heuristicType === 'Voronoi') {
+        if (legacyHeuristicType === 'Voronoi') {
           const decoded = decodeVoronoiBounds(value.BoundsData64);
           if (decoded) {
             shape = toPolygonShape(
@@ -749,90 +1145,108 @@ async function readHeuristicShapesFromDatabase() {
 
 async function readHeuristicClaimedOwnersFromDatabase() {
   const now = Date.now();
-  if (
-    heuristicClaimedOwnerCache &&
-    now - heuristicClaimedOwnerCacheAtMs < CLAIMED_OWNER_MAP_CACHE_TTL_MS
-  ) {
-    return heuristicClaimedOwnerCache;
-  }
+  const owners = await withInternalDatabase(async (client) => {
+    const { version, ownerByBoundId } =
+      await readHeuristicOwnershipMapFromDatabase(client);
+    const mapHasEntries = Object.keys(ownerByBoundId).length > 0;
 
-  const owners =
-    (await withInternalDatabase(async (client) => {
-      const payload = await client.call('JSON.GET', HEURISTIC_MANIFEST_KEY, '.');
-      const manifest = normalizeRedisJsonPayload(payload);
-      if (!manifest) {
-        return null;
-      }
+    if (
+      heuristicClaimedOwnerCache &&
+      heuristicClaimedOwnerCacheVersion &&
+      version &&
+      heuristicClaimedOwnerCacheVersion === version
+    ) {
+      return heuristicClaimedOwnerCache;
+    }
 
-      const ownerByBoundId = {};
-      for (const value of getManifestEntryValues(manifest.Claimed)) {
-        if (!value || typeof value !== 'object') {
-          continue;
-        }
+    if (
+      !mapHasEntries &&
+      heuristicClaimedOwnerCache &&
+      now - heuristicClaimedOwnerCacheAtMs < CLAIMED_OWNER_MAP_CACHE_TTL_MS
+    ) {
+      return heuristicClaimedOwnerCache;
+    }
 
-        const boundId = String(value.ID ?? value.id ?? '').trim();
-        if (!boundId) {
-          continue;
-        }
-
-        let ownerId =
-          typeof value.OwnerName === 'string' ? value.OwnerName.trim() : '';
-        if (!ownerId && typeof value.Owner64 === 'string') {
-          try {
-            ownerId = decodeNetworkIdentity(Buffer.from(value.Owner64, 'base64')).trim();
-          } catch {
-            ownerId = '';
-          }
-        }
-
-        if (ownerId) {
-          ownerByBoundId[boundId] = ownerId;
-        }
-      }
-
+    if (mapHasEntries) {
       heuristicClaimedOwnerCache = ownerByBoundId;
       heuristicClaimedOwnerCacheAtMs = Date.now();
+      heuristicClaimedOwnerCacheVersion = version;
       return ownerByBoundId;
-    })) || null;
+    }
 
-  if (owners && typeof owners === 'object') {
-    return owners;
-  }
+    const manifest = await readLegacyHeuristicManifest(client);
+    if (!manifest) {
+      return null;
+    }
 
-  return heuristicClaimedOwnerCache || {};
+    const legacyOwnerByBoundId = {};
+    for (const value of getManifestEntryValues(manifest.Claimed)) {
+      if (!value || typeof value !== 'object') {
+        continue;
+      }
+
+      const boundId = String(value.ID ?? value.id ?? '').trim();
+      if (!boundId) {
+        continue;
+      }
+
+      let ownerId = typeof value.OwnerName === 'string' ? value.OwnerName.trim() : '';
+      if (!ownerId && typeof value.Owner64 === 'string') {
+        try {
+          ownerId = decodeNetworkIdentity(Buffer.from(value.Owner64, 'base64')).trim();
+        } catch {
+          ownerId = '';
+        }
+      }
+
+      if (ownerId) {
+        legacyOwnerByBoundId[boundId] = ownerId;
+      }
+    }
+
+    heuristicClaimedOwnerCache = legacyOwnerByBoundId;
+    heuristicClaimedOwnerCacheAtMs = Date.now();
+    heuristicClaimedOwnerCacheVersion = version;
+    return legacyOwnerByBoundId;
+  });
+
+  return owners && typeof owners === 'object'
+    ? owners
+    : heuristicClaimedOwnerCache || {};
 }
 
 async function readHeuristicTypeFromDatabase() {
   return (
     (await withInternalDatabase(async (client) => {
-      const payload = await client.call(
-        'JSON.GET',
-        HEURISTIC_MANIFEST_KEY,
-        '.HeuristicType'
-      );
+      const rawType =
+        typeof client.getBuffer === 'function'
+          ? await client.getBuffer(HEURISTIC_TYPE_KEY)
+          : await client.get(HEURISTIC_TYPE_KEY);
+      const normalizedType = normalizeHeuristicTypeName(rawType);
+      if (normalizedType) {
+        return normalizedType;
+      }
 
+      const payload = await client.call('JSON.GET', HEURISTIC_MANIFEST_KEY, '.HeuristicType');
       if (payload == null) {
         return null;
       }
-
       const raw = String(payload).trim();
       if (!raw || raw === 'null') {
         return null;
       }
-
       try {
         let parsed = JSON.parse(raw);
         if (Array.isArray(parsed)) {
           parsed = parsed[0];
         }
         if (typeof parsed === 'string') {
-          const text = parsed.trim();
-          return text.length > 0 ? text : null;
+          return normalizeHeuristicTypeName(parsed);
         }
       } catch {}
 
       const unquoted = raw.replace(/^"(.*)"$/, '$1').trim();
-      return unquoted.length > 0 ? unquoted : null;
+      return normalizeHeuristicTypeName(unquoted);
     })) || null
   );
 }

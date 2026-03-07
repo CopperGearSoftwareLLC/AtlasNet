@@ -9,14 +9,25 @@ const {
 } = require('./format');
 
 const AUTHORITY_ENTITY_SNAPSHOTS_KEY = 'Authority_EntitySnapshots';
+const NETWORK_TELEMETRY_KEY = 'Network_Telemetry';
 const SERVER_REGISTRY_KEY = 'Server Registry ID_IP';
 const SERVER_REGISTRY_PUBLIC_KEY = 'Server Registry ID_IP_public';
 const NODE_MANIFEST_SHARD_NODE_KEY = 'Node Manifest Shard_Node';
+const SNAPSHOT_BOUNDIDS_TO_ENTITY_LIST_KEY = 'Snapshot:BoundIDs -> EntityList';
+const SNAPSHOT_BOUNDIDS_TO_TRANSFORMS_KEY = 'Snapshot:BoundIDs -> Transforms';
 const HEALTH_PING_KEY = 'Health_Ping';
 const CLIENT_ID_TO_IP_KEY = 'ClientID to IP';
 const CLIENT_ID_TO_PROXY_ID_KEY = 'ClientID to ProxyID';
 const PROXY_CLIENTS_SET_KEY = 'Proxy_{}_Clients';
 const HEURISTIC_MANIFEST_KEY = 'HeuristicManifest';
+const HEURISTIC_TYPE_KEY = 'Heuristic:Type';
+const HEURISTIC_VERSION_KEY = 'Heuristic:Version';
+const HEURISTIC_DATA_KEY = 'Heuristic:Data';
+const HEURISTIC_OWNERSHIP_VERSION_KEY = 'Heuristic::Ownership:Version';
+const HEURISTIC_OWNERSHIP_NID_TO_BOUND_MAP_KEY =
+  'Heuristic::Ownership:NetID -> BoundID Map';
+const UUID_PATTERN =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 const NETWORK_IDENTITY_TYPE_NAME_BY_CODE = {
   0: 'invalid',
@@ -167,6 +178,178 @@ function decodeAuthorityEntitySnapshotValue(raw) {
   }
 }
 
+function normalizeText(raw) {
+  return decodeRedisDisplayValue(raw).replace(/\0/g, '').trim();
+}
+
+function parseBoundIdText(raw) {
+  const text = normalizeText(raw);
+  const match = text.match(/^\d+/);
+  if (!match) {
+    return '';
+  }
+  return String(Number(match[0]));
+}
+
+function decodeOwnershipNetIdField(raw) {
+  const text = normalizeText(raw);
+  if (UUID_PATTERN.test(text)) {
+    return `shard:${text}`;
+  }
+  return decodeNetworkIdentityValue(raw);
+}
+
+function readVarString(cursor) {
+  const len = cursor.readVarU32();
+  const bytes = cursor.readBytes(len);
+  return decodeRedisDisplayValue(bytes);
+}
+
+function decodeNetworkTelemetryBinaryValue(raw) {
+  const value = asBuffer(raw);
+  if (!value) {
+    return '';
+  }
+
+  const utf8Decoded = decodeRedisDisplayValue(value);
+  if (typeof utf8Decoded === 'string' && utf8Decoded.includes('\t')) {
+    return utf8Decoded;
+  }
+
+  try {
+    const cursor = new ByteCursor(value);
+    const count = cursor.readU32();
+    if (!Number.isFinite(count) || count < 0 || count > 10000) {
+      return decodeRedisDisplayValue(value);
+    }
+
+    const rows = [];
+    for (let i = 0; i < count; i += 1) {
+      const identityId = readVarString(cursor);
+      const targetId = readVarString(cursor);
+      const pingMs = cursor.readU32() | 0;
+      const inBytesPerSec = cursor.readF32();
+      const outBytesPerSec = cursor.readF32();
+      const inPacketsPerSec = cursor.readF32();
+      const pendingReliableBytes = cursor.readU32();
+      const pendingUnreliableBytes = cursor.readU32();
+      const sentUnackedReliableBytes = cursor.readU32();
+      const queueTimeUsec = Number(cursor.readU64());
+      const qualityLocal = cursor.readF32();
+      const qualityRemote = cursor.readF32();
+      const state = cursor.readU32() | 0;
+
+      rows.push(
+        [
+          identityId,
+          targetId,
+          pingMs,
+          inBytesPerSec,
+          outBytesPerSec,
+          inPacketsPerSec,
+          pendingReliableBytes,
+          pendingUnreliableBytes,
+          sentUnackedReliableBytes,
+          queueTimeUsec,
+          qualityLocal,
+          qualityRemote,
+          state,
+        ].join('\t')
+      );
+    }
+
+    let out = rows.join('\n');
+    if (cursor.remaining() > 0) {
+      out += `\n<trailing-bytes ${cursor.remaining()}>`;
+    }
+    return out;
+  } catch {
+    return decodeRedisDisplayValue(value);
+  }
+}
+
+function decodeSnapshotTransformsValue(raw) {
+  const value = asBuffer(raw);
+  if (!value) {
+    return '';
+  }
+  if (value.length === 0) {
+    return '[]';
+  }
+  // Transform: world(u16) + position(vec3) + aabb(min+max vec3) = 38 bytes.
+  if (value.length % 38 !== 0) {
+    return decodeRedisDisplayValue(value);
+  }
+
+  try {
+    const cursor = new ByteCursor(value);
+    const rows = [];
+    while (cursor.remaining() >= 38) {
+      const world = cursor.readU16();
+      const position = {
+        x: cursor.readF32(),
+        y: cursor.readF32(),
+        z: cursor.readF32(),
+      };
+      const min = { x: cursor.readF32(), y: cursor.readF32(), z: cursor.readF32() };
+      const max = { x: cursor.readF32(), y: cursor.readF32(), z: cursor.readF32() };
+      rows.push({ world, position, aabb: { min, max } });
+    }
+    return JSON.stringify(rows, null, 2);
+  } catch {
+    return decodeRedisDisplayValue(value);
+  }
+}
+
+function decodeSnapshotEntityListValue(raw) {
+  const value = asBuffer(raw);
+  if (!value) {
+    return '';
+  }
+  if (value.length === 0) {
+    return '[]';
+  }
+
+  try {
+    const cursor = new ByteCursor(value);
+    const rows = [];
+    while (cursor.remaining() > 0) {
+      if (cursor.remaining() < 87) {
+        break;
+      }
+      const entityId = formatUuid(cursor.readBytes(16));
+      const world = cursor.readU16();
+      const position = {
+        x: cursor.readF32(),
+        y: cursor.readF32(),
+        z: cursor.readF32(),
+      };
+      const min = { x: cursor.readF32(), y: cursor.readF32(), z: cursor.readF32() };
+      const max = { x: cursor.readF32(), y: cursor.readF32(), z: cursor.readF32() };
+      const isClient = cursor.readU8() !== 0;
+      const clientId = formatUuid(cursor.readBytes(16));
+      const packetSeq = Number(cursor.readU64());
+      const transferGeneration = Number(cursor.readU64());
+      const metadata = cursor.readBlob();
+
+      rows.push({
+        entityId,
+        world,
+        position,
+        aabb: { min, max },
+        isClient,
+        clientId,
+        packetSeq,
+        transferGeneration,
+        metadata: summarizeBlob(metadata),
+      });
+    }
+    return JSON.stringify(rows, null, 2);
+  } catch {
+    return decodeRedisDisplayValue(value);
+  }
+}
+
 function shouldDecodeSetKey(key) {
   return (
     key === PROXY_CLIENTS_SET_KEY ||
@@ -189,6 +372,10 @@ const HARDCODED_HASH_DECODERS = {
     decodeField: (field) => decodeRedisDisplayValue(field),
     decodeValue: (value) => decodeAuthorityEntitySnapshotValue(value),
   },
+  [NETWORK_TELEMETRY_KEY]: {
+    decodeField: (field) => decodeNetworkIdentityValue(field),
+    decodeValue: (value) => decodeNetworkTelemetryBinaryValue(value),
+  },
   [SERVER_REGISTRY_KEY]: {
     decodeField: (field) => decodeNetworkIdentityValue(field),
     decodeValue: (value) => decodeRedisDisplayValue(value),
@@ -200,6 +387,18 @@ const HARDCODED_HASH_DECODERS = {
   [NODE_MANIFEST_SHARD_NODE_KEY]: {
     decodeField: (field) => decodeNetworkIdentityValue(field),
     decodeValue: (value) => decodeRedisDisplayValue(value),
+  },
+  [HEURISTIC_OWNERSHIP_NID_TO_BOUND_MAP_KEY]: {
+    decodeField: (field) => decodeOwnershipNetIdField(field),
+    decodeValue: (value) => parseBoundIdText(value),
+  },
+  [SNAPSHOT_BOUNDIDS_TO_ENTITY_LIST_KEY]: {
+    decodeField: (field) => parseBoundIdText(field),
+    decodeValue: (value) => decodeSnapshotEntityListValue(value),
+  },
+  [SNAPSHOT_BOUNDIDS_TO_TRANSFORMS_KEY]: {
+    decodeField: (field) => parseBoundIdText(field),
+    decodeValue: (value) => decodeSnapshotTransformsValue(value),
   },
   [HEALTH_PING_KEY]: {
     decodeField: (field) => decodeNetworkIdentityValue(field),
@@ -393,6 +592,143 @@ function decodeBase64NetworkIdentity(base64Value) {
   }
 }
 
+function tryDecodeGridHeuristicRaw(raw, count) {
+  const gridShapeSerializedBytes = 4 + 12 + 12;
+  if (
+    !Number.isFinite(count) ||
+    count < 0 ||
+    count > 100000 ||
+    count * gridShapeSerializedBytes !== raw.length - 8
+  ) {
+    return null;
+  }
+
+  const cursor = new ByteCursor(raw);
+  const _count = Number(cursor.readU64());
+  const bounds = [];
+  for (let i = 0; i < _count; i += 1) {
+    const shapeId = cursor.readU32();
+    const min = readVec3(cursor);
+    const max = readVec3(cursor);
+    bounds.push({
+      kind: 'GridShape',
+      ID: shapeId,
+      aabb: { min, max },
+    });
+  }
+  if (cursor.remaining() !== 0) {
+    return null;
+  }
+  return {
+    kind: 'GridHeuristic',
+    boundsCount: _count,
+    bounds,
+  };
+}
+
+function tryDecodeVoronoiHeuristicRaw(raw, count) {
+  if (!Number.isFinite(count) || count < 0 || count > 100000) {
+    return null;
+  }
+
+  const cursor = new ByteCursor(raw);
+  const _count = Number(cursor.readU64());
+  const bounds = [];
+  for (let i = 0; i < _count; i += 1) {
+    if (cursor.remaining() < 8) {
+      return null;
+    }
+    const shapeId = cursor.readU32();
+    const pointCount = cursor.readU32();
+    if (!Number.isFinite(pointCount) || pointCount < 3 || pointCount > 8192) {
+      return null;
+    }
+    const points = [];
+    for (let p = 0; p < pointCount; p += 1) {
+      if (cursor.remaining() < 8) {
+        return null;
+      }
+      points.push({
+        x: cursor.readF32(),
+        y: cursor.readF32(),
+      });
+    }
+    bounds.push({
+      kind: 'VoronoiShape',
+      ID: shapeId,
+      points,
+    });
+  }
+  if (cursor.remaining() !== 0) {
+    return null;
+  }
+  return {
+    kind: 'VoronoiHeuristic',
+    boundsCount: _count,
+    bounds,
+  };
+}
+
+function decodeHeuristicDataRawValue(raw, heuristicTypeHint = '') {
+  const value = asBuffer(raw);
+  if (!value || value.length === 0) {
+    return decodeRedisDisplayValue(raw);
+  }
+  if (value.length < 8) {
+    return decodeRedisDisplayValue(value);
+  }
+
+  try {
+    const count = Number(value.readBigUInt64BE(0));
+    const typeHint = String(heuristicTypeHint || '').trim().toLowerCase();
+    const preferVoronoi = typeHint === 'voronoi';
+
+    const primary = preferVoronoi
+      ? tryDecodeVoronoiHeuristicRaw(value, count)
+      : tryDecodeGridHeuristicRaw(value, count);
+    if (primary) {
+      return primary;
+    }
+
+    const secondary = preferVoronoi
+      ? tryDecodeGridHeuristicRaw(value, count)
+      : tryDecodeVoronoiHeuristicRaw(value, count);
+    if (secondary) {
+      return secondary;
+    }
+
+    return {
+      kind: 'unknown',
+      decodedBytes: value.length,
+      preview: formatBinaryPreview(value),
+    };
+  } catch {
+    return decodeRedisDisplayValue(value);
+  }
+}
+
+const HARDCODED_STRING_DECODERS = {
+  [HEURISTIC_TYPE_KEY]: (value) => normalizeText(value),
+  [HEURISTIC_VERSION_KEY]: (value) => normalizeText(value),
+  [HEURISTIC_OWNERSHIP_VERSION_KEY]: (value) => normalizeText(value),
+  [HEURISTIC_DATA_KEY]: (value) => JSON.stringify(decodeHeuristicDataRawValue(value), null, 2),
+};
+
+function hasHardcodedStringDecoder(key) {
+  return Object.prototype.hasOwnProperty.call(HARDCODED_STRING_DECODERS, key);
+}
+
+function decodeHardcodedStringValue(key, value, decodeEnabled) {
+  if (!decodeEnabled) {
+    return decodeRedisRawValue(value);
+  }
+  const decoder = HARDCODED_STRING_DECODERS[key];
+  if (!decoder) {
+    return decodeRedisDisplayValue(value);
+  }
+  return decoder(value);
+}
+
 function decodeHeuristicManifestJsonPayload(payload, decodeEnabled) {
   if (!decodeEnabled || typeof payload !== 'string' || payload.trim().length === 0) {
     return payload;
@@ -447,9 +783,11 @@ function decodeJsonPayloadForKey(key, payload, decodeEnabled) {
 }
 
 module.exports = {
+  decodeHardcodedStringValue,
   decodeHardcodedHashEntry,
   decodeJsonPayloadForKey,
   decodeSetMemberForKey,
   hasHardcodedHashDecoder,
+  hasHardcodedStringDecoder,
   shouldDecodeSetKey,
 };

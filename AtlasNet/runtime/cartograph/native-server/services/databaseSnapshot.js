@@ -9,9 +9,11 @@ const {
 const {
   decodeRedisDisplayValue,
   decodeRedisRawValue,
+  decodeHardcodedStringValue,
   decodeJsonPayloadForKey,
   formatHashPayloadPairs,
   hasHardcodedHashDecoder,
+  hasHardcodedStringDecoder,
   readHardcodedHashPayload,
   readHardcodedSetPayload,
   shouldDecodeSetKey,
@@ -315,11 +317,13 @@ async function populateRecordPayloads(client, metadata, recordsByKey, options = 
         }
 
         const value = values[i];
-        setRecordPayload(
-          record,
-          value == null ? '' : decodeValue(value),
-          value == null ? 0 : 1
-        );
+        const decodedValue =
+          value == null
+            ? ''
+            : hasHardcodedStringDecoder(stringKeys[i])
+            ? decodeHardcodedStringValue(stringKeys[i], value, decodeSerialized)
+            : decodeValue(value);
+        setRecordPayload(record, decodedValue, value == null ? 0 : 1);
       }
     } catch (err) {
       for (const key of stringKeys) {

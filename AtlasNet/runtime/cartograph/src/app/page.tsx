@@ -309,7 +309,7 @@ export default function OverviewPage() {
         <MetricCard
           label="Curr Bounds Heuristic"
           value={databaseSummary.heuristicType ?? 'unknown'}
-          hint="from HeuristicManifest.HeuristicType"
+          hint="from Heuristic:Type"
         />
       </section>
 
