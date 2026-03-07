@@ -1,5 +1,6 @@
 #pragma once
 #include <boost/uuid/random_generator.hpp>
+#include <boost/uuid/string_generator.hpp>
 #include <boost/uuid/uuid_io.hpp>
 
 #include "Global/pch.hpp"
@@ -22,9 +23,11 @@ class UUIDGen
 	}
 	static const char inline BASE20_ALPHABET[21] = "0123456789ABCDEFGHJK";	// 20 chars, no I,L,O
 
-	static std::string ToString(const UUID& uuid)
+	static std::string ToString(const UUID& uuid) { return boost::uuids::to_string(uuid); }
+	static UUID FromString(const std::string_view str)
 	{
-		return boost::uuids::to_string(uuid);
+		static boost::uuids::string_generator gen;
+		return gen(str.data());
 	}
 	/*
 	static std::string encode_base20(const UUID &uuid)
@@ -67,5 +70,4 @@ class UUIDGen
 
 		return id;
 	}*/
-
 };

@@ -14,7 +14,7 @@
 #include "Entity/EntityLedger.hpp"
 #include "Entity/Transform.hpp"
 #include "Events/EventEnums.hpp"
-#include "Events/EventSystem.hpp"
+#include "Events/GlobalEvents.hpp"
 #include "Events/Events/Client/ClientEvents.hpp"
 #include "Events/Events/Debug/LogEvent.hpp"
 #include "Global/Misc/UUID.hpp"
@@ -42,9 +42,9 @@ void IAtlasNetServer::AtlasNet_Initialize()
 	Interlink::Get().Init();
 	NetworkManifest::Get().ScheduleNetworkPings();
 	HealthManifest::Get().ScheduleHealthPings();
-	EventSystem::Get().Init();
+	GlobalEvents::Get().Init();
 	DockerEvents::Get().Init(DockerEventsInit{});
-	EventSystem::Get().Subscribe<LogEvent>(
+	GlobalEvents::Get().Subscribe<LogEvent>(
 		[&](const LogEvent &e) { logger->DebugFormatted("Received LogEvent: {}", e.message); });
 
 	BoundLeaser::Get().Init();
@@ -53,7 +53,7 @@ void IAtlasNetServer::AtlasNet_Initialize()
 	EntityLedger::Get().Init();
 	ClientLedger::Ensure();
 	SnapshotService::Ensure();
-	EventSystem::Get().Subscribe<ClientConnectEvent>(
+	GlobalEvents::Get().Subscribe<ClientConnectEvent>(
 		[this](const ClientConnectEvent &e)
 		{
 			if (e.ConnectedShard == NetworkCredentials::Get().GetID())

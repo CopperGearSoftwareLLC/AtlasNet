@@ -1,5 +1,5 @@
 #include "Demigod.hpp"
-#include "Events/EventSystem.hpp"
+#include "Events/GlobalEvents.hpp"
 #include "InterlinkIdentifier.hpp"
 #include "ServerRegistry.hpp"
 #include "DockerIO.hpp"

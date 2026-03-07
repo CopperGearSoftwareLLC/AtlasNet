@@ -1,6 +1,6 @@
 #pragma once
 #include "Debug/Crash/CrashHandler.hpp"
-#include "Events/EventSystem.hpp"
+#include "Events/GlobalEvents.hpp"
 #include "Interlink/Interlink.hpp"
 #include "Interlink/Telemetry/NetworkManifest.hpp"
 #include "Network/NetworkCredentials.hpp"
@@ -13,7 +13,7 @@ class NodeJSWrapper
 		CrashHandler::Get().Init();
 		NetworkCredentials::Make(NetworkIdentity::MakeIDCartograph());
 		Interlink::Get().Init();
-		EventSystem::Get().Init();
+		GlobalEvents::Get().Init();
 		NetworkManifest::Get().ScheduleNetworkPings();
 	}
 	~NodeJSWrapper() { Interlink::Get().Shutdown(); }

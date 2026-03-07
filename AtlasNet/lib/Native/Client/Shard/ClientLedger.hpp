@@ -6,7 +6,7 @@
 #include "Client/Database/ClientManifest.hpp"
 #include "Client/Packet/ClientSpawnPacket.hpp"
 #include "Debug/Log.hpp"
-#include "Events/EventSystem.hpp"
+#include "Events/GlobalEvents.hpp"
 #include "Events/Events/Client/ClientEvents.hpp"
 #include "Global/Misc/Singleton.hpp"
 #include "Global/Misc/UUID.hpp"
@@ -42,7 +42,7 @@ class ClientLedger : public Singleton<ClientLedger>
 			ev.ConnectedProxy = info.sender;
 			ev.SpawnLocation = c.spawn_Location;
 			ev.ConnectedShard = NetworkCredentials::Get().GetID();
-			EventSystem::Get().Dispatch(ev);
+			GlobalEvents::Get().Dispatch(ev);
 		}
 	}
 };

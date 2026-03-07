@@ -16,11 +16,13 @@
 #include "Docker/DockerIO.hpp"
 #include "Entity/Entity.hpp"
 #include "Entity/Transform.hpp"
-#include "Events/EventSystem.hpp"
 #include "Events/Events/Debug/LogEvent.hpp"
+#include "Events/GlobalEvents.hpp"
 #include "Global/Serialize/ByteReader.hpp"
 #include "Heuristic/Database/HeuristicManifest.hpp"
 #include "Heuristic/GridHeuristic/GridHeuristic.hpp"
+#include "Heuristic/HeuristicService.hpp"
+#include "Heuristic/IBounds.hpp"
 #include "Heuristic/IHeuristic.hpp"
 #include "Heuristic/Quadtree/QuadtreeHeuristic.hpp"
 #include "Heuristic/Voronoi/VoronoiHeuristic.hpp"
@@ -263,7 +265,8 @@ void WatchDog::Init()
 		{
 			logger->ErrorFormatted("HEALTH CHECK FAIL : {}. Removing from Health Manifest",
 								   ID_fail.ToString());
-			const bool requeued = HeuristicManifest::Get().RequeueClaimedBound(ID_fail.ToString());
+
+			const bool requeued = HeuristicManifest::Get().ReleaseClaimedBound(ID_fail);
 			if (requeued)
 			{
 				logger->DebugFormatted("Requeued claimed bounds for {}", ID_fail.ToString());
@@ -275,7 +278,8 @@ void WatchDog::Init()
 			}
 		});
 	Interlink::Get().Init();
-	EventSystem::Get().Init();
+	GlobalEvents::Get().Init();
+	HeuristicService::Ensure();
 
 	// Legacy grid-cell heuristic is still available as a separate heuristic,
 	// but WatchDog now defaults to the Quadtree heuristic. For Voronoi
@@ -300,87 +304,12 @@ void WatchDog::Cleanup()
 	Interlink::Get().Shutdown();
 }
 
-void WatchDog::SetShardCount(uint32 NewCount)
-{
-	ShardCount = NewCount;
-
-	if (const char* k8sHost = std::getenv("KUBERNETES_SERVICE_HOST"); k8sHost && *k8sHost)
-	{
-		const bool scaled = ScaleK8sShardDeployment(logger, NewCount);
-		if (scaled)
-		{
-			logger->DebugFormatted("Scaled k8s shard deployment to {} replicas", NewCount);
-		}
-		else
-		{
-			logger->ErrorFormatted("Unable to scale k8s shard deployment to {} replicas", NewCount);
-		}
-		return;
-	}
-
-	logger->Warning("Assuming Docker Swarm mode. Fix this code up eventualy stinkler");
-
-	const std::string filter = "%7B%22label%22%3A%5B%22atlasnet.role%3Dshard%22%5D%7D";
-
-	try
-	{
-		std::string listResp = DockerIO::Get().request("GET", "/services?filters=" + filter);
-		auto services = Json::parse(listResp, nullptr, false);
-
-		if (services.is_discarded() || !services.is_array() || services.empty())
-		{
-			logger->Warning(
-				"No Swarm shard service found (legacy mode); skipping scale operation.");
-			return;
-		}
-
-		const std::string serviceId = services[0]["ID"];
-		std::string inspectResp = DockerIO::Get().request("GET", "/services/" + serviceId);
-		auto inspectJson = Json::parse(inspectResp, nullptr, false);
-		if (inspectJson.is_discarded())
-		{
-			logger->Warning("Swarm service inspect response was invalid JSON.");
-			return;
-		}
-
-		int version = inspectJson["Version"]["Index"];
-		auto spec = inspectJson["Spec"];
-		spec["Mode"]["Replicated"]["Replicas"] = NewCount;
-
-		std::string updatePath =
-			"/services/" + serviceId + "/update?version=" + std::to_string(version);
-
-		std::string updateResp = DockerIO::Get().request("POST", updatePath, &spec);
-
-		if (!updateResp.empty())
-		{
-			logger->DebugFormatted("Service update responded with\n{}",
-								   Json::parse(updateResp).dump(4));
-		}
-
-		logger->DebugFormatted("Scaled swarm shard service to {} replicas", NewCount);
-	}
-	catch (const std::exception& e)
-	{
-		logger->WarningFormatted("Legacy Swarm scaling failed, continuing without autoscale: {}",
-								 e.what());
-	}
-}
+void WatchDog::SetShardCount(uint32 NewCount) {}
 void WatchDog::ComputeHeuristic()
 {
-	std::vector<AtlasEntityMinimal> entities;
-	for (int i = 0; i < 4; i++)
-	{
-		AtlasEntityMinimal e;
-		e.transform.position = {10 * ((i / 2) ? 1 : -1), 10 * ((i % 2) ? 1 : -1), 0};
-		entities.push_back(e);
-	}
-	logger->DebugFormatted("Computing Heuristic: {}", IHeuristic::TypeToString(ActiveHeuristic));
-
-	logger->Debug("IHeuristic::Compute");
-	Heuristic->Compute(std::span(entities));
+	/*
 	HeuristicManifest::Get().PushHeuristic(*Heuristic);
-	std::unordered_map<IBounds::BoundsID, ByteWriter> bws;
+	std::unordered_map<BoundsID, ByteWriter> bws;
 	logger->Debug("IHeuristic::SerializeBounds");
 	Heuristic->SerializeBounds(bws);
 	logger->Debug("HeuristicManifest::GetPendingBoundsCount");
@@ -401,7 +330,7 @@ void WatchDog::ComputeHeuristic()
 	}
 
 	std::vector<std::string> data;
-	std::unordered_map<IBounds::BoundsID, ByteReader> brs;
+	std::unordered_map<BoundsID, ByteReader> brs;
 	logger->Debug("HeuristicManifest::GetPendingBoundsAsByteReaders");
 	HeuristicManifest::Get().GetPendingBoundsAsByteReaders(data, brs);
 
@@ -412,7 +341,7 @@ void WatchDog::ComputeHeuristic()
 		logger->DebugFormatted("Retreived ID {}, min:{}, max:{}", boundID,
 							   glm::to_string(s.aabb.min), glm::to_string(s.aabb.max));
 	}
-	SetShardCount(bws.size());
+	SetShardCount(bws.size());*/
 }
 void WatchDog::SwitchHeuristic(IHeuristic::Type newHeuristic)
 {

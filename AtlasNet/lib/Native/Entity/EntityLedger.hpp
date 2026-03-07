@@ -92,6 +92,10 @@ class EntityLedger : public Singleton<EntityLedger>
 	{
 		_WriteLock([&]() { std::forward<FN>(f)(_GetEntity(ID)); });
 	}
+	size_t GetEntityCount() const
+	{
+		return _ReadLock([&]() { return entities.size(); });
+	}
 	AtlasEntityID GetClientEntityID(const ClientID& cid) const
 	{
 		return _ReadLock([&]() { return _GetClientEntityID(cid); });

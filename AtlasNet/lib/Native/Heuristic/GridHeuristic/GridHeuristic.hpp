@@ -24,18 +24,18 @@ class GridHeuristic : public THeuristic<GridShape>
 	GridHeuristic();
 	std::vector<GridShape> quads;
 
-	void Compute(const std::span<const AtlasEntityMinimal>&) override;
+	void Compute(const std::span<const Transform>& span) override;
 	uint32_t GetBoundsCount() const override;
 	void GetBounds(std::vector<GridShape>& out_bounds) const override;
 	void GetBoundDeltas(std::vector<TBoundDelta<GridShape>>& out_deltas) const override;
 	IHeuristic::Type GetType() const override;
-	void SerializeBounds(std::unordered_map<IBounds::BoundsID, ByteWriter>& bws) override;
+	void SerializeBounds(std::unordered_map<BoundsID, ByteWriter>& bws) override;
 
 	void Serialize(ByteWriter& bw) const override;
 	void Deserialize(ByteReader& br) override;
 
 	// std::unique_ptr<IBounds> QueryPosition(vec3 p) override;
-	std::optional<IBounds::BoundsID> QueryPosition(vec3 p)const override;
-	const IBounds& GetBound(IBounds::BoundsID id) const override;
+	std::optional<BoundsID> QueryPosition(vec3 p)const override;
+	const IBounds& GetBound(BoundsID id) const override;
 	std::span<const GridShape> GetGrids() const { return quads; }
 };

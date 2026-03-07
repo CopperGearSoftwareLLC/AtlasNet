@@ -3,16 +3,18 @@
 #include <chrono>
 #include <stop_token>
 #include <thread>
+#include <type_traits>
 
 #include "Debug/Log.hpp"
 #include "Global/Misc/Singleton.hpp"
+#include "Heuristic/Database/HeuristicManifest.hpp"
 #include "Heuristic/IBounds.hpp"
+#include "Heuristic/IHeuristic.hpp"
 #include "Network/NetworkIdentity.hpp"
 class BoundLeaser : public Singleton<BoundLeaser>
 {
 	Log logger = Log("BoundLeaser");
-	std::unique_ptr<IBounds> ClaimedBound;
-	IBounds::BoundsID ClaimedBoundID;
+	std::optional<BoundsID> ClaimedBoundID;
 
 	std::jthread LoopThread;
 
@@ -21,7 +23,7 @@ class BoundLeaser : public Singleton<BoundLeaser>
 	{
 		while (!st.stop_requested())
 		{
-			if (!ClaimedBound)
+			if (!ClaimedBoundID.has_value())
 			{
 				ClaimBound();
 			}
@@ -37,8 +39,19 @@ class BoundLeaser : public Singleton<BoundLeaser>
 		logger.Debug("Init");
 		LoopThread = std::jthread([this](std::stop_token st) { LoopEntry(st); });
 	}
-	[[nodiscard]] constexpr bool HasBound() const { return ClaimedBound != nullptr; }
-	[[nodiscard]] constexpr const IBounds& GetBound() const { return *ClaimedBound; }
-	[[nodiscard]] constexpr IBounds::BoundsID GetBoundID() const {return ClaimedBoundID;}
-	
+	[[nodiscard]] constexpr bool HasBound() const { return ClaimedBoundID.has_value(); }
+	template <typename FN>
+		requires std::is_invocable_v<FN, const IBounds&>
+	auto GetBound(FN&& f)
+	{
+		HeuristicManifest::Get().PullHeuristic(
+			[&](const IHeuristic& h)
+			{
+				if (ClaimedBoundID.has_value())
+				{
+					return f(h.GetBound(ClaimedBoundID.value()));
+				}
+			});
+	}
+	[[nodiscard]] constexpr BoundsID GetBoundID() const { return ClaimedBoundID.value(); }
 };

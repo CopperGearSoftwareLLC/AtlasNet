@@ -8,6 +8,7 @@
 #include "Global/Misc/UUID.hpp"
 #include "Global/pch.hpp"
 #include "Heuristic/Database/HeuristicManifest.hpp"
+#include "Heuristic/IBounds.hpp"
 #include "Heuristic/IHeuristic.hpp"
 #include "Interlink/Interlink.hpp"
 #include "Network/NetworkCredentials.hpp"
@@ -64,6 +65,15 @@ class HandshakeService : public Singleton<HandshakeService>
 	}
 	[[nodiscard]] std::optional<NetworkIdentity> DetermineShard(const Transform& t)
 	{
-		return HeuristicManifest::Get().ShardFromPosition(t);
+		return HeuristicManifest::Get().PullHeuristic(
+			[&](const IHeuristic& h) -> std::optional<NetworkIdentity>
+			{
+				std::optional<BoundsID> bid = h.QueryPosition(t.position);
+				if (!bid.has_value())
+					return std::nullopt;
+				return HeuristicManifest::Get().QueryOwnershipState(
+					[bid = bid](const HeuristicManifest::OwnershipStateWrapper& o)
+					{ return o.GetBoundOwner(bid.value()); });
+			});
 	}
 };

@@ -49,8 +49,11 @@ class EntityLedgersView
 
 		std::unique_lock<std::mutex> lock(mtx);
 
-		auto BoundID = HeuristicManifest::Get().BoundIDFromShard(info.sender);
-
+		auto BoundID = HeuristicManifest::Get().QueryOwnershipState(
+			[&](const HeuristicManifest::OwnershipStateWrapper& w)
+			{ return w.GetBoundOwner(info.sender); });
+		ASSERT(BoundID.has_value(), "INVALID SCENARIO");
+		ASSERT(BoundID.value() >= 0 && BoundID.value() <= 4, "FUCK");  // Trying to find a Bug
 		if (BoundID.has_value())
 		{
 			for (const auto& ae : std::get<std::vector<AtlasEntityMinimal>>(p.Response_Entities))

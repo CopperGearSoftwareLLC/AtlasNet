@@ -20,7 +20,7 @@
 #include "Global/pch.hpp"
 #include "InternalDB/InternalDB.hpp"
 #include "Network/NetworkIdentity.hpp"
-class EventSystem : public Singleton<EventSystem>
+class GlobalEvents : public Singleton<GlobalEvents>
 {
 	Log logger = Log("EventSystem");
 	std::jthread ConsumeThread;
@@ -32,7 +32,7 @@ class EventSystem : public Singleton<EventSystem>
 	using EventCallFn = std::function<void(const IEvent& e)>;
 	std::unordered_map<EventTypeID, std::vector<EventCallFn>>
 		event_subscriptions;
-	EventSystem() = default;
+	GlobalEvents() = default;
 	sw::redis::Subscriber redisSubscriber = InternalDB::Get()->Subscriber();
 	void Init()
 	{
@@ -117,7 +117,8 @@ class EventSystem : public Singleton<EventSystem>
 			EventRegistry::Get().GetEventName<T>();
 
 		ByteWriter bw;
-		event.Serialize(bw);
+		const IEvent& baseEvent = event;
+		baseEvent.Serialize(bw);
 		InternalDB::Get()->Publish(eventName, bw.as_string_view());
 		logger.DebugFormatted("Event {} dispatched", eventName);
 	}

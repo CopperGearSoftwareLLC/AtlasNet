@@ -10,6 +10,7 @@
 
 #include "Entity/Entity.hpp"
 #include "Entity/EntityLedger.hpp"
+#include "Entity/Transform.hpp"
 #include "Global/Serialize/ByteReader.hpp"
 #include "Global/Serialize/ByteWriter.hpp"
 #include "Heuristic/BoundLeaser.hpp"
@@ -51,17 +52,87 @@ void SnapshotService::UploadSnapshot()
 {
 	if (BoundLeaser::Get().HasBound())
 	{
-		IBounds::BoundsID boundID = BoundLeaser::Get().GetBoundID();
+		BoundsID boundID = BoundLeaser::Get().GetBoundID();
 		ByteWriter entityListWriter;
-		EntityLedger::Get().ForEachEntityRead(std::execution::seq, [&](const AtlasEntity& entity)
-											  { entity.Serialize(entityListWriter); });
+		ByteWriter transformWriter;
 		boost::container::static_vector<char, 32> boundString;
 		boundString.resize(32);
-		std::to_chars(boundString.data(), boundString.data() + boundString.size(), boundID);
-		InternalDB::Get()->HSet(SnapshotBoundsID_2_EntityList_Entry_HashTable, boundString.data(),
-								entityListWriter.as_string_view());
+		if (EntityLedger::Get().GetEntityCount() > 0)
+		{
+			EntityLedger::Get().ForEachEntityRead(std::execution::seq,
+												  [&](const AtlasEntity& entity)
+												  {
+													  entity.Serialize(entityListWriter);
+													  entity.transform.Serialize(transformWriter);
+												  });
+
+			std::to_chars(boundString.data(), boundString.data() + boundString.size(), boundID);
+			InternalDB::Get()->HSet(SnapshotBoundsID_2_EntityList_Entry_HashTable,
+									boundString.data(), entityListWriter.as_string_view());
+			InternalDB::Get()->HSet(SnapshotBoundsID_2_Transform_Entry_HashTable,
+									boundString.data(), transformWriter.as_string_view());
+		}
+		else
+		{
+			InternalDB::Get()->HDel(SnapshotBoundsID_2_EntityList_Entry_HashTable,
+									{boundString.data()});
+			InternalDB::Get()->HDel(SnapshotBoundsID_2_Transform_Entry_HashTable,
+									{boundString.data()});
+		}
 	}
 	else
 	{
+	}
+}
+void SnapshotService::FetchEntityListSnapshot(
+	std::unordered_map<BoundsID, std::vector<AtlasEntity>>& data)
+{
+	data.clear();
+	const std::unordered_map<std::string, std::string> keyvals =
+		InternalDB::Get()->HGetAll(SnapshotBoundsID_2_EntityList_Entry_HashTable);
+
+	data.reserve(keyvals.size());
+	for (const auto& [Key, Val] : keyvals)
+	{
+		const BoundsID ID = std::stoi(Key);
+		data.emplace(ID, std::vector<AtlasEntity>{});
+		auto& vec = data.at(ID);
+		ByteReader br(Val);
+		while (br.remaining())
+		{
+			vec.emplace_back(AtlasEntity{}).Deserialize(br);
+		}
+	}
+}
+void SnapshotService::FetchBoundsTransformList(
+	std::unordered_map<BoundsID, std::vector<Transform>>& transforms)
+{
+	transforms.clear();
+	const std::unordered_map<std::string, std::string> keyvals =
+		InternalDB::Get()->HGetAll(SnapshotBoundsID_2_Transform_Entry_HashTable);
+
+	transforms.reserve(keyvals.size());
+	for (const auto& [Key, Val] : keyvals)
+	{
+		const BoundsID ID = std::stoi(Key);
+		transforms.emplace(ID, std::vector<Transform>{});
+		auto& vec = transforms.at(ID);
+		ByteReader br(Val);
+		while (br.remaining())
+		{
+			vec.emplace_back(Transform{}).Deserialize(br);
+		}
+	}
+}
+void SnapshotService::FetchAllTransforms(std::vector<Transform>& transforms)
+{
+	transforms.clear();
+	const std::unordered_map<std::string, std::string> keyvals =
+		InternalDB::Get()->HGetAll(SnapshotBoundsID_2_Transform_Entry_HashTable);
+
+	for (const auto& [Key, Val] : keyvals)
+	{
+		ByteReader br(Val);
+		transforms.emplace_back(Transform{}).Deserialize(br);
 	}
 }

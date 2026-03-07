@@ -7,7 +7,7 @@
 #include "Global/Serialize/ByteWriter.hpp"
 #include "Heuristic/IBounds.hpp"
 GridHeuristic::GridHeuristic() {}
-void GridHeuristic::Compute(const std::span<const AtlasEntityMinimal>& span)
+void GridHeuristic::Compute(const std::span<const Transform>& span)
 {
 	quads.resize(4);
 	for (int i = 0; i < 4; i++)
@@ -27,7 +27,7 @@ IHeuristic::Type GridHeuristic::GetType() const
 {
 	return IHeuristic::Type::eGridCell;
 }
-void GridHeuristic::SerializeBounds(std::unordered_map<IBounds::BoundsID, ByteWriter>& bws)
+void GridHeuristic::SerializeBounds(std::unordered_map<BoundsID, ByteWriter>& bws)
 {
 	bws.clear();
 	for (const GridShape& quad : quads)
@@ -54,7 +54,7 @@ void GridHeuristic::Deserialize(ByteReader& br)
 	}
 };
 
-std::optional<IBounds::BoundsID> GridHeuristic::QueryPosition(vec3 p) const
+std::optional<BoundsID> GridHeuristic::QueryPosition(vec3 p) const
 {
 	for (const auto& shape : quads)
 	{
@@ -66,7 +66,7 @@ std::optional<IBounds::BoundsID> GridHeuristic::QueryPosition(vec3 p) const
 
 	return std::nullopt;
 }
-const IBounds& GridHeuristic::GetBound(IBounds::BoundsID id) const
+const IBounds& GridHeuristic::GetBound(BoundsID id) const
 {
 	for (const auto& grid : quads)
 	{

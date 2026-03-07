@@ -12,6 +12,7 @@
 #include <chrono>
 #include <execution>
 #include <mutex>
+#include <shared_mutex>
 #include <stop_token>
 #include <thread>
 #include <unordered_map>
@@ -45,11 +46,25 @@ class TransferCoordinator : public Singleton<TransferCoordinator>
 	std::unordered_map<TransferID, ClientTransferData> ClientTransfers;
 
 	std::stack<AtlasEntityID> EntitiesToParseForReceiver;
-	mutable std::mutex EntityTransferMutex, ClientTransferMutex;
+	mutable std::shared_mutex transferMutex;
 	std::jthread TransferThread;
 	Log logger = Log("TransferCoordinator");
 	PacketManager::Subscription EntityTransferPacketSubscription, ClientTransferPacketSubscription,
 		ClientSwitchRequestPacketSubscription;
+
+	template <typename FN>
+	decltype(auto) _ReadLock(FN&& fn) const
+	{
+		std::shared_lock lock(transferMutex);
+		return std::invoke(std::forward<FN>(fn));
+	}
+
+	template <typename FN>
+	decltype(auto) _WriteLock(FN&& fn)
+	{
+		std::unique_lock lock(transferMutex);
+		return std::invoke(std::forward<FN>(fn));
+	}
 
    public:
 	TransferCoordinator();

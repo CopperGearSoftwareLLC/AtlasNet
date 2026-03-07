@@ -17,7 +17,7 @@
 #include "Database/NodeManifest.hpp"
 #include "Database/ServerRegistry.hpp"
 #include "Docker/DockerIO.hpp"
-#include "Events/EventSystem.hpp"
+#include "Events/GlobalEvents.hpp"
 #include "Events/Events/Client/ClientEvents.hpp"
 #include "GameNetworkingSockets.hpp"
 #include "Global/Misc/UUID.hpp"
@@ -940,7 +940,7 @@ void Interlink::OnClientConnected(const Connection &c)
 		ClientHandshakeEvent cce;
 		cce.client = client;
 		cce.ConnectedProxy = NetworkCredentials::Get().GetID();
-		EventSystem::Get().Dispatch(cce);
+		GlobalEvents::Get().Dispatch(cce);
 
 		HandshakeService::Get().OnClientConnect(client);
 	}

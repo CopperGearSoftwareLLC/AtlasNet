@@ -14,8 +14,8 @@
 #include "Entity/EntityHandle.hpp"
 #include "Entity/EntityLedger.hpp"
 #include "Entity/Transform.hpp"
-#include "Events/EventSystem.hpp"
 #include "Events/Events/Client/ClientEvents.hpp"
+#include "Events/GlobalEvents.hpp"
 #include "Global/Misc/UUID.hpp"
 #include "Global/Serialize/ByteReader.hpp"
 #include "Global/Serialize/ByteWriter.hpp"
@@ -30,7 +30,7 @@ void SandboxServer::Run()
 		[this](const NetClientIntentHeader& h, const GameClientInputCommand& c)
 		{ OnGameClientInputCommand(h, c); });
 
-	EventSystem::Get().Subscribe<ClientConnectEvent>(
+	GlobalEvents::Get().Subscribe<ClientConnectEvent>(
 		[&](const ClientConnectEvent& e)
 		{
 			logger.DebugFormatted("Client Connected event!\n - ID: {}\n - IP: {}\n - Proxy: {}",
@@ -42,11 +42,11 @@ void SandboxServer::Run()
 	{
 		std::this_thread::sleep_for(std::chrono::milliseconds(20));
 	}
-	if (const auto& Bound = BoundLeaser::Get().GetBound(); Bound.ID == 0)
+	if (BoundLeaser::Get().GetBoundID() == 0)
 	{
 		std::mt19937 rng(std::random_device{}());
 		std::uniform_real_distribution<float> dist(0.0f, 1.0f);
-		for (int i = 0; i < 50; i++)
+		for (int i = 0; i < 100; i++)
 		{
 			float z = dist(rng) * 2.0f - 1.0f;					// z in [-1, 1]
 			float theta = dist(rng) * 2.0f * glm::pi<float>();	// angle around Z
@@ -177,7 +177,7 @@ void SandboxServer::OnGameClientInputCommand(const NetClientIntentHeader& header
 	/* logger.DebugFormatted("Received a GameClientInputCommand from {} requesting to move to {}",
 						  UUIDGen::ToString(header.clientID),
 						  glm::to_string(command.myDesiredDestination)); */
-	if (!EntityLedger::Get().ExistsEntity(header.entityID)) 
+	if (!EntityLedger::Get().ExistsEntity(header.entityID))
 	{
 		logger.ErrorFormatted("GameClient Input command THROWN AWAY. THIS SHOULD NOT HAPPEN");
 		return;

@@ -1,6 +1,8 @@
 #include "RedisConnection.hpp"
 
 #include <hiredis/read.h>
+#include <sw/redis++/async_redis.h>
+#include <sw/redis++/redis.h>
 
 #include <iostream>
 #include <string_view>
@@ -331,6 +333,15 @@ std::future<std::vector<std::string>> RedisConnection::SMembersAsync(
 {
 	return WithAsync([&](auto& r) -> std::future<std::vector<std::string>>
 					 { return r.template smembers<std::vector<std::string>>(key); });
+}
+ std::optional<std::string>RedisConnection::SPop(const std::string_view& key) const {
+	return WithSync([&](auto& r) -> std::optional<std::string>
+					 { return r.spop(key); });
+}
+std::future<std::optional<std::string>> RedisConnection::SPopAsync(const std::string_view& key) const
+{
+	return WithAsync([&](auto& r) -> std::future<std::optional<std::string>>
+					 { return r.spop(key); });
 }
 
 // =====================

@@ -7,10 +7,11 @@
 #include "Global/Serialize/ByteReader.hpp"
 #include "Global/Serialize/ByteWriter.hpp"
 #include "Global/pch.hpp"
+using BoundsID = uint32_t;
 struct IBounds
 {
 	virtual ~IBounds() = default;
-	using BoundsID = uint32_t;
+	//using BoundsID = uint32_t;
 	BoundsID ID;
 	void Serialize(ByteWriter& bw) const
 	{

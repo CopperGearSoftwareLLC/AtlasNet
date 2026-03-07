@@ -11,6 +11,8 @@ services:
   WatchDog:
     image: watchdog
     networks: [AtlasNet]
+    environment:
+      ATLASNET_DOCKER_MODE: "1"
     cap_add:
       - SYS_PTRACE
     security_opt:
@@ -31,11 +33,11 @@ services:
   Shard:
     image: SHARD_IMAGE_NAME
     networks: [AtlasNet]
-
     cap_add:
-      - SYS_PTRACE
+      - SYS_ADMIN
+      - PERFMON
     security_opt:
-      - seccomp=unconfined
+      - seccomp:unconfined
     deploy:
      labels:
         atlasnet.role: shard # REQUIRED

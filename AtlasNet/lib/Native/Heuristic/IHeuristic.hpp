@@ -9,6 +9,7 @@
 
 #include "Debug/Log.hpp"
 #include "Entity/Entity.hpp"
+#include "Entity/Transform.hpp"
 #include "Global/Serialize/ByteReader.hpp"
 #include "Global/Serialize/ByteWriter.hpp"
 #include "Global/pch.hpp"
@@ -92,24 +93,24 @@ class IHeuristic
 		requires std::is_invocable_v<FN, const IBounds&>
 	void ForEachBound(FN&& f) const
 	{
-		for (IBounds::BoundsID i = 0; i < GetBoundsCount();i++)
+		for (BoundsID i = 0; i < GetBoundsCount();i++)
 		{
 			f(GetBound(i));
 		}
 	}
 	virtual ~IHeuristic() = default;
 	[[nodiscard]] virtual Type GetType() const = 0;
-
-	virtual void Compute(const std::span<const AtlasEntityMinimal>& span) = 0;
+	
+	virtual void Compute(const std::span<const Transform>& span) = 0;
 
 	virtual uint32_t GetBoundsCount() const = 0;
 	/** */
-	virtual void SerializeBounds(std::unordered_map<IBounds::BoundsID, ByteWriter>& bws) = 0;
+	virtual void SerializeBounds(std::unordered_map<BoundsID, ByteWriter>& bws) = 0;
 	virtual void Serialize(ByteWriter& bw) const = 0;
 
 	virtual void Deserialize(ByteReader& br) = 0;
-	[[nodiscard]] virtual std::optional<IBounds::BoundsID> QueryPosition(vec3 p) const = 0;
-	[[nodiscard]] virtual const IBounds& GetBound(IBounds::BoundsID id) const = 0;
+	[[nodiscard]] virtual std::optional<BoundsID> QueryPosition(vec3 p) const = 0;
+	[[nodiscard]] virtual const IBounds& GetBound(BoundsID id) const = 0;
 };
 template <typename BoundType>
 struct TBoundDelta

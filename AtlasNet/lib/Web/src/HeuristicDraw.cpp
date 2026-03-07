@@ -43,18 +43,6 @@ void HeuristicDraw::DrawCurrentHeuristic(std::vector<IBoundsDrawShape>& shapes)
 							rect.size_x = gs.aabb.halfExtents().x * 2;
 							rect.size_y = gs.aabb.halfExtents().y * 2;
 							rect.id = gs.ID;
-
-							if (const auto shard = HeuristicManifest::Get().ShardFromBoundID(gs.ID);
-								shard.has_value())
-							{
-								rect.color = "rgba(100, 255, 149, 1)";
-								rect.owner_id = shard->ToString();
-							}
-							else
-							{
-								rect.color = "rgba(255, 149, 100, 1)";
-							}
-
 							shapes.emplace_back(rect);
 						});
 				}
@@ -70,6 +58,9 @@ void HeuristicDraw::DrawCurrentHeuristic(std::vector<IBoundsDrawShape>& shapes)
 							const VoronoiBounds& polyBound = *vsp;
 							IBoundsDrawShape poly;
 							poly.id = polyBound.ID;
+							ASSERT(poly.id >= 0 && poly.id <= 4,
+								   "FUCK");	 // Trying to find a Bug
+
 							poly.type = IBoundsDrawShape::Type::ePolygon;
 							const vec3 c = polyBound.GetCenter();
 							poly.pos_x = c.x;
@@ -83,21 +74,26 @@ void HeuristicDraw::DrawCurrentHeuristic(std::vector<IBoundsDrawShape>& shapes)
 								poly.verticies.emplace_back(v.x - c.x, v.y - c.y);
 							}
 
-							if (const auto shard =
-									HeuristicManifest::Get().ShardFromBoundID(polyBound.ID);
-								shard.has_value())
-							{
-								poly.color = "rgba(100, 255, 149, 1)";
-								poly.owner_id = shard->ToString();
-							}
-							else
-							{
-								poly.color = "rgba(255, 149, 100, 1)";
-							}
 							shapes.emplace_back(std::move(poly));
 						});
 				}
 				break;
+			}
+		});
+	HeuristicManifest::Get().QueryOwnershipState(
+		[&](const HeuristicManifest::OwnershipStateWrapper& o)
+		{
+			for (auto& shape : shapes)
+			{
+				if (const auto shard = o.GetBoundOwner(shape.id); shard.has_value())
+				{
+					shape.color = "rgba(100, 255, 149, 1)";
+					shape.owner_id = shard->ToString();
+				}
+				else
+				{
+					shape.color = "rgba(255, 149, 100, 1)";
+				}
 			}
 		});
 

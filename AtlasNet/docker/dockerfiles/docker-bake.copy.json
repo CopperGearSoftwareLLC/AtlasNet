@@ -1,7 +1,7 @@
 {
   "group": {
     "default": {
-      "targets": ["atlasnetsdk", "watchdog", "proxy", "shard", "cartograph"]
+      "targets": ["atlasnetsdk", "watchdog", "proxy", "cartograph"]
     }
   },
   "target": {
@@ -27,14 +27,6 @@
       "depends-on": ["atlasnetsdk"],
       "load": true,
       "tags": ["proxy:latest"]
-    },
-    "shard": {
-      "context": ".",
-      "dockerfile": "docker/dockerfiles/CopyDockerfile",
-      "target": "shard",
-      "depends-on": ["atlasnetsdk"],
-      "load": true,
-      "tags": ["shard:latest"]
     },
     "cartograph": {
       "context": ".",

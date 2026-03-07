@@ -7,10 +7,6 @@ COPY ./.stage /atlasnet
 FROM scratch AS atlasnetsdk
 COPY ./.stage /atlasnet
 
-FROM runner AS shard
-COPY --from=atlasnetsdk /atlasnet/shard /atlasnet/shard
-ENTRYPOINT [ "/atlasnet/shard" ]
-
 FROM runner AS watchdog
 COPY --from=atlasnetsdk /atlasnet/watchdog /atlasnet/watchdog
 ENTRYPOINT [ "/atlasnet/watchdog" ]

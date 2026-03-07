@@ -7,14 +7,15 @@
 
 #include "Entity/Entity.hpp"
 #include "Entity/Packet/LocalEntityListRequestPacket.hpp"
-#include "Transfer/TransferCoordinator.hpp"
 #include "Global/Misc/UUID.hpp"
 #include "Heuristic/BoundLeaser.hpp"
 #include "Heuristic/Database/HeuristicManifest.hpp"
-#include "Network/NetworkCredentials.hpp"
+#include "Heuristic/IBounds.hpp"
 #include "Interlink/Interlink.hpp"
+#include "Network/NetworkCredentials.hpp"
 #include "Network/NetworkEnums.hpp"
 #include "Network/Packet/PacketManager.hpp"
+#include "Transfer/TransferCoordinator.hpp"
 void EntityLedger::Init()
 {
 	sub_EntityListRequestPacket =
@@ -81,29 +82,30 @@ void EntityLedger::LoopThreadEntry(std::stop_token st)
 				for (const auto& [ID, entity] : entities)
 					snapshot.emplace_back(ID, entity.transform.position);
 			});
+			if (snapshot.empty()) continue;
 
 		const NetworkIdentity selfId = NetworkCredentials::Get().GetID();
-		for (const auto& [ID, pos] : snapshot)
-		{
-			// Skip entities already in an active transfer.
-			if (TransferCoordinator::Get().IsEntityInTransfer(ID))
+		if (!BoundLeaser::Get().HasBound()) continue;
+		BoundLeaser::Get().GetBound(
+			[&](const IBounds& b)
 			{
-				continue;
-			}
+				for (const auto& [ID, pos] : snapshot)
+				{
+					// Skip entities already in an active transfer.
 
-			Transform t;
-			t.position = pos;
-			const auto targetShard = HeuristicManifest::Get().ShardFromPosition(t);
-			if (!targetShard.has_value() || *targetShard == selfId)
-			{
-				continue;
-			}
+					if (TransferCoordinator::Get().IsEntityInTransfer(ID))
+					{
+						continue;
+					}
 
-			EntitiesNewlyOutOfBounds.push_back(ID);
-			logger.DebugFormatted(
-				"Entity scheduled for transfer:\n - ID {}\n - EntityPos: {}\n - targetShard {}",
-				UUIDGen::ToString(ID), glm::to_string(pos), targetShard->ToString());
-		}
+					if (b.Contains(pos))
+					{
+						continue;
+					}
+
+					EntitiesNewlyOutOfBounds.push_back(ID);
+				}
+			});
 
 		if (!EntitiesNewlyOutOfBounds.empty())
 		{
@@ -111,5 +113,6 @@ void EntityLedger::LoopThreadEntry(std::stop_token st)
 		}
 
 		std::this_thread::sleep_for(std::chrono::milliseconds(50));
+
 	}
 }

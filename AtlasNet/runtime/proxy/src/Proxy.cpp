@@ -4,7 +4,7 @@
 
 #include "Command/CommandRouter.hpp"
 #include "Debug/Crash/CrashHandler.hpp"
-#include "Events/EventSystem.hpp"
+#include "Events/GlobalEvents.hpp"
 #include "Global/Misc/UUID.hpp"
 #include "Interlink/Database/HealthManifest.hpp"
 #include "Interlink/Interlink.hpp"
@@ -36,7 +36,7 @@ void Proxy::Init()
 	CommandRouter::Ensure();
 	NetworkManifest::Get().ScheduleNetworkPings();
 	HealthManifest::Get().ScheduleHealthPings();
-	EventSystem::Get().Init();
+	GlobalEvents::Get().Init();
 }
 void Proxy::Shutdown()
 {
