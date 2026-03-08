@@ -571,7 +571,6 @@ export default function MapPage() {
     setHoveredShardId,
     shardHoverBoundsById,
     shardHoverPolygonsById: shardPolygonsById,
-    showGnsConnections,
     showShardHoverDetails,
   });
 

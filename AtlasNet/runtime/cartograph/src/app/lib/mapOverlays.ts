@@ -324,12 +324,16 @@ export function buildOverlayShapes(args: {
       ...buildGnsConnectionOverlays(
         args.networkTelemetry,
         args.networkNodeIdSet,
-        args.projectedShardPositions
+        args.projectedShardPositions,
+        args.hoveredShardId
       ),
       ...buildShardNodeOverlays(
         args.networkNodeIds,
         args.ownerPositions,
-        args.projectedShardPositions
+        args.projectedShardPositions,
+        args.networkTelemetry,
+        args.networkNodeIdSet,
+        args.hoveredShardId
       )
     );
   }
@@ -340,10 +344,14 @@ export function buildOverlayShapes(args: {
 function buildGnsConnectionOverlays(
   networkTelemetry: ShardTelemetry[],
   networkNodeIdSet: Set<string>,
-  projectedShardPositions: Map<string, Point2>
+  projectedShardPositions: Map<string, Point2>,
+  hoveredShardId: string | null
 ): ShapeJS[] {
   const overlays: ShapeJS[] = [];
   const seen = new Set<string>();
+  const focusedShardId = normalizeShardId(String(hoveredShardId ?? ''));
+  const hasFocusedShard =
+    focusedShardId.length > 0 && networkNodeIdSet.has(focusedShardId);
 
   for (const shard of networkTelemetry) {
     const fromId = normalizeShardId(shard.shardId);
@@ -372,6 +380,9 @@ function buildGnsConnectionOverlays(
         continue;
       }
       seen.add(key);
+      const isFocusedEdge =
+        hasFocusedShard &&
+        (fromId === focusedShardId || toId === focusedShardId);
 
       overlays.push({
         type: 'line',
@@ -380,7 +391,11 @@ function buildGnsConnectionOverlays(
           { x: fromPos.x, y: fromPos.y },
           { x: toPos.x, y: toPos.y },
         ],
-        color: 'rgba(80, 200, 255, 0.65)',
+        color: hasFocusedShard
+          ? isFocusedEdge
+            ? 'rgba(80, 200, 255, 0.9)'
+            : 'rgba(80, 200, 255, 0.16)'
+          : 'rgba(80, 200, 255, 0.65)',
       });
     }
   }
@@ -388,12 +403,56 @@ function buildGnsConnectionOverlays(
   return overlays;
 }
 
+function computeFocusedShardNeighbors(args: {
+  networkTelemetry: ShardTelemetry[];
+  networkNodeIdSet: Set<string>;
+  focusedShardId: string;
+}): Set<string> {
+  const { focusedShardId, networkNodeIdSet, networkTelemetry } = args;
+  const related = new Set<string>([focusedShardId]);
+
+  for (const shard of networkTelemetry) {
+    const fromId = normalizeShardId(shard.shardId);
+    if (!networkNodeIdSet.has(fromId)) {
+      continue;
+    }
+
+    for (const connection of shard.connections) {
+      const toId = normalizeShardId(connection.targetId);
+      if (!networkNodeIdSet.has(toId)) {
+        continue;
+      }
+      if (fromId === focusedShardId) {
+        related.add(toId);
+      }
+      if (toId === focusedShardId) {
+        related.add(fromId);
+      }
+    }
+  }
+
+  return related;
+}
+
 function buildShardNodeOverlays(
   networkNodeIds: string[],
   ownerPositions: Map<string, Point2>,
-  projectedShardPositions: Map<string, Point2>
+  projectedShardPositions: Map<string, Point2>,
+  networkTelemetry: ShardTelemetry[],
+  networkNodeIdSet: Set<string>,
+  hoveredShardId: string | null
 ): ShapeJS[] {
   const overlays: ShapeJS[] = [];
+  const focusedShardId = normalizeShardId(String(hoveredShardId ?? ''));
+  const hasFocusedShard =
+    focusedShardId.length > 0 && networkNodeIdSet.has(focusedShardId);
+  const focusedRelatedIds = hasFocusedShard
+    ? computeFocusedShardNeighbors({
+        networkTelemetry,
+        networkNodeIdSet,
+        focusedShardId,
+      })
+    : null;
 
   for (const shardId of networkNodeIds) {
     const anchor = projectedShardPositions.get(shardId);
@@ -402,13 +461,22 @@ function buildShardNodeOverlays(
     }
 
     const hasOwnerSample = ownerPositions.has(shardId);
+    const isFocusedRelated = focusedRelatedIds?.has(shardId) ?? false;
     overlays.push({
       type: 'circle',
       position: anchor,
       radius: hasOwnerSample ? 2.6 : 2.1,
-      color: hasOwnerSample
-        ? 'rgba(80, 200, 255, 0.95)'
-        : 'rgba(120, 170, 220, 0.75)',
+      color: hasFocusedShard
+        ? isFocusedRelated
+          ? hasOwnerSample
+            ? 'rgba(80, 200, 255, 0.98)'
+            : 'rgba(120, 170, 220, 0.9)'
+          : hasOwnerSample
+            ? 'rgba(80, 200, 255, 0.22)'
+            : 'rgba(120, 170, 220, 0.2)'
+        : hasOwnerSample
+          ? 'rgba(80, 200, 255, 0.95)'
+          : 'rgba(120, 170, 220, 0.75)',
     });
   }
 

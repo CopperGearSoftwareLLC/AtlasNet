@@ -11,7 +11,6 @@ interface Point2 {
 
 interface UseShardHoverStateArgs {
   showShardHoverDetails: boolean;
-  showGnsConnections: boolean;
   networkNodeIdSet: Set<string>;
   shardHoverBoundsById: Map<string, ShardHoverBounds>;
   shardHoverPolygonsById: Map<string, Point2[][]>;
@@ -73,11 +72,9 @@ export function useShardHoverState({
   setHoveredShardId,
   shardHoverBoundsById,
   shardHoverPolygonsById,
-  showGnsConnections,
   showShardHoverDetails,
 }: UseShardHoverStateArgs): UseShardHoverStateResult {
   const showShardHoverDetailsRef = useRef(showShardHoverDetails);
-  const showGnsConnectionsRef = useRef(showGnsConnections);
   const shardHoverBoundsByIdRef = useRef<Map<string, ShardHoverBounds>>(new Map());
   const shardHoverPolygonsByIdRef = useRef<Map<string, Point2[][]>>(new Map());
   const networkNodeIdSetRef = useRef<Set<string>>(new Set());
@@ -95,10 +92,6 @@ export function useShardHoverState({
   }, [clearHoveredShard, showShardHoverDetails]);
 
   useEffect(() => {
-    showGnsConnectionsRef.current = showGnsConnections;
-  }, [showGnsConnections]);
-
-  useEffect(() => {
     networkNodeIdSetRef.current = networkNodeIdSet;
   }, [networkNodeIdSet]);
 
@@ -111,23 +104,14 @@ export function useShardHoverState({
   }, [shardHoverPolygonsById]);
 
   useEffect(() => {
-    if (!showGnsConnections) {
-      clearHoveredShard();
-      return;
-    }
     if (hoveredShardId && !networkNodeIdSet.has(hoveredShardId)) {
       clearHoveredShard();
     }
-  }, [clearHoveredShard, hoveredShardId, networkNodeIdSet, showGnsConnections]);
+  }, [clearHoveredShard, hoveredShardId, networkNodeIdSet]);
 
   const handleMapPointerWorld = useCallback(
     (point: Point2 | null, screen: Point2 | null) => {
-      if (
-        !showShardHoverDetailsRef.current ||
-        !showGnsConnectionsRef.current ||
-        !point ||
-        !screen
-      ) {
+      if (!showShardHoverDetailsRef.current || !point || !screen) {
         clearHoveredShard();
         return;
       }
