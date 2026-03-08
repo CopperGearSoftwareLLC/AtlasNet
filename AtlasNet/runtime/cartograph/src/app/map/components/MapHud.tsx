@@ -11,11 +11,11 @@ interface MapHudProps {
   showGnsConnections: boolean;
   showAuthorityEntities: boolean;
   authorityLinkMode: AuthorityLinkMode;
-  showShardHoverDetails: boolean;
+  showEntityOwnershipHover: boolean;
   onToggleGnsConnections: () => void;
   onToggleAuthorityEntities: () => void;
   onSetAuthorityLinkMode: (mode: AuthorityLinkMode) => void;
-  onToggleShardHoverDetails: () => void;
+  onToggleEntityOwnershipHover: () => void;
   entityCount: number;
   shardCount: number;
   networkEdgeCount: number;
@@ -86,15 +86,15 @@ export function MapHud({
   onTakeSnapshot,
   onToggleAuthorityEntities,
   onToggleGnsConnections,
-  onToggleShardHoverDetails,
+  onToggleEntityOwnershipHover,
   authorityLinkMode,
   playbackActive,
   pollIntervalMs,
   projectionMode,
   shardCount,
   showAuthorityEntities,
+  showEntityOwnershipHover,
   showGnsConnections,
-  showShardHoverDetails,
   viewMode,
 }: MapHudProps) {
   const maxInteractionSensitivity = Math.max(
@@ -184,10 +184,10 @@ export function MapHud({
       <label style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
         <input
           type="checkbox"
-          checked={showShardHoverDetails}
-          onChange={() => onToggleShardHoverDetails()}
+          checked={showEntityOwnershipHover}
+          onChange={() => onToggleEntityOwnershipHover()}
         />
-        shard hover details
+        entity ownership hover
       </label>
       <button
         type="button"

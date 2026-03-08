@@ -32,6 +32,7 @@ interface UseMapDerivedDataArgs {
   showAuthorityEntities: boolean;
   showGnsConnections: boolean;
   hoveredShardId: string | null;
+  showEntityOwnershipHover: boolean;
 }
 
 interface MapDerivedData {
@@ -51,6 +52,7 @@ export function useMapDerivedData({
   baseShapes,
   hoveredShardId,
   networkTelemetry,
+  showEntityOwnershipHover,
   transferManifest,
   showAuthorityEntities,
   showGnsConnections,
@@ -144,6 +146,8 @@ export function useMapDerivedData({
         transferManifest,
         showAuthorityEntities,
         showGnsConnections,
+        hoveredShardId,
+        showEntityOwnershipHover,
       }),
     [
       authorityEntities,
@@ -156,6 +160,8 @@ export function useMapDerivedData({
       transferManifest,
       showAuthorityEntities,
       showGnsConnections,
+      hoveredShardId,
+      showEntityOwnershipHover,
     ]
   );
 

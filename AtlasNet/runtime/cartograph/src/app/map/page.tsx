@@ -140,7 +140,8 @@ export default function MapPage() {
   const [showAuthorityEntities, setShowAuthorityEntities] = useState(true);
   const [authorityLinkMode, setAuthorityLinkMode] =
     useState<AuthorityLinkMode>('owner');
-  const [showShardHoverDetails, setShowShardHoverDetails] = useState(true);
+  const [showShardHoverDetails] = useState(true);
+  const [showEntityOwnershipHover, setShowEntityOwnershipHover] = useState(true);
   const [hoveredShardId, setHoveredShardId] = useState<string | null>(null);
   const [hoveredShardAnchor, setHoveredShardAnchor] = useState<{
     x: number;
@@ -560,6 +561,7 @@ export default function MapPage() {
     showAuthorityEntities,
     showGnsConnections,
     hoveredShardId,
+    showEntityOwnershipHover,
   });
 
   const { clearHoveredShard, handleMapPointerWorld } = useShardHoverState({
@@ -776,11 +778,13 @@ export default function MapPage() {
         showGnsConnections={showGnsConnections}
         showAuthorityEntities={showAuthorityEntities}
         authorityLinkMode={authorityLinkMode}
-        showShardHoverDetails={showShardHoverDetails}
+        showEntityOwnershipHover={showEntityOwnershipHover}
         onToggleGnsConnections={() => setShowGnsConnections((value) => !value)}
         onToggleAuthorityEntities={() => setShowAuthorityEntities((value) => !value)}
         onSetAuthorityLinkMode={setAuthorityLinkMode}
-        onToggleShardHoverDetails={() => setShowShardHoverDetails((value) => !value)}
+        onToggleEntityOwnershipHover={() =>
+          setShowEntityOwnershipHover((value) => !value)
+        }
         entityCount={authorityEntities.length}
         shardCount={networkNodeIds.length}
         networkEdgeCount={networkEdgeCount}

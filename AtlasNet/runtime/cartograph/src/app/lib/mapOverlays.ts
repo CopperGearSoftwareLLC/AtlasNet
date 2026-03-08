@@ -22,6 +22,7 @@ interface HandoffEntityLink {
   stage: string;
   state: string;
 }
+const NON_HOVERED_ENTITY_DIM_FACTOR = 0.22;
 
 type TransferStageName =
   | 'none'
@@ -128,12 +129,41 @@ function resolveHandoffLineLabel(link: HandoffEntityLink): string {
   return formatTransferStageLabel(link.stage);
 }
 
+function scaleColorAlpha(color: string, factor: number): string {
+  if (factor >= 1) {
+    return color;
+  }
+  const match = color.match(
+    /^rgba?\(\s*([0-9.]+)\s*,\s*([0-9.]+)\s*,\s*([0-9.]+)(?:\s*,\s*([0-9.]+))?\s*\)$/i
+  );
+  if (!match) {
+    return color;
+  }
+
+  const r = Number(match[1]);
+  const g = Number(match[2]);
+  const b = Number(match[3]);
+  const a = match[4] == null ? 1 : Number(match[4]);
+  if (
+    !Number.isFinite(r) ||
+    !Number.isFinite(g) ||
+    !Number.isFinite(b) ||
+    !Number.isFinite(a)
+  ) {
+    return color;
+  }
+
+  const alpha = Math.max(0, Math.min(1, a * factor));
+  return `rgba(${Math.round(r)}, ${Math.round(g)}, ${Math.round(b)}, ${alpha})`;
+}
+
 function buildHandoffEntityLinkOverlays(args: {
   entity: AuthorityEntityTelemetry;
   handoffLinks: HandoffEntityLink[];
   projectedShardPositions: Map<string, Point2>;
+  dimmed: boolean;
 }): ShapeJS[] {
-  const { entity, handoffLinks, projectedShardPositions } = args;
+  const { dimmed, entity, handoffLinks, projectedShardPositions } = args;
   const overlays: ShapeJS[] = [];
 
   for (const handoffLink of handoffLinks) {
@@ -150,7 +180,10 @@ function buildHandoffEntityLinkOverlays(args: {
         { x: entity.x, y: entity.y },
         { x: linkTarget.x, y: linkTarget.y },
       ],
-      color: resolveHandoffLineColor(handoffLink),
+      color: scaleColorAlpha(
+        resolveHandoffLineColor(handoffLink),
+        dimmed ? NON_HOVERED_ENTITY_DIM_FACTOR : 1
+      ),
       label: resolveHandoffLineLabel(handoffLink),
     });
   }
@@ -161,8 +194,9 @@ function buildHandoffEntityLinkOverlays(args: {
 function buildOwnerLinkOverlay(args: {
   entity: AuthorityEntityTelemetry;
   projectedShardPositions: Map<string, Point2>;
+  dimmed: boolean;
 }): ShapeJS | null {
-  const { entity, projectedShardPositions } = args;
+  const { dimmed, entity, projectedShardPositions } = args;
   const ownerPos = projectedShardPositions.get(normalizeShardId(entity.ownerId));
   if (!ownerPos) {
     return null;
@@ -176,17 +210,26 @@ function buildOwnerLinkOverlay(args: {
       { x: entity.x, y: entity.y },
       { x: ownerPos.x, y: ownerPos.y },
     ],
-    color: isClient ? 'rgba(255, 96, 96, 0.9)' : 'rgba(255, 255, 0, 0.9)',
+    color: scaleColorAlpha(
+      isClient ? 'rgba(255, 96, 96, 0.9)' : 'rgba(255, 255, 0, 0.9)',
+      dimmed ? NON_HOVERED_ENTITY_DIM_FACTOR : 1
+    ),
   };
 }
 
-function buildAuthorityEntityNodeOverlay(entity: AuthorityEntityTelemetry): ShapeJS {
+function buildAuthorityEntityNodeOverlay(
+  entity: AuthorityEntityTelemetry,
+  dimmed: boolean
+): ShapeJS {
   const isClient = Boolean(entity.isClient);
   return {
     type: 'circle',
     position: { x: entity.x, y: entity.y },
     radius: 1.8,
-    color: isClient ? 'rgba(255, 72, 72, 1)' : 'rgba(255, 240, 80, 1)',
+    color: scaleColorAlpha(
+      isClient ? 'rgba(255, 72, 72, 1)' : 'rgba(255, 240, 80, 1)',
+      dimmed ? NON_HOVERED_ENTITY_DIM_FACTOR : 1
+    ),
   };
 }
 
@@ -194,19 +237,32 @@ function buildAuthorityEntityOverlays(
   authorityEntities: AuthorityEntityTelemetry[],
   authorityLinkMode: AuthorityLinkMode,
   projectedShardPositions: Map<string, Point2>,
-  transferManifest: TransferManifestTelemetry[]
+  transferManifest: TransferManifestTelemetry[],
+  hoveredShardId: string | null,
+  showEntityOwnershipHover: boolean
 ): ShapeJS[] {
   const overlays: ShapeJS[] = [];
+  const hoveredShardIdNormalized = showEntityOwnershipHover
+    ? normalizeShardId(String(hoveredShardId ?? ''))
+    : '';
   const handoffLinksByEntity =
     authorityLinkMode === 'handoff'
       ? indexHandoffLinksByEntity(transferManifest)
       : null;
 
   for (const entity of authorityEntities) {
-    overlays.push(buildAuthorityEntityNodeOverlay(entity));
+    const ownerIdNormalized = normalizeShardId(entity.ownerId);
+    const dimmed =
+      hoveredShardIdNormalized.length > 0 &&
+      ownerIdNormalized !== hoveredShardIdNormalized;
+    overlays.push(buildAuthorityEntityNodeOverlay(entity, dimmed));
 
     if (authorityLinkMode === 'owner') {
-      const ownerLine = buildOwnerLinkOverlay({ entity, projectedShardPositions });
+      const ownerLine = buildOwnerLinkOverlay({
+        entity,
+        projectedShardPositions,
+        dimmed,
+      });
       if (ownerLine) {
         overlays.push(ownerLine);
       }
@@ -227,6 +283,7 @@ function buildAuthorityEntityOverlays(
         entity,
         handoffLinks,
         projectedShardPositions,
+        dimmed,
       })
     );
   }
@@ -244,6 +301,8 @@ export function buildOverlayShapes(args: {
   transferManifest: TransferManifestTelemetry[];
   showAuthorityEntities: boolean;
   showGnsConnections: boolean;
+  hoveredShardId: string | null;
+  showEntityOwnershipHover: boolean;
 }): ShapeJS[] {
   const overlays: ShapeJS[] = [];
 
@@ -253,7 +312,9 @@ export function buildOverlayShapes(args: {
         args.authorityEntities,
         args.authorityLinkMode,
         args.projectedShardPositions,
-        args.transferManifest
+        args.transferManifest,
+        args.hoveredShardId,
+        args.showEntityOwnershipHover
       )
     );
   }
