@@ -132,14 +132,14 @@ fi
 : "${DOCKERHUB_EMAIL:=atlasnet@example.invalid}"
 : "${ATLASNET_WAIT_FOR_SHARD_READY:=true}"
 
-if [[ -z "${DOCKERHUB_NAMESPACE}" ]] && [[ -z "${ATLASNET_WATCHDOG_IMAGE:-}" || -z "${ATLASNET_PROXY_IMAGE:-}" || -z "${ATLASNET_SHARD_IMAGE:-}" || -z "${ATLASNET_CARTOGRAPH_IMAGE:-}" ]]; then
+if [[ -z "${DOCKERHUB_NAMESPACE}" ]] && [[ -z "${ATLASNET_WATCHDOG_IMAGE:-}" || -z "${ATLASNET_PROXY_IMAGE:-}" || -z "${ATLASNET_SANDBOX_SERVER_IMAGE:-}" || -z "${ATLASNET_CARTOGRAPH_IMAGE:-}" ]]; then
   die "Set DOCKERHUB_NAMESPACE in .env, or explicitly set all ATLASNET_*_IMAGE values."
 fi
 
 : "${ATLASNET_WATCHDOG_IMAGE:=${DOCKERHUB_NAMESPACE}/watchdog:${ATLASNET_IMAGE_TAG}}"
 : "${ATLASNET_PROXY_IMAGE:=${DOCKERHUB_NAMESPACE}/proxy:${ATLASNET_IMAGE_TAG}}"
-: "${ATLASNET_SHARD_IMAGE:=${DOCKERHUB_NAMESPACE}/shard:${ATLASNET_IMAGE_TAG}}"
 : "${ATLASNET_CARTOGRAPH_IMAGE:=${DOCKERHUB_NAMESPACE}/cartograph:${ATLASNET_IMAGE_TAG}}"
+: "${ATLASNET_SANDBOX_SERVER_IMAGE:=${DOCKERHUB_NAMESPACE}/sandbox-server:${ATLASNET_IMAGE_TAG}}"
 
 need_cmd kubectl
 
@@ -153,7 +153,7 @@ echo "Deploying AtlasNet to namespace '$ATLASNET_K8S_NAMESPACE' ..."
 echo " - server node: $SERVER_NODE_NAME"
 echo " - watchdog image: $ATLASNET_WATCHDOG_IMAGE"
 echo " - proxy image: $ATLASNET_PROXY_IMAGE"
-echo " - shard image: $ATLASNET_SHARD_IMAGE"
+echo " - sandbox server image: $ATLASNET_SANDBOX_SERVER_IMAGE"
 echo " - cartograph image: $ATLASNET_CARTOGRAPH_IMAGE"
 echo " - imagePullPolicy: $ATLASNET_IMAGE_PULL_POLICY"
 
@@ -166,7 +166,7 @@ trap 'rm -f "$TMP_MANIFEST"' EXIT
 
 sed \
   -e "s|__NAMESPACE__|$(escape_sed_replacement "$ATLASNET_K8S_NAMESPACE")|g" \
-  -e "s|__SHARD_IMAGE__|$(escape_sed_replacement "$ATLASNET_SHARD_IMAGE")|g" \
+  -e "s|__SHARD_IMAGE__|$(escape_sed_replacement "$ATLASNET_SANDBOX_SERVER_IMAGE")|g" \
   -e "s|__SERVER_NODE_NAME__|$(escape_sed_replacement "$SERVER_NODE_NAME")|g" \
   -e "s|image: watchdog:latest|image: $(escape_sed_replacement "$ATLASNET_WATCHDOG_IMAGE")|g" \
   -e "s|image: proxy:latest|image: $(escape_sed_replacement "$ATLASNET_PROXY_IMAGE")|g" \

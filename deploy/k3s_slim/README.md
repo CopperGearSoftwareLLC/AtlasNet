@@ -52,7 +52,7 @@ kubectl get pods -A -o wide
 Set these in `.env`:
 - `DOCKERHUB_NAMESPACE`
 - `ATLASNET_IMAGE_TAG`
-- Optional image overrides: `ATLASNET_WATCHDOG_IMAGE`, `ATLASNET_PROXY_IMAGE`, `ATLASNET_SHARD_IMAGE`, `ATLASNET_CARTOGRAPH_IMAGE`
+- Optional image overrides: `ATLASNET_WATCHDOG_IMAGE`, `ATLASNET_PROXY_IMAGE`, `ATLASNET_SANDBOX_SERVER_IMAGE`, `ATLASNET_CARTOGRAPH_IMAGE`
 
 Then deploy:
 ```bash
@@ -68,14 +68,14 @@ The deploy script reuses the AtlasNet Kubernetes runtime manifest and rewrites i
 and builds:
 - `watchdog:latest`
 - `proxy:latest`
-- `shard:latest`
+- `sandbox-server:latest`
 - `cartograph:latest`
 
 `make atlasnet-push` will:
 - tag those local images as `${DOCKERHUB_NAMESPACE}/*:${ATLASNET_IMAGE_TAG}`
 - push them to Docker Hub
 
-If you need a custom shard/game-server image, set `ATLASNET_SHARD_IMAGE` explicitly in `.env`.
+If you need a custom game-server image, set `ATLASNET_SANDBOX_SERVER_IMAGE` explicitly in `.env`.
 
 ### Private Docker Hub repos
 

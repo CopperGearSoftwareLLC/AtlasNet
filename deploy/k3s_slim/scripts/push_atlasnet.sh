@@ -40,8 +40,8 @@ esac
 
 : "${ATLASNET_WATCHDOG_IMAGE:=${DOCKERHUB_NAMESPACE}/watchdog:${ARCH_TAG}}"
 : "${ATLASNET_PROXY_IMAGE:=${DOCKERHUB_NAMESPACE}/proxy:${ARCH_TAG}}"
-: "${ATLASNET_SHARD_IMAGE:=${DOCKERHUB_NAMESPACE}/shard:${ARCH_TAG}}"
 : "${ATLASNET_CARTOGRAPH_IMAGE:=${DOCKERHUB_NAMESPACE}/cartograph:${ARCH_TAG}}"
+: "${ATLASNET_SANDBOX_SERVER_IMAGE:=${DOCKERHUB_NAMESPACE}/sandbox-server:${ARCH_TAG}}"
 
 tag_and_push() {
   local local_image="$1"   # e.g. watchdog:latest
@@ -62,14 +62,14 @@ echo "NOTE: This assumes you've already built local images (e.g. via 'sandbox_at
 
 tag_and_push "watchdog:latest"   "$ATLASNET_WATCHDOG_IMAGE"
 tag_and_push "proxy:latest"      "$ATLASNET_PROXY_IMAGE"
-tag_and_push "shard:latest"      "$ATLASNET_SHARD_IMAGE"
+tag_and_push "sandbox-server:latest" "$ATLASNET_SANDBOX_SERVER_IMAGE"
 tag_and_push "cartograph:latest" "$ATLASNET_CARTOGRAPH_IMAGE"
 
 echo
 echo "Done. Published images:"
 echo " - $ATLASNET_WATCHDOG_IMAGE"
 echo " - $ATLASNET_PROXY_IMAGE"
-echo " - $ATLASNET_SHARD_IMAGE"
+echo " - $ATLASNET_SANDBOX_SERVER_IMAGE"
 echo " - $ATLASNET_CARTOGRAPH_IMAGE"
 echo
 echo "Next:"

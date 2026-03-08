@@ -49,12 +49,12 @@ merge_one() {
 
 merge_one "watchdog"
 merge_one "proxy"
-merge_one "shard"
+merge_one "sandbox-server"
 merge_one "cartograph"
 
 echo
 echo "Done. Multi-arch manifests created for:"
 echo "  - ${DOCKERHUB_NAMESPACE}/watchdog:${ATLASNET_IMAGE_TAG}"
 echo "  - ${DOCKERHUB_NAMESPACE}/proxy:${ATLASNET_IMAGE_TAG}"
-echo "  - ${DOCKERHUB_NAMESPACE}/shard:${ATLASNET_IMAGE_TAG}"
+echo "  - ${DOCKERHUB_NAMESPACE}/sandbox-server:${ATLASNET_IMAGE_TAG}"
 echo "  - ${DOCKERHUB_NAMESPACE}/cartograph:${ATLASNET_IMAGE_TAG}"
