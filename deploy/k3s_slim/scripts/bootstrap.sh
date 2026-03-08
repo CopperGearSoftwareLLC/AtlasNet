@@ -157,6 +157,36 @@ check_sudo_access() {
   fi
 }
 
+ensure_remote_curl() {
+  local host_ip="$1"
+  local host_user="$2"
+  local label="$3"
+
+  if ssh -i "$SSH_KEY" \
+    -o BatchMode=yes \
+    -o StrictHostKeyChecking=accept-new \
+    -o ConnectTimeout=5 \
+    "${host_user}@${host_ip}" 'command -v curl >/dev/null 2>&1'; then
+    return 0
+  fi
+
+  echo "${label}: curl not found; installing..."
+  ssh -i "$SSH_KEY" \
+    -o BatchMode=yes \
+    -o StrictHostKeyChecking=accept-new \
+    -o ConnectTimeout=5 \
+    "${host_user}@${host_ip}" '
+      set -euo pipefail
+      if command -v apt-get >/dev/null 2>&1; then
+        sudo apt-get update -qq
+        sudo apt-get install -y curl
+      else
+        echo "ERROR: curl is missing and apt-get is unavailable on this node." >&2
+        exit 1
+      fi
+    '
+}
+
 check_server_api_port_conflict() {
   local server_ip="$1"
   local listeners
@@ -342,6 +372,32 @@ for entry in $WORKER_IPS; do
   check_sudo_access "$host" "$user"
 done
 
+echo "Ensuring curl is available on nodes ..."
+for entry in $SERVER_IPS; do
+  [[ -n "$entry" ]] || continue
+  entry="${entry//\"/}"
+  if [[ "$entry" == *@* ]]; then
+    user="${entry%@*}"
+    host="${entry#*@}"
+  else
+    user="$SERVER_SSH_USER"
+    host="$entry"
+  fi
+  ensure_remote_curl "$host" "$user" "server ${host}"
+done
+for entry in $WORKER_IPS; do
+  [[ -n "$entry" ]] || continue
+  entry="${entry//\"/}"
+  if [[ "$entry" == *@* ]]; then
+    user="${entry%@*}"
+    host="${entry#*@}"
+  else
+    user="$WORKER_SSH_USER"
+    host="$entry"
+  fi
+  ensure_remote_curl "$host" "$user" "worker ${host}"
+done
+
 check_server_api_port_conflict "$PRIMARY_SERVER_IP"
 
 install_k3sup_if_missing
@@ -469,3 +525,5 @@ echo
 echo "Done. Verify with:"
 echo "  export KUBECONFIG=\"$TARGET_KUBECONFIG_PATH\""
 echo "  kubectl get nodes -o wide"
+echo
+kubectl get nodes -o wide || true
