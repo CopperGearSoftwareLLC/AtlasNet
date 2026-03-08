@@ -10,9 +10,11 @@ import type {
   TransferStateQueueTelemetry,
   WorkersSnapshotResponse,
 } from './cartographTypes';
-import { parseAuthorityRows } from './authorityTelemetryTypes';
-import { parseTransferManifestRows } from './transferManifestTypes';
-import { parseTransferStateQueueRows } from './transferStateQueueTypes';
+import {
+  parseAuthorityRows,
+  parseTransferManifestRows,
+  parseTransferStateQueueRows,
+} from './telemetryParsers';
 
 interface PolledResourceOptions<T> {
   url: string;

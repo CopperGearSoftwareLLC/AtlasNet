@@ -6,6 +6,7 @@ import type {
 } from '../../shared/cartographTypes';
 import { normalizeDatabaseSnapshot } from '../../shared/databaseSnapshot';
 import { fetchNativeJson } from '../../shared/nativeClient';
+import { parseOptionalBooleanFlag } from '../../shared/queryParams';
 
 const TIMEOUT_MS = 1500;
 const MAX_MATCHED_RECORDS = 300;
@@ -22,30 +23,6 @@ interface MatchResult {
   matchedIn: MatchField;
   matchedTerms: string[];
   relevance: number;
-}
-
-function parseOptionalBooleanFlag(raw: string): boolean | undefined {
-  const normalized = raw.trim().toLowerCase();
-  if (normalized.length === 0) {
-    return undefined;
-  }
-  if (
-    normalized === '1' ||
-    normalized === 'true' ||
-    normalized === 'on' ||
-    normalized === 'yes'
-  ) {
-    return true;
-  }
-  if (
-    normalized === '0' ||
-    normalized === 'false' ||
-    normalized === 'off' ||
-    normalized === 'no'
-  ) {
-    return false;
-  }
-  return undefined;
 }
 
 function addTerm(

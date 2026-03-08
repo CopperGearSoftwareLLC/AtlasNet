@@ -1,15 +1,7 @@
-import { NextResponse } from 'next/server';
-import { fetchNativeJson } from '../../shared/nativeClient';
+import { respondWithNativeArray } from '../../shared/nativeRoute';
 
 const TIMEOUT_MS = 12000;
 
 export async function GET() {
-  const payload = await fetchNativeJson<unknown>({
-    path: '/shard-placement',
-    timeoutMs: TIMEOUT_MS,
-  });
-  if (!Array.isArray(payload)) {
-    return NextResponse.json([], { status: 200 });
-  }
-  return NextResponse.json(payload, { status: 200 });
+  return respondWithNativeArray('/shard-placement', TIMEOUT_MS);
 }

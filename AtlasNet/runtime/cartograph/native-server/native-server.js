@@ -100,97 +100,86 @@ function parseBooleanQueryFlag(value, defaultValue) {
   return defaultValue;
 }
 
-app.get('/networktelemetry', async (_req, res) => {
+async function respondJson(res, readData, errorMessage, includeAddonError = true) {
   try {
-    const hybridCollectors = ensureHybridCollectors();
-    const data = await collectNetworkTelemetry({
-      addon: hybridCollectors.addon,
-      networkTelemetry: hybridCollectors.networkTelemetry,
-    });
-    res.json(data);
+    res.json(await readData());
   } catch (err) {
-    if (addonLoadError) {
+    if (includeAddonError && addonLoadError) {
       console.error(addonLoadError);
     }
     console.error(err);
-    res.status(500).json({ error: 'Network telemetry fetch failed' });
+    res.status(500).json({ error: errorMessage });
   }
+}
+
+app.get('/networktelemetry', async (_req, res) => {
+  return respondJson(
+    res,
+    async () => {
+      const hybridCollectors = ensureHybridCollectors();
+      return collectNetworkTelemetry({
+        addon: hybridCollectors.addon,
+        networkTelemetry: hybridCollectors.networkTelemetry,
+      });
+    },
+    'Network telemetry fetch failed'
+  );
 });
 
 app.get('/authoritytelemetry', async (_req, res) => {
-  try {
-    const hybridCollectors = ensureHybridCollectors();
-    const data = await collectAuthorityTelemetry({
-      addon: hybridCollectors.addon,
-      entityLedgersView: hybridCollectors.entityLedgersView,
-    });
-    res.json(data);
-  } catch (err) {
-    if (addonLoadError) {
-      console.error(addonLoadError);
-    }
-    console.error(err);
-    res.status(500).json({ error: 'Authority telemetry fetch failed' });
-  }
+  return respondJson(
+    res,
+    async () => {
+      const hybridCollectors = ensureHybridCollectors();
+      return collectAuthorityTelemetry({
+        addon: hybridCollectors.addon,
+        entityLedgersView: hybridCollectors.entityLedgersView,
+      });
+    },
+    'Authority telemetry fetch failed'
+  );
 });
 
 app.get('/transfermanifest', async (_req, res) => {
-  try {
-    const data = await collectTransferManifest();
-    res.json(data);
-  } catch (err) {
-    if (addonLoadError) {
-      console.error(addonLoadError);
-    }
-    console.error(err);
-    res.status(500).json({ error: 'Transfer manifest fetch failed' });
-  }
+  return respondJson(res, collectTransferManifest, 'Transfer manifest fetch failed');
 });
 
 app.get('/transferstatequeue', async (_req, res) => {
-  try {
-    const hybridCollectors = ensureHybridCollectors();
-    const data = await collectTransferStateQueue({
-      addon: hybridCollectors.addon,
-      transferStateQueueView: hybridCollectors.transferStateQueueView,
-    });
-    res.json(data);
-  } catch (err) {
-    if (addonLoadError) {
-      console.error(addonLoadError);
-    }
-    console.error(err);
-    res.status(500).json({ error: 'Transfer state queue fetch failed' });
-  }
+  return respondJson(
+    res,
+    async () => {
+      const hybridCollectors = ensureHybridCollectors();
+      return collectTransferStateQueue({
+        addon: hybridCollectors.addon,
+        transferStateQueueView: hybridCollectors.transferStateQueueView,
+      });
+    },
+    'Transfer state queue fetch failed'
+  );
 });
 
 app.get('/heuristic', async (_req, res) => {
-  try {
-    const hybridCollectors = ensureHybridCollectors();
-    const data = await collectHeuristicShapes({
-      addon: hybridCollectors.addon,
-    });
-    res.json(data);
-  } catch (err) {
-    if (addonLoadError) {
-      console.error(addonLoadError);
-    }
-    console.error(err);
-    res.status(500).json({ error: 'Heuristic shape fetch failed' });
-  }
+  return respondJson(
+    res,
+    async () => {
+      const hybridCollectors = ensureHybridCollectors();
+      return collectHeuristicShapes({
+        addon: hybridCollectors.addon,
+      });
+    },
+    'Heuristic shape fetch failed'
+  );
 });
 
 app.get('/heuristictype', async (_req, res) => {
-  try {
-    const heuristicType = await readHeuristicTypeFromDatabase();
-    res.json({ heuristicType: heuristicType || null });
-  } catch (err) {
-    if (addonLoadError) {
-      console.error(addonLoadError);
-    }
-    console.error(err);
-    res.status(500).json({ error: 'Heuristic type fetch failed' });
-  }
+  return respondJson(
+    res,
+    async () => {
+      const heuristicType = await readHeuristicTypeFromDatabase();
+      return { heuristicType: heuristicType || null };
+    },
+    'Heuristic type fetch failed'
+  );
 });
 
 app.get('/databases', async (req, res) => {
@@ -202,7 +191,7 @@ app.get('/databases', async (req, res) => {
     const requestedSource =
       typeof req.query.source === 'string' ? req.query.source.trim() : '';
     const decodeSerialized = parseBooleanQueryFlag(
-      req.query.decodeSerialized ?? req.query.decodeEntitySnapshots,
+      req.query.decodeSerialized,
       true
     );
     const selectedSource = resolveSelectedSource(runningSources, requestedSource);
@@ -222,23 +211,16 @@ app.get('/databases', async (req, res) => {
 });
 
 app.get('/workers', async (_req, res) => {
-  try {
-    const snapshot = await readWorkersSnapshot();
-    res.json(snapshot);
-  } catch (err) {
-    console.error(err);
-    res.status(500).json({ error: 'Workers snapshot failed' });
-  }
+  return respondJson(res, readWorkersSnapshot, 'Workers snapshot failed', false);
 });
 
 app.get('/shard-placement', async (_req, res) => {
-  try {
-    const placement = await readShardPlacementFromDatabase();
-    res.json(placement);
-  } catch (err) {
-    console.error(err);
-    res.status(500).json({ error: 'Shard placement fetch failed' });
-  }
+  return respondJson(
+    res,
+    readShardPlacementFromDatabase,
+    'Shard placement fetch failed',
+    false
+  );
 });
 
 const PORT = Number(process.env.CARTOGRAPH_NATIVE_PORT || DEFAULT_PORT);

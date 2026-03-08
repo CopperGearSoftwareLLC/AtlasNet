@@ -36,63 +36,6 @@ const EMPTY_DATABASE_SUMMARY: DatabaseSummary = {
   errorText: null,
 };
 
-function parseHeuristicType(records: DatabaseSnapshotResponse['records']): string | null {
-  if (!Array.isArray(records)) {
-    return null;
-  }
-
-  const heuristicManifestRecord = records.find(
-    (record) => String(record.key ?? '').trim().toLowerCase() === 'heuristicmanifest'
-  );
-  if (heuristicManifestRecord) {
-    const payload = String(heuristicManifestRecord.payload ?? '').trim();
-    if (payload) {
-      try {
-        let parsed = JSON.parse(payload) as unknown;
-        if (Array.isArray(parsed)) {
-          parsed = parsed[0];
-        }
-        if (
-          parsed &&
-          typeof parsed === 'object' &&
-          typeof (parsed as Record<string, unknown>).HeuristicType === 'string'
-        ) {
-          const text = String(
-            (parsed as Record<string, unknown>).HeuristicType
-          ).trim();
-          if (text.length > 0) {
-            return text;
-          }
-        }
-      } catch {}
-    }
-  }
-
-  // Backward-compat fallback for legacy key.
-  const heuristicRecord = records.find(
-    (record) => String(record.key ?? '').trim().toLowerCase() === 'heuristic_type'
-  );
-  if (!heuristicRecord) {
-    return null;
-  }
-
-  const payload = String(heuristicRecord.payload ?? '').trim();
-  if (!payload) {
-    return null;
-  }
-
-  try {
-    const parsed = JSON.parse(payload) as unknown;
-    if (typeof parsed === 'string') {
-      const text = parsed.trim();
-      return text.length > 0 ? text : null;
-    }
-  } catch {}
-
-  const firstLine = payload.split(/\r?\n/)[0]?.trim();
-  return firstLine && firstLine.length > 0 ? firstLine : null;
-}
-
 function MetricCard({
   label,
   value,
@@ -199,7 +142,7 @@ export default function OverviewPage() {
         setDatabaseSummary({
           activeSources: sources.length,
           totalKeys: records.length,
-          heuristicType: heuristicType ?? parseHeuristicType(records),
+          heuristicType,
           lastUpdatedMs: Date.now(),
           errorText: null,
         });
