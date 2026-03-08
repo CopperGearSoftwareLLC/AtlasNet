@@ -1,7 +1,7 @@
 // /app/api/heuristicfetch/route.ts
 import { NextResponse } from 'next/server';
-import { normalizeHeuristicShapes } from '../../lib/server/heuristicShapeMapper';
-import { fetchNativeJson } from '../../lib/server/nativeClient';
+import { normalizeHeuristicShapes } from '../../map/heuristicShapeMapper';
+import { fetchNativeJson } from '../../shared/nativeClient';
 
 const TIMEOUT_MS = 700;
 

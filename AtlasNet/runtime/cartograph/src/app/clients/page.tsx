@@ -5,11 +5,11 @@ import type {
   AuthorityEntityTelemetry,
   DatabaseRecord,
   DatabaseSnapshotResponse,
-} from '../lib/cartographTypes';
-import { useAuthorityEntities } from '../lib/hooks/useTelemetryFeeds';
-import { DatabaseExplorerInspector } from '../database/components/DatabaseExplorerInspector';
-import { useEntityDatabaseDetails } from '../map/entityInspector/useEntityDatabaseDetails';
-import { HardcodedDecodeToggle } from '../database/RevertByteOptimation/HardcodedDecodeToggle';
+} from '../shared/cartographTypes';
+import { useAuthorityEntities } from '../shared/useTelemetryFeeds';
+import { DatabaseExplorerInspector } from '../database/DatabaseExplorerInspector';
+import { useEntityDatabaseDetails } from '../map/useEntityDatabaseDetails';
+import { HardcodedDecodeToggle } from '../database/HardcodedDecodeToggle';
 
 const DEFAULT_AUTHORITY_POLL_INTERVAL_MS = 250;
 const MIN_AUTHORITY_POLL_INTERVAL_MS = 50;

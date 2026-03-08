@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
-import { normalizeWorkersSnapshot } from '../../lib/server/workersSnapshot';
-import { fetchNativeJson } from '../../lib/server/nativeClient';
+import { normalizeWorkersSnapshot } from '../../workers/workersSnapshot';
+import { fetchNativeJson } from '../../shared/nativeClient';
 
 const TIMEOUT_MS = 12000;
 

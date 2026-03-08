@@ -5,9 +5,9 @@ import type {
   DatabaseRecord,
   DatabaseSnapshotResponse,
   DatabaseSource,
-} from '../lib/cartographTypes';
-import { HardcodedDecodeToggle } from './RevertByteOptimation/HardcodedDecodeToggle';
-import { DatabaseExplorerInspector } from './components/DatabaseExplorerInspector';
+} from '../shared/cartographTypes';
+import { HardcodedDecodeToggle } from './HardcodedDecodeToggle';
+import { DatabaseExplorerInspector } from './DatabaseExplorerInspector';
 
 const DEFAULT_POLL_INTERVAL_MS = 1000;
 const MIN_POLL_INTERVAL_MS = 250;

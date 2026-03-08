@@ -6,8 +6,8 @@ import type {
   WorkerContainerTelemetry,
   WorkerContextTelemetry,
   WorkerSwarmNodeTelemetry,
-} from '../lib/cartographTypes';
-import { useShardPlacement, useWorkersSnapshot } from '../lib/hooks/useTelemetryFeeds';
+} from '../shared/cartographTypes';
+import { useShardPlacement, useWorkersSnapshot } from '../shared/useTelemetryFeeds';
 
 const DEFAULT_POLL_INTERVAL_MS = 5000;
 const MIN_POLL_INTERVAL_MS = 1000;

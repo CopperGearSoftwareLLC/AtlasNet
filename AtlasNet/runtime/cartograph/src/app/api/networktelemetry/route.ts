@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
-import type { ShardTelemetry } from '../../lib/cartographTypes';
-import { fetchNativeJson } from '../../lib/server/nativeClient';
+import type { ShardTelemetry } from '../../shared/cartographTypes';
+import { fetchNativeJson } from '../../shared/nativeClient';
 
 const TIMEOUT_MS = 500;
 

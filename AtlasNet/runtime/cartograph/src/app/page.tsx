@@ -2,15 +2,15 @@
 
 import Link from 'next/link';
 import { useEffect, useMemo, useState } from 'react';
-import { ServerBoundsMinimapSection } from './components/ServerBoundsMinimapSection';
-import type { DatabaseSnapshotResponse } from './lib/cartographTypes';
+import { ServerBoundsMinimapSection } from './network/ServerBoundsMinimapSection';
+import type { DatabaseSnapshotResponse } from './shared/cartographTypes';
 import {
   useAuthorityEntities,
   useHeuristicShapes,
   useNetworkTelemetry,
   useWorkersSnapshot,
-} from './lib/hooks/useTelemetryFeeds';
-import { useServerBoundsMinimapData } from './lib/hooks/useServerBoundsMinimapData';
+} from './shared/useTelemetryFeeds';
+import { useServerBoundsMinimapData } from './network/useServerBoundsMinimapData';
 
 const TELEMETRY_POLL_INTERVAL_MS = 1000;
 const WORKERS_POLL_INTERVAL_MS = 5000;

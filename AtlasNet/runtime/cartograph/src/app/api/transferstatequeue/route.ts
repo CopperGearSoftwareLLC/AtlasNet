@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { fetchNativeJson } from '../../lib/server/nativeClient';
+import { fetchNativeJson } from '../../shared/nativeClient';
 
 const TIMEOUT_MS = 6000;
 

@@ -9,30 +9,30 @@ import type {
   ShardTelemetry,
   TransferManifestTelemetry,
   TransferStateQueueTelemetry,
-} from '../lib/cartographTypes';
-import { useMapDerivedData } from '../lib/hooks/useMapDerivedData';
-import { useShardHoverState } from '../lib/hooks/useShardHoverState';
+} from '../shared/cartographTypes';
+import { useMapDerivedData } from './useMapDerivedData';
+import { useShardHoverState } from './useShardHoverState';
 import {
   useAuthorityEntities,
   useHeuristicShapes,
   useNetworkTelemetry,
   useShardPlacement,
   useTransferStateQueue,
-} from '../lib/hooks/useTelemetryFeeds';
+} from '../shared/useTelemetryFeeds';
 import {
   createMapRenderer,
   type MapProjectionMode,
   type MapViewMode,
-} from '../lib/mapRenderer';
-import { EntityInspectorPanel } from './entityInspector/EntityInspectorPanel';
+} from './mapRenderer';
+import { EntityInspectorPanel } from './EntityInspectorPanel';
 import {
   useEntityDatabaseDetails,
   type EntityDatabaseDetailsState,
-} from './entityInspector/useEntityDatabaseDetails';
-import { useCtrlDragEntitySelection } from './entityInspector/useCtrlDragEntitySelection';
-import { MapHud } from './components/MapHud';
-import { MapPlaybackBar } from './components/MapPlaybackBar';
-import { ShardHoverTooltip } from './components/ShardHoverTooltip';
+} from './useEntityDatabaseDetails';
+import { useCtrlDragEntitySelection } from './useCtrlDragEntitySelection';
+import { MapHud } from './MapHud';
+import { MapPlaybackBar } from './MapPlaybackBar';
+import { ShardHoverTooltip } from './ShardHoverTooltip';
 import {
   buildLiveTransferManifest,
   ingestTransferQueueEvents,
@@ -40,7 +40,7 @@ import {
   selectSnapshotTransferEvents,
   snapToNearestTickMs,
   type ActiveTransferQueueEvent,
-} from './playback/transferPlaybackTimeline';
+} from './transferPlaybackTimeline';
 
 const DEFAULT_POLL_INTERVAL_MS = 50;
 const MIN_POLL_INTERVAL_MS = 1;

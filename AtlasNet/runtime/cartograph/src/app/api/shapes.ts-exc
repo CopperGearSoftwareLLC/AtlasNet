@@ -1,6 +1,6 @@
 // /pages/api/shapes.ts
 import type { NextApiRequest, NextApiResponse } from 'next';
-import type { ShapeJS } from '../../lib/cartographTypes';
+import type { ShapeJS } from '../../shared/cartographTypes';
 
 export default function handler(req: NextApiRequest, res: NextApiResponse<ShapeJS[]>) {
     const heuristic_addon = require('../../nextjs/native/Heuristic.node');

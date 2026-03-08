@@ -3,9 +3,9 @@ import type {
   DatabaseRecord,
   DatabaseSnapshotResponse,
   DatabaseSource,
-} from '../../lib/cartographTypes';
-import { normalizeDatabaseSnapshot } from '../../lib/server/databaseSnapshot';
-import { fetchNativeJson } from '../../lib/server/nativeClient';
+} from '../../shared/cartographTypes';
+import { normalizeDatabaseSnapshot } from '../../shared/databaseSnapshot';
+import { fetchNativeJson } from '../../shared/nativeClient';
 
 const TIMEOUT_MS = 1500;
 const MAX_MATCHED_RECORDS = 300;
