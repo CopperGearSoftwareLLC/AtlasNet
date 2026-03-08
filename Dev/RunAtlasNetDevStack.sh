@@ -30,6 +30,54 @@ if [ "$SWARM_STATE" != "active" ]; then
     fi
 fi
 
+wait_for_stack_services() {
+    local timeout="${ATLASNET_STACK_READY_TIMEOUT:-180}"
+    local elapsed=0
+
+    if ! [[ "$timeout" =~ ^[0-9]+$ ]] || [ "$timeout" -lt 1 ]; then
+        timeout=180
+    fi
+
+    echo "Waiting for stack services to reach desired replicas (timeout: ${timeout}s)..."
+    while [ "$elapsed" -lt "$timeout" ]; do
+        mapfile -t service_rows < <(docker stack services --format '{{.Name}}\t{{.Replicas}}' "$STACK_NAME" 2>/dev/null || true)
+        if [ "${#service_rows[@]}" -eq 0 ]; then
+            sleep 1
+            elapsed=$((elapsed + 1))
+            continue
+        fi
+
+        local all_ready=1
+        for row in "${service_rows[@]}"; do
+            local replicas="${row#*$'\t'}"
+            local current="${replicas%/*}"
+            local desired="${replicas#*/}"
+
+            if ! [[ "$current" =~ ^[0-9]+$ && "$desired" =~ ^[0-9]+$ ]]; then
+                all_ready=0
+                break
+            fi
+            if [ "$current" -lt "$desired" ]; then
+                all_ready=0
+                break
+            fi
+        done
+
+        if [ "$all_ready" -eq 1 ]; then
+            echo "All stack services reached desired replicas."
+            docker stack services "$STACK_NAME" || true
+            return 0
+        fi
+
+        sleep 1
+        elapsed=$((elapsed + 1))
+    done
+
+    echo "Timed out waiting for stack services to reach desired replicas."
+    docker stack services "$STACK_NAME" || true
+    return 1
+}
+
 # Check if stack file exists
 if [ ! -f "$STACK_FILE" ]; then
     echo "Error: $STACK_FILE not found."
@@ -103,5 +151,7 @@ fi
 
 # Clean up
 rm "$TEMP_STACK_FILE"
+
+wait_for_stack_services
 
 echo "Stack '$STACK_NAME' deployed successfully."
