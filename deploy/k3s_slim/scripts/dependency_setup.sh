@@ -88,4 +88,4 @@ done
 
 echo
 echo "Dependency setup finished on all nodes."
-echo "If you changed kernel cmdline (cgroup), reboot each node before running: make linux-pi"
+echo "If you changed kernel cmdline (cgroup), reboot each node before running: make k3s-deploy"

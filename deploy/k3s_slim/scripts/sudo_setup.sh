@@ -126,4 +126,4 @@ for entry in $WORKERS; do
   ensure_passwordless_sudo "$host" "$user" "worker ${host}"
 done
 
-echo "Sudo setup done. Run 'make linux-pi'."
+echo "Sudo setup done. Run 'make k3s-deploy'."

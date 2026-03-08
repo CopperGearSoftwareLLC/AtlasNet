@@ -71,4 +71,4 @@ for entry in $WORKERS; do
   ensure_key_access "$user" "$host" "worker ${host}"
 done
 
-echo "SSH setup done. Run 'make linux-pi'."
+echo "SSH setup done. Run 'make k3s-deploy'."

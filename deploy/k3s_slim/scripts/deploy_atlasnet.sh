@@ -115,7 +115,7 @@ wait_for_shard_ready() {
   echo "Warning: shard deployment did not report a ready replica within timeout."
 }
 
-[[ -f "$KUBECONFIG_PATH" ]] || die "Missing kubeconfig: $KUBECONFIG_PATH (run make linux-pi first)"
+[[ -f "$KUBECONFIG_PATH" ]] || die "Missing kubeconfig: $KUBECONFIG_PATH (run make k3s-deploy first)"
 [[ -f "$BASE_TEMPLATE" ]] || die "Missing base template: $BASE_TEMPLATE"
 
 if [[ -f "$ENV_FILE" ]]; then

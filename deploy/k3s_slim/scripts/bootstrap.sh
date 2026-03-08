@@ -96,8 +96,8 @@ done
 
 # At least one server required
 : "${SERVER_IPS:?At least one server required (set SERVER_IPS in .env)}"
-: "${SERVER_SSH_USER:?SERVER_SSH_USER is required (pass --server-user from Makefile/linux-pi)}"
-: "${SSH_KEY:?SSH_KEY is required (pass --ssh-key from Makefile/linux-pi)}"
+: "${SERVER_SSH_USER:?SERVER_SSH_USER is required (pass --server-user from Makefile/k3s-deploy)}"
+: "${SSH_KEY:?SSH_KEY is required (pass --ssh-key from Makefile/k3s-deploy)}"
 : "${WORKER_SSH_USER:=pi}"
 : "${WORKER_IPS:=}"
 : "${K3S_EXTRA_ARGS:=}"
@@ -184,7 +184,7 @@ ${listeners}
 
 This blocks k3s server startup.
 Common cause on dev machines: IDE/port-forward process bound to 127.0.0.1:6443.
-Close/stop that port forward and rerun 'make linux-pi'.
+Close/stop that port forward and rerun 'make k3s-deploy'.
 EOF2
   exit 1
 }

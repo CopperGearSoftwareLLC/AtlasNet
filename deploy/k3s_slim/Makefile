@@ -1,12 +1,12 @@
 SHELL := /usr/bin/env bash
 
 # run in this order:
-# in dev container - AtlasnetDockerBuild_Fast
+# in dev container - AtlasnetDockerBuild_Fast SandboxServerDockerBuild_Fast
 # atlasnet-push
 # atlasnet-merge-manifests
 # ssh-setup
 # sudo-setup
-# linux-pi
+# k3s-deploy
 # atlasnet-deploy
 
 
@@ -18,7 +18,7 @@ ENV_EXPORTS := SERVER_IPS SERVER_SSH_USER WORKER_IPS WORKER_SSH_USER SSH_KEY K3S
 -include $(ENV_FILE)
 export $(ENV_EXPORTS)
 
-.PHONY: bootstrap nodes linux-pi ssh-setup sudo-setup port-cleanup cleanup-cluster dependency-setup atlasnet-push atlasnet-deploy atlasnet-status atlasnet-merge-manifests
+.PHONY: bootstrap nodes k3s-deploy ssh-setup sudo-setup port-cleanup cleanup-cluster dependency-setup atlasnet-push atlasnet-deploy atlasnet-status atlasnet-merge-manifests
 
 bootstrap:
 	./scripts/bootstrap.sh
@@ -41,7 +41,7 @@ port-cleanup:
 cleanup-cluster:
 	./scripts/cleanup_cluster.sh
 
-linux-pi:
+k3s-deploy:
 	@servers="$${SERVER_IPS}"; \
 	primary="$${servers%% *}"; \
 	: "$${servers:?Set SERVER_IPS in .env}"; \

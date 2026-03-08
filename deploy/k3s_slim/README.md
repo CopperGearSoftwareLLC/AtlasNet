@@ -31,10 +31,10 @@ Edit `.env`:
 ```bash
 make ssh-setup
 make sudo-setup
-make linux-pi
+make k3s-deploy
 ```
 
-`make linux-pi` automatically runs a port cleanup step first (`scripts/port_cleanup.sh`).
+`make k3s-deploy` automatically runs a port cleanup step first (`scripts/port_cleanup.sh`).
 By default it frees `7946` on server/worker (common Docker Swarm vs MetalLB conflict).
 You can override with `SERVER_PORT_CLEANUP_PORTS` / `WORKER_PORT_CLEANUP_PORTS` in `.env`.
 Port cleanup will stop a systemd service if it owns the port, otherwise it terminates the process.
@@ -45,7 +45,7 @@ kubectl get nodes -o wide
 kubectl get pods -A -o wide
 ```
 
-`kubectl` should work directly because `make linux-pi` writes `~/.kube/config`.
+`kubectl` should work directly because `make k3s-deploy` writes `~/.kube/config`.
 
 ## 4) Deploy AtlasNet workloads (Docker Hub images)
 
@@ -95,7 +95,7 @@ Use a single multi-arch image tag (e.g. `ATLASNET_IMAGE_TAG=latest` with a manif
 - `make sudo-setup`: enable passwordless sudo for SSH users on server(s) + worker(s).
 - `make dependency-setup`: install iptables and set cgroup flags on all nodes (run once; reboot nodes if cmdline changed).
 - `make port-cleanup`: free configured required ports on server(s) + worker(s).
-- `make linux-pi`: install k3s on first server, join additional servers (HA) and workers.
+- `make k3s-deploy`: install k3s on first server, join additional servers (HA) and workers.
 - `make nodes`: quick `kubectl get nodes -o wide` using project kubeconfig.
 - `make atlasnet-push`: tag and push existing local AtlasNet images to Docker Hub.
 - `make atlasnet-merge-manifests`: create multi-arch manifest tag from per-arch tags (see .env `ATLASNET_IMAGE_TAG_*`).
@@ -109,4 +109,4 @@ Use a single multi-arch image tag (e.g. `ATLASNET_IMAGE_TAG=latest` with a manif
 - `sudo: Authentication failed`:
   run `make sudo-setup`, or use root SSH users and set `K3SUP_USE_SUDO=false`.
 - `kubectl` tries `localhost:8080`:
-  your kubeconfig is not active; rerun `make linux-pi` or check `~/.kube/config`.
+  your kubeconfig is not active; rerun `make k3s-deploy` or check `~/.kube/config`.
