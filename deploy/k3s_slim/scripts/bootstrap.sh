@@ -190,24 +190,45 @@ EOF2
 }
 
 install_k3sup_if_missing() {
-  if command -v k3sup >/dev/null 2>&1; then
+  local k3sup_bin="/usr/local/bin/k3sup"
+
+  if [[ -x "$k3sup_bin" ]]; then
+    export PATH="/usr/local/bin:$PATH"
     return 0
   fi
 
-  echo "k3sup not found; installing to ~/.local/bin (requires curl)..."
+  echo "k3sup not found at $k3sup_bin; downloading installer payload (requires curl)..."
   need_cmd curl
-  mkdir -p "$HOME/.local/bin"
-  export PATH="$HOME/.local/bin:$PATH"
 
-  # Official installer script from the k3sup project (convenient for learning/homelab).
-  # If you prefer, install a pinned binary manually and remove this.
+  # Use the official installer flow:
+  #   curl -sLS https://get.k3sup.dev | sh
+  #   sudo install k3sup /usr/local/bin/
   if [[ -n "$K3SUP_VERSION" ]]; then
-    curl -sLS https://get.k3sup.dev | sh -s -- -b "$HOME/.local/bin" "$K3SUP_VERSION"
+    curl -sLS https://get.k3sup.dev | sh -s -- "$K3SUP_VERSION"
   else
-    curl -sLS https://get.k3sup.dev | sh -s -- -b "$HOME/.local/bin"
+    curl -sLS https://get.k3sup.dev | sh
   fi
 
-  command -v k3sup >/dev/null 2>&1 || die "k3sup install failed"
+  local k3sup_src=""
+  if [[ -f "$PWD/k3sup" ]]; then
+    k3sup_src="$PWD/k3sup"
+  elif [[ -f "$ROOT_DIR/k3sup" ]]; then
+    k3sup_src="$ROOT_DIR/k3sup"
+  fi
+
+  [[ -n "$k3sup_src" ]] || die "k3sup download completed but binary was not found (expected ./k3sup)."
+  chmod +x "$k3sup_src"
+
+  if install -m 0755 "$k3sup_src" "$k3sup_bin" 2>/dev/null; then
+    :
+  elif command -v sudo >/dev/null 2>&1; then
+    sudo install -m 0755 "$k3sup_src" "$k3sup_bin"
+  else
+    die "Cannot write /usr/local/bin and sudo is unavailable. Install k3sup manually: sudo install $k3sup_src $k3sup_bin"
+  fi
+
+  export PATH="/usr/local/bin:$PATH"
+  [[ -x "$k3sup_bin" ]] || die "k3sup install failed"
 }
 
 K3SUP_RETRIES="${K3SUP_RETRIES:-3}"
