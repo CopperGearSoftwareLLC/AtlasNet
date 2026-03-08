@@ -1,6 +1,6 @@
 'use client';
 
-import { formatRate } from './mapData';
+import { formatRate } from '../mapData';
 
 interface HoverAnchor {
   x: number;

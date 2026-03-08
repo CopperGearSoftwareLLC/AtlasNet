@@ -11,7 +11,7 @@ import type {
   TransferStateQueueTelemetry,
 } from '../shared/cartographTypes';
 import { useMapDerivedData } from './useMapDerivedData';
-import { useShardHoverState } from './useShardHoverState';
+import { useShardHoverState } from './mouse-hover/useShardHoverState';
 import {
   useAuthorityEntities,
   useHeuristicShapes,
@@ -24,15 +24,15 @@ import {
   type MapProjectionMode,
   type MapViewMode,
 } from './mapRenderer';
-import { EntityInspectorPanel } from './EntityInspectorPanel';
+import { EntityInspectorPanel } from './entity-inspector/EntityInspectorPanel';
 import {
   useEntityInspectorLookup,
   type EntityInspectorLookupState,
-} from './useEntityInspectorLookup';
+} from './entity-inspector/useEntityInspectorLookup';
 import { useCtrlDragEntitySelection } from './useCtrlDragEntitySelection';
 import { MapHud } from './MapHud';
-import { MapPlaybackBar } from './MapPlaybackBar';
-import { ShardHoverTooltip } from './ShardHoverTooltip';
+import { MapPlaybackBar } from './playback/MapPlaybackBar';
+import { ShardHoverTooltip } from './mouse-hover/ShardHoverTooltip';
 import {
   buildLiveTransferManifest,
   ingestTransferQueueEvents,
@@ -40,7 +40,7 @@ import {
   selectSnapshotTransferEvents,
   snapToNearestTickMs,
   type ActiveTransferQueueEvent,
-} from './transferPlaybackTimeline';
+} from './playback/transferPlaybackTimeline';
 
 const DEFAULT_POLL_INTERVAL_MS = 50;
 const MIN_POLL_INTERVAL_MS = 1;

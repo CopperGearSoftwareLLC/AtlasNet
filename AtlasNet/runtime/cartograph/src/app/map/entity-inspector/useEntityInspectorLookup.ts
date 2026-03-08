@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import type { AuthorityEntityTelemetry } from '../shared/cartographTypes';
+import type { AuthorityEntityTelemetry } from '../../shared/cartographTypes';
 import type { EntityInspectorLookupResponse } from './entityInspectorContracts';
 
 export interface EntityInspectorLookupState {

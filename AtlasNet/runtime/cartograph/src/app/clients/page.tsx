@@ -8,7 +8,7 @@ import type {
 } from '../shared/cartographTypes';
 import { useAuthorityEntities } from '../shared/useTelemetryPolling';
 import { DatabaseExplorerInspector } from '../database/DatabaseExplorerInspector';
-import { useEntityInspectorLookup } from '../map/useEntityInspectorLookup';
+import { useEntityInspectorLookup } from '../map/entity-inspector/useEntityInspectorLookup';
 import { SerializedDecodeToggle } from '../database/SerializedDecodeToggle';
 
 const DEFAULT_AUTHORITY_POLL_INTERVAL_MS = 250;

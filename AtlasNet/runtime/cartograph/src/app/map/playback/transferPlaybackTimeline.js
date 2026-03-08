@@ -1,6 +1,6 @@
 /**
- * @typedef {import('../shared/cartographTypes').TransferManifestTelemetry} TransferManifestTelemetry
- * @typedef {import('../shared/cartographTypes').TransferStateQueueTelemetry} TransferStateQueueTelemetry
+ * @typedef {import('../../shared/cartographTypes').TransferManifestTelemetry} TransferManifestTelemetry
+ * @typedef {import('../../shared/cartographTypes').TransferStateQueueTelemetry} TransferStateQueueTelemetry
  */
 
 /**

@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import type { MouseEvent, WheelEvent } from 'react';
-import type { ShardTelemetry } from '../shared/cartographTypes';
+import type { ShardTelemetry } from '../../shared/cartographTypes';
 import {
   buildCircularNodes,
   buildNetworkGraph,

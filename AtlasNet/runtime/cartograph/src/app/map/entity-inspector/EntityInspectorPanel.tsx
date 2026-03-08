@@ -2,8 +2,8 @@
 
 import { useEffect, useRef, useState } from 'react';
 import type { MouseEvent as ReactMouseEvent } from 'react';
-import type { AuthorityEntityTelemetry } from '../shared/cartographTypes';
-import { DatabaseExplorerInspector } from '../database/DatabaseExplorerInspector';
+import type { AuthorityEntityTelemetry } from '../../shared/cartographTypes';
+import { DatabaseExplorerInspector } from '../../database/DatabaseExplorerInspector';
 import type { EntityInspectorLookupState } from './useEntityInspectorLookup';
 
 const ENTITY_INSPECTOR_DESKTOP_GRID_COLUMNS_CLASS =

@@ -1,7 +1,7 @@
 import type {
   TransferManifestTelemetry,
   TransferStateQueueTelemetry,
-} from '../shared/cartographTypes';
+} from '../../shared/cartographTypes';
 
 export interface ActiveTransferQueueEvent {
   event: TransferStateQueueTelemetry;

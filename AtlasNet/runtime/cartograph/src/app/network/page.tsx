@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useMemo } from 'react';
 import { ServerBoundsMinimapSection } from './ServerBoundsMinimapSection';
-import { CircularNodeGraphPanel } from './CircularNodeGraphPanel';
+import { CircularNodeGraphPanel } from './circular-node-graph/CircularNodeGraphPanel';
 import { ShardTelemetryRow } from './ShardTelemetryRow';
 import { TelemetryPanel } from './TelemetryPanel';
 import {

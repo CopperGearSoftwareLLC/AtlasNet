@@ -1,4 +1,4 @@
-import type { DatabaseRecord } from '../shared/cartographTypes';
+import type { DatabaseRecord } from '../../shared/cartographTypes';
 
 export interface EntityInspectorMatchedRecord extends DatabaseRecord {
   matchedIn: 'key' | 'payload' | 'both';

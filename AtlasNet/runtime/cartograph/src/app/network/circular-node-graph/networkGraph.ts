@@ -1,4 +1,4 @@
-import type { ShardTelemetry } from '../shared/cartographTypes';
+import type { ShardTelemetry } from '../../shared/cartographTypes';
 
 export interface GraphNode {
   id: string;
