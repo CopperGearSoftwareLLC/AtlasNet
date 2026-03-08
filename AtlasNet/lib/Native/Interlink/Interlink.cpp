@@ -7,6 +7,7 @@
 #include <boost/describe/enum_to_string.hpp>
 #include <chrono>
 #include <cstdlib>
+#include <exception>
 #include <stop_token>
 #include <string_view>
 #include <thread>
@@ -68,6 +69,102 @@ std::optional<std::string> GetNonEmptyEnv(const char* key)
 		return std::nullopt;
 	}
 	return std::string(value);
+}
+
+std::string GetJsonString(const nlohmann::json& object, const char* key)
+{
+	if (!object.is_object())
+	{
+		return {};
+	}
+	const auto it = object.find(key);
+	if (it == object.end() || !it->is_string())
+	{
+		return {};
+	}
+	return it->get<std::string>();
+}
+
+std::string StripLeadingSlashes(std::string value)
+{
+	while (!value.empty() && value.front() == '/')
+	{
+		value.erase(value.begin());
+	}
+	return value;
+}
+
+struct SwarmPlacementInfo
+{
+	std::string nodeName;
+	std::string taskName;
+};
+
+std::optional<SwarmPlacementInfo> ResolveSwarmPlacementInfoFromDocker()
+{
+	const auto self = DockerIO::Get().InspectSelf();
+	if (!self.is_object())
+	{
+		return std::nullopt;
+	}
+
+	SwarmPlacementInfo out;
+	if (const auto configIt = self.find("Config");
+		configIt != self.end() && configIt->is_object())
+	{
+		const auto& config = *configIt;
+		if (const auto labelsIt = config.find("Labels");
+			labelsIt != config.end() && labelsIt->is_object())
+		{
+			const auto& labels = *labelsIt;
+			out.taskName = GetJsonString(labels, "com.docker.swarm.task.name");
+			const std::string nodeId = GetJsonString(labels, "com.docker.swarm.node.id");
+			if (!nodeId.empty())
+			{
+				const std::string nodeResponse = DockerIO::Get().request("GET", "/nodes/" + nodeId);
+				const auto node = nlohmann::json::parse(nodeResponse, nullptr, false);
+				if (node.is_object())
+				{
+					if (const auto descIt = node.find("Description");
+						descIt != node.end() && descIt->is_object())
+					{
+						out.nodeName = GetJsonString(*descIt, "Hostname");
+					}
+					if (out.nodeName.empty())
+					{
+						if (const auto specIt = node.find("Spec");
+							specIt != node.end() && specIt->is_object())
+						{
+							out.nodeName = GetJsonString(*specIt, "Name");
+						}
+					}
+				}
+				if (out.nodeName.empty())
+				{
+					out.nodeName = nodeId;
+				}
+			}
+		}
+	}
+
+	if (out.taskName.empty())
+	{
+		out.taskName = StripLeadingSlashes(GetJsonString(self, "Name"));
+	}
+	if (out.nodeName.empty())
+	{
+		if (const auto nodeIt = self.find("Node");
+			nodeIt != self.end() && nodeIt->is_object())
+		{
+			out.nodeName = GetJsonString(*nodeIt, "Name");
+		}
+	}
+
+	if (out.nodeName.empty() && out.taskName.empty())
+	{
+		return std::nullopt;
+	}
+	return out;
 }
 
 std::string ResolveInterlinkAdvertiseIp()
@@ -640,6 +737,33 @@ void Interlink::Init()
 		else
 		{
 			entry.podIP = advertiseIp;
+		}
+		if (entry.nodeName.empty() || entry.podName.empty())
+		{
+			try
+			{
+				if (const auto swarmPlacement = ResolveSwarmPlacementInfoFromDocker();
+					swarmPlacement.has_value())
+				{
+					if (entry.nodeName.empty() && !swarmPlacement->nodeName.empty())
+					{
+						entry.nodeName = swarmPlacement->nodeName;
+					}
+					if (entry.podName.empty() && !swarmPlacement->taskName.empty())
+					{
+						entry.podName = swarmPlacement->taskName;
+					}
+				}
+			}
+			catch (const std::exception& ex)
+			{
+				logger.DebugFormatted("[Interlink] Failed to resolve swarm placement metadata: {}",
+									  ex.what());
+			}
+			catch (...)
+			{
+				logger.Debug("[Interlink] Failed to resolve swarm placement metadata.");
+			}
 		}
 
 		NodeManifest::Get().RegisterShardNode(NetworkCredentials::Get().GetID(), entry);

@@ -2,12 +2,14 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import type {
-  ShardPlacementTelemetry,
   WorkerContainerTelemetry,
   WorkerContextTelemetry,
   WorkerSwarmNodeTelemetry,
 } from '../shared/cartographTypes';
 import { useShardPlacement, useWorkersSnapshot } from '../shared/useTelemetryPolling';
+import { parseAggregateLogsBySource, resolveContainerLogs } from './logParsing';
+import { buildShardIdLookup, resolveContainerShardId } from './shardLookup';
+import { useAutoFollowLogViewport } from './useAutoFollowLogViewport';
 
 const DEFAULT_POLL_INTERVAL_MS = 5000;
 const MIN_POLL_INTERVAL_MS = 1000;
@@ -128,117 +130,6 @@ function containerSelectionKey(container: WorkerContainerTelemetry, index: numbe
     return `name:${name}:${index}`;
   }
   return `idx:${index}`;
-}
-
-function extractPodName(container: WorkerContainerTelemetry): string | null {
-  const fullName = String(container.name || '').trim();
-  if (!fullName) {
-    return null;
-  }
-  const slashIndex = fullName.indexOf('/');
-  if (slashIndex <= 0) {
-    return null;
-  }
-  const podName = fullName.slice(0, slashIndex).trim();
-  return podName || null;
-}
-
-function buildShardIdByPodName(placement: ShardPlacementTelemetry[]): Map<string, string> {
-  const out = new Map<string, string>();
-  for (const row of placement) {
-    const podName = String(row.podName || '').trim();
-    const shardId = String(row.shardId || '').trim();
-    if (!podName || !shardId || out.has(podName)) {
-      continue;
-    }
-    out.set(podName, shardId);
-  }
-  return out;
-}
-
-function parseAggregateLogsBySource(aggregateLogs: string): Map<string, string> {
-  const out = new Map<string, string>();
-  const lines = String(aggregateLogs || '').split(/\r?\n/);
-
-  let currentSource: string | null = null;
-  let buffer: string[] = [];
-
-  function flushCurrentSource() {
-    if (!currentSource) {
-      return;
-    }
-    const text = buffer.join('\n').trimEnd();
-    out.set(currentSource, text);
-  }
-
-  for (const line of lines) {
-    const sourceMatch = line.match(/^\[([^\]]+)\]\s*$/);
-    if (sourceMatch) {
-      flushCurrentSource();
-      currentSource = sourceMatch[1].trim();
-      buffer = [];
-      continue;
-    }
-
-    if (currentSource) {
-      buffer.push(line);
-    }
-  }
-
-  flushCurrentSource();
-  return out;
-}
-
-function collectContainerLogCandidates(container: WorkerContainerTelemetry): string[] {
-  const values = new Set<string>();
-
-  function addCandidate(value: string | null | undefined) {
-    const text = String(value || '').trim();
-    if (text) {
-      values.add(text);
-    }
-  }
-
-  addCandidate(container.name);
-  addCandidate(container.id);
-
-  const id = String(container.id || '').trim();
-  const idWithoutPrefix = id.includes('://') ? id.split('://').pop() : null;
-  addCandidate(idWithoutPrefix);
-
-  const name = String(container.name || '').trim();
-  if (name.includes('/')) {
-    addCandidate(name.split('/').pop());
-  }
-
-  return Array.from(values.values());
-}
-
-function resolveContainerLogs(
-  container: WorkerContainerTelemetry,
-  aggregateLogsBySource: Map<string, string>
-): string {
-  const directLogs = String(container.logs || '').trim();
-  if (directLogs.length > 0) {
-    return directLogs;
-  }
-
-  const candidates = collectContainerLogCandidates(container);
-  for (const candidate of candidates) {
-    if (aggregateLogsBySource.has(candidate)) {
-      return aggregateLogsBySource.get(candidate) || '';
-    }
-  }
-
-  for (const [source, text] of aggregateLogsBySource.entries()) {
-    for (const candidate of candidates) {
-      if (source.endsWith(`/${candidate}`)) {
-        return text;
-      }
-    }
-  }
-
-  return '';
 }
 
 function nodeStatusPillClasses(node: WorkerSwarmNodeTelemetry): string {
@@ -523,8 +414,8 @@ export default function WorkersPage() {
   }, [snapshot.contexts]);
 
   const workerNodes = useMemo(() => buildNodeViews(contexts), [contexts]);
-  const shardIdByPodName = useMemo(
-    () => buildShardIdByPodName(shardPlacement),
+  const shardIdLookup = useMemo(
+    () => buildShardIdLookup(shardPlacement),
     [shardPlacement]
   );
 
@@ -638,6 +529,11 @@ export default function WorkersPage() {
   const emptyLogsText = selectedContainer
     ? 'No logs collected for this container yet.'
     : 'No logs collected for this worker yet.';
+  const logsResetToken = `${selectedWorker?.key ?? ''}:${selectedContainerKey ?? ''}`;
+  const { logsViewportRef, onLogsScroll } = useAutoFollowLogViewport(
+    visibleLogs,
+    logsResetToken
+  );
 
   function onSelectContainer(containerKey: string): void {
     if (!selectedWorker) {
@@ -659,11 +555,7 @@ export default function WorkersPage() {
   }
 
   function resolveShardId(container: WorkerContainerTelemetry): string | null {
-    const podName = extractPodName(container);
-    if (!podName) {
-      return null;
-    }
-    return shardIdByPodName.get(podName) || null;
+    return resolveContainerShardId(container, shardIdLookup);
   }
 
   return (
@@ -810,7 +702,11 @@ export default function WorkersPage() {
                 {logsTitle}
               </div>
               {visibleLogs ? (
-                <pre className="max-h-[420px] overflow-auto whitespace-pre-wrap break-words px-4 py-3 font-mono text-sm leading-6 text-slate-200">
+                <pre
+                  ref={logsViewportRef}
+                  onScroll={onLogsScroll}
+                  className="max-h-[420px] overflow-auto whitespace-pre-wrap break-words px-4 py-3 font-mono text-sm leading-6 text-slate-200"
+                >
                   {visibleLogs}
                 </pre>
               ) : (

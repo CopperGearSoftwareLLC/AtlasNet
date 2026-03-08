@@ -55,6 +55,10 @@ services:
   ${CARTOGRAPH_SERVICE_NAME}:
     image: ${CARTOGRAPH_IMAGE_NAME}
     networks: [${ATLASNET_NETWORK_NAME}]
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+    environment:
+      - CARTOGRAPH_DOCKER_SOCKET_PATH=/var/run/docker.sock
     ports:
       - "3000:3000"   # Next.js default
       - "9229:9229"   # Node inspector

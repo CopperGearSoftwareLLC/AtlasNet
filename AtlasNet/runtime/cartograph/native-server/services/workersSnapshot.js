@@ -9,12 +9,14 @@ const K8S_COMMAND_TIMEOUT_MS = 3500;
 const MAX_CONTEXTS = 64;
 const MAX_CONTAINERS_PER_CONTEXT = 300;
 const DEFAULT_DOCKER_SOCKET_PATH = '/var/run/docker.sock';
-const MAX_LOG_CHARS_PER_NODE = 24 * 1024;
+const MAX_LOG_CHARS_PER_NODE = 512 * 1024;
 const MAX_LOG_SOURCES_PER_NODE = 10;
+const LOG_TAIL_LINES_PER_CONTAINER = 300;
 const NODE_LOG_CACHE_TTL_MS = 4000;
 
 const k8sNodeLogCache = new Map();
 const dockerNodeLogCache = new Map();
+const dockerApiNodeLogCache = new Map();
 
 function asObject(value) {
   return value && typeof value === 'object' ? value : null;
@@ -88,6 +90,58 @@ function truncateText(value, maxChars = MAX_LOG_CHARS_PER_NODE) {
     return text;
   }
   return `${text.slice(0, maxChars)}\n...[truncated ${text.length - maxChars} chars]`;
+}
+
+function parseLogTimestampMs(line) {
+  const text = asString(line);
+  if (!text) {
+    return null;
+  }
+  const firstSpace = text.indexOf(' ');
+  const token = firstSpace >= 0 ? text.slice(0, firstSpace) : text;
+  const ts = Date.parse(token);
+  return Number.isFinite(ts) ? ts : null;
+}
+
+function buildChronologicalAggregateLog(sourceLogs) {
+  const entries = [];
+  let order = 0;
+  for (const sourceLog of Array.isArray(sourceLogs) ? sourceLogs : []) {
+    const source = asString(sourceLog?.source);
+    const body = asString(sourceLog?.body);
+    if (!source || !body) {
+      continue;
+    }
+    const lines = body
+      .split(/\r?\n/)
+      .map((line) => String(line ?? ''))
+      .filter((line) => line.trim().length > 0);
+    for (const line of lines) {
+      entries.push({
+        source,
+        line,
+        timestampMs: parseLogTimestampMs(line),
+        order,
+      });
+      order += 1;
+    }
+  }
+
+  entries.sort((left, right) => {
+    const leftHasTs = Number.isFinite(left.timestampMs);
+    const rightHasTs = Number.isFinite(right.timestampMs);
+    if (leftHasTs && rightHasTs && left.timestampMs !== right.timestampMs) {
+      return left.timestampMs - right.timestampMs;
+    }
+    if (leftHasTs !== rightHasTs) {
+      return leftHasTs ? -1 : 1;
+    }
+    return left.order - right.order;
+  });
+
+  return truncateText(
+    entries.map((entry) => `[${entry.source}] ${entry.line}`).join('\n')
+  );
 }
 
 function parseJsonLines(stdout) {
@@ -436,44 +490,50 @@ async function collectK8sNodeAggregateLogs(api, podContainersByNode) {
     const cacheKey = `${api.namespace}:${nodeName}`;
     const cached = k8sNodeLogCache.get(cacheKey);
     if (cached && nowMs - cached.atMs < NODE_LOG_CACHE_TTL_MS) {
-      out.set(nodeName, cached.text);
+      out.set(nodeName, cached);
       continue;
     }
 
     const selectedSources = podContainers.slice(0, MAX_LOG_SOURCES_PER_NODE);
-    const chunks = await Promise.all(
+    const fetched = await Promise.all(
       selectedSources.map(async (source) => {
         const podName = asString(source?.podName);
         const containerName = asString(source?.containerName);
         if (!podName || !containerName) {
-          return '';
+          return null;
         }
 
         const path =
           `/api/v1/namespaces/${encodeURIComponent(api.namespace)}/pods/` +
           `${encodeURIComponent(podName)}/log?container=${encodeURIComponent(containerName)}` +
-          '&tailLines=40&timestamps=true';
+          `&tailLines=${LOG_TAIL_LINES_PER_CONTAINER}&timestamps=true`;
 
         const result = await kubernetesApiRequest(api, path, 1200);
         if (!result.ok) {
-          return '';
+          return null;
         }
 
         const body = asString(result.body);
         if (!body) {
-          return '';
+          return null;
         }
 
-        return `[${podName}/${containerName}]\n${body}`;
+        return {
+          source: `${podName}/${containerName}`,
+          body,
+        };
       })
     );
 
-    const text = truncateText(chunks.filter((chunk) => chunk.length > 0).join('\n\n'));
-    k8sNodeLogCache.set(cacheKey, {
+    const sourceLogs = fetched.filter((entry) => entry && entry.source && entry.body);
+    const logsBySource = new Map(sourceLogs.map((entry) => [entry.source, entry.body]));
+    const snapshot = {
       atMs: nowMs,
-      text,
-    });
-    out.set(nodeName, text);
+      text: buildChronologicalAggregateLog(sourceLogs),
+      logsBySource,
+    };
+    k8sNodeLogCache.set(cacheKey, snapshot);
+    out.set(nodeName, snapshot);
   }
 
   return out;
@@ -710,10 +770,19 @@ async function readWorkersSnapshotViaKubernetes() {
 
   const nodes = nodeRows.map((node) => {
     const nodeId = asString(node.hostname || node.id);
-    const nodeContainers = (containersByNode.get(nodeId) ?? []).slice(
-      0,
-      MAX_CONTAINERS_PER_CONTEXT
-    );
+    const nodeLogSnapshot = logsByNode.get(nodeId);
+    const nodeContainers = (containersByNode.get(nodeId) ?? [])
+      .slice(0, MAX_CONTAINERS_PER_CONTEXT)
+      .map((container) => {
+        const containerLog = nodeLogSnapshot?.logsBySource?.get(asString(container?.name));
+        if (!containerLog) {
+          return container;
+        }
+        return {
+          ...container,
+          logs: containerLog,
+        };
+      });
     const metric = metricsByNode.get(nodeId);
 
     const cpuCapacityCores = asOptionalFiniteNumber(node.cpuCapacityCores);
@@ -728,12 +797,13 @@ async function readWorkersSnapshotViaKubernetes() {
       cpuUsagePct: safePercent(cpuUsageCores, cpuCapacityCores),
       memoryUsagePct: safePercent(memoryUsageBytes, memoryCapacityBytes),
       containers: nodeContainers,
-      aggregateLogs: logsByNode.get(nodeId) ?? '',
+      aggregateLogs: nodeLogSnapshot?.text ?? '',
     };
   });
 
   if (nodes.length === 0) {
     for (const [nodeId, nodeContainers] of containersByNode.entries()) {
+      const nodeLogSnapshot = logsByNode.get(nodeId);
       nodes.push({
         id: nodeId,
         hostname: nodeId,
@@ -749,8 +819,17 @@ async function readWorkersSnapshotViaKubernetes() {
         memoryUsageBytes: null,
         cpuUsagePct: null,
         memoryUsagePct: null,
-        containers: nodeContainers.slice(0, MAX_CONTAINERS_PER_CONTEXT),
-        aggregateLogs: logsByNode.get(nodeId) ?? '',
+        containers: nodeContainers.slice(0, MAX_CONTAINERS_PER_CONTEXT).map((container) => {
+          const containerLog = nodeLogSnapshot?.logsBySource?.get(asString(container?.name));
+          if (!containerLog) {
+            return container;
+          }
+          return {
+            ...container,
+            logs: containerLog,
+          };
+        }),
+        aggregateLogs: nodeLogSnapshot?.text ?? '',
       });
     }
   }
@@ -873,6 +952,155 @@ function dockerApiRequest(socketPath, path, timeoutMs = DOCKER_COMMAND_TIMEOUT_M
 
     req.end();
   });
+}
+
+function dockerApiRequestRaw(socketPath, path, timeoutMs = DOCKER_COMMAND_TIMEOUT_MS) {
+  return new Promise((resolve) => {
+    const chunks = [];
+    let settled = false;
+
+    const done = (result) => {
+      if (settled) {
+        return;
+      }
+      settled = true;
+      resolve(result);
+    };
+
+    const req = http.request(
+      {
+        method: 'GET',
+        socketPath,
+        path,
+      },
+      (res) => {
+        res.on('data', (chunk) => {
+          chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(String(chunk)));
+        });
+        res.on('end', () => {
+          const statusCode = Number(res.statusCode ?? 0);
+          const bodyBuffer = Buffer.concat(chunks);
+          done({
+            ok: statusCode >= 200 && statusCode < 300,
+            statusCode,
+            body: bodyBuffer.toString('utf8'),
+            bodyBuffer,
+            error: null,
+          });
+        });
+      }
+    );
+
+    req.on('error', (err) => {
+      done({
+        ok: false,
+        statusCode: 0,
+        body: Buffer.concat(chunks).toString('utf8'),
+        bodyBuffer: Buffer.concat(chunks),
+        error: err instanceof Error ? err.message : String(err),
+      });
+    });
+
+    req.setTimeout(timeoutMs, () => {
+      req.destroy(new Error(`timed out after ${timeoutMs}ms`));
+    });
+
+    req.end();
+  });
+}
+
+function decodeDockerLogStreamBody(bodyBuffer) {
+  if (!Buffer.isBuffer(bodyBuffer) || bodyBuffer.length === 0) {
+    return '';
+  }
+
+  const chunks = [];
+  let offset = 0;
+  let framed = true;
+  while (offset + 8 <= bodyBuffer.length) {
+    const streamType = bodyBuffer[offset];
+    const paddingOk =
+      bodyBuffer[offset + 1] === 0 &&
+      bodyBuffer[offset + 2] === 0 &&
+      bodyBuffer[offset + 3] === 0;
+    const payloadSize = bodyBuffer.readUInt32BE(offset + 4);
+    const frameStart = offset + 8;
+    const frameEnd = frameStart + payloadSize;
+    if (
+      (streamType !== 1 && streamType !== 2) ||
+      !paddingOk ||
+      payloadSize < 0 ||
+      frameEnd > bodyBuffer.length
+    ) {
+      framed = false;
+      break;
+    }
+
+    if (payloadSize > 0) {
+      chunks.push(bodyBuffer.subarray(frameStart, frameEnd));
+    }
+    offset = frameEnd;
+  }
+
+  if (framed && offset === bodyBuffer.length && chunks.length > 0) {
+    return Buffer.concat(chunks).toString('utf8');
+  }
+
+  return bodyBuffer.toString('utf8');
+}
+
+async function collectDockerApiAggregateLogs(socketPath, nodeKey, containers) {
+  const cacheKey = `${socketPath}:${nodeKey}`;
+  const nowMs = Date.now();
+  const cached = dockerApiNodeLogCache.get(cacheKey);
+  if (cached && nowMs - cached.atMs < NODE_LOG_CACHE_TTL_MS) {
+    return cached;
+  }
+
+  const selectedContainers = (Array.isArray(containers) ? containers : []).slice(
+    0,
+    MAX_LOG_SOURCES_PER_NODE
+  );
+
+  const logsByContainerRef = new Map();
+  const sourceLogsRaw = await Promise.all(
+    selectedContainers.map(async (container) => {
+      const containerRef = asString(container?.id || container?.name);
+      const containerName = asString(container?.name, containerRef);
+      if (!containerRef) {
+        return null;
+      }
+
+      const logsPath =
+        `/containers/${encodeURIComponent(containerRef)}/logs` +
+        `?stdout=1&stderr=1&tail=${LOG_TAIL_LINES_PER_CONTAINER}&timestamps=1`;
+      const result = await dockerApiRequestRaw(socketPath, logsPath, 1200);
+      if (!result.ok) {
+        return null;
+      }
+
+      const logBody = asString(decodeDockerLogStreamBody(result.bodyBuffer));
+      if (!logBody) {
+        return null;
+      }
+
+      logsByContainerRef.set(containerRef, logBody);
+      logsByContainerRef.set(containerName, logBody);
+      return {
+        source: containerName,
+        body: logBody,
+      };
+    })
+  );
+
+  const sourceLogs = sourceLogsRaw.filter((entry) => entry && entry.source && entry.body);
+  const snapshot = {
+    atMs: nowMs,
+    text: buildChronologicalAggregateLog(sourceLogs),
+    logsByContainerRef,
+  };
+  dockerApiNodeLogCache.set(cacheKey, snapshot);
+  return snapshot;
 }
 
 function parseContextRows(stdout) {
@@ -1255,10 +1483,26 @@ async function readWorkersSnapshotViaDockerApi(baseErrorMessage) {
 
   const primaryNode = materializedNodes[0];
   const primaryNodeId = asString(primaryNode?.id || primaryNode?.hostname || fallbackNodeId);
-  const containers = containersRaw.map((container) => ({
+  const baseContainers = containersRaw.map((container) => ({
     ...container,
     nodeId: primaryNodeId,
   }));
+  const dockerApiLogs = await collectDockerApiAggregateLogs(
+    socketPath,
+    primaryNodeId,
+    baseContainers
+  );
+  const containers = baseContainers.map((container) => {
+    const containerRef = asString(container?.id || container?.name);
+    const logs = dockerApiLogs.logsByContainerRef.get(containerRef);
+    if (!logs) {
+      return container;
+    }
+    return {
+      ...container,
+      logs,
+    };
+  });
   const enrichedNodes = materializedNodes.map((node) => {
     const nodeId = asString(node.id || node.hostname || primaryNodeId);
     const nodeContainers = nodeId === primaryNodeId ? containers : [];
@@ -1271,7 +1515,7 @@ async function readWorkersSnapshotViaDockerApi(baseErrorMessage) {
       memoryCapacityBytes: daemon.memoryTotalBytes,
       memoryUsagePct: null,
       containers: nodeContainers,
-      aggregateLogs: '',
+      aggregateLogs: nodeId === primaryNodeId ? dockerApiLogs.text : '',
     };
   });
 
@@ -1366,44 +1610,60 @@ async function collectDockerAggregateLogs(contextName, nodeKey, containers) {
   const nowMs = Date.now();
   const cached = dockerNodeLogCache.get(cacheKey);
   if (cached && nowMs - cached.atMs < NODE_LOG_CACHE_TTL_MS) {
-    return cached.text;
+    return cached;
   }
 
   const selectedContainers = (Array.isArray(containers) ? containers : []).slice(
     0,
     MAX_LOG_SOURCES_PER_NODE
   );
-  const chunks = await Promise.all(
+  const logsByContainerRef = new Map();
+  const sourceLogsRaw = await Promise.all(
     selectedContainers.map(async (container) => {
       const containerRef = asString(container?.id || container?.name);
       const containerName = asString(container?.name, containerRef);
       if (!containerRef) {
-        return '';
+        return null;
       }
 
       const result = await runDockerCommand(
-        ['--context', contextName, 'logs', '--tail', '40', containerRef],
+        [
+          '--context',
+          contextName,
+          'logs',
+          '--tail',
+          String(LOG_TAIL_LINES_PER_CONTAINER),
+          '--timestamps',
+          containerRef,
+        ],
         1200
       );
       if (!result.ok) {
-        return '';
+        return null;
       }
 
-      const logBody = asString(result.stdout);
+      const logBody = asString(result.stdout || result.stderr);
       if (!logBody) {
-        return '';
+        return null;
       }
 
-      return `[${containerName}]\n${logBody}`;
+      logsByContainerRef.set(containerRef, logBody);
+      logsByContainerRef.set(containerName, logBody);
+      return {
+        source: containerName,
+        body: logBody,
+      };
     })
   );
 
-  const text = truncateText(chunks.filter((chunk) => chunk.length > 0).join('\n\n'));
-  dockerNodeLogCache.set(cacheKey, {
+  const sourceLogs = sourceLogsRaw.filter((entry) => entry && entry.source && entry.body);
+  const snapshot = {
     atMs: nowMs,
-    text,
-  });
-  return text;
+    text: buildChronologicalAggregateLog(sourceLogs),
+    logsByContainerRef,
+  };
+  dockerNodeLogCache.set(cacheKey, snapshot);
+  return snapshot;
 }
 
 async function enrichContext(baseContext) {
@@ -1488,11 +1748,22 @@ async function enrichContext(baseContext) {
 
   const primaryNode = materializedNodes[0];
   const primaryNodeId = asString(primaryNode?.id || primaryNode?.hostname || fallbackNodeId);
-  const containers = containersRaw.map((container) => ({
+  const baseContainers = containersRaw.map((container) => ({
     ...container,
     nodeId: primaryNodeId,
   }));
-  const aggregateLogs = await collectDockerAggregateLogs(contextName, primaryNodeId, containers);
+  const aggregateLogs = await collectDockerAggregateLogs(contextName, primaryNodeId, baseContainers);
+  const containers = baseContainers.map((container) => {
+    const containerRef = asString(container?.id || container?.name);
+    const logs = aggregateLogs.logsByContainerRef.get(containerRef);
+    if (!logs) {
+      return container;
+    }
+    return {
+      ...container,
+      logs,
+    };
+  });
   const nodes = materializedNodes.map((node) => {
     const nodeId = asString(node.id || node.hostname || primaryNodeId);
     const nodeContainers = nodeId === primaryNodeId ? containers : [];
@@ -1505,7 +1776,7 @@ async function enrichContext(baseContext) {
       memoryCapacityBytes: daemon.memoryTotalBytes,
       memoryUsagePct: null,
       containers: nodeContainers,
-      aggregateLogs: nodeId === primaryNodeId ? aggregateLogs : '',
+      aggregateLogs: nodeId === primaryNodeId ? aggregateLogs.text : '',
     };
   });
 

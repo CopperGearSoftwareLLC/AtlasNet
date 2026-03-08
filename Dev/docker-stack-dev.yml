@@ -33,6 +33,8 @@ services:
   Shard:
     image: SHARD_IMAGE_NAME
     networks: [AtlasNet]
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
     cap_add:
       - SYS_ADMIN
       - PERFMON
