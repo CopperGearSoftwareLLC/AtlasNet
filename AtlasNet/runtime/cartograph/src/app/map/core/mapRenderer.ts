@@ -1,4 +1,4 @@
-import type { ShapeJS } from '../shared/cartographTypes';
+import type { ShapeJS } from '../../shared/cartographTypes';
 
 export type MapViewMode = '2d' | '3d';
 export type MapProjectionMode = 'orthographic' | 'perspective';

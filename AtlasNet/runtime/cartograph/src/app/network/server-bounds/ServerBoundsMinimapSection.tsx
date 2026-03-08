@@ -1,7 +1,7 @@
 'use client';
 
 import { useMemo } from 'react';
-import type { Point2, ShardHoverBounds } from '../map/mapData';
+import type { Point2, ShardHoverBounds } from '../../map/core/mapData';
 import type { ServerBoundsShardSummary } from './serverBoundsTypes';
 
 interface ServerBoundsMinimapSectionProps {

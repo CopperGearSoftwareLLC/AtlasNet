@@ -4,7 +4,7 @@ import type {
   ShapeJS,
   ShardTelemetry,
   TransferManifestTelemetry,
-} from '../shared/cartographTypes';
+} from '../../shared/cartographTypes';
 
 export interface Point2 {
   x: number;

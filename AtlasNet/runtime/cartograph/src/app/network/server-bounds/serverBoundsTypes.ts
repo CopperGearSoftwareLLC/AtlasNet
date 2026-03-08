@@ -1,4 +1,4 @@
-import type { ShardHoverBounds } from '../map/mapData';
+import type { ShardHoverBounds } from '../../map/core/mapData';
 
 export type ServerBoundsShardStatus = 'bounded' | 'unbounded' | 'bounded stale';
 

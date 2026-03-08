@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useRef } from 'react';
 import type { Dispatch, SetStateAction } from 'react';
-import type { ShardHoverBounds } from '../mapData';
+import type { ShardHoverBounds } from '../core/mapData';
 
 interface Point2 {
   x: number;

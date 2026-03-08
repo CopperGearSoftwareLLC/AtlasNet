@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { normalizeHeuristicShapes } from '../../map/heuristicShapeMapper';
+import { normalizeHeuristicShapes } from '../../map/core/heuristicShapeMapper';
 import { fetchNativeJson } from '../../shared/nativeClient';
 
 const TIMEOUT_MS = 700;

@@ -5,7 +5,7 @@ import type {
   AuthorityEntityTelemetry,
   ShapeJS,
   ShardTelemetry,
-} from '../shared/cartographTypes';
+} from '../../shared/cartographTypes';
 import {
   computeMapBoundsCenter,
   computeNetworkEdgeCount,
@@ -18,7 +18,7 @@ import {
   normalizeShardId,
   type Point2,
   type ShardHoverBounds,
-} from '../map/mapData';
+} from '../../map/core/mapData';
 import type { ServerBoundsShardSummary } from './serverBoundsTypes';
 
 interface UseServerBoundsMinimapDataArgs {

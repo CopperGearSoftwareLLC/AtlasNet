@@ -1,16 +1,16 @@
 'use client';
 
 import { useEffect, useState, useMemo } from 'react';
-import { ServerBoundsMinimapSection } from './ServerBoundsMinimapSection';
+import { ServerBoundsMinimapSection } from './server-bounds/ServerBoundsMinimapSection';
 import { CircularNodeGraphPanel } from './circular-node-graph/CircularNodeGraphPanel';
-import { ShardTelemetryRow } from './ShardTelemetryRow';
-import { TelemetryPanel } from './TelemetryPanel';
+import { ShardTelemetryRow } from './telemetry-list/ShardTelemetryRow';
+import { TelemetryPanel } from './telemetry-list/TelemetryPanel';
 import {
   useAuthorityEntities,
   useHeuristicShapes,
   useNetworkTelemetry,
 } from '../shared/useTelemetryPolling';
-import { useServerBoundsMinimapData } from './useServerBoundsMinimapData';
+import { useServerBoundsMinimapData } from './server-bounds/useServerBoundsMinimapData';
 
 const ENABLE_NETWORK_TELEMETRY = true;
 const DEFAULT_POLL_INTERVAL_MS = 200;

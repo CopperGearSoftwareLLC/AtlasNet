@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from 'react';
 import type { MouseEventHandler, PointerEventHandler, RefObject } from 'react';
-import type { AuthorityEntityTelemetry } from '../shared/cartographTypes';
+import type { AuthorityEntityTelemetry } from '../../shared/cartographTypes';
 
 interface MapPoint {
   x: number;

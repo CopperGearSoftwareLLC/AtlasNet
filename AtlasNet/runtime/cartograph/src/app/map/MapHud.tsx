@@ -5,7 +5,7 @@ import type { AuthorityLinkMode } from '../shared/cartographTypes';
 import type {
   MapProjectionMode,
   MapViewMode,
-} from './mapRenderer';
+} from './core/mapRenderer';
 
 interface MapHudProps {
   showGnsConnections: boolean;

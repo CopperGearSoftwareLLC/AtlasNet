@@ -1,4 +1,4 @@
-import type { ShapeJS, Vec2 } from '../shared/cartographTypes';
+import type { ShapeJS, Vec2 } from '../../shared/cartographTypes';
 
 interface RawShape {
   id?: unknown;

@@ -5,7 +5,7 @@ import type {
   ShapeJS,
   ShardTelemetry,
   TransferManifestTelemetry,
-} from '../shared/cartographTypes';
+} from '../../shared/cartographTypes';
 import {
   buildHoveredShardEdgeLabels,
   buildOverlayShapes,

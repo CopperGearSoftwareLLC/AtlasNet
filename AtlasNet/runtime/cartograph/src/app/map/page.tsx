@@ -10,7 +10,7 @@ import type {
   TransferManifestTelemetry,
   TransferStateQueueTelemetry,
 } from '../shared/cartographTypes';
-import { useMapDerivedData } from './useMapDerivedData';
+import { useMapDerivedData } from './core/useMapDerivedData';
 import { useShardHoverState } from './mouse-hover/useShardHoverState';
 import {
   useAuthorityEntities,
@@ -23,13 +23,13 @@ import {
   createMapRenderer,
   type MapProjectionMode,
   type MapViewMode,
-} from './mapRenderer';
+} from './core/mapRenderer';
 import { EntityInspectorPanel } from './entity-inspector/EntityInspectorPanel';
 import {
   useEntityInspectorLookup,
   type EntityInspectorLookupState,
 } from './entity-inspector/useEntityInspectorLookup';
-import { useCtrlDragEntitySelection } from './useCtrlDragEntitySelection';
+import { useCtrlDragEntitySelection } from './entity-inspector/useCtrlDragEntitySelection';
 import { MapHud } from './MapHud';
 import { MapPlaybackBar } from './playback/MapPlaybackBar';
 import { ShardHoverTooltip } from './mouse-hover/ShardHoverTooltip';

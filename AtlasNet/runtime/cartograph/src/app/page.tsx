@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { useEffect, useMemo, useState } from 'react';
-import { ServerBoundsMinimapSection } from './network/ServerBoundsMinimapSection';
+import { ServerBoundsMinimapSection } from './network/server-bounds/ServerBoundsMinimapSection';
 import type { DatabaseSnapshotResponse } from './shared/cartographTypes';
 import {
   useAuthorityEntities,
@@ -10,7 +10,7 @@ import {
   useNetworkTelemetry,
   useWorkersSnapshot,
 } from './shared/useTelemetryPolling';
-import { useServerBoundsMinimapData } from './network/useServerBoundsMinimapData';
+import { useServerBoundsMinimapData } from './network/server-bounds/useServerBoundsMinimapData';
 
 const TELEMETRY_POLL_INTERVAL_MS = 1000;
 const WORKERS_POLL_INTERVAL_MS = 5000;
