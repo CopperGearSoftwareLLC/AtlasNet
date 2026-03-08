@@ -178,6 +178,7 @@ void TransferCoordinator::TransferTick()
 									 NetworkMessageSendFlag::eReliableNow);
 
 		PreTransfer.stage = EntityTransferStage::ePrepare;
+		TransferManifest::Get().QueueEntityTransferStage(PreTransfer, EntityTransferStage::ePrepare);
 
 		// Stage 3: Insert into internal state under lock
 		_WriteLock([&]() { EntityTransfers.insert({PreTransfer.ID, PreTransfer}); });
@@ -243,6 +244,7 @@ void TransferCoordinator::OnEntityTransferPacketArrival(const EntityTransferPack
 			response.SetAsReadyStage();
 			Interlink::Get().SendMessage(info.sender, response,
 										 NetworkMessageSendFlag::eReliableNow);
+			TransferManifest::Get().QueueEntityTransferStage(data, EntityTransferStage::eReady);
 
 			// Stage 3: Update internal state under lock
 			_WriteLock([&]() { EntityTransfers.insert({data.ID, data}); });
@@ -269,6 +271,8 @@ void TransferCoordinator::OnEntityTransferPacketArrival(const EntityTransferPack
 
 			Interlink::Get().SendMessage(info.sender, response,
 										 NetworkMessageSendFlag::eReliableNow);
+			TransferManifest::Get().QueueEntityTransferStage(
+				transferEntrySnapshot, EntityTransferStage::eCommit);
 
 			// Stage 3: Update internal state
 			_WriteLock(
@@ -298,6 +302,8 @@ void TransferCoordinator::OnEntityTransferPacketArrival(const EntityTransferPack
 			completeResponse.SetAsCompleteStage();
 			Interlink::Get().SendMessage(info.sender, completeResponse,
 										 NetworkMessageSendFlag::eReliableNow);
+			TransferManifest::Get().QueueEntityTransferStage(
+				transferEntrySnapshot, EntityTransferStage::eComplete);
 
 			// Stage 3: Remove internal record under lock
 			_WriteLock([&]() { EntityTransfers.erase(p.TransferID); });

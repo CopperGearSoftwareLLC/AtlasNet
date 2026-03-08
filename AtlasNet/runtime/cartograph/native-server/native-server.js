@@ -44,6 +44,7 @@ try {
 let nodeJsWrapper = null;
 let networkTelemetry = null;
 let entityLedgersView = null;
+let transferStateQueueView = null;
 global.nodeJsWrapper = null;
 
 function ensureHybridCollectors() {
@@ -65,11 +66,15 @@ function ensureHybridCollectors() {
   if (!entityLedgersView && addon.EntityLedgersView) {
     entityLedgersView = new addon.EntityLedgersView();
   }
+  if (!transferStateQueueView && addon.TransferStateQueueView) {
+    transferStateQueueView = new addon.TransferStateQueueView();
+  }
 
   return {
     addon,
     networkTelemetry,
     entityLedgersView,
+    transferStateQueueView,
   };
 }
 
@@ -186,7 +191,13 @@ app.get('/transferstatequeue', async (req, res) => {
   try {
     const requestedMode = getRequestedCollectionMode(req.query);
     const mode = resolveCollectionMode(requestedMode);
+    const hybridCollectors =
+      mode === COLLECTION_MODE_INTERLINK_HYBRID
+        ? ensureHybridCollectors()
+        : { addon: null, transferStateQueueView: null };
     const { modeUsed, data } = await collectTransferStateQueue({
+      addon: hybridCollectors.addon,
+      transferStateQueueView: hybridCollectors.transferStateQueueView,
       requestedMode: mode,
     });
     res.set('x-cartograph-collection-mode', String(modeUsed));

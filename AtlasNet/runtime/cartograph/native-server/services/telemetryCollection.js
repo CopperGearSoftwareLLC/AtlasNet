@@ -6,6 +6,7 @@ const {
 const { readNetworkTelemetry } = require('./networkTelemetry');
 const { readEntityLedgersTelemetry } = require('./entityLedgerTelemetry');
 const { readHeuristicShapes } = require('./heuristicShapes');
+const { readTransferStateQueueTelemetry } = require('./transferStateQueueTelemetry');
 const {
   readAuthorityTelemetryFromDatabase,
   readHeuristicClaimedOwnersFromDatabase,
@@ -127,12 +128,29 @@ async function collectTransferManifest({ requestedMode }) {
   return { modeUsed: mode, data: [] };
 }
 
-async function collectTransferStateQueue({ requestedMode }) {
+async function collectTransferStateQueue({
+  addon,
+  transferStateQueueView,
+  requestedMode,
+}) {
   const mode = resolveCollectionMode(requestedMode);
-  if (
-    mode === COLLECTION_MODE_PURE_DATABASE ||
-    mode === COLLECTION_MODE_INTERLINK_HYBRID
-  ) {
+  if (mode === COLLECTION_MODE_PURE_DATABASE) {
+    return {
+      modeUsed: COLLECTION_MODE_PURE_DATABASE,
+      data: await readTransferStateQueueFromDatabase(),
+    };
+  }
+
+  if (mode === COLLECTION_MODE_INTERLINK_HYBRID) {
+    const hasAddon = Boolean(
+      addon && transferStateQueueView && addon.std_vector_std_vector_std_string__
+    );
+    if (hasAddon) {
+      return {
+        modeUsed: COLLECTION_MODE_INTERLINK_HYBRID,
+        data: readTransferStateQueueTelemetry(addon, transferStateQueueView),
+      };
+    }
     return {
       modeUsed: COLLECTION_MODE_PURE_DATABASE,
       data: await readTransferStateQueueFromDatabase(),
