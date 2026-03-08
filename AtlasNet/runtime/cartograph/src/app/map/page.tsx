@@ -18,7 +18,7 @@ import {
   useNetworkTelemetry,
   useShardPlacement,
   useTransferStateQueue,
-} from '../shared/useTelemetryFeeds';
+} from '../shared/useTelemetryPolling';
 import {
   createMapRenderer,
   type MapProjectionMode,
@@ -26,9 +26,9 @@ import {
 } from './mapRenderer';
 import { EntityInspectorPanel } from './EntityInspectorPanel';
 import {
-  useEntityDatabaseDetails,
-  type EntityDatabaseDetailsState,
-} from './useEntityDatabaseDetails';
+  useEntityInspectorLookup,
+  type EntityInspectorLookupState,
+} from './useEntityInspectorLookup';
 import { useCtrlDragEntitySelection } from './useCtrlDragEntitySelection';
 import { MapHud } from './MapHud';
 import { MapPlaybackBar } from './MapPlaybackBar';
@@ -60,7 +60,7 @@ const MIN_PLAYBACK_TIME_TICK_MS = 10;
 const MAX_PLAYBACK_TIME_TICK_MS = 100;
 const PLAYBACK_TIME_TICK_STEP_MS = 10;
 
-const EMPTY_DETAILS_STATE: EntityDatabaseDetailsState = {
+const EMPTY_DETAILS_STATE: EntityInspectorLookupState = {
   loading: false,
   error: null,
   data: null,
@@ -73,7 +73,7 @@ interface PlaybackFrame {
   authorityEntities: AuthorityEntityTelemetry[];
   transferManifest: TransferManifestTelemetry[];
   shardPlacement: ShardPlacementTelemetry[];
-  entityDetailsByEntityId: Record<string, EntityDatabaseDetailsState>;
+  entityDetailsByEntityId: Record<string, EntityInspectorLookupState>;
 }
 
 function clonePlaybackPayload(
@@ -120,9 +120,9 @@ function getFrameAtCursor(
 }
 
 function snapshotDetailsByEntityId(
-  cache: Map<string, EntityDatabaseDetailsState>
-): Record<string, EntityDatabaseDetailsState> {
-  const out: Record<string, EntityDatabaseDetailsState> = {};
+  cache: Map<string, EntityInspectorLookupState>
+): Record<string, EntityInspectorLookupState> {
+  const out: Record<string, EntityInspectorLookupState> = {};
   for (const [entityId, state] of cache.entries()) {
     out[entityId] = state;
   }
@@ -291,15 +291,15 @@ export default function MapPage() {
       null,
     [activeEntityId, authorityEntitiesLive]
   );
-  const liveEntityDetails = useEntityDatabaseDetails(
+  const liveEntityDetails = useEntityInspectorLookup(
     activeEntityLive,
     entityDetailPollIntervalMs
   );
-  const playbackLookupDetails = useEntityDatabaseDetails(
+  const playbackLookupDetails = useEntityInspectorLookup(
     playbackActive ? activeSelectedEntity : null,
     0
   );
-  const liveEntityDetailsCacheRef = useRef<Map<string, EntityDatabaseDetailsState>>(
+  const liveEntityDetailsCacheRef = useRef<Map<string, EntityInspectorLookupState>>(
     new Map()
   );
 

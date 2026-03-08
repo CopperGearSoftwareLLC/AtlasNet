@@ -9,7 +9,7 @@ import {
   useAuthorityEntities,
   useHeuristicShapes,
   useNetworkTelemetry,
-} from '../shared/useTelemetryFeeds';
+} from '../shared/useTelemetryPolling';
 import { useServerBoundsMinimapData } from './useServerBoundsMinimapData';
 
 const ENABLE_NETWORK_TELEMETRY = true;

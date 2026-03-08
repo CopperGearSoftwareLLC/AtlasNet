@@ -17,7 +17,7 @@ const {
   readHardcodedHashPayload,
   readHardcodedSetPayload,
   shouldDecodeSetKey,
-} = require('./RevertByteOptimation');
+} = require('./serializedDecoders');
 
 function truncatePayload(payload) {
   if (typeof payload !== 'string') {

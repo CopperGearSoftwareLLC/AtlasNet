@@ -9,7 +9,7 @@ import {
   useHeuristicShapes,
   useNetworkTelemetry,
   useWorkersSnapshot,
-} from './shared/useTelemetryFeeds';
+} from './shared/useTelemetryPolling';
 import { useServerBoundsMinimapData } from './network/useServerBoundsMinimapData';
 
 const TELEMETRY_POLL_INTERVAL_MS = 1000;

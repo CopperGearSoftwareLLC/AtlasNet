@@ -1,14 +1,14 @@
 'use client';
 
-interface HardcodedDecodeToggleProps {
+interface SerializedDecodeToggleProps {
   enabled: boolean;
   onChange: (enabled: boolean) => void;
 }
 
-export function HardcodedDecodeToggle({
+export function SerializedDecodeToggle({
   enabled,
   onChange,
-}: HardcodedDecodeToggleProps) {
+}: SerializedDecodeToggleProps) {
   return (
     <label className="flex min-w-60 items-center gap-2 text-xs text-slate-400">
       <input

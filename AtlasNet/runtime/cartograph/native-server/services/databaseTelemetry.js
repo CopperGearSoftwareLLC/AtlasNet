@@ -1,5 +1,5 @@
 const Redis = require('ioredis');
-const { formatUuid } = require('./RevertByteOptimation/format');
+const { formatUuid } = require('./serializedDecoders/format');
 const { buildNetworkTelemetry } = require('./networkTelemetry');
 const { getDatabaseTargets, SNAPSHOT_CONNECT_TIMEOUT_MS } = require('../config');
 

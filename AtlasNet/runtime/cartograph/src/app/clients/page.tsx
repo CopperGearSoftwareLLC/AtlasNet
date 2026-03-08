@@ -6,10 +6,10 @@ import type {
   DatabaseRecord,
   DatabaseSnapshotResponse,
 } from '../shared/cartographTypes';
-import { useAuthorityEntities } from '../shared/useTelemetryFeeds';
+import { useAuthorityEntities } from '../shared/useTelemetryPolling';
 import { DatabaseExplorerInspector } from '../database/DatabaseExplorerInspector';
-import { useEntityDatabaseDetails } from '../map/useEntityDatabaseDetails';
-import { HardcodedDecodeToggle } from '../database/HardcodedDecodeToggle';
+import { useEntityInspectorLookup } from '../map/useEntityInspectorLookup';
+import { SerializedDecodeToggle } from '../database/SerializedDecodeToggle';
 
 const DEFAULT_AUTHORITY_POLL_INTERVAL_MS = 250;
 const MIN_AUTHORITY_POLL_INTERVAL_MS = 50;
@@ -350,7 +350,7 @@ export default function ClientsPage() {
     () => entities.find((entity) => entity.entityId === activeEntityId) ?? null,
     [activeEntityId, entities]
   );
-  const details = useEntityDatabaseDetails(activeEntity, ENTITY_DETAIL_POLL_INTERVAL_MS);
+  const details = useEntityInspectorLookup(activeEntity, ENTITY_DETAIL_POLL_INTERVAL_MS);
 
   const totalClients = entities.filter((entity) => entity.isClient).length;
   const totalEntities = entities.length;
@@ -413,7 +413,7 @@ export default function ClientsPage() {
             include non-isClient entities
           </label>
 
-          <HardcodedDecodeToggle enabled={decodeSerialized} onChange={setDecodeSerialized} />
+          <SerializedDecodeToggle enabled={decodeSerialized} onChange={setDecodeSerialized} />
 
           <label className="flex min-w-64 items-center gap-2">
             db poll:{' '}

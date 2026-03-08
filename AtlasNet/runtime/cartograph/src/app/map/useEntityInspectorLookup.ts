@@ -2,9 +2,9 @@
 
 import { useEffect, useState } from 'react';
 import type { AuthorityEntityTelemetry } from '../shared/cartographTypes';
-import type { EntityInspectorLookupResponse } from './entityInspectorTypes';
+import type { EntityInspectorLookupResponse } from './entityInspectorContracts';
 
-export interface EntityDatabaseDetailsState {
+export interface EntityInspectorLookupState {
   loading: boolean;
   error: string | null;
   data: EntityInspectorLookupResponse | null;
@@ -19,7 +19,7 @@ interface LookupContext {
 
 const POLL_DISABLED_AT_MS = 5000;
 
-const EMPTY_DETAILS_STATE: EntityDatabaseDetailsState = {
+const EMPTY_DETAILS_STATE: EntityInspectorLookupState = {
   loading: false,
   error: null,
   data: null,
@@ -95,11 +95,11 @@ function areLookupResponsesEqual(
   return true;
 }
 
-export function useEntityDatabaseDetails(
+export function useEntityInspectorLookup(
   entity: AuthorityEntityTelemetry | null,
   pollIntervalMs = 0
-): EntityDatabaseDetailsState {
-  const [state, setState] = useState<EntityDatabaseDetailsState>(EMPTY_DETAILS_STATE);
+): EntityInspectorLookupState {
+  const [state, setState] = useState<EntityInspectorLookupState>(EMPTY_DETAILS_STATE);
   const [frozenLookupContext, setFrozenLookupContext] = useState<LookupContext | null>(
     null
   );
@@ -183,7 +183,7 @@ export function useEntityDatabaseDetails(
       inFlight = true;
       try {
         const response = await fetch(
-          `/api/map-entity-inspector?${params.toString()}`,
+          `/api/entity-database-inspector?${params.toString()}`,
           {
             cache: 'no-store',
             signal: ac.signal,

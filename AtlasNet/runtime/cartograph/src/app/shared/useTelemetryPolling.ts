@@ -14,7 +14,7 @@ import {
   parseAuthorityRows,
   parseTransferManifestRows,
   parseTransferStateQueueRows,
-} from './telemetryParsers';
+} from './parseTelemetryPayloads';
 
 interface PolledResourceOptions<T> {
   url: string;
@@ -205,7 +205,7 @@ export function useHeuristicShapes({
   onHttpError,
 }: Partial<TelemetryPollingOptions> = {}): ShapeJS[] {
   return usePolledResource<ShapeJS[]>({
-    url: '/api/heuristicfetch',
+    url: '/api/heuristic-shapes',
     intervalMs,
     enabled,
     createInitialValue: () => [],

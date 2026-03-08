@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from 'react';
 import type { MouseEvent as ReactMouseEvent } from 'react';
 import type { AuthorityEntityTelemetry } from '../shared/cartographTypes';
 import { DatabaseExplorerInspector } from '../database/DatabaseExplorerInspector';
-import type { EntityDatabaseDetailsState } from './useEntityDatabaseDetails';
+import type { EntityInspectorLookupState } from './useEntityInspectorLookup';
 
 const ENTITY_INSPECTOR_DESKTOP_GRID_COLUMNS_CLASS =
   'lg:grid-cols-[minmax(0,1fr)_minmax(0,2fr)]';
@@ -14,7 +14,7 @@ interface EntityInspectorPanelProps {
   selectedEntities: AuthorityEntityTelemetry[];
   activeEntityId: string | null;
   hoveredEntityId: string | null;
-  detailsState: EntityDatabaseDetailsState;
+  detailsState: EntityInspectorLookupState;
   playbackMode?: boolean;
   pollIntervalMs: number;
   minPollIntervalMs: number;

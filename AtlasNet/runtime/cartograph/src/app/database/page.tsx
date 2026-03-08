@@ -6,7 +6,7 @@ import type {
   DatabaseSnapshotResponse,
   DatabaseSource,
 } from '../shared/cartographTypes';
-import { HardcodedDecodeToggle } from './HardcodedDecodeToggle';
+import { SerializedDecodeToggle } from './SerializedDecodeToggle';
 import { DatabaseExplorerInspector } from './DatabaseExplorerInspector';
 
 const DEFAULT_POLL_INTERVAL_MS = 1000;
@@ -182,7 +182,7 @@ export default function DatabasePage() {
 
         <div className="rounded-2xl border border-slate-800 bg-slate-900/70 p-3">
           <div className="flex flex-wrap items-center gap-3">
-            <HardcodedDecodeToggle enabled={decodeSerialized} onChange={setDecodeSerialized} />
+            <SerializedDecodeToggle enabled={decodeSerialized} onChange={setDecodeSerialized} />
             <label className="flex min-w-60 items-center gap-2 text-xs text-slate-400">
               <input
                 type="range"

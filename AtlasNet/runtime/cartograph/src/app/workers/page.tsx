@@ -7,7 +7,7 @@ import type {
   WorkerContextTelemetry,
   WorkerSwarmNodeTelemetry,
 } from '../shared/cartographTypes';
-import { useShardPlacement, useWorkersSnapshot } from '../shared/useTelemetryFeeds';
+import { useShardPlacement, useWorkersSnapshot } from '../shared/useTelemetryPolling';
 
 const DEFAULT_POLL_INTERVAL_MS = 5000;
 const MIN_POLL_INTERVAL_MS = 1000;
