@@ -11,8 +11,7 @@ import {
   computeNetworkEdgeCount,
   computeProjectedShardPositions,
   computeShardAnchorPositions,
-  computeShardBoundsById,
-  computeShardPolygonsById,
+  computeShardGeometryById,
   computeShardHoverBoundsById,
   isShardIdentity,
   normalizeShardId,
@@ -42,18 +41,13 @@ export function useServerBoundsMinimapData({
   authorityEntities,
   networkTelemetry,
 }: UseServerBoundsMinimapDataArgs): ServerBoundsMinimapData {
-  const shardBoundsById = useMemo(
-    () => computeShardBoundsById(heuristicShapes),
-    [heuristicShapes]
-  );
-
   const shardAnchorPositions = useMemo(
     () => computeShardAnchorPositions(heuristicShapes),
     [heuristicShapes]
   );
 
-  const shardPolygonsById = useMemo(
-    () => computeShardPolygonsById(heuristicShapes),
+  const { shardBoundsById, shardPolygonsById } = useMemo(
+    () => computeShardGeometryById(heuristicShapes),
     [heuristicShapes]
   );
 

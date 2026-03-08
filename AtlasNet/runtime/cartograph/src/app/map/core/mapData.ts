@@ -219,11 +219,15 @@ export function computeMapBoundsCenter(baseShapes: ShapeJS[]): Point2 {
   };
 }
 
-export function computeShardBoundsById(baseShapes: ShapeJS[]): Map<string, ShardHoverBounds> {
-  const raw = new Map<
+export function computeShardGeometryById(baseShapes: ShapeJS[]): {
+  shardBoundsById: Map<string, ShardHoverBounds>;
+  shardPolygonsById: Map<string, Point2[][]>;
+} {
+  const rawBounds = new Map<
     string,
     { minX: number; maxX: number; minY: number; maxY: number; hasPoint: boolean }
   >();
+  const shardPolygonsById = new Map<string, Point2[][]>();
 
   for (const shape of baseShapes) {
     const ownerId = normalizeShardId(shape.ownerId ?? '');
@@ -236,7 +240,7 @@ export function computeShardBoundsById(baseShapes: ShapeJS[]): Map<string, Shard
       continue;
     }
 
-    const current = raw.get(ownerId) ?? {
+    const bounds = rawBounds.get(ownerId) ?? {
       minX: Infinity,
       maxX: -Infinity,
       minY: Infinity,
@@ -248,26 +252,40 @@ export function computeShardBoundsById(baseShapes: ShapeJS[]): Map<string, Shard
       if (!Number.isFinite(point.x) || !Number.isFinite(point.y)) {
         continue;
       }
-      current.hasPoint = true;
-      if (point.x < current.minX) current.minX = point.x;
-      if (point.x > current.maxX) current.maxX = point.x;
-      if (point.y < current.minY) current.minY = point.y;
-      if (point.y > current.maxY) current.maxY = point.y;
+      bounds.hasPoint = true;
+      if (point.x < bounds.minX) bounds.minX = point.x;
+      if (point.x > bounds.maxX) bounds.maxX = point.x;
+      if (point.y < bounds.minY) bounds.minY = point.y;
+      if (point.y > bounds.maxY) bounds.maxY = point.y;
     }
+    rawBounds.set(ownerId, bounds);
 
-    raw.set(ownerId, current);
+    if (
+      shape.type === 'polygon' &&
+      Array.isArray(shape.points) &&
+      shape.points.length >= 3 &&
+      points.length >= 3
+    ) {
+      const existing = shardPolygonsById.get(ownerId);
+      if (existing) {
+        existing.push(points);
+      } else {
+        shardPolygonsById.set(ownerId, [points]);
+      }
+    }
   }
 
-  const out = new Map<string, ShardHoverBounds>();
-  for (const [shardId, bounds] of raw) {
+  const shardBoundsById = new Map<string, ShardHoverBounds>();
+  for (const [shardId, bounds] of rawBounds) {
     if (!bounds.hasPoint) {
       continue;
     }
+
     const minX = bounds.minX - SHARD_BOUNDS_PADDING;
     const maxX = bounds.maxX + SHARD_BOUNDS_PADDING;
     const minY = bounds.minY - SHARD_BOUNDS_PADDING;
     const maxY = bounds.maxY + SHARD_BOUNDS_PADDING;
-    out.set(shardId, {
+    shardBoundsById.set(shardId, {
       minX,
       maxX,
       minY,
@@ -276,35 +294,18 @@ export function computeShardBoundsById(baseShapes: ShapeJS[]): Map<string, Shard
     });
   }
 
-  return out;
+  return {
+    shardBoundsById,
+    shardPolygonsById,
+  };
+}
+
+export function computeShardBoundsById(baseShapes: ShapeJS[]): Map<string, ShardHoverBounds> {
+  return computeShardGeometryById(baseShapes).shardBoundsById;
 }
 
 export function computeShardPolygonsById(baseShapes: ShapeJS[]): Map<string, Point2[][]> {
-  const out = new Map<string, Point2[][]>();
-
-  for (const shape of baseShapes) {
-    if (shape.type !== 'polygon' || !shape.points || shape.points.length < 3) {
-      continue;
-    }
-    const ownerId = normalizeShardId(shape.ownerId ?? '');
-    if (!isShardIdentity(ownerId)) {
-      continue;
-    }
-
-    const points = getShapeAnchorPoints(shape);
-    if (points.length < 3) {
-      continue;
-    }
-
-    const existing = out.get(ownerId);
-    if (existing) {
-      existing.push(points);
-    } else {
-      out.set(ownerId, [points]);
-    }
-  }
-
-  return out;
+  return computeShardGeometryById(baseShapes).shardPolygonsById;
 }
 
 export function computeNetworkNodeIds(networkTelemetry: ShardTelemetry[]): string[] {

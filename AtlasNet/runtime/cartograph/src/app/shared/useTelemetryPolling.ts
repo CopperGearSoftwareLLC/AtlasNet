@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import type {
   AuthorityEntityTelemetry,
   ShardPlacementTelemetry,
@@ -22,6 +22,7 @@ interface PolledResourceOptions<T> {
   enabled?: boolean;
   createInitialValue: () => T;
   mapResponse: (raw: unknown) => T;
+  areEqual?: (left: T, right: T) => boolean;
   resetOnException?: boolean;
   resetOnHttpError?: boolean;
   onException?: (err: unknown) => void;
@@ -34,22 +35,34 @@ interface PolledResourceOptions<T> {
   }) => void;
 }
 
+const EMPTY_SHAPES: ShapeJS[] = [];
+const EMPTY_SHARD_TELEMETRY: ShardTelemetry[] = [];
+const EMPTY_SHARD_PLACEMENT: ShardPlacementTelemetry[] = [];
+const EMPTY_WORKERS_CONTEXTS: WorkersSnapshotResponse['contexts'] = [];
+const EMPTY_WORKERS_SNAPSHOT: WorkersSnapshotResponse = {
+  collectedAtMs: null,
+  dockerCliAvailable: false,
+  error: null,
+  contexts: EMPTY_WORKERS_CONTEXTS,
+};
+
 function toShapeArray(raw: unknown): ShapeJS[] {
-  return Array.isArray(raw) ? (raw as ShapeJS[]) : [];
+  if (!Array.isArray(raw) || raw.length === 0) {
+    return EMPTY_SHAPES;
+  }
+  return raw as ShapeJS[];
 }
 
 function toShardTelemetryArray(raw: unknown): ShardTelemetry[] {
-  return Array.isArray(raw) ? (raw as ShardTelemetry[]) : [];
+  if (!Array.isArray(raw) || raw.length === 0) {
+    return EMPTY_SHARD_TELEMETRY;
+  }
+  return raw as ShardTelemetry[];
 }
 
 function toWorkersSnapshot(raw: unknown): WorkersSnapshotResponse {
   if (!raw || typeof raw !== 'object') {
-    return {
-      collectedAtMs: null,
-      dockerCliAvailable: false,
-      error: null,
-      contexts: [],
-    };
+    return EMPTY_WORKERS_SNAPSHOT;
   }
 
   const payload = raw as Partial<WorkersSnapshotResponse>;
@@ -62,12 +75,15 @@ function toWorkersSnapshot(raw: unknown): WorkersSnapshotResponse {
     error: typeof payload.error === 'string' && payload.error.trim().length > 0
       ? payload.error
       : null,
-    contexts: Array.isArray(payload.contexts) ? payload.contexts : [],
+    contexts: Array.isArray(payload.contexts) ? payload.contexts : EMPTY_WORKERS_CONTEXTS,
   };
 }
 
 function toShardPlacementArray(raw: unknown): ShardPlacementTelemetry[] {
-  return Array.isArray(raw) ? (raw as ShardPlacementTelemetry[]) : [];
+  if (!Array.isArray(raw) || raw.length === 0) {
+    return EMPTY_SHARD_PLACEMENT;
+  }
+  return raw as ShardPlacementTelemetry[];
 }
 
 function usePolledResource<T>({
@@ -76,6 +92,7 @@ function usePolledResource<T>({
   enabled = true,
   createInitialValue,
   mapResponse,
+  areEqual,
   resetOnException = false,
   resetOnHttpError = false,
   onException,
@@ -85,34 +102,51 @@ function usePolledResource<T>({
   const [data, setData] = useState<T>(() => createInitialValue());
   const createInitialValueRef = useRef(createInitialValue);
   const mapResponseRef = useRef(mapResponse);
+  const areEqualRef = useRef(areEqual);
   const onExceptionRef = useRef(onException);
   const onHttpErrorRef = useRef(onHttpError);
   const onPollResultRef = useRef(onPollResult);
 
   createInitialValueRef.current = createInitialValue;
   mapResponseRef.current = mapResponse;
+  areEqualRef.current = areEqual;
   onExceptionRef.current = onException;
   onHttpErrorRef.current = onHttpError;
   onPollResultRef.current = onPollResult;
 
+  const updateData = useCallback((next: T): void => {
+    setData((previous) => {
+      const equals = areEqualRef.current
+        ? areEqualRef.current(previous, next)
+        : Object.is(previous, next);
+      return equals ? previous : next;
+    });
+  }, []);
+
   useEffect(() => {
     if (!enabled) {
-      setData(createInitialValueRef.current());
+      updateData(createInitialValueRef.current());
       return;
     }
 
     let alive = true;
     let inFlight = false;
+    let activeController: AbortController | null = null;
 
     async function poll() {
       if (inFlight) {
         return;
       }
       inFlight = true;
+      const controller = new AbortController();
+      activeController = controller;
       const pollStartedAtMs = Date.now();
 
       try {
-        const response = await fetch(url, { cache: 'no-store' });
+        const response = await fetch(url, {
+          cache: 'no-store',
+          signal: controller.signal,
+        });
         if (!response.ok) {
           onHttpErrorRef.current?.(response.status);
           onPollResultRef.current?.({
@@ -122,7 +156,7 @@ function usePolledResource<T>({
             statusCode: response.status,
           });
           if (alive && resetOnHttpError) {
-            setData(createInitialValueRef.current());
+            updateData(createInitialValueRef.current());
           }
           return;
         }
@@ -132,7 +166,7 @@ function usePolledResource<T>({
           return;
         }
 
-        setData(mapResponseRef.current(raw));
+        updateData(mapResponseRef.current(raw));
         onPollResultRef.current?.({
           pollStartedAtMs,
           pollCompletedAtMs: Date.now(),
@@ -140,6 +174,9 @@ function usePolledResource<T>({
           statusCode: response.status,
         });
       } catch (err) {
+        if (controller.signal.aborted) {
+          return;
+        }
         onExceptionRef.current?.(err);
         onPollResultRef.current?.({
           pollStartedAtMs,
@@ -148,9 +185,12 @@ function usePolledResource<T>({
           statusCode: null,
         });
         if (alive && resetOnException) {
-          setData(createInitialValueRef.current());
+          updateData(createInitialValueRef.current());
         }
       } finally {
+        if (activeController === controller) {
+          activeController = null;
+        }
         inFlight = false;
       }
     }
@@ -168,6 +208,7 @@ function usePolledResource<T>({
 
     return () => {
       alive = false;
+      activeController?.abort();
       clearInterval(intervalId);
     };
   }, [
@@ -175,6 +216,7 @@ function usePolledResource<T>({
     intervalMs,
     resetOnException,
     resetOnHttpError,
+    updateData,
     url,
   ]);
 

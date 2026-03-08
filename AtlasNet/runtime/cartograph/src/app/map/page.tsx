@@ -76,15 +76,6 @@ interface PlaybackFrame {
   entityDetailsByEntityId: Record<string, EntityInspectorLookupState>;
 }
 
-function clonePlaybackPayload(
-  payload: Omit<PlaybackFrame, 'capturedAtMs'>
-): Omit<PlaybackFrame, 'capturedAtMs'> {
-  if (typeof structuredClone === 'function') {
-    return structuredClone(payload);
-  }
-  return JSON.parse(JSON.stringify(payload)) as Omit<PlaybackFrame, 'capturedAtMs'>;
-}
-
 function getFrameIndexAtCursor(frames: PlaybackFrame[], cursorMs: number): number {
   if (frames.length === 0) {
     return -1;
@@ -133,6 +124,7 @@ export default function MapPage() {
   const containerRef = useRef<HTMLDivElement>(null);
   const rendererRef = useRef<ReturnType<typeof createMapRenderer> | null>(null);
   const historyRef = useRef<PlaybackFrame[]>([]);
+  const lastSnapshotCaptureAtMsRef = useRef(0);
   const transferLastTimestampByEntityRef = useRef<Map<string, number>>(new Map());
   const transferTimelineRef = useRef<TransferStateQueueTelemetry[]>([]);
   const transferPollStartedAtMsRef = useRef<number>(0);
@@ -317,12 +309,15 @@ export default function MapPage() {
     });
   }, [activeEntityLive, liveEntityDetails]);
 
-  const latestLiveFrameDataRef = useRef<Omit<PlaybackFrame, 'capturedAtMs'> | null>(
-    null
-  );
-
   useEffect(() => {
-    latestLiveFrameDataRef.current = {
+    const nowMs = Date.now();
+    if (nowMs - lastSnapshotCaptureAtMsRef.current < SNAPSHOT_RECORD_SPACING_MS) {
+      return;
+    }
+    lastSnapshotCaptureAtMsRef.current = nowMs;
+
+    const frame: PlaybackFrame = {
+      capturedAtMs: nowMs,
       baseShapes: baseShapesLive,
       networkTelemetry: networkTelemetryLive,
       authorityEntities: authorityEntitiesLive,
@@ -332,6 +327,14 @@ export default function MapPage() {
         liveEntityDetailsCacheRef.current
       ),
     };
+
+    const frames = historyRef.current;
+    frames.push(frame);
+
+    const cutoffMs = nowMs - SNAPSHOT_WINDOW_MS;
+    while (frames.length > 0 && frames[0].capturedAtMs < cutoffMs) {
+      frames.shift();
+    }
   }, [
     baseShapesLive,
     networkTelemetryLive,
@@ -341,33 +344,6 @@ export default function MapPage() {
     liveEntityDetails,
     activeEntityLive,
   ]);
-
-  useEffect(() => {
-    const intervalId = setInterval(() => {
-      const latest = latestLiveFrameDataRef.current;
-      if (!latest) {
-        return;
-      }
-
-      const nowMs = Date.now();
-      const frozen = clonePlaybackPayload(latest);
-      const frame: PlaybackFrame = {
-        capturedAtMs: nowMs,
-        ...frozen,
-      };
-      const frames = historyRef.current;
-      frames.push(frame);
-
-      const cutoffMs = nowMs - SNAPSHOT_WINDOW_MS;
-      while (frames.length > 0 && frames[0].capturedAtMs < cutoffMs) {
-        frames.shift();
-      }
-    }, SNAPSHOT_RECORD_SPACING_MS);
-
-    return () => {
-      clearInterval(intervalId);
-    };
-  }, []);
 
   useEffect(() => {
     if (!playbackActive || playbackPaused) {

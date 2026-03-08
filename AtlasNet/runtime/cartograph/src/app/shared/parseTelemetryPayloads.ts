@@ -6,6 +6,10 @@ import type {
   TransferStateQueueTelemetry,
 } from './cartographTypes';
 
+const EMPTY_AUTHORITY_ROWS: AuthorityEntityTelemetry[] = [];
+const EMPTY_TRANSFER_MANIFEST_ROWS: TransferManifestTelemetry[] = [];
+const EMPTY_TRANSFER_QUEUE_ROWS: TransferStateQueueTelemetry[] = [];
+
 const VALID_TRANSFER_STAGES: ReadonlySet<TransferManifestStage> = new Set([
   'eNone',
   'ePrepare',
@@ -99,10 +103,11 @@ function normalizeTimestampMsRequired(value: unknown): number {
 
 function parseTransferRows<T extends TransferManifestTelemetry | TransferStateQueueTelemetry>(
   raw: unknown,
-  normalizeTimestamp: (value: unknown) => T['timestampMs']
+  normalizeTimestamp: (value: unknown) => T['timestampMs'],
+  emptyRows: T[]
 ): T[] {
   if (!Array.isArray(raw)) {
-    return [];
+    return emptyRows;
   }
 
   const rows: T[] = [];
@@ -132,14 +137,14 @@ function parseTransferRows<T extends TransferManifestTelemetry | TransferStateQu
     } as T);
   }
 
-  return rows;
+  return rows.length > 0 ? rows : emptyRows;
 }
 
 // Authority telemetry is emitted as tuple rows:
 // [entityId, ownerId, world, x, y, z, isClient, clientId]
 export function parseAuthorityRows(raw: unknown): AuthorityEntityTelemetry[] {
   if (!Array.isArray(raw)) {
-    return [];
+    return EMPTY_AUTHORITY_ROWS;
   }
 
   const rows: AuthorityEntityTelemetry[] = [];
@@ -159,19 +164,24 @@ export function parseAuthorityRows(raw: unknown): AuthorityEntityTelemetry[] {
     });
   }
 
-  return rows.filter((row) => row.entityId.length > 0 && row.ownerId.length > 0);
+  const normalized = rows.filter(
+    (row) => row.entityId.length > 0 && row.ownerId.length > 0
+  );
+  return normalized.length > 0 ? normalized : EMPTY_AUTHORITY_ROWS;
 }
 
 export function parseTransferManifestRows(raw: unknown): TransferManifestTelemetry[] {
   return parseTransferRows<TransferManifestTelemetry>(
     raw,
-    normalizeTimestampMsOptional
+    normalizeTimestampMsOptional,
+    EMPTY_TRANSFER_MANIFEST_ROWS
   );
 }
 
 export function parseTransferStateQueueRows(raw: unknown): TransferStateQueueTelemetry[] {
   return parseTransferRows<TransferStateQueueTelemetry>(
     raw,
-    normalizeTimestampMsRequired
+    normalizeTimestampMsRequired,
+    EMPTY_TRANSFER_QUEUE_ROWS
   );
 }

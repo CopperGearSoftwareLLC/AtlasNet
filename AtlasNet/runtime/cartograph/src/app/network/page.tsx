@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState, useMemo } from 'react';
+import { useState, useMemo, useRef } from 'react';
 import { ServerBoundsMinimapSection } from './server-bounds/ServerBoundsMinimapSection';
 import { CircularNodeGraphPanel } from './circular-node-graph/CircularNodeGraphPanel';
 import { ShardTelemetryRow } from './telemetry-list/ShardTelemetryRow';
@@ -38,10 +38,12 @@ function pushRolling(prev: number[], value: number): number[] {
 }
 
 export default function NetworkTelemetryPage() {
-  const [shards, setShards] = useState<ShardState[]>([]);
   const [selectedShardId, setSelectedShardId] = useState<string | null>(null);
   const [pollIntervalMs, setPollIntervalMs] = useState(DEFAULT_POLL_INTERVAL_MS);
   const [showServerBoundsMinimap, setShowServerBoundsMinimap] = useState(true);
+  const shardHistoryByIdRef = useRef<
+    Map<string, { downloadHistory: number[]; uploadHistory: number[] }>
+  >(new Map());
   const telemetryPollIntervalMs =
     pollIntervalMs >= POLL_DISABLED_AT_MS ? 0 : pollIntervalMs;
   const latestTelemetry = useNetworkTelemetry({
@@ -85,21 +87,38 @@ export default function NetworkTelemetryPage() {
 
   const selectedShard = selectedShardId ? latestById.get(selectedShardId) : null;
 
-  useEffect(() => {
-    setShards((prev) => {
-      const prevById = new Map(prev.map((s) => [s.shardId, s]));
+  const shards = useMemo(() => {
+    const previousById = shardHistoryByIdRef.current;
+    const nextById = new Map<
+      string,
+      { downloadHistory: number[]; uploadHistory: number[] }
+    >();
 
-      return latestTelemetry.map((t) => {
-        const old = prevById.get(t.shardId);
-        return {
-          shardId: t.shardId,
-          downloadKbps: t.downloadKbps,
-          uploadKbps: t.uploadKbps,
-          downloadHistory: pushRolling(old?.downloadHistory ?? [], t.downloadKbps),
-          uploadHistory: pushRolling(old?.uploadHistory ?? [], t.uploadKbps),
-        };
-      });
+    const rows = latestTelemetry.map((telemetry) => {
+      const previous = previousById.get(telemetry.shardId);
+      const nextHistory = {
+        downloadHistory: pushRolling(
+          previous?.downloadHistory ?? [],
+          telemetry.downloadKbps
+        ),
+        uploadHistory: pushRolling(
+          previous?.uploadHistory ?? [],
+          telemetry.uploadKbps
+        ),
+      };
+      nextById.set(telemetry.shardId, nextHistory);
+
+      return {
+        shardId: telemetry.shardId,
+        downloadKbps: telemetry.downloadKbps,
+        uploadKbps: telemetry.uploadKbps,
+        downloadHistory: nextHistory.downloadHistory,
+        uploadHistory: nextHistory.uploadHistory,
+      };
     });
+
+    shardHistoryByIdRef.current = nextById;
+    return rows;
   }, [latestTelemetry]);
 
   return (

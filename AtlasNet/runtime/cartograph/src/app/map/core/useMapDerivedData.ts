@@ -16,8 +16,7 @@ import {
   computeOwnerPositions,
   computeProjectedShardPositions,
   computeShardAnchorPositions,
-  computeShardBoundsById,
-  computeShardPolygonsById,
+  computeShardGeometryById,
   computeShardHoverBoundsById,
   type HoveredShardEdgeLabel,
   type ShardHoverBounds,
@@ -72,13 +71,8 @@ export function useMapDerivedData({
     [baseShapes]
   );
 
-  const shardBoundsById = useMemo(
-    () => computeShardBoundsById(baseShapes),
-    [baseShapes]
-  );
-
-  const shardPolygonsById = useMemo(
-    () => computeShardPolygonsById(baseShapes),
+  const { shardBoundsById, shardPolygonsById } = useMemo(
+    () => computeShardGeometryById(baseShapes),
     [baseShapes]
   );
 
