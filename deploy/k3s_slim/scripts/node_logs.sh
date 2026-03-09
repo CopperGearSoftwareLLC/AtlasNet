@@ -108,13 +108,22 @@ write_follow_script() {
   cat > "$FOLLOW_SCRIPT_PATH" <<'SCRIPT_EOF'
 #!/usr/bin/env bash
 set -euo pipefail
-sudo find /var/log/pods -type f -name '*.log' -print0 | xargs -0 sudo tail -n 0 -F
+sudo -n find /var/log/pods -type f -name '*.log' -print0 | xargs -0 sudo -n tail -n 0 -F
 SCRIPT_EOF
   chmod +x "$FOLLOW_SCRIPT_PATH"
 }
 
 is_running() {
   pgrep -f "$FOLLOW_SCRIPT_PATH" >/dev/null 2>&1
+}
+
+ensure_passwordless_sudo() {
+  if sudo -n true >/dev/null 2>&1; then
+    return 0
+  fi
+
+  echo "passwordless sudo is not configured for $(id -un) on $(hostname -s)"
+  return 1
 }
 
 start_headless() {
@@ -174,6 +183,7 @@ write_follow_script
 
 case "$ACTION" in
   start)
+    ensure_passwordless_sudo
     if start_desktop_terminal; then
       exit 0
     fi
