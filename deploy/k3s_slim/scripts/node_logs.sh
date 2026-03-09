@@ -108,7 +108,74 @@ write_follow_script() {
   cat > "$FOLLOW_SCRIPT_PATH" <<'SCRIPT_EOF'
 #!/usr/bin/env bash
 set -euo pipefail
-sudo -n find /var/log/pods -type f -name '*.log' -print0 | xargs -0 sudo -n tail -n 0 -F
+
+log() {
+  printf '[atlasnet-node-logs] %s\n' "$*"
+}
+
+scan_log_files() {
+  mapfile -t log_files < <(sudo -n find /var/log/pods -type f -name '*.log' -print | sort)
+}
+
+calc_signature() {
+  if [[ "${#log_files[@]}" -eq 0 ]]; then
+    printf ''
+    return 0
+  fi
+
+  printf '%s\n' "${log_files[@]}"
+}
+
+stop_tail() {
+  if [[ -n "${tail_pid:-}" ]] && kill -0 "$tail_pid" >/dev/null 2>&1; then
+    kill "$tail_pid" >/dev/null 2>&1 || true
+    wait "$tail_pid" >/dev/null 2>&1 || true
+  fi
+  tail_pid=""
+}
+
+start_tail() {
+  if [[ "${#log_files[@]}" -eq 0 ]]; then
+    return 0
+  fi
+
+  log "tracking ${#log_files[@]} pod log files"
+  sudo -n tail -n 0 -F "${log_files[@]}" &
+  tail_pid="$!"
+}
+
+cleanup() {
+  stop_tail
+}
+
+declare -a log_files=()
+current_signature="__init__"
+tail_pid=""
+
+trap cleanup EXIT INT TERM
+
+while true; do
+  scan_log_files
+  new_signature="$(calc_signature)"
+
+  if [[ "$new_signature" != "$current_signature" ]]; then
+    stop_tail
+    current_signature="$new_signature"
+
+    if [[ "${#log_files[@]}" -eq 0 ]]; then
+      log "no pod log files found; waiting for pods..."
+    else
+      start_tail
+    fi
+  fi
+
+  if [[ -n "${tail_pid:-}" ]] && ! kill -0 "$tail_pid" >/dev/null 2>&1; then
+    log "tail process exited; restarting"
+    start_tail
+  fi
+
+  sleep 2
+done
 SCRIPT_EOF
   chmod +x "$FOLLOW_SCRIPT_PATH"
 }
