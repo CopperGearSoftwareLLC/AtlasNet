@@ -18,7 +18,7 @@ ENV_EXPORTS := SERVER_IPS SERVER_SSH_USER WORKER_IPS WORKER_SSH_USER SSH_KEY K3S
 -include $(ENV_FILE)
 export $(ENV_EXPORTS)
 
-.PHONY: bootstrap nodes k3s-deploy platform ssh-setup sudo-setup port-cleanup cleanup-cluster dependency-setup atlasnet-push atlasnet-deploy atlasnet-status atlasnet-merge-manifests
+.PHONY: bootstrap nodes k3s-deploy platform node-logs-start node-logs-stop ssh-setup sudo-setup port-cleanup cleanup-cluster dependency-setup atlasnet-push atlasnet-deploy atlasnet-status atlasnet-merge-manifests
 
 bootstrap:
 	./scripts/bootstrap.sh
@@ -59,6 +59,12 @@ k3s-deploy:
 
 platform:
 	./scripts/platform.sh
+
+node-logs-start:
+	./scripts/node_logs.sh start
+
+node-logs-stop:
+	./scripts/node_logs.sh stop
 
 atlasnet-deploy:
 	./scripts/deploy_atlasnet.sh
