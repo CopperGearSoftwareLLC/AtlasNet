@@ -24,7 +24,7 @@ Environment:
   ATLASNET_K3D_CLUSTER_NAME       k3d cluster name (default: atlasnet-dev)
   ATLASNET_LATENCY_HELPER_NAME    Helper container name (default: atlasnet_latency_helper)
   LATENCY_DELAY                   delay value passed to tc netem (default: 100ms)
-  LATENCY_JITTER                  jitter value passed to tc netem (default: 20ms)
+  LATENCY_JITTER                  optional jitter value passed to tc netem (default: none)
 EOF
 }
 
@@ -141,16 +141,19 @@ helper_apply_latency() {
     [ -n "$ifaces" ] || { echo "failed to determine interfaces for ${target_name}" >&2; exit 1; }
 
     for iface in $ifaces; do
-      nsenter -t "$pid" -n tc qdisc replace dev "$iface" root netem delay "$latency_delay" "$latency_jitter"
+      if [ -n "$latency_jitter" ]; then
+        nsenter -t "$pid" -n tc qdisc replace dev "$iface" root netem delay "$latency_delay" "$latency_jitter"
+      else
+        nsenter -t "$pid" -n tc qdisc replace dev "$iface" root netem delay "$latency_delay"
+      fi
     done
 
-    qdisc_output="$(for iface in $ifaces; do nsenter -t "$pid" -n tc -s qdisc show dev "$iface"; done 2>&1)"
-    echo "$qdisc_output"
+    qdisc_output="$(for iface in $ifaces; do nsenter -t "$pid" -n tc qdisc show dev "$iface"; done 2>&1)"
     echo "$qdisc_output" | grep -q "netem" || {
       echo "latency verification failed: runtime=${runtime_name} target=${target_name} ifaces=${ifaces}" >&2
       exit 1
     }
-    echo "latency applied: runtime=${runtime_name} target=${target_name} ifaces=${ifaces} delay=${latency_delay} jitter=${latency_jitter}"
+    echo "latency applied: target=${target_name} delay=${latency_delay}"
   ' sh "$target_name" "$LATENCY_DELAY" "$LATENCY_JITTER" "$runtime_name"
 }
 
@@ -175,20 +178,32 @@ helper_clear_latency() {
         ""|0) echo "latency clear skipped: runtime=${runtime_name} target=${target_name} (container missing)" ; exit 0 ;;
       esac
 
-      ifaces="$(nsenter -t "$pid" -n ip -o link show 2>/dev/null | awk -F": " '"'"'$2 != "lo" {print $2}'"'"' | sed "s/@.*//" | sort -u)"
+      ifaces="$(nsenter -t "$pid" -n sh -eu -c '"'"'
+        if command -v ip >/dev/null 2>&1; then
+          ip -o link show 2>/dev/null | awk -F": " '"'"'"'"'"'"'"'"'$2 != "lo" {print $2}'"'"'"'"'"'"'"'"' | sed "s/@.*//" | sort -u
+        elif [ -d /sys/class/net ]; then
+          find /sys/class/net -mindepth 1 -maxdepth 1 -printf "%f\n" 2>/dev/null | grep -v "^lo$" | sort -u
+        fi
+      '"'"' 2>/dev/null || true)"
       [ -n "$ifaces" ] || { echo "latency clear skipped: runtime=${runtime_name} target=${target_name} (iface missing)" ; exit 0; }
 
       for iface in $ifaces; do
         nsenter -t "$pid" -n tc qdisc del dev "$iface" root >/dev/null 2>&1 || true
+        nsenter -t "$pid" -n tc qdisc del dev "$iface" ingress >/dev/null 2>&1 || true
       done
 
-      qdisc_output="$(for iface in $ifaces; do nsenter -t "$pid" -n tc qdisc show dev "$iface"; done 2>&1 || true)"
-      echo "$qdisc_output"
+      ifb_ifaces="$(printf "%s\n" "$ifaces" | grep -E "^ifb[0-9]+$" || true)"
+      for iface in $ifb_ifaces; do
+        nsenter -t "$pid" -n ip link set dev "$iface" down >/dev/null 2>&1 || true
+        nsenter -t "$pid" -n ip link del "$iface" >/dev/null 2>&1 || true
+      done
+
+      qdisc_output="$(nsenter -t "$pid" -n tc qdisc show 2>&1 || true)"
       echo "$qdisc_output" | grep -q "netem" && {
         echo "latency clear verification failed: runtime=${runtime_name} target=${target_name} ifaces=${ifaces}" >&2
         exit 1
       }
-      echo "latency cleared: runtime=${runtime_name} target=${target_name} ifaces=${ifaces}"
+      echo "latency cleared: target=${target_name}"
     ' sh "$target_name" "$runtime_name"
   done
 }
@@ -204,7 +219,7 @@ STACK_NAME="${ATLASNET_SWARM_STACK_NAME:-atlasnet_dev}"
 SHARD_SERVICE_NAME="${ATLASNET_SWARM_SHARD_SERVICE_NAME:-${STACK_NAME}_Shard}"
 CLUSTER_NAME="${ATLASNET_K3D_CLUSTER_NAME:-atlasnet-dev}"
 LATENCY_DELAY="${LATENCY_DELAY:-100ms}"
-LATENCY_JITTER="${LATENCY_JITTER:-20ms}"
+LATENCY_JITTER="${LATENCY_JITTER:-}"
 
 if [[ "$ACTION" == "clear-all" && "$RUNTIME" == "auto" ]]; then
   resolve_swarm_shard_targets "$SHARD_SERVICE_NAME"

@@ -37,13 +37,6 @@ add_custom_target(sandbox_atlasnet_run_Docker
      DEPENDS SandboxServerDockerBuild AtlasnetDockerBuild_Fast 
      )
 
-add_custom_target(sandbox_atlasnet_run_k3d_fast
-     COMMAND ${CMAKE_COMMAND} -E chdir ${CMAKE_SOURCE_DIR} bash ${CMAKE_SOURCE_DIR}/k8s/k3d/scripts/FreePortsAndServices.sh
-     COMMAND ${CMAKE_COMMAND} -E chdir ${CMAKE_SOURCE_DIR} ${CMAKE_SOURCE_DIR}/k8s/k3d/scripts/RunAtlasNetK3dDev.sh atlasnet-dev ${SANDBOX_SERVER_IMAGE_NAME}
-     USES_TERMINAL
-     DEPENDS AtlasnetDockerBuild_FastCached SandboxServerDockerBuild_Fast
-     )
-
 add_custom_target(sandbox_atlasnet_apply_latency
      COMMAND ${CMAKE_COMMAND} -E chdir ${CMAKE_SOURCE_DIR} bash ${CMAKE_SOURCE_DIR}/Dev/LocalRuntimeLatency.sh auto apply-auto
      USES_TERMINAL
