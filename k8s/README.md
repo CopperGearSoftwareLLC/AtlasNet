@@ -29,3 +29,8 @@ make atlasnet-deploy
 ## Notes
 - AtlasNet runtime deploys now come from `k8s/charts/atlasnet` for both k3d and k3s paths.
 - Platform add-ons (`metrics-server`, `MetalLB`, `ingress-nginx`, `cert-manager`) are installed via Helm in `k3s/scripts/platform.sh`.
+- Local Docker-based latency automation is centralized in `Dev/LocalRuntimeLatency.sh` and uses the persistent helper container built from `Dev/LatencyHelper.dockerfile`.
+  Example: `./Dev/LocalRuntimeLatency.sh auto apply-auto`
+  Example: `ATLASNET_LOCAL_LATENCY_RUNTIME=k3d ./Dev/LocalRuntimeLatency.sh auto clear-all`
+  Auto mode selects Swarm shard containers or k3d worker node containers; if both are running, set `ATLASNET_LOCAL_LATENCY_RUNTIME`.
+  Deploy scripts also ensure the helper is running via `Dev/EnsureLatencyHelper.sh`.

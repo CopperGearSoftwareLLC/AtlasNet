@@ -44,6 +44,18 @@ add_custom_target(sandbox_atlasnet_run_k3d_fast
      DEPENDS AtlasnetDockerBuild_FastCached SandboxServerDockerBuild_Fast
      )
 
+add_custom_target(sandbox_atlasnet_apply_latency
+     COMMAND ${CMAKE_COMMAND} -E chdir ${CMAKE_SOURCE_DIR} bash ${CMAKE_SOURCE_DIR}/Dev/LocalRuntimeLatency.sh auto apply-auto
+     USES_TERMINAL
+     COMMENT "Local runtime: apply latency to a random auto-detected target"
+     )
+
+add_custom_target(sandbox_atlasnet_clear_latency
+     COMMAND ${CMAKE_COMMAND} -E chdir ${CMAKE_SOURCE_DIR} bash ${CMAKE_SOURCE_DIR}/Dev/LocalRuntimeLatency.sh auto clear-all
+     USES_TERMINAL
+     COMMENT "Local runtime: clear latency from the auto-detected target set"
+     )
+
 # k3s command routing (keep this surface area small).
 find_program(ATLASNET_MAKE_EXECUTABLE make REQUIRED)
 set(ATLASNET_K3S_DIR "${CMAKE_SOURCE_DIR}/k8s/k3s")
@@ -84,7 +96,7 @@ add_custom_target(k3s_02_setup_nodes
   COMMENT "Run all node setup steps (ssh, sudo, dependency)"
 )
 
-add_custom_target(k3s_03_deploy_and_platform
+add_custom_target(k3s_03_cluster_and_platform
   COMMAND "${ATLASNET_MAKE_EXECUTABLE}" -C "${ATLASNET_K3S_DIR}" "k3s-deploy"
   COMMAND "${ATLASNET_MAKE_EXECUTABLE}" -C "${ATLASNET_K3S_DIR}" "platform"
   WORKING_DIRECTORY "${CMAKE_SOURCE_DIR}"

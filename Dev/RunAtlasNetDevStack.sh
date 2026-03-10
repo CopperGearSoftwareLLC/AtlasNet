@@ -154,4 +154,7 @@ rm "$TEMP_STACK_FILE"
 
 wait_for_stack_services
 
+echo "Ensuring latency helper is running..."
+bash "${PWD}/EnsureLatencyHelper.sh"
+
 echo "Stack '$STACK_NAME' deployed successfully."

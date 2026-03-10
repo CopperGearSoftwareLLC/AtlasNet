@@ -660,6 +660,9 @@ fi
 
 sync_headlamp_default_kubeconfig
 
+echo "==> Ensuring latency helper is running..."
+bash "${REPO_ROOT}/Dev/EnsureLatencyHelper.sh"
+
 echo
 echo "Kubernetes services in namespace '$NAMESPACE':"
 kctl get svc -n "$NAMESPACE"
