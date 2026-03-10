@@ -22,21 +22,36 @@ function decodeConnectionRow(row) {
 
 function computeShardAverages(connections) {
   if (!connections || connections.length === 0) {
-    return { inAvg: 0, outAvg: 0 };
+    return { inAvg: 0, outAvg: 0, pingAvg: null };
   }
 
   let inSum = 0;
   let outSum = 0;
+  let pingSum = 0;
+  let pingCount = 0;
 
   for (const c of connections) {
     inSum += c.inBytesPerSec;
     outSum += c.outBytesPerSec;
+    if (Number.isFinite(c.pingMs) && c.pingMs >= 0) {
+      pingSum += c.pingMs;
+      pingCount += 1;
+    }
   }
 
   return {
     inAvg: inSum / connections.length,
     outAvg: outSum / connections.length,
+    pingAvg: pingCount > 0 ? pingSum / pingCount : null,
   };
+}
+
+function normalizeAvgPingMs(value) {
+  const pingMs = Number(value);
+  if (!Number.isFinite(pingMs) || pingMs < 0) {
+    return null;
+  }
+  return pingMs;
 }
 
 function toStringRows(telemetryVec) {
@@ -101,11 +116,12 @@ function buildNetworkTelemetry(ids, rows) {
 
   return orderedShardIds.map((id) => {
     const connections = rowsByShard.get(id) ?? [];
-    const { inAvg, outAvg } = computeShardAverages(connections);
+    const { inAvg, outAvg, pingAvg } = computeShardAverages(connections);
     return {
       shardId: id,
       downloadKbps: inAvg,
       uploadKbps: outAvg,
+      avgPingMs: pingAvg,
       connections,
     };
   });
@@ -147,5 +163,6 @@ function readNetworkTelemetry(addon, networkTelemetry, options = {}) {
 
 module.exports = {
   buildNetworkTelemetry,
+  normalizeAvgPingMs,
   readNetworkTelemetry,
 };

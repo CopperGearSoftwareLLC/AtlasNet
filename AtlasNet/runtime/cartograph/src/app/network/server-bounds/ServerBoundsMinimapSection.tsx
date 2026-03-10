@@ -2,6 +2,7 @@
 
 import { useMemo } from 'react';
 import type { Point2, ShardHoverBounds } from '../../map/core/mapData';
+import { formatPingMs } from '../../shared/networkTelemetryMetrics';
 import type { ServerBoundsShardSummary } from './serverBoundsTypes';
 
 interface ServerBoundsMinimapSectionProps {
@@ -238,6 +239,9 @@ function ShardSummaryCard({
         </div>
         <div className="rounded border border-slate-800 bg-slate-950 px-2 py-1 text-slate-300">
           out bytes: <span className="font-mono">{formatRate(summary.uploadKbps)}</span>
+        </div>
+        <div className="rounded border border-slate-800 bg-slate-950 px-2 py-1 text-slate-300">
+          avg ping: <span className="font-mono">{formatPingMs(summary.avgPingMs)}</span>
         </div>
       </div>
     </article>

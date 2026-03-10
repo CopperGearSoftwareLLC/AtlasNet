@@ -23,8 +23,10 @@ type ShardState = {
   shardId: string;
   downloadKbps: number;
   uploadKbps: number;
+  avgPingMs: number | null;
   downloadHistory: number[];
   uploadHistory: number[];
+  pingHistory: number[];
 };
 
 const HISTORY_LEN = 60;
@@ -42,7 +44,14 @@ export default function NetworkTelemetryPage() {
   const [pollIntervalMs, setPollIntervalMs] = useState(DEFAULT_POLL_INTERVAL_MS);
   const [showServerBoundsMinimap, setShowServerBoundsMinimap] = useState(true);
   const shardHistoryByIdRef = useRef<
-    Map<string, { downloadHistory: number[]; uploadHistory: number[] }>
+    Map<
+      string,
+      {
+        downloadHistory: number[];
+        uploadHistory: number[];
+        pingHistory: number[];
+      }
+    >
   >(new Map());
   const telemetryPollIntervalMs =
     pollIntervalMs >= POLL_DISABLED_AT_MS ? 0 : pollIntervalMs;
@@ -91,7 +100,11 @@ export default function NetworkTelemetryPage() {
     const previousById = shardHistoryByIdRef.current;
     const nextById = new Map<
       string,
-      { downloadHistory: number[]; uploadHistory: number[] }
+      {
+        downloadHistory: number[];
+        uploadHistory: number[];
+        pingHistory: number[];
+      }
     >();
 
     const rows = latestTelemetry.map((telemetry) => {
@@ -105,6 +118,10 @@ export default function NetworkTelemetryPage() {
           previous?.uploadHistory ?? [],
           telemetry.uploadKbps
         ),
+        pingHistory: pushRolling(
+          previous?.pingHistory ?? [],
+          telemetry.avgPingMs ?? 0
+        ),
       };
       nextById.set(telemetry.shardId, nextHistory);
 
@@ -112,8 +129,10 @@ export default function NetworkTelemetryPage() {
         shardId: telemetry.shardId,
         downloadKbps: telemetry.downloadKbps,
         uploadKbps: telemetry.uploadKbps,
+        avgPingMs: telemetry.avgPingMs,
         downloadHistory: nextHistory.downloadHistory,
         uploadHistory: nextHistory.uploadHistory,
+        pingHistory: nextHistory.pingHistory,
       };
     });
 
@@ -190,6 +209,8 @@ export default function NetworkTelemetryPage() {
             <th>Download Graph</th>
             <th align="right">Upload Avg</th>
             <th>Upload Graph</th>
+            <th align="right">Avg Ping</th>
+            <th>Ping Graph</th>
           </tr>
         </thead>
 
@@ -200,8 +221,10 @@ export default function NetworkTelemetryPage() {
               shardId={s.shardId}
               downloadKbps={s.downloadKbps}
               uploadKbps={s.uploadKbps}
+              avgPingMs={s.avgPingMs}
               downloadHistory={s.downloadHistory}
               uploadHistory={s.uploadHistory}
+              pingHistory={s.pingHistory}
               onOpenTelemetry={setSelectedShardId}
             />
           ))}

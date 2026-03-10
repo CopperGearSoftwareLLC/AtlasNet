@@ -1,4 +1,4 @@
-const { readNetworkTelemetry } = require('./networkTelemetry');
+const { normalizeAvgPingMs, readNetworkTelemetry } = require('./networkTelemetry');
 const { readEntityLedgersTelemetry } = require('./entityLedgerTelemetry');
 const { readHeuristicShapes } = require('./heuristicShapes');
 const {
@@ -45,6 +45,8 @@ function mergeNetworkTelemetryRows(primaryRows, secondaryRows) {
       const previousConnections = asArray(previous?.connections);
       const hasRowConnections = rowConnections.length > 0;
       const hasPreviousConnections = previousConnections.length > 0;
+      const rowAvgPingMs = normalizeAvgPingMs(row?.avgPingMs);
+      const previousAvgPingMs = normalizeAvgPingMs(previous?.avgPingMs);
 
       const next = {
         shardId,
@@ -54,6 +56,7 @@ function mergeNetworkTelemetryRows(primaryRows, secondaryRows) {
         uploadKbps: Number.isFinite(Number(row?.uploadKbps))
           ? Number(row.uploadKbps)
           : Number(previous?.uploadKbps) || 0,
+        avgPingMs: rowAvgPingMs ?? previousAvgPingMs,
         connections:
           hasRowConnections || !hasPreviousConnections
             ? rowConnections
@@ -66,6 +69,7 @@ function mergeNetworkTelemetryRows(primaryRows, secondaryRows) {
         byShardId.set(shardId, {
           ...previous,
           ...next,
+          avgPingMs: previousAvgPingMs ?? next.avgPingMs,
           connections:
             hasPreviousConnections && !hasRowConnections
               ? previousConnections

@@ -2,6 +2,7 @@
 
 import { useEffect } from 'react';
 import type { ShardTelemetry } from '../../shared/cartographTypes';
+import { formatPingMs } from '../../shared/networkTelemetryMetrics';
 
 function Metric({
   label,
@@ -73,9 +74,10 @@ export function TelemetryPanel({
           </div>
 
           {/* Summary */}
-          <div className="grid grid-cols-3 gap-4 rounded-2xl bg-slate-900/60 border border-slate-800 p-4">
+          <div className="grid grid-cols-4 gap-4 rounded-2xl bg-slate-900/60 border border-slate-800 p-4">
             <Metric label="Download" value={`${shard.downloadKbps.toFixed(1)} Bytes/s`} />
             <Metric label="Upload" value={`${shard.uploadKbps.toFixed(1)} Bytes/s`} />
+            <Metric label="Avg Ping" value={formatPingMs(shard.avgPingMs)} />
             <Metric label="Connections" value={shard.connections.length} />
           </div>
 

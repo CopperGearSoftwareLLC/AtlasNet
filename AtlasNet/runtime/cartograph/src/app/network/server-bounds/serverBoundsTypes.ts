@@ -13,4 +13,5 @@ export interface ServerBoundsShardSummary {
   connectionCount: number;
   downloadKbps: number;
   uploadKbps: number;
+  avgPingMs: number | null;
 }

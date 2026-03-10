@@ -1,4 +1,5 @@
 import type { ShardTelemetry } from '../../shared/cartographTypes';
+import { computeAveragePingMs } from '../../shared/networkTelemetryMetrics';
 
 export interface GraphNode {
   id: string;
@@ -11,12 +12,14 @@ export interface GraphEdge {
   to: string;
   inBytesPerSec: number;
   outBytesPerSec: number;
+  avgPingMs: number | null;
 }
 
 export interface GraphNodeStats {
   downloadKbps: number;
   uploadKbps: number;
   connections: number;
+  avgPingMs: number | null;
 }
 
 type ConnectionLike =
@@ -70,6 +73,7 @@ export function buildNetworkGraph(telemetry: ShardTelemetry[]): {
   const nodeIds = telemetry.map((shard) => shard.shardId);
   const nodeIdSet = new Set(nodeIds);
   const edgeMap = new Map<string, GraphEdge>();
+  const shardById = new Map(telemetry.map((shard) => [shard.shardId, shard]));
 
   for (const shard of telemetry) {
     for (const rawConnection of shard.connections as ConnectionLike[]) {
@@ -98,9 +102,22 @@ export function buildNetworkGraph(telemetry: ShardTelemetry[]): {
           to: targetId,
           inBytesPerSec: inRate,
           outBytesPerSec: outRate,
+          avgPingMs: null,
         });
       }
     }
+  }
+
+  for (const edge of edgeMap.values()) {
+    const sourceShard = shardById.get(edge.from);
+    if (!sourceShard) {
+      continue;
+    }
+    edge.avgPingMs = computeAveragePingMs(
+      sourceShard.connections.filter(
+        (connection) => getConnectionTarget(connection as ConnectionLike) === edge.to
+      )
+    );
   }
 
   return {
@@ -118,6 +135,7 @@ export function buildNodeStats(
       downloadKbps: shard.downloadKbps,
       uploadKbps: shard.uploadKbps,
       connections: shard.connections.length,
+      avgPingMs: shard.avgPingMs,
     });
   }
   return stats;

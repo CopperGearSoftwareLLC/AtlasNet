@@ -1,6 +1,7 @@
 'use client';
 
 import React from 'react';
+import { formatPingMs } from '../../shared/networkTelemetryMetrics';
 import { LineGraphCanvas } from './LineGraphCanvas';
 
 export type ShardTelemetryRowProps = {
@@ -9,10 +10,12 @@ export type ShardTelemetryRowProps = {
   /** Latest values (for table cells) */
   downloadKbps: number;
   uploadKbps: number;
+  avgPingMs: number | null;
 
   /** Rolling histories (for graphs) */
   downloadHistory: number[];
   uploadHistory: number[];
+  pingHistory: number[];
 
   /**
    * Called when the user wants to open the detailed telemetry side panel
@@ -28,8 +31,10 @@ export function ShardTelemetryRow({
   shardId,
   downloadKbps,
   uploadKbps,
+  avgPingMs,
   downloadHistory,
   uploadHistory,
+  pingHistory,
   onOpenTelemetry,
 }: ShardTelemetryRowProps) {
   return (
@@ -67,6 +72,14 @@ export function ShardTelemetryRow({
 
       <td style={{ padding: 8 }}>
         <LineGraphCanvas values={uploadHistory} width={220} height={60} />
+      </td>
+
+      <td style={{ padding: 8, textAlign: 'right', whiteSpace: 'nowrap' }}>
+        {formatPingMs(avgPingMs)}
+      </td>
+
+      <td style={{ padding: 8 }}>
+        <LineGraphCanvas values={pingHistory} width={220} height={60} />
       </td>
     </tr>
   );

@@ -687,6 +687,7 @@ export default function MapPage() {
             hoveredShardAnchor={hoveredShardAnchor}
             downloadBytesPerSec={hoveredTelemetry?.downloadKbps ?? 0}
             uploadBytesPerSec={hoveredTelemetry?.uploadKbps ?? 0}
+            avgPingMs={hoveredTelemetry?.avgPingMs ?? null}
             outgoingConnectionCount={hoveredShardEdgeLabels.length}
             workerNodeName={hoveredShardWorkerNode}
           />

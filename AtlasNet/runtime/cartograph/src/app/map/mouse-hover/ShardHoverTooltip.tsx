@@ -1,6 +1,7 @@
 'use client';
 
 import { formatRate } from '../core/mapData';
+import { formatPingMs } from '../../shared/networkTelemetryMetrics';
 
 interface HoverAnchor {
   x: number;
@@ -12,12 +13,14 @@ interface ShardHoverTooltipProps {
   hoveredShardAnchor: HoverAnchor | null;
   downloadBytesPerSec: number;
   uploadBytesPerSec: number;
+  avgPingMs: number | null;
   outgoingConnectionCount: number;
   workerNodeName: string | null;
 }
 
 export function ShardHoverTooltip({
   downloadBytesPerSec,
+  avgPingMs,
   hoveredShardAnchor,
   hoveredShardId,
   outgoingConnectionCount,
@@ -62,10 +65,13 @@ export function ShardHoverTooltip({
         {hoveredShardId}
       </div>
       <div style={{ color: '#cbd5e1', marginBottom: 4 }}>
+        Worker node: {workerNodeName || 'unknown'}
+      </div>
+      <div style={{ color: '#cbd5e1', marginBottom: 4 }}>
         Down {formatRate(downloadBytesPerSec)} B/s {' • '}Up {formatRate(uploadBytesPerSec)} B/s
       </div>
       <div style={{ color: '#cbd5e1', marginBottom: 4 }}>
-        Worker node: {workerNodeName || 'unknown'}
+        Avg ping: {formatPingMs(avgPingMs)}
       </div>
       <div style={{ color: '#94a3b8' }}>{outgoingConnectionCount} outgoing connections</div>
     </div>

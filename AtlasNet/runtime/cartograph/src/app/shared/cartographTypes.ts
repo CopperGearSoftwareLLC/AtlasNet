@@ -36,6 +36,7 @@ export interface ShardTelemetry {
   shardId: string;
   downloadKbps: number;
   uploadKbps: number;
+  avgPingMs: number | null;
   connections: ConnectionTelemetry[];
 }
 

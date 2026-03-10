@@ -173,6 +173,7 @@ export function useServerBoundsMinimapData({
         connectionCount: telemetry?.connections.length ?? 0,
         downloadKbps: telemetry?.downloadKbps ?? 0,
         uploadKbps: telemetry?.uploadKbps ?? 0,
+        avgPingMs: telemetry?.avgPingMs ?? null,
       });
     }
 

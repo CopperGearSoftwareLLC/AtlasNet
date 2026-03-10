@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from 'react';
 import type { MouseEvent, WheelEvent } from 'react';
+import { formatPingMs } from '../../shared/networkTelemetryMetrics';
 import type { GraphEdge, GraphNode, GraphNodeStats } from './networkGraph';
 
 const MIN_ZOOM = 0.3;
@@ -279,7 +280,7 @@ export function CircularNodeGraph({
           const screenY = pan.y + midY * zoom;
           const label = `In ${formatRate(edge.inBytesPerSec)} B/s • Out ${formatRate(
             edge.outBytesPerSec
-          )} B/s`;
+          )} B/s • Ping ${formatPingMs(edge.avgPingMs)}`;
 
           return (
             <text
@@ -308,7 +309,7 @@ export function CircularNodeGraph({
             <rect
               x={screenX}
               y={screenY}
-              width={180}
+              width={220}
               height={48}
               rx={8}
               fill="rgba(15, 23, 42, 0.85)"
@@ -334,7 +335,7 @@ export function CircularNodeGraph({
               y={screenY + 46}
               className="fill-slate-400 text-[9px]"
             >
-              {stats.connections} connections
+              Ping {formatPingMs(stats.avgPingMs)} • {stats.connections} connections
             </text>
           </g>
         );
