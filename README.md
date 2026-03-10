@@ -230,7 +230,7 @@ cmake --build build --target sandbox_atlasnet_run_k3d_fast
 - frees AtlasNet runtime ports
 - creates/uses k3d cluster `atlasnet-dev`
 - imports locally built images (`watchdog`, `proxy`, `cartograph`, `sandbox-server`)
-- deploys Kubernetes manifests from `deploy/k8s/overlays/k3d/`
+- deploys Kubernetes manifests from `k8s/manifests/`
 
 `sandbox_atlasnet_run_k3d_fast`:
 - still redeploys the full cluster

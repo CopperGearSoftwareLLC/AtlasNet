@@ -5,7 +5,7 @@ ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 REPO_ROOT="$(cd "$ROOT_DIR/../.." && pwd)"
 ENV_FILE="$ROOT_DIR/.env"
 KUBECONFIG_PATH="$ROOT_DIR/config/kubeconfig"
-BASE_TEMPLATE="$REPO_ROOT/deploy/k8s/overlays/k3d/atlasnet-dev.yaml"
+BASE_TEMPLATE="$REPO_ROOT/k8s/manifests/atlasnet-dev.yaml"
 
 die() { echo "ERROR: $*" >&2; exit 1; }
 need_cmd() { command -v "$1" >/dev/null 2>&1 || die "Missing '$1'. Install it first."; }

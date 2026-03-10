@@ -2,7 +2,7 @@
 # Native arm64 (Pi) build helper for AtlasNet
 #
 # Usage on the Pi:
-#   cd pi-native
+#   cd k8s/pi-native
 #   make deps           # (optional) install build deps via apt
 #   make vcpkg          # clone + bootstrap vcpkg into /opt/vcpkg
 #   make configure      # configure CMake for arm64 with vcpkg
@@ -16,8 +16,8 @@
 # Adjust if you prefer a different install location on the Pi.
 VCPKG_ROOT ?= /opt/vcpkg
 
-# AtlasNet repo root is the parent of this directory.
-ATLASNET_ROOT := $(abspath ..)
+# AtlasNet repo root is two levels up from this directory.
+ATLASNET_ROOT := $(abspath ../..)
 
 # Separate build dir for Pi native builds (keeps devcontainer build tree separate).
 BUILD_DIR ?= $(ATLASNET_ROOT)/build-pi
@@ -115,4 +115,3 @@ push-docker:
 	docker push "$(DOCKERHUB_NAMESPACE)/shard:$(ATLASNET_IMAGE_TAG)"
 	docker push "$(DOCKERHUB_NAMESPACE)/cartograph:$(ATLASNET_IMAGE_TAG)"
 	@echo "==> Done. Published arm64 images to Docker Hub namespace '$(DOCKERHUB_NAMESPACE)' with tag '$(ATLASNET_IMAGE_TAG)'."
-

@@ -5,7 +5,10 @@ CLUSTER_NAME="${1:-atlasnet-dev}"
 SHARD_IMAGE_NAME="${2:-sandbox-server:latest}"
 NAMESPACE="${ATLASNET_K8S_NAMESPACE:-atlasnet-dev}"
 SWARM_STACK_PREFIX="${ATLASNET_SWARM_STACK_PREFIX:-atlasnet_dev}"
-MANIFEST_TEMPLATE="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)/deploy/k8s/overlays/k3d/atlasnet-dev.yaml"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+K3D_DIR="$(cd "${SCRIPT_DIR}/.." && pwd)"
+REPO_ROOT="$(cd "${K3D_DIR}/../.." && pwd)"
+MANIFEST_TEMPLATE="${REPO_ROOT}/k8s/manifests/atlasnet-dev.yaml"
 K3D_SERVER_COUNT="${ATLASNET_K3D_SERVERS:-1}"
 K3D_AGENT_COUNT="${ATLASNET_K3D_AGENTS:-2}"
 PORT_WAIT_TIMEOUT="${ATLASNET_K3D_PORT_WAIT_TIMEOUT:-15}"
@@ -150,7 +153,7 @@ fi
 
 write_host_kubeconfig() {
     local server_lb host_cfg api_port cluster server_url
-    host_cfg="${ATLASNET_HOST_KUBECONFIG:-$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)/Dev/.kube/k3d-${CLUSTER_NAME}-host.yaml}"
+    host_cfg="${ATLASNET_HOST_KUBECONFIG:-${K3D_DIR}/.kube/k3d-${CLUSTER_NAME}-host.yaml}"
     mkdir -p "$(dirname "$host_cfg")"
 
     if ! k3d kubeconfig get "$CLUSTER_NAME" >"$host_cfg"; then

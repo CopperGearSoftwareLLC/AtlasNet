@@ -5,8 +5,8 @@ temp
 .cache
 imgui.ini
 logs
-Dev/.kube/
+k8s/k3d/.kube/
 /build-local
-deploy/k3s_slim/.env
+k8s/k3s/.env
 /AtlasNet/.vcpkg-temp
 /AtlasNet/build/vcpkg_installed

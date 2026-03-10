@@ -13,4 +13,4 @@ AtlasNet runtime deploy is handled by:
 ```bash
 make atlasnet-deploy
 ```
-from the `deploy/k3s_slim` folder.
+from the `k8s/k3s` folder.

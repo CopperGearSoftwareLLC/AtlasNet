@@ -73,4 +73,4 @@ echo " - $ATLASNET_SANDBOX_SERVER_IMAGE"
 echo " - $ATLASNET_CARTOGRAPH_IMAGE"
 echo
 echo "Next:"
-echo " - deploy/k3s_slim: make atlasnet-deploy"
+echo " - k8s/k3s: make atlasnet-deploy"

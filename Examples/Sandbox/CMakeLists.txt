@@ -23,8 +23,8 @@ endif()
 
 
 add_custom_target(sandbox_atlasnet_run_k3d
-     COMMAND ${CMAKE_COMMAND} -E chdir ${CMAKE_SOURCE_DIR} bash ${CMAKE_SOURCE_DIR}/Dev/FreePortsAndServices.sh
-     COMMAND ${CMAKE_COMMAND} -E chdir ${CMAKE_SOURCE_DIR}/Dev ${CMAKE_SOURCE_DIR}/Dev/RunAtlasNetK3dDev.sh atlasnet-dev ${SANDBOX_SERVER_IMAGE_NAME}
+     COMMAND ${CMAKE_COMMAND} -E chdir ${CMAKE_SOURCE_DIR} bash ${CMAKE_SOURCE_DIR}/k8s/k3d/scripts/FreePortsAndServices.sh
+     COMMAND ${CMAKE_COMMAND} -E chdir ${CMAKE_SOURCE_DIR} ${CMAKE_SOURCE_DIR}/k8s/k3d/scripts/RunAtlasNetK3dDev.sh atlasnet-dev ${SANDBOX_SERVER_IMAGE_NAME}
      COMMAND ${CMAKE_COMMAND} -E chdir ${CMAKE_SOURCE_DIR} bash ${CMAKE_SOURCE_DIR}/Dev/PruneUnusedDockerResources.sh
      USES_TERMINAL
      DEPENDS SandboxServerDockerBuild AtlasnetDockerBuild_Fast 
@@ -38,19 +38,19 @@ add_custom_target(sandbox_atlasnet_run_Docker
      )
 
 add_custom_target(sandbox_atlasnet_run_k3d_fast
-     COMMAND ${CMAKE_COMMAND} -E chdir ${CMAKE_SOURCE_DIR} bash ${CMAKE_SOURCE_DIR}/Dev/FreePortsAndServices.sh
-     COMMAND ${CMAKE_COMMAND} -E chdir ${CMAKE_SOURCE_DIR}/Dev ${CMAKE_SOURCE_DIR}/Dev/RunAtlasNetK3dDev.sh atlasnet-dev ${SANDBOX_SERVER_IMAGE_NAME}
+     COMMAND ${CMAKE_COMMAND} -E chdir ${CMAKE_SOURCE_DIR} bash ${CMAKE_SOURCE_DIR}/k8s/k3d/scripts/FreePortsAndServices.sh
+     COMMAND ${CMAKE_COMMAND} -E chdir ${CMAKE_SOURCE_DIR} ${CMAKE_SOURCE_DIR}/k8s/k3d/scripts/RunAtlasNetK3dDev.sh atlasnet-dev ${SANDBOX_SERVER_IMAGE_NAME}
      USES_TERMINAL
      DEPENDS AtlasnetDockerBuild_FastCached SandboxServerDockerBuild_Fast
      )
 
-# k3s slim command routing (keep this surface area small).
+# k3s command routing (keep this surface area small).
 find_program(ATLASNET_MAKE_EXECUTABLE make REQUIRED)
-set(ATLASNET_K3S_SLIM_DIR "${CMAKE_SOURCE_DIR}/deploy/k3s_slim")
+set(ATLASNET_K3S_DIR "${CMAKE_SOURCE_DIR}/k8s/k3s")
 
 function(add_k3s_target cmake_target make_target)
   add_custom_target(${cmake_target}
-    COMMAND "${ATLASNET_MAKE_EXECUTABLE}" -C "${ATLASNET_K3S_SLIM_DIR}" "${make_target}"
+    COMMAND "${ATLASNET_MAKE_EXECUTABLE}" -C "${ATLASNET_K3S_DIR}" "${make_target}"
     WORKING_DIRECTORY "${CMAKE_SOURCE_DIR}"
     USES_TERMINAL
     COMMENT "k3s: ${make_target}"
@@ -68,7 +68,7 @@ add_k3s_target(k3s_09_latency_clear_all latency-clear-all)
 
 # Consolidated workflows.
 add_custom_target(k3s_00_build_and_push
-  COMMAND "${ATLASNET_MAKE_EXECUTABLE}" -C "${ATLASNET_K3S_SLIM_DIR}" "atlasnet-push"
+  COMMAND "${ATLASNET_MAKE_EXECUTABLE}" -C "${ATLASNET_K3S_DIR}" "atlasnet-push"
   WORKING_DIRECTORY "${CMAKE_SOURCE_DIR}"
   USES_TERMINAL
   DEPENDS AtlasnetDockerBuild_Fast SandboxServerDockerBuild
@@ -76,17 +76,17 @@ add_custom_target(k3s_00_build_and_push
 )
 
 add_custom_target(k3s_02_setup_nodes
-  COMMAND "${ATLASNET_MAKE_EXECUTABLE}" -C "${ATLASNET_K3S_SLIM_DIR}" "ssh-setup"
-  COMMAND "${ATLASNET_MAKE_EXECUTABLE}" -C "${ATLASNET_K3S_SLIM_DIR}" "sudo-setup"
-  COMMAND "${ATLASNET_MAKE_EXECUTABLE}" -C "${ATLASNET_K3S_SLIM_DIR}" "dependency-setup"
+  COMMAND "${ATLASNET_MAKE_EXECUTABLE}" -C "${ATLASNET_K3S_DIR}" "ssh-setup"
+  COMMAND "${ATLASNET_MAKE_EXECUTABLE}" -C "${ATLASNET_K3S_DIR}" "sudo-setup"
+  COMMAND "${ATLASNET_MAKE_EXECUTABLE}" -C "${ATLASNET_K3S_DIR}" "dependency-setup"
   WORKING_DIRECTORY "${CMAKE_SOURCE_DIR}"
   USES_TERMINAL
   COMMENT "Run all node setup steps (ssh, sudo, dependency)"
 )
 
 add_custom_target(k3s_03_deploy_and_platform
-  COMMAND "${ATLASNET_MAKE_EXECUTABLE}" -C "${ATLASNET_K3S_SLIM_DIR}" "k3s-deploy"
-  COMMAND "${ATLASNET_MAKE_EXECUTABLE}" -C "${ATLASNET_K3S_SLIM_DIR}" "platform"
+  COMMAND "${ATLASNET_MAKE_EXECUTABLE}" -C "${ATLASNET_K3S_DIR}" "k3s-deploy"
+  COMMAND "${ATLASNET_MAKE_EXECUTABLE}" -C "${ATLASNET_K3S_DIR}" "platform"
   WORKING_DIRECTORY "${CMAKE_SOURCE_DIR}"
   USES_TERMINAL
   COMMENT "Deploy k3s cluster, then install platform add-ons"

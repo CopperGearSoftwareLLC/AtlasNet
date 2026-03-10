@@ -4,7 +4,7 @@ set -euo pipefail
 usage() {
     cat <<'EOF'
 Usage:
-  Dev/FreePortsAndServices.sh [--dry-run] [--keep-k3d-clusters] [--keep-k8s-services] [--keep-local-listeners] [port ...]
+  k8s/k3d/scripts/FreePortsAndServices.sh [--dry-run] [--keep-k3d-clusters] [--keep-k8s-services] [--keep-local-listeners] [port ...]
 
 Frees host ports by:
   1) Deleting k3d clusters whose load balancer publishes those ports
@@ -17,11 +17,11 @@ Default ports (if none provided):
   2555 3000 9229
 
 Examples:
-  Dev/FreePortsAndServices.sh
-  Dev/FreePortsAndServices.sh --dry-run
-  Dev/FreePortsAndServices.sh --keep-k3d-clusters --keep-k8s-services
-  Dev/FreePortsAndServices.sh --keep-local-listeners
-  Dev/FreePortsAndServices.sh 3000 2555
+  k8s/k3d/scripts/FreePortsAndServices.sh
+  k8s/k3d/scripts/FreePortsAndServices.sh --dry-run
+  k8s/k3d/scripts/FreePortsAndServices.sh --keep-k3d-clusters --keep-k8s-services
+  k8s/k3d/scripts/FreePortsAndServices.sh --keep-local-listeners
+  k8s/k3d/scripts/FreePortsAndServices.sh 3000 2555
 EOF
 }
 
