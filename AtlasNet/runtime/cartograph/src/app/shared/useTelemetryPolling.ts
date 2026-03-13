@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type {
   AuthorityEntityTelemetry,
+  RecomputeSnapshotsResponse,
   ShardPlacementTelemetry,
   ShapeJS,
   ShardTelemetry,
@@ -45,6 +46,11 @@ const EMPTY_WORKERS_SNAPSHOT: WorkersSnapshotResponse = {
   error: null,
   contexts: EMPTY_WORKERS_CONTEXTS,
 };
+const EMPTY_RECOMPUTE_SNAPSHOTS: RecomputeSnapshotsResponse = {
+  latestSnapshotId: 0,
+  latestUpdatedMs: null,
+  snapshots: [],
+};
 
 function toShapeArray(raw: unknown): ShapeJS[] {
   if (!Array.isArray(raw) || raw.length === 0) {
@@ -84,6 +90,26 @@ function toShardPlacementArray(raw: unknown): ShardPlacementTelemetry[] {
     return EMPTY_SHARD_PLACEMENT;
   }
   return raw as ShardPlacementTelemetry[];
+}
+
+function toHotspotSnapshotsResponse(raw: unknown): RecomputeSnapshotsResponse {
+  if (!raw || typeof raw !== 'object') {
+    return EMPTY_RECOMPUTE_SNAPSHOTS;
+  }
+
+  const payload = raw as Partial<RecomputeSnapshotsResponse>;
+  return {
+    latestSnapshotId:
+      typeof payload.latestSnapshotId === 'number' &&
+      Number.isFinite(payload.latestSnapshotId)
+        ? Math.max(0, Math.floor(payload.latestSnapshotId))
+        : 0,
+    latestUpdatedMs:
+      typeof payload.latestUpdatedMs === 'number' && Number.isFinite(payload.latestUpdatedMs)
+        ? Math.floor(payload.latestUpdatedMs)
+        : null,
+    snapshots: Array.isArray(payload.snapshots) ? payload.snapshots : [],
+  };
 }
 
 function usePolledResource<T>({
@@ -252,6 +278,27 @@ export function useHeuristicShapes({
     enabled,
     createInitialValue: () => [],
     mapResponse: toShapeArray,
+    resetOnException,
+    resetOnHttpError,
+    onException,
+    onHttpError,
+  });
+}
+
+export function useRecomputeSnapshots({
+  intervalMs = 0,
+  enabled = true,
+  resetOnException = false,
+  resetOnHttpError = false,
+  onException,
+  onHttpError,
+}: Partial<TelemetryPollingOptions> = {}): RecomputeSnapshotsResponse {
+  return usePolledResource<RecomputeSnapshotsResponse>({
+    url: '/api/recompute-snapshots',
+    intervalMs,
+    enabled,
+    createInitialValue: () => EMPTY_RECOMPUTE_SNAPSHOTS,
+    mapResponse: toHotspotSnapshotsResponse,
     resetOnException,
     resetOnHttpError,
     onException,

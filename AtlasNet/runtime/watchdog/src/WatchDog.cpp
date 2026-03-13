@@ -21,6 +21,7 @@
 #include "Global/Serialize/ByteReader.hpp"
 #include "Heuristic/Database/HeuristicManifest.hpp"
 #include "Heuristic/GridHeuristic/GridHeuristic.hpp"
+#include "Heuristic/HotspotSnapshotService.hpp"
 #include "Heuristic/HeuristicService.hpp"
 #include "Heuristic/IBounds.hpp"
 #include "Heuristic/IHeuristic.hpp"
@@ -281,6 +282,7 @@ void WatchDog::Init()
 	Interlink::Get().Init();
 	GlobalEvents::Get().Init();
 	HeuristicService::Ensure();
+	HotspotSnapshotService::Ensure();
 
 	// Legacy grid-cell heuristic is still available as a separate heuristic,
 	// but WatchDog now defaults to the Quadtree heuristic. For Voronoi

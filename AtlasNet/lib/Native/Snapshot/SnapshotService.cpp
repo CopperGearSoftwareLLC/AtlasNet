@@ -133,6 +133,9 @@ void SnapshotService::FetchAllTransforms(std::vector<Transform>& transforms)
 	for (const auto& [Key, Val] : keyvals)
 	{
 		ByteReader br(Val);
-		transforms.emplace_back(Transform{}).Deserialize(br);
+		while (br.remaining())
+		{
+			transforms.emplace_back(Transform{}).Deserialize(br);
+		}
 	}
 }
