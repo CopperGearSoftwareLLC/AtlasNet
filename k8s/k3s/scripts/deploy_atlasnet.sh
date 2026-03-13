@@ -127,6 +127,12 @@ fi
 : "${DOCKERHUB_EMAIL:=atlasnet@example.invalid}"
 : "${ATLASNET_WAIT_FOR_SHARD_READY:=true}"
 : "${ATLASNET_HELM_RELEASE_NAME:=atlasnet}"
+: "${ATLASNET_CARTOGRAPH_INGRESS_CLASS_NAME:=nginx}"
+: "${ATLASNET_CARTOGRAPH_INGRESS_HOST:=cartograph.atlasnet.local}"
+
+if [[ -z "$ATLASNET_CARTOGRAPH_INGRESS_HOST" ]]; then
+  die "ATLASNET_CARTOGRAPH_INGRESS_HOST must be set."
+fi
 
 if [[ -z "${DOCKERHUB_NAMESPACE}" ]] && [[ -z "${ATLASNET_WATCHDOG_IMAGE:-}" || -z "${ATLASNET_PROXY_IMAGE:-}" || -z "${ATLASNET_SANDBOX_SERVER_IMAGE:-}" || -z "${ATLASNET_CARTOGRAPH_IMAGE:-}" ]]; then
   die "Set DOCKERHUB_NAMESPACE in .env, or explicitly set all ATLASNET_*_IMAGE values."
@@ -153,6 +159,7 @@ echo " - proxy image: $ATLASNET_PROXY_IMAGE"
 echo " - sandbox server image: $ATLASNET_SANDBOX_SERVER_IMAGE"
 echo " - cartograph image: $ATLASNET_CARTOGRAPH_IMAGE"
 echo " - imagePullPolicy: $ATLASNET_IMAGE_PULL_POLICY"
+echo " - cartograph ingress host: $ATLASNET_CARTOGRAPH_INGRESS_HOST"
 
 warn_if_mixed_arch_cluster
 ensure_namespace
@@ -166,6 +173,8 @@ helm upgrade --install "$ATLASNET_HELM_RELEASE_NAME" "$CHART_DIR" \
   --set-string images.proxy="$ATLASNET_PROXY_IMAGE" \
   --set-string images.shard="$ATLASNET_SANDBOX_SERVER_IMAGE" \
   --set-string images.cartograph="$ATLASNET_CARTOGRAPH_IMAGE" \
+  --set-string cartograph.ingress.className="$ATLASNET_CARTOGRAPH_INGRESS_CLASS_NAME" \
+  --set-string cartograph.ingress.host="$ATLASNET_CARTOGRAPH_INGRESS_HOST" \
   --wait >/dev/null
 
 # Migration cleanup for earlier revisions where workload kinds differed.
@@ -188,3 +197,4 @@ report_image_pull_issues
 echo
 echo "Deployment complete."
 kubectl -n "$ATLASNET_K8S_NAMESPACE" get pods,svc -o wide
+echo "Cartograph ingress: http://$ATLASNET_CARTOGRAPH_INGRESS_HOST"

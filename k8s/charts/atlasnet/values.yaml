@@ -8,3 +8,10 @@ images:
   shard: sandbox-server:latest
   cartograph: cartograph:latest
   internaldb: valkey/valkey-bundle:latest
+
+cartograph:
+  ingress:
+    className: nginx
+    host: cartograph.atlasnet.local
+    path: /
+    pathType: Prefix

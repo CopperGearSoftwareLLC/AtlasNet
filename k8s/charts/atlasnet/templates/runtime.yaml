@@ -378,7 +378,7 @@ metadata:
   name: atlasnet-cartograph
   namespace: {{ .Release.Namespace }}
 spec:
-  type: LoadBalancer
+  type: ClusterIP
   selector:
     app: atlasnet-cartograph
   ports:
@@ -390,6 +390,26 @@ spec:
       protocol: TCP
       port: 9229
       targetPort: inspect
+{{ $cartographIngressHost := required "values.cartograph.ingress.host is required" .Values.cartograph.ingress.host }}
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: atlasnet-cartograph
+  namespace: {{ .Release.Namespace }}
+spec:
+  ingressClassName: {{ default "nginx" .Values.cartograph.ingress.className | quote }}
+  rules:
+    - host: {{ $cartographIngressHost | quote }}
+      http:
+        paths:
+          - path: {{ default "/" .Values.cartograph.ingress.path | quote }}
+            pathType: {{ default "Prefix" .Values.cartograph.ingress.pathType | quote }}
+            backend:
+              service:
+                name: atlasnet-cartograph
+                port:
+                  number: 3000
 ---
 apiVersion: apps/v1
 kind: StatefulSet

@@ -51,6 +51,18 @@ kubectl get pods -A -o wide
 ### Optional: Platform add-ons and host access
 `make platform` installs optional cluster add-ons from `.env`.
 
+Cartograph is exposed through ingress-nginx by default. Set the hostname you want in `.env`:
+```bash
+INSTALL_INGRESS_NGINX=true
+ATLASNET_CARTOGRAPH_INGRESS_HOST=cartograph.atlasnet.local
+```
+
+Then point that hostname at your ingress IP with DNS or `/etc/hosts`, and run:
+```bash
+make platform
+make atlasnet-deploy
+```
+
 ## Optional: Render chart locally
 Use the project kubeconfig and render/apply the shared AtlasNet chart manually:
 ```bash

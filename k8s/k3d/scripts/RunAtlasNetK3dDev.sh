@@ -20,8 +20,18 @@ IMAGE_PULL_POLICY="${ATLASNET_IMAGE_PULL_POLICY:-IfNotPresent}"
 WATCHDOG_IMAGE_NAME="${ATLASNET_WATCHDOG_IMAGE:-watchdog:latest}"
 PROXY_IMAGE_NAME="${ATLASNET_PROXY_IMAGE:-proxy:latest}"
 CARTOGRAPH_IMAGE_NAME="${ATLASNET_CARTOGRAPH_IMAGE:-cartograph:latest}"
+CARTOGRAPH_INGRESS_CLASS_NAME="${ATLASNET_K3D_CARTOGRAPH_INGRESS_CLASS_NAME:-traefik}"
+CARTOGRAPH_INGRESS_HOST="${ATLASNET_K3D_CARTOGRAPH_INGRESS_HOST:-cartograph.k3d.atlasnet.local}"
+CARTOGRAPH_LOOPBACK_PORT="${ATLASNET_K3D_CARTOGRAPH_LOOPBACK_PORT:-3000}"
+CARTOGRAPH_LOOPBACK_PORT_FALLBACK="${ATLASNET_K3D_CARTOGRAPH_LOOPBACK_PORT_FALLBACK:-13000}"
+CARTOGRAPH_INSPECT_PORT="${ATLASNET_K3D_CARTOGRAPH_INSPECT_PORT:-9229}"
+CARTOGRAPH_INSPECT_PORT_FALLBACK="${ATLASNET_K3D_CARTOGRAPH_INSPECT_PORT_FALLBACK:-19229}"
 HELM_RELEASE_NAME="${ATLASNET_HELM_RELEASE_NAME:-atlasnet}"
 HOST_KUBECONFIG_PATH=""
+ACTIVE_CARTOGRAPH_LOOPBACK_PORT=""
+ACTIVE_CARTOGRAPH_INSPECT_PORT=""
+PORT_FORWARD_PID_FILE=""
+PORT_FORWARD_LOG_FILE=""
 
 is_nonnegative_int() {
     [[ "$1" =~ ^[0-9]+$ ]]
@@ -111,7 +121,7 @@ port_in_use() {
 wait_for_ports_free() {
     local timeout="$PORT_WAIT_TIMEOUT"
     local elapsed=0
-    local ports=(3000 9229 2555)
+    local ports=(80 443 3000 9229 2555)
     while ((elapsed < timeout)); do
         local busy=0
         for p in "${ports[@]}"; do
@@ -129,8 +139,8 @@ wait_for_ports_free() {
     done
 
     echo "Error: ports are still busy after ${timeout}s; aborting k3d cluster startup." >&2
-    ss -ltnu | grep -E ':3000|:9229|:2555' || true
-    echo "Hint: if listeners are on 127.0.0.1:3000/9229, close VS Code forwarded ports for those values and retry." >&2
+    ss -ltnu | grep -E ':80|:443|:3000|:9229|:2555' || true
+    echo "Hint: free 80/443/3000/9229/2555 on the host, then retry." >&2
     echo "      In this repo, keep 3000/9229 out of static devcontainer forwardPorts to avoid k3d bind conflicts." >&2
     exit 1
 }
@@ -149,8 +159,8 @@ if ((CLUSTER_EXISTS == 0)); then
         --servers "$K3D_SERVER_COUNT" \
         --agents "$K3D_AGENT_COUNT" \
         --wait \
-        -p "3000:3000@loadbalancer" \
-        -p "9229:9229@loadbalancer" \
+        -p "80:80@loadbalancer" \
+        -p "443:443@loadbalancer" \
         -p "2555:2555/udp@loadbalancer" \
         --volume "/var/run/docker.sock:/var/run/docker.sock@all"
 else
@@ -208,6 +218,132 @@ write_host_kubeconfig() {
 }
 
 write_host_kubeconfig
+
+is_pid_running() {
+    local pid="${1:-}"
+    [[ -n "$pid" ]] || return 1
+    kill -0 "$pid" >/dev/null 2>&1
+}
+
+pick_loopback_port() {
+    local preferred="$1"
+    local fallback="$2"
+
+    if ! port_in_use "$preferred"; then
+        printf '%s\n' "$preferred"
+        return 0
+    fi
+    if ! port_in_use "$fallback"; then
+        printf '%s\n' "$fallback"
+        return 0
+    fi
+
+    return 1
+}
+
+stop_existing_cartograph_port_forward() {
+    local existing_pid=""
+
+    if [[ -f "$PORT_FORWARD_PID_FILE" ]]; then
+        existing_pid="$(<"$PORT_FORWARD_PID_FILE")"
+        if is_pid_running "$existing_pid"; then
+            kill "$existing_pid" >/dev/null 2>&1 || true
+            for _attempt in {1..20}; do
+                if ! is_pid_running "$existing_pid"; then
+                    break
+                fi
+                sleep 0.1
+            done
+            if is_pid_running "$existing_pid"; then
+                kill -9 "$existing_pid" >/dev/null 2>&1 || true
+            fi
+        fi
+        rm -f "$PORT_FORWARD_PID_FILE"
+    fi
+}
+
+ensure_cartograph_port_forward() {
+    local pf_pid=""
+
+    if ! command -v kubectl >/dev/null 2>&1; then
+        echo "Warning: kubectl is not installed; skipping Cartograph loopback port-forward."
+        return 0
+    fi
+    if ! command -v python3 >/dev/null 2>&1; then
+        echo "Warning: python3 is not installed; skipping Cartograph loopback port-forward."
+        return 0
+    fi
+    if [[ -z "${HOST_KUBECONFIG_PATH:-}" || ! -s "$HOST_KUBECONFIG_PATH" ]]; then
+        echo "Warning: host kubeconfig is unavailable; skipping Cartograph loopback port-forward."
+        return 0
+    fi
+
+    ACTIVE_CARTOGRAPH_LOOPBACK_PORT="$(pick_loopback_port "$CARTOGRAPH_LOOPBACK_PORT" "$CARTOGRAPH_LOOPBACK_PORT_FALLBACK")" \
+        || { echo "Error: no free host port available for Cartograph HTTP loopback (${CARTOGRAPH_LOOPBACK_PORT}/${CARTOGRAPH_LOOPBACK_PORT_FALLBACK})." >&2; return 1; }
+    ACTIVE_CARTOGRAPH_INSPECT_PORT="$(pick_loopback_port "$CARTOGRAPH_INSPECT_PORT" "$CARTOGRAPH_INSPECT_PORT_FALLBACK")" \
+        || { echo "Error: no free host port available for Cartograph inspect loopback (${CARTOGRAPH_INSPECT_PORT}/${CARTOGRAPH_INSPECT_PORT_FALLBACK})." >&2; return 1; }
+
+    if [[ "$ACTIVE_CARTOGRAPH_INSPECT_PORT" == "$ACTIVE_CARTOGRAPH_LOOPBACK_PORT" ]]; then
+        echo "Error: selected Cartograph loopback ports collide on $ACTIVE_CARTOGRAPH_LOOPBACK_PORT." >&2
+        return 1
+    fi
+
+    stop_existing_cartograph_port_forward
+
+    : >"$PORT_FORWARD_LOG_FILE"
+    rm -f "$PORT_FORWARD_PID_FILE"
+    pf_pid="$(python3 - <<'PY' "$HOST_KUBECONFIG_PATH" "$NAMESPACE" "$ACTIVE_CARTOGRAPH_LOOPBACK_PORT" "$ACTIVE_CARTOGRAPH_INSPECT_PORT" "$PORT_FORWARD_LOG_FILE" "$PORT_FORWARD_PID_FILE"
+import subprocess
+import sys
+
+kubeconfig, namespace, http_port, inspect_port, log_path, pid_path = sys.argv[1:]
+
+with open(log_path, "ab", buffering=0) as log_fp, open("/dev/null", "rb", buffering=0) as devnull:
+    proc = subprocess.Popen(
+        [
+            "kubectl",
+            "--kubeconfig",
+            kubeconfig,
+            "-n",
+            namespace,
+            "port-forward",
+            "service/atlasnet-cartograph",
+            f"{http_port}:3000",
+            f"{inspect_port}:9229",
+        ],
+        stdin=devnull,
+        stdout=log_fp,
+        stderr=subprocess.STDOUT,
+        close_fds=True,
+        start_new_session=True,
+    )
+
+with open(pid_path, "w", encoding="utf-8") as pid_fp:
+    pid_fp.write(f"{proc.pid}\n")
+
+print(proc.pid)
+PY
+)" || {
+        echo "Error: failed to launch Cartograph loopback port-forward." >&2
+        return 1
+    }
+
+    for _attempt in {1..50}; do
+        if port_in_use "$ACTIVE_CARTOGRAPH_LOOPBACK_PORT" && port_in_use "$ACTIVE_CARTOGRAPH_INSPECT_PORT"; then
+            return 0
+        fi
+        if ! is_pid_running "$pf_pid"; then
+            break
+        fi
+        sleep 0.1
+    done
+
+    echo "Error: failed to establish Cartograph loopback port-forward." >&2
+    if [[ -s "$PORT_FORWARD_LOG_FILE" ]]; then
+        sed -n '1,80p' "$PORT_FORWARD_LOG_FILE" >&2
+    fi
+    return 1
+}
 
 sync_headlamp_default_kubeconfig() {
     if [[ "${ATLASNET_HEADLAMP_KUBECONFIG_SYNC:-1}" != "1" ]]; then
@@ -592,6 +728,8 @@ helm template "$HELM_RELEASE_NAME" "$CHART_DIR" \
     --set-string images.proxy="$PROXY_IMAGE_NAME" \
     --set-string images.shard="$SHARD_IMAGE_NAME" \
     --set-string images.cartograph="$CARTOGRAPH_IMAGE_NAME" \
+    --set-string cartograph.ingress.className="$CARTOGRAPH_INGRESS_CLASS_NAME" \
+    --set-string cartograph.ingress.host="$CARTOGRAPH_INGRESS_HOST" \
     >"$TEMP_MANIFEST"
 
 if [[ "$KUBECTL_MODE" == "incluster" ]]; then
@@ -659,6 +797,10 @@ else
 fi
 
 sync_headlamp_default_kubeconfig
+PORT_FORWARD_PID_FILE="${ATLASNET_K3D_CARTOGRAPH_PORT_FORWARD_PID_FILE:-/tmp/atlasnet-k3d-${CLUSTER_NAME}-cartograph-port-forward.pid}"
+PORT_FORWARD_LOG_FILE="${ATLASNET_K3D_CARTOGRAPH_PORT_FORWARD_LOG_FILE:-/tmp/atlasnet-k3d-${CLUSTER_NAME}-cartograph-port-forward.log}"
+echo "==> Ensuring Cartograph loopback port-forward..."
+ensure_cartograph_port_forward
 
 echo "==> Ensuring latency helper is running..."
 bash "${REPO_ROOT}/Dev/EnsureLatencyHelper.sh"
@@ -668,6 +810,8 @@ echo "Kubernetes services in namespace '$NAMESPACE':"
 kctl get svc -n "$NAMESPACE"
 echo
 echo "Cluster '$CLUSTER_NAME' is ready."
-echo "Cartograph: http://127.0.0.1:3000"
+echo "Cartograph: http://${CARTOGRAPH_INGRESS_HOST}"
+echo "Cartograph loopback: http://127.0.0.1:${ACTIVE_CARTOGRAPH_LOOPBACK_PORT}"
+echo "Cartograph inspect loopback: 127.0.0.1:${ACTIVE_CARTOGRAPH_INSPECT_PORT}"
 echo "Proxy UDP: 127.0.0.1:2555"
 echo "InternalDB: Cluster-internal service (internaldb:6379)"

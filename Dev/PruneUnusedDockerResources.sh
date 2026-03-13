@@ -27,10 +27,31 @@ if ! docker info >/dev/null 2>&1; then
     exit 1
 fi
 
-echo "==> Pruning unused Docker images..."
-docker image prune --all --force
+run_prune_step() {
+    local label="$1"
+    shift
 
-echo "==> Pruning unused Docker volumes..."
-docker volume prune --force
+    local output=""
+    local status=0
+
+    echo "==> ${label}..."
+    if ! output="$("$@" 2>&1)"; then
+        status=$?
+        echo "Error: ${label} failed." >&2
+        if [[ -n "$output" ]]; then
+            printf '%s\n' "$output" >&2
+        fi
+        exit "$status"
+    fi
+
+    if [[ -n "$output" ]]; then
+        printf '%s\n' "$output"
+    else
+        echo "(no Docker output)"
+    fi
+}
+
+run_prune_step "Pruning unused Docker images" docker image prune --all --force
+run_prune_step "Pruning unused Docker volumes" docker volume prune --force
 
 echo "==> Docker prune complete."
