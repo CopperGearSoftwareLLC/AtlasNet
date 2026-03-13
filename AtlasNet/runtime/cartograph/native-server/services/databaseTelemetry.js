@@ -275,12 +275,73 @@ function parseVoronoiShapeBoundsRaw(raw, offset) {
   }
   try {
     const id = raw.readUInt32BE(offset);
-    const pointCount = raw.readUInt32BE(offset + 4);
-    if (!Number.isFinite(pointCount) || pointCount < 3 || pointCount > 8192) {
-      return null;
+    const versionOrPointCount = raw.readUInt32BE(offset + 4);
+
+    if (versionOrPointCount <= 2) {
+      const version = versionOrPointCount;
+      if (version !== 1 || offset + 20 > raw.length) {
+        return null;
+      }
+
+      const site = {
+        x: raw.readFloatBE(offset + 8),
+        y: raw.readFloatBE(offset + 12),
+      };
+      const halfPlaneCount = raw.readUInt32BE(offset + 16);
+      if (!Number.isFinite(halfPlaneCount) || halfPlaneCount < 0 || halfPlaneCount > 8192) {
+        return null;
+      }
+
+      let cursor = offset + 20;
+      const halfPlanes = [];
+      for (let i = 0; i < halfPlaneCount; i += 1) {
+        if (cursor + 12 > raw.length) {
+          return null;
+        }
+        const nx = raw.readFloatBE(cursor);
+        const ny = raw.readFloatBE(cursor + 4);
+        const c = raw.readFloatBE(cursor + 8);
+        if (!Number.isFinite(nx) || !Number.isFinite(ny) || !Number.isFinite(c)) {
+          return null;
+        }
+        halfPlanes.push({ nx, ny, c });
+        cursor += 12;
+      }
+
+      if (cursor + 4 > raw.length) {
+        return null;
+      }
+      const pointCount = raw.readUInt32BE(cursor);
+      cursor += 4;
+      if (!Number.isFinite(pointCount) || pointCount < 0 || pointCount > 8192) {
+        return null;
+      }
+
+      const points = [];
+      for (let i = 0; i < pointCount; i += 1) {
+        if (cursor + 8 > raw.length) {
+          return null;
+        }
+        const x = raw.readFloatBE(cursor);
+        const y = raw.readFloatBE(cursor + 4);
+        if (!Number.isFinite(x) || !Number.isFinite(y)) {
+          return null;
+        }
+        points.push({ x, y });
+        cursor += 8;
+      }
+
+      return {
+        nextOffset: cursor,
+        bound: { id, site, halfPlanes, points },
+      };
     }
 
     let cursor = offset + 8;
+    const pointCount = versionOrPointCount;
+    if (!Number.isFinite(pointCount) || pointCount < 3 || pointCount > 8192) {
+      return null;
+    }
     const points = [];
     for (let i = 0; i < pointCount; i += 1) {
       if (cursor + 8 > raw.length) {
@@ -558,7 +619,64 @@ function decodeVoronoiBounds(base64Value) {
   }
   try {
     const id = raw.readUInt32BE(0);
-    const count = raw.readUInt32BE(4);
+    const versionOrCount = raw.readUInt32BE(4);
+    if (versionOrCount <= 2) {
+      const version = versionOrCount;
+      if (version !== 1 || raw.length < 20) {
+        return null;
+      }
+
+      const site = {
+        x: raw.readFloatBE(8),
+        y: raw.readFloatBE(12),
+      };
+      const halfPlaneCount = raw.readUInt32BE(16);
+      if (!Number.isFinite(halfPlaneCount) || halfPlaneCount < 0 || halfPlaneCount > 2048) {
+        return null;
+      }
+
+      let offset = 20;
+      const halfPlanes = [];
+      for (let i = 0; i < halfPlaneCount; i += 1) {
+        if (offset + 12 > raw.length) {
+          return null;
+        }
+        const nx = raw.readFloatBE(offset);
+        const ny = raw.readFloatBE(offset + 4);
+        const c = raw.readFloatBE(offset + 8);
+        offset += 12;
+        if (!Number.isFinite(nx) || !Number.isFinite(ny) || !Number.isFinite(c)) {
+          return null;
+        }
+        halfPlanes.push({ nx, ny, c });
+      }
+
+      if (offset + 4 > raw.length) {
+        return null;
+      }
+      const count = raw.readUInt32BE(offset);
+      offset += 4;
+      if (!Number.isFinite(count) || count < 0 || count > 2048) {
+        return null;
+      }
+
+      const points = [];
+      for (let i = 0; i < count; i += 1) {
+        if (offset + 8 > raw.length) {
+          return null;
+        }
+        const x = raw.readFloatBE(offset);
+        const y = raw.readFloatBE(offset + 4);
+        offset += 8;
+        if (!Number.isFinite(x) || !Number.isFinite(y)) {
+          return null;
+        }
+        points.push({ x, y });
+      }
+      return { id, site, halfPlanes, points };
+    }
+
+    const count = versionOrCount;
     if (!Number.isFinite(count) || count < 3 || count > 2048) {
       return null;
     }
@@ -582,7 +700,70 @@ function decodeVoronoiBounds(base64Value) {
   }
 }
 
-function toPolygonShape(id, points, ownerId, color) {
+function normalizeSite(value) {
+  if (!value || typeof value !== 'object') {
+    return undefined;
+  }
+  const x = Number(value.x);
+  const y = Number(value.y);
+  if (!Number.isFinite(x) || !Number.isFinite(y)) {
+    return undefined;
+  }
+  return { x, y };
+}
+
+function normalizeHalfPlanes(value) {
+  if (!Array.isArray(value)) {
+    return undefined;
+  }
+
+  const halfPlanes = [];
+  for (const plane of value) {
+    if (!plane || typeof plane !== 'object') {
+      continue;
+    }
+    const nx = Number(plane.nx ?? plane.normal?.x ?? plane.n?.x);
+    const ny = Number(plane.ny ?? plane.normal?.y ?? plane.n?.y);
+    const c = Number(plane.c ?? plane.offset ?? plane.constant);
+    if (!Number.isFinite(nx) || !Number.isFinite(ny) || !Number.isFinite(c)) {
+      continue;
+    }
+    halfPlanes.push({ nx, ny, c });
+  }
+
+  return halfPlanes.length > 0 ? halfPlanes : undefined;
+}
+
+function toVoronoiShape(bounds, ownerId, color) {
+  if (!bounds || typeof bounds !== 'object') {
+    return null;
+  }
+
+  if (Array.isArray(bounds.points) && bounds.points.length >= 3) {
+    return toPolygonShape(bounds.id, bounds.points, ownerId, color, bounds);
+  }
+
+  const site = normalizeSite(bounds.site);
+  const halfPlanes = normalizeHalfPlanes(bounds.halfPlanes);
+  if (!site || !halfPlanes) {
+    return null;
+  }
+
+  return {
+    id: String(bounds.id),
+    ownerId: ownerId || '',
+    type: 3,
+    position: site,
+    radius: 0,
+    size: { x: 0, y: 0 },
+    color,
+    points: [],
+    site,
+    halfPlanes,
+  };
+}
+
+function toPolygonShape(id, points, ownerId, color, extras = null) {
   if (!Array.isArray(points) || points.length < 3) {
     return null;
   }
@@ -614,6 +795,9 @@ function toPolygonShape(id, points, ownerId, color) {
     y: Number(p.y) - cy,
   }));
 
+  const site = normalizeSite(extras?.site);
+  const halfPlanes = normalizeHalfPlanes(extras?.halfPlanes);
+
   return {
     id: String(id),
     ownerId: ownerId || '',
@@ -623,6 +807,8 @@ function toPolygonShape(id, points, ownerId, color) {
     size: { x: Math.abs(maxX - minX), y: Math.abs(maxY - minY) },
     color,
     points: localPoints,
+    site,
+    halfPlanes,
   };
 }
 
@@ -986,8 +1172,8 @@ async function readHeuristicShapesFromDatabase() {
             : 'rgba(255, 149, 100, 1)';
 
           let shape = null;
-          if (isVoronoi && Array.isArray(bound.points)) {
-            shape = toPolygonShape(bound.id, bound.points, ownerId, color);
+          if (isVoronoi) {
+            shape = toVoronoiShape(bound, ownerId, color);
           } else if (bound.min && bound.max) {
             shape = toBoundsPolygonShape(bound, ownerId, color);
           }
@@ -1018,12 +1204,7 @@ async function readHeuristicShapesFromDatabase() {
         if (legacyHeuristicType === 'Voronoi') {
           const decoded = decodeVoronoiBounds(value.BoundsData64);
           if (decoded) {
-            shape = toPolygonShape(
-              decoded.id,
-              decoded.points,
-              '',
-              'rgba(255, 149, 100, 1)'
-            );
+            shape = toVoronoiShape(decoded, '', 'rgba(255, 149, 100, 1)');
           }
         }
         if (!shape) {
@@ -1055,12 +1236,7 @@ async function readHeuristicShapesFromDatabase() {
         if (legacyHeuristicType === 'Voronoi') {
           const decoded = decodeVoronoiBounds(value.BoundsData64);
           if (decoded) {
-            shape = toPolygonShape(
-              decoded.id,
-              decoded.points,
-              ownerId,
-              'rgba(100, 255, 149, 1)'
-            );
+            shape = toVoronoiShape(decoded, ownerId, 'rgba(100, 255, 149, 1)');
           }
         }
         if (!shape) {

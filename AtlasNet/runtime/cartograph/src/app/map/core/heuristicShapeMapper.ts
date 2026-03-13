@@ -1,4 +1,5 @@
-import type { ShapeJS, Vec2 } from '../../shared/cartographTypes';
+import type { HalfPlane2, ShapeJS, Vec2 } from '../../shared/cartographTypes';
+import { normalizeHalfPlanes, normalizePoint } from './shapeGeometry';
 
 interface RawShape {
   id?: unknown;
@@ -16,6 +17,8 @@ interface RawShape {
   vertices?: unknown;
   points?: unknown;
   color?: unknown;
+  site?: unknown;
+  halfPlanes?: unknown;
 }
 
 function asNumber(value: unknown, fallback = 0): number {
@@ -51,6 +54,15 @@ function toPoints(points: unknown): Vec2[] {
   return result;
 }
 
+function toSite(value: unknown): Vec2 | undefined {
+  return normalizePoint(value) ?? undefined;
+}
+
+function toHalfPlanes(value: unknown): HalfPlane2[] | undefined {
+  const halfPlanes = normalizeHalfPlanes(value);
+  return halfPlanes.length > 0 ? halfPlanes : undefined;
+}
+
 function convertShape(rawShape: RawShape): ShapeJS {
   const shape: ShapeJS = {
     id: rawShape.id == null ? undefined : String(rawShape.id),
@@ -61,6 +73,8 @@ function convertShape(rawShape: RawShape): ShapeJS {
       y: asNumber(rawShape.position?.y),
     },
     color: rawShape.color == null ? undefined : String(rawShape.color),
+    site: toSite(rawShape.site),
+    halfPlanes: toHalfPlanes(rawShape.halfPlanes),
   };
 
   switch (asNumber(rawShape.type, -1)) {

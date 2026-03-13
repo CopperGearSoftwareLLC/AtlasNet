@@ -1,4 +1,5 @@
 import type { ShapeJS } from '../../shared/cartographTypes';
+import { resolveShapeWorldPolygon } from './shapeGeometry';
 
 export type MapViewMode = '2d' | '3d';
 export type MapProjectionMode = 'orthographic' | 'perspective';
@@ -388,6 +389,23 @@ export function createMapRenderer({
       return null;
     }
     return { x: projected.x, y: projected.y };
+  }
+
+  function getViewportWorldPolygon(): { x: number; y: number }[] {
+    const corners = [
+      screenToWorldMap(0, 0),
+      screenToWorldMap(canvasWidth(), 0),
+      screenToWorldMap(canvasWidth(), canvasHeight()),
+      screenToWorldMap(0, canvasHeight()),
+    ];
+
+    const out: { x: number; y: number }[] = [];
+    for (const corner of corners) {
+      if (corner && Number.isFinite(corner.x) && Number.isFinite(corner.y)) {
+        out.push(corner);
+      }
+    }
+    return out.length >= 3 ? out : [];
   }
 
   function getEntityFocusRadius3D(
@@ -1067,6 +1085,7 @@ export function createMapRenderer({
       return;
     }
 
+    const viewportPolygon = getViewportWorldPolygon();
     for (const shape of shapes) {
       const x = shape.position.x * scale2D + offsetX;
       const y = shape.position.y * scale2D + offsetY;
@@ -1094,16 +1113,24 @@ export function createMapRenderer({
           break;
         }
         case 'polygon': {
-          const pts = shape.points ?? [];
-          if (pts.length > 0) {
+          const worldPts = resolveShapeWorldPolygon(shape, viewportPolygon);
+          if (worldPts.length > 0) {
+            ctx.restore();
             ctx.beginPath();
-            ctx.moveTo(pts[0].x, pts[0].y);
-            for (let i = 1; i < pts.length; i += 1) {
-              ctx.lineTo(pts[i].x, pts[i].y);
+            ctx.moveTo(
+              worldPts[0].x * scale2D + offsetX,
+              worldPts[0].y * scale2D + offsetY
+            );
+            for (let i = 1; i < worldPts.length; i += 1) {
+              ctx.lineTo(
+                worldPts[i].x * scale2D + offsetX,
+                worldPts[i].y * scale2D + offsetY
+              );
             }
             ctx.closePath();
             ctx.strokeStyle = color;
             ctx.stroke();
+            continue;
           }
           break;
         }
@@ -1132,6 +1159,7 @@ export function createMapRenderer({
       return;
     }
 
+    const viewportPolygon = getViewportWorldPolygon();
     for (const shape of shapes) {
       const base = shapePositionToWorld(shape);
       const color = shape.color ?? 'rgba(100, 149, 255, 1)';
@@ -1177,12 +1205,12 @@ export function createMapRenderer({
           break;
         }
         case 'polygon': {
-          const localPts = shape.points ?? [];
-          if (localPts.length >= 2) {
-            const worldPts = localPts.map((p) => ({
-              x: base.x + (p.x ?? 0),
-              y: base.y + ((p as { z?: number }).z ?? 0),
-              z: base.z + (p.y ?? 0),
+          const polygonPts = resolveShapeWorldPolygon(shape, viewportPolygon);
+          if (polygonPts.length >= 2) {
+            const worldPts = polygonPts.map((p) => ({
+              x: p.x,
+              y: base.y,
+              z: p.y,
             }));
             drawPolyline3D(worldPts, true, color, 1.5);
           }

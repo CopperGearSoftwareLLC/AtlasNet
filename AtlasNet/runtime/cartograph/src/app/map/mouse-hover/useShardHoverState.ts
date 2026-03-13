@@ -2,17 +2,18 @@
 
 import { useCallback, useEffect, useRef } from 'react';
 import type { Dispatch, SetStateAction } from 'react';
-import type { ShardHoverBounds } from '../core/mapData';
-
-interface Point2 {
-  x: number;
-  y: number;
-}
+import {
+  pointWithinShardRegion,
+  type Point2,
+  type ShardHoverBounds,
+  type ShardHoverRegion,
+} from '../core/mapData';
 
 interface UseShardHoverStateArgs {
   showShardHoverDetails: boolean;
   networkNodeIdSet: Set<string>;
   shardHoverBoundsById: Map<string, ShardHoverBounds>;
+  shardHoverRegionsById: Map<string, ShardHoverRegion[]>;
   shardHoverPolygonsById: Map<string, Point2[][]>;
   hoveredShardId: string | null;
   setHoveredShardId: Dispatch<SetStateAction<string | null>>;
@@ -33,32 +34,15 @@ function pointWithinBounds(point: Point2, bounds: ShardHoverBounds): boolean {
   );
 }
 
-function pointInPolygon(point: Point2, polygon: Point2[]): boolean {
-  if (polygon.length < 3) {
-    return false;
-  }
-
-  // Ray casting: count edge crossings to the right.
-  let inside = false;
-  for (let i = 0, j = polygon.length - 1; i < polygon.length; j = i, i += 1) {
-    const xi = polygon[i].x;
-    const yi = polygon[i].y;
-    const xj = polygon[j].x;
-    const yj = polygon[j].y;
-
-    const intersects =
-      yi > point.y !== yj > point.y &&
-      point.x < ((xj - xi) * (point.y - yi)) / (yj - yi + 1e-12) + xi;
-    if (intersects) {
-      inside = !inside;
-    }
-  }
-  return inside;
-}
-
 function pointWithinAnyPolygon(point: Point2, polygons: Point2[][]): boolean {
   for (const polygon of polygons) {
-    if (pointInPolygon(point, polygon)) {
+    if (
+      pointWithinShardRegion(point, {
+        kind: 'polygon',
+        points: polygon,
+        area: Number.POSITIVE_INFINITY,
+      })
+    ) {
       return true;
     }
   }
@@ -71,11 +55,13 @@ export function useShardHoverState({
   setHoveredShardAnchor,
   setHoveredShardId,
   shardHoverBoundsById,
+  shardHoverRegionsById,
   shardHoverPolygonsById,
   showShardHoverDetails,
 }: UseShardHoverStateArgs): UseShardHoverStateResult {
   const showShardHoverDetailsRef = useRef(showShardHoverDetails);
   const shardHoverBoundsByIdRef = useRef<Map<string, ShardHoverBounds>>(new Map());
+  const shardHoverRegionsByIdRef = useRef<Map<string, ShardHoverRegion[]>>(new Map());
   const shardHoverPolygonsByIdRef = useRef<Map<string, Point2[][]>>(new Map());
   const networkNodeIdSetRef = useRef<Set<string>>(new Set());
 
@@ -100,6 +86,10 @@ export function useShardHoverState({
   }, [shardHoverBoundsById]);
 
   useEffect(() => {
+    shardHoverRegionsByIdRef.current = shardHoverRegionsById;
+  }, [shardHoverRegionsById]);
+
+  useEffect(() => {
     shardHoverPolygonsByIdRef.current = shardHoverPolygonsById;
   }, [shardHoverPolygonsById]);
 
@@ -118,8 +108,57 @@ export function useShardHoverState({
 
       let nextHoveredId: string | null = null;
       let smallestArea = Infinity;
+      let nearestInfiniteDistance = Infinity;
 
-      for (const [shardId, bounds] of shardHoverBoundsByIdRef.current) {
+      for (const shardId of networkNodeIdSetRef.current) {
+        const bounds = shardHoverBoundsByIdRef.current.get(shardId);
+        const regions = shardHoverRegionsByIdRef.current.get(shardId) ?? [];
+
+        if (regions.length > 0) {
+          let matchedArea = Infinity;
+          let matchedInfiniteDistance = Infinity;
+          let matchedRegion = false;
+
+          for (const region of regions) {
+            if (!pointWithinShardRegion(point, region)) {
+              continue;
+            }
+            matchedRegion = true;
+            if (Number.isFinite(region.area)) {
+              matchedArea = Math.min(matchedArea, region.area);
+              continue;
+            }
+            if (region.kind === 'halfPlaneCell') {
+              const dx = point.x - region.site.x;
+              const dy = point.y - region.site.y;
+              matchedInfiniteDistance = Math.min(
+                matchedInfiniteDistance,
+                Math.hypot(dx, dy)
+              );
+            }
+          }
+
+          if (!matchedRegion) {
+            continue;
+          }
+
+          if (
+            matchedArea < smallestArea ||
+            (!Number.isFinite(matchedArea) &&
+              !Number.isFinite(smallestArea) &&
+              matchedInfiniteDistance < nearestInfiniteDistance)
+          ) {
+            smallestArea = matchedArea;
+            nearestInfiniteDistance = matchedInfiniteDistance;
+            nextHoveredId = shardId;
+          }
+          continue;
+        }
+
+        if (!bounds) {
+          continue;
+        }
+
         if (!networkNodeIdSetRef.current.has(shardId)) {
           continue;
         }
@@ -136,6 +175,7 @@ export function useShardHoverState({
 
         if (bounds.area < smallestArea) {
           smallestArea = bounds.area;
+          nearestInfiniteDistance = Infinity;
           nextHoveredId = shardId;
         }
       }

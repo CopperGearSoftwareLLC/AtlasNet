@@ -267,13 +267,18 @@ async function collectAuthorityTelemetry({ addon, entityLedgersView }) {
 }
 
 async function collectHeuristicShapes({ addon }) {
+  const databaseShapes = await readHeuristicShapesFromDatabase();
+  if (databaseShapes.length > 0) {
+    return databaseShapes;
+  }
+
   const hasAddon = Boolean(
     addon && addon.HeuristicDraw && addon.std_vector_IBoundsDrawShape_
   );
   if (hasAddon) {
     return readHeuristicShapes(addon);
   }
-  return readHeuristicShapesFromDatabase();
+  return [];
 }
 
 async function collectTransferManifest() {

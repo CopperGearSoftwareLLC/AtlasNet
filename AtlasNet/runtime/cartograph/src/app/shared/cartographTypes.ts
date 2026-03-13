@@ -3,6 +3,12 @@ export interface Vec2 {
   y: number;
 }
 
+export interface HalfPlane2 {
+  nx: number;
+  ny: number;
+  c: number;
+}
+
 export interface ShapeJS {
   id?: string;
   ownerId?: string;
@@ -11,6 +17,8 @@ export interface ShapeJS {
   radius?: number;
   size?: Vec2;
   points?: Vec2[];
+  site?: Vec2;
+  halfPlanes?: HalfPlane2[];
   color?: string;
   label?: string;
 }

@@ -639,7 +639,62 @@ function tryDecodeVoronoiHeuristicRaw(raw, count) {
       return null;
     }
     const shapeId = cursor.readU32();
-    const pointCount = cursor.readU32();
+    const versionOrPointCount = cursor.readU32();
+
+    if (versionOrPointCount <= 2) {
+      const version = versionOrPointCount;
+      if (version !== 1 || cursor.remaining() < 12) {
+        return null;
+      }
+
+      const site = {
+        x: cursor.readF32(),
+        y: cursor.readF32(),
+      };
+      const halfPlaneCount = cursor.readU32();
+      if (!Number.isFinite(halfPlaneCount) || halfPlaneCount < 0 || halfPlaneCount > 8192) {
+        return null;
+      }
+      const halfPlanes = [];
+      for (let p = 0; p < halfPlaneCount; p += 1) {
+        if (cursor.remaining() < 12) {
+          return null;
+        }
+        halfPlanes.push({
+          nx: cursor.readF32(),
+          ny: cursor.readF32(),
+          c: cursor.readF32(),
+        });
+      }
+
+      if (cursor.remaining() < 4) {
+        return null;
+      }
+      const pointCount = cursor.readU32();
+      if (!Number.isFinite(pointCount) || pointCount < 0 || pointCount > 8192) {
+        return null;
+      }
+      const points = [];
+      for (let p = 0; p < pointCount; p += 1) {
+        if (cursor.remaining() < 8) {
+          return null;
+        }
+        points.push({
+          x: cursor.readF32(),
+          y: cursor.readF32(),
+        });
+      }
+      bounds.push({
+        kind: 'VoronoiShape',
+        ID: shapeId,
+        site,
+        halfPlanes,
+        points,
+      });
+      continue;
+    }
+
+    const pointCount = versionOrPointCount;
     if (!Number.isFinite(pointCount) || pointCount < 3 || pointCount > 8192) {
       return null;
     }

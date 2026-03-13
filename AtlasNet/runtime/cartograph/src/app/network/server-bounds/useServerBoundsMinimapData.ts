@@ -7,6 +7,7 @@ import type {
   ShardTelemetry,
 } from '../../shared/cartographTypes';
 import {
+  getShapeAnchorPoints,
   computeMapBoundsCenter,
   computeNetworkEdgeCount,
   computeProjectedShardPositions,
@@ -18,6 +19,7 @@ import {
   type Point2,
   type ShardHoverBounds,
 } from '../../map/core/mapData';
+import { buildFramePolygonFromPoints } from '../../map/core/shapeGeometry';
 import type { ServerBoundsShardSummary } from './serverBoundsTypes';
 
 interface UseServerBoundsMinimapDataArgs {
@@ -46,14 +48,35 @@ export function useServerBoundsMinimapData({
     [heuristicShapes]
   );
 
-  const { shardBoundsById, shardPolygonsById } = useMemo(
-    () => computeShardGeometryById(heuristicShapes),
-    [heuristicShapes]
-  );
-
   const mapBoundsCenter = useMemo(
     () => computeMapBoundsCenter(heuristicShapes),
     [heuristicShapes]
+  );
+
+  const minimapClipPolygon = useMemo(() => {
+    const points: Point2[] = [];
+    for (const shape of heuristicShapes) {
+      points.push(...getShapeAnchorPoints(shape));
+    }
+    for (const entity of authorityEntities) {
+      if (Number.isFinite(entity.x) && Number.isFinite(entity.y)) {
+        points.push({ x: entity.x, y: entity.y });
+      }
+    }
+    for (const anchor of shardAnchorPositions.values()) {
+      points.push(anchor);
+    }
+
+    return buildFramePolygonFromPoints(points, 20);
+  }, [authorityEntities, heuristicShapes, shardAnchorPositions]);
+
+  const { shardBoundsById, shardPolygonsById, claimedShardIds } = useMemo(
+    () =>
+      computeShardGeometryById({
+        baseShapes: heuristicShapes,
+        clipPolygon: minimapClipPolygon,
+      }),
+    [heuristicShapes, minimapClipPolygon]
   );
 
   const shardTelemetryById = useMemo(() => {
@@ -135,8 +158,8 @@ export function useServerBoundsMinimapData({
   );
 
   const claimedBoundShardIds = useMemo(
-    () => new Set(shardBoundsById.keys()),
-    [shardBoundsById]
+    () => new Set(claimedShardIds),
+    [claimedShardIds]
   );
 
   const networkEdgeCount = useMemo(
@@ -146,6 +169,7 @@ export function useServerBoundsMinimapData({
 
   const shardSummaries = useMemo(() => {
     const ids = new Set<string>();
+    for (const shardId of claimedBoundShardIds) ids.add(shardId);
     for (const shardId of shardBoundsByIdWithNetworkFallback.keys()) ids.add(shardId);
     for (const shardId of shardTelemetryById.keys()) ids.add(shardId);
     for (const shardId of entitiesByShardId.keys()) ids.add(shardId);
@@ -155,7 +179,7 @@ export function useServerBoundsMinimapData({
       const telemetry = shardTelemetryById.get(shardId);
       const claimedBound = shardBoundsById.get(shardId) ?? null;
       const bounds = shardBoundsByIdWithNetworkFallback.get(shardId) ?? null;
-      const hasClaimedBound = claimedBound != null;
+      const hasClaimedBound = claimedBoundShardIds.has(shardId);
       const hasNetworkTelemetry = telemetry != null;
       const status: ServerBoundsShardSummary['status'] = hasClaimedBound
         ? hasNetworkTelemetry
@@ -181,6 +205,7 @@ export function useServerBoundsMinimapData({
     return out;
   }, [
     clientsByShardId,
+    claimedBoundShardIds,
     entitiesByShardId,
     shardBoundsById,
     shardBoundsByIdWithNetworkFallback,

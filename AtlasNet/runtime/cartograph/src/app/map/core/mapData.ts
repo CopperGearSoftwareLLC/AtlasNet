@@ -1,15 +1,21 @@
 import type {
+  HalfPlane2,
   AuthorityLinkMode,
   AuthorityEntityTelemetry,
   ShapeJS,
   ShardTelemetry,
   TransferManifestTelemetry,
 } from '../../shared/cartographTypes';
-
-export interface Point2 {
-  x: number;
-  y: number;
-}
+import {
+  collectShapeAnchorPoints,
+  computePolygonSignedArea,
+  getShapeSite,
+  pointWithinHalfPlanes,
+  resolveShapeWorldPolygon,
+  shapeHasHalfPlaneCell,
+  type Point2,
+} from './shapeGeometry';
+export type { Point2 } from './shapeGeometry';
 
 export interface ShardHoverBounds {
   minX: number;
@@ -18,6 +24,23 @@ export interface ShardHoverBounds {
   maxY: number;
   area: number;
 }
+
+export interface ShardHoverRegionPolygon {
+  kind: 'polygon';
+  points: Point2[];
+  area: number;
+}
+
+export interface ShardHoverRegionHalfPlaneCell {
+  kind: 'halfPlaneCell';
+  site: Point2;
+  halfPlanes: HalfPlane2[];
+  area: number;
+}
+
+export type ShardHoverRegion =
+  | ShardHoverRegionPolygon
+  | ShardHoverRegionHalfPlaneCell;
 
 export interface HoveredShardEdgeLabel {
   targetId: string;
@@ -95,41 +118,7 @@ export function stableOffsetFromId(id: string): Point2 {
 }
 
 export function getShapeAnchorPoints(shape: ShapeJS): Point2[] {
-  const cx = shape.position.x ?? 0;
-  const cy = shape.position.y ?? 0;
-
-  if (shape.type === 'polygon' && shape.points && shape.points.length > 0) {
-    return shape.points.map((point) => ({ x: cx + point.x, y: cy + point.y }));
-  }
-
-  if (shape.type === 'line' && shape.points && shape.points.length > 0) {
-    return shape.points.map((point) => ({ x: point.x, y: point.y }));
-  }
-
-  if (shape.type === 'rectangle' || shape.type === 'rectImage') {
-    const halfX = (shape.size?.x ?? 0) / 2;
-    const halfY = (shape.size?.y ?? 0) / 2;
-    return [
-      { x: cx - halfX, y: cy - halfY },
-      { x: cx + halfX, y: cy - halfY },
-      { x: cx + halfX, y: cy + halfY },
-      { x: cx - halfX, y: cy + halfY },
-    ];
-  }
-
-  if (shape.type === 'circle') {
-    const radius = Math.abs(shape.radius ?? 0);
-    if (radius > 0) {
-      return [
-        { x: cx - radius, y: cy },
-        { x: cx + radius, y: cy },
-        { x: cx, y: cy - radius },
-        { x: cx, y: cy + radius },
-      ];
-    }
-  }
-
-  return [{ x: cx, y: cy }];
+  return collectShapeAnchorPoints(shape);
 }
 
 export function undirectedEdgeKey(left: string, right: string): string {
@@ -219,15 +208,52 @@ export function computeMapBoundsCenter(baseShapes: ShapeJS[]): Point2 {
   };
 }
 
-export function computeShardGeometryById(baseShapes: ShapeJS[]): {
+export function pointInPolygon(point: Point2, polygon: Point2[]): boolean {
+  if (polygon.length < 3) {
+    return false;
+  }
+
+  let inside = false;
+  for (let i = 0, j = polygon.length - 1; i < polygon.length; j = i, i += 1) {
+    const xi = polygon[i].x;
+    const yi = polygon[i].y;
+    const xj = polygon[j].x;
+    const yj = polygon[j].y;
+
+    const intersects =
+      yi > point.y !== yj > point.y &&
+      point.x < ((xj - xi) * (point.y - yi)) / (yj - yi + 1e-12) + xi;
+    if (intersects) {
+      inside = !inside;
+    }
+  }
+  return inside;
+}
+
+export function pointWithinShardRegion(point: Point2, region: ShardHoverRegion): boolean {
+  if (region.kind === 'polygon') {
+    return pointInPolygon(point, region.points);
+  }
+  return pointWithinHalfPlanes(point, region.halfPlanes);
+}
+
+export function computeShardGeometryById(args: {
+  baseShapes: ShapeJS[];
+  clipPolygon?: Point2[] | null;
+}): {
   shardBoundsById: Map<string, ShardHoverBounds>;
   shardPolygonsById: Map<string, Point2[][]>;
+  shardRegionsById: Map<string, ShardHoverRegion[]>;
+  claimedShardIds: Set<string>;
 } {
+  const { baseShapes, clipPolygon } = args;
   const rawBounds = new Map<
     string,
     { minX: number; maxX: number; minY: number; maxY: number; hasPoint: boolean }
   >();
   const shardPolygonsById = new Map<string, Point2[][]>();
+  const shardRegionsById = new Map<string, ShardHoverRegion[]>();
+  const claimedShardIds = new Set<string>();
 
   for (const shape of baseShapes) {
     const ownerId = normalizeShardId(shape.ownerId ?? '');
@@ -235,43 +261,61 @@ export function computeShardGeometryById(baseShapes: ShapeJS[]): {
       continue;
     }
 
-    const points = getShapeAnchorPoints(shape);
-    if (points.length === 0) {
+    claimedShardIds.add(ownerId);
+
+    const resolvedPolygon = resolveShapeWorldPolygon(shape, clipPolygon);
+    if (resolvedPolygon.length >= 3) {
+      const bounds = rawBounds.get(ownerId) ?? {
+        minX: Infinity,
+        maxX: -Infinity,
+        minY: Infinity,
+        maxY: -Infinity,
+        hasPoint: false,
+      };
+
+      for (const point of resolvedPolygon) {
+        if (!Number.isFinite(point.x) || !Number.isFinite(point.y)) {
+          continue;
+        }
+        bounds.hasPoint = true;
+        if (point.x < bounds.minX) bounds.minX = point.x;
+        if (point.x > bounds.maxX) bounds.maxX = point.x;
+        if (point.y < bounds.minY) bounds.minY = point.y;
+        if (point.y > bounds.maxY) bounds.maxY = point.y;
+      }
+      rawBounds.set(ownerId, bounds);
+
+      const existingPolygons = shardPolygonsById.get(ownerId);
+      if (existingPolygons) {
+        existingPolygons.push(resolvedPolygon);
+      } else {
+        shardPolygonsById.set(ownerId, [resolvedPolygon]);
+      }
+
+      const polygonArea = Math.max(1, Math.abs(computePolygonSignedArea(resolvedPolygon)));
+      const existingRegions = shardRegionsById.get(ownerId) ?? [];
+      existingRegions.push({
+        kind: 'polygon',
+        points: resolvedPolygon,
+        area: polygonArea,
+      });
+      shardRegionsById.set(ownerId, existingRegions);
       continue;
     }
 
-    const bounds = rawBounds.get(ownerId) ?? {
-      minX: Infinity,
-      maxX: -Infinity,
-      minY: Infinity,
-      maxY: -Infinity,
-      hasPoint: false,
-    };
-
-    for (const point of points) {
-      if (!Number.isFinite(point.x) || !Number.isFinite(point.y)) {
+    if (shapeHasHalfPlaneCell(shape)) {
+      const site = getShapeSite(shape);
+      if (!site) {
         continue;
       }
-      bounds.hasPoint = true;
-      if (point.x < bounds.minX) bounds.minX = point.x;
-      if (point.x > bounds.maxX) bounds.maxX = point.x;
-      if (point.y < bounds.minY) bounds.minY = point.y;
-      if (point.y > bounds.maxY) bounds.maxY = point.y;
-    }
-    rawBounds.set(ownerId, bounds);
-
-    if (
-      shape.type === 'polygon' &&
-      Array.isArray(shape.points) &&
-      shape.points.length >= 3 &&
-      points.length >= 3
-    ) {
-      const existing = shardPolygonsById.get(ownerId);
-      if (existing) {
-        existing.push(points);
-      } else {
-        shardPolygonsById.set(ownerId, [points]);
-      }
+      const existingRegions = shardRegionsById.get(ownerId) ?? [];
+      existingRegions.push({
+        kind: 'halfPlaneCell',
+        site,
+        halfPlanes: shape.halfPlanes ?? [],
+        area: Number.POSITIVE_INFINITY,
+      });
+      shardRegionsById.set(ownerId, existingRegions);
     }
   }
 
@@ -297,15 +341,17 @@ export function computeShardGeometryById(baseShapes: ShapeJS[]): {
   return {
     shardBoundsById,
     shardPolygonsById,
+    shardRegionsById,
+    claimedShardIds,
   };
 }
 
 export function computeShardBoundsById(baseShapes: ShapeJS[]): Map<string, ShardHoverBounds> {
-  return computeShardGeometryById(baseShapes).shardBoundsById;
+  return computeShardGeometryById({ baseShapes }).shardBoundsById;
 }
 
 export function computeShardPolygonsById(baseShapes: ShapeJS[]): Map<string, Point2[][]> {
-  return computeShardGeometryById(baseShapes).shardPolygonsById;
+  return computeShardGeometryById({ baseShapes }).shardPolygonsById;
 }
 
 export function computeNetworkNodeIds(networkTelemetry: ShardTelemetry[]): string[] {
