@@ -1,21 +1,15 @@
 #pragma once
 
-#include <stop_token>
-#include <thread>
+#include <cstddef>
 
-#include "Debug/Log.hpp"
-#include "Global/Misc/Singleton.hpp"
+#include "Heuristic/Voronoi/VoronoiHeuristic.hpp"
+#include "Heuristic/Voronoi/HotspotVoronoiHeuristic.hpp"
 
-class HotspotSnapshotService : public Singleton<HotspotSnapshotService>
+class HotspotSnapshotService
 {
-	Log logger = Log("HotspotSnapshotService");
-	std::jthread computeThread;
-
-	// Legacy class name, but this service now emits generic recompute snapshot
-	// records for hotspot generation and stores them asynchronously.
-	void ComputeThreadLoop(std::stop_token st);
-	void ComputeAndStoreSnapshot();
-
    public:
-	HotspotSnapshotService();
+	static void StoreSnapshot(
+		const HotspotVoronoiHeuristic& heuristic, size_t entityCount);
+	static void StoreSnapshot(
+		const VoronoiHeuristic& heuristic, size_t entityCount, uint32_t availableServerCount);
 };

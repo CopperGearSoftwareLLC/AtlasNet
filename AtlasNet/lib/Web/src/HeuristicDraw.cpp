@@ -49,6 +49,7 @@ void HeuristicDraw::DrawCurrentHeuristic(std::vector<IBoundsDrawShape>& shapes)
 				break;
 
 				case IHeuristic::Type::eVoronoi:
+				case IHeuristic::Type::eHotspotVoronoi:
 				{
 					h.ForEachBound(
 						[&](const IBounds& b)

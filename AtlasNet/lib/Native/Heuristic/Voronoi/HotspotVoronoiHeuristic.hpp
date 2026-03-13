@@ -1,43 +1,48 @@
 #pragma once
 
-#include <vector>
 #include <optional>
+#include <vector>
 
-#include "Global/Types/AABB.hpp"
 #include "Global/pch.hpp"
 #include "Heuristic/IBounds.hpp"
 #include "Heuristic/IHeuristic.hpp"
 #include "Heuristic/Voronoi/VoronoiBounds.hpp"
 
-// Voronoi heuristic used for testing.
-// Partitions the world into N convex polygon regions using standard Voronoi
-// half-plane clipping within a fixed bounding box.
-class VoronoiHeuristic : public THeuristic<VoronoiBounds>
+struct HotspotVoronoiSample
+{
+	double x = 0.0;
+	double y = 0.0;
+	double weight = 0.0;
+	double radius = 0.0;
+};
+
+class HotspotVoronoiHeuristic : public THeuristic<VoronoiBounds>
 {
    public:
 	struct Options
 	{
-		// Half-extent of the total region in X/Y, matching the legacy grid.
 		vec2 NetHalfExtent = {100.0f, 100.0f};
-		// Number of Voronoi seeds / regions.
-		uint32_t SeedCount = 16;
+		uint32_t DefaultServerCount = 5;
+		uint32_t HotspotCount = 8;
+		uint32_t DensityGridResolution = 24;
 	} options;
 
-	VoronoiHeuristic();
+	HotspotVoronoiHeuristic();
 
-	// Allows callers (e.g. WatchDog) to request a seed count.
-	void SetSeedCount(uint32_t count);
+	void SetAvailableServerCount(uint32_t count);
+	void SetHotspotCount(uint32_t count);
+	[[nodiscard]] uint32_t GetActiveServerCount() const;
+	[[nodiscard]] uint32_t GetHotspotCount() const;
+	[[nodiscard]] const std::vector<HotspotVoronoiSample>& GetHotspots() const;
 	[[nodiscard]] const std::vector<glm::vec2>& GetSeeds() const;
 
-	// IHeuristic interface
 	void Compute(const std::span<const Transform>& span) override;
 	uint32_t GetBoundsCount() const override;
 	void GetBounds(std::vector<VoronoiBounds>& out_bounds) const override;
 	void GetBoundDeltas(
 		std::vector<TBoundDelta<VoronoiBounds>>& out_deltas) const override;
 	IHeuristic::Type GetType() const override;
-	void SerializeBounds(
-		std::unordered_map<BoundsID, ByteWriter>& bws) override;
+	void SerializeBounds(std::unordered_map<BoundsID, ByteWriter>& bws) override;
 
 	void Serialize(ByteWriter& bw) const override;
 	void Deserialize(ByteReader& br) override;
@@ -46,6 +51,9 @@ class VoronoiHeuristic : public THeuristic<VoronoiBounds>
 	const IBounds& GetBound(BoundsID id) const override;
 
    private:
-	std::vector<glm::vec2> _seeds;
-	std::vector<VoronoiBounds> _cells;
+	uint32_t requestedServerCount = 0;
+	uint32_t activeServerCount = 0;
+	std::vector<HotspotVoronoiSample> hotspots;
+	std::vector<glm::vec2> seeds;
+	std::vector<VoronoiBounds> cells;
 };

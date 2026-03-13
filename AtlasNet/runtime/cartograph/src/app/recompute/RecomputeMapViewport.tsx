@@ -13,16 +13,14 @@ interface RecomputeMapViewportProps {
   baseShapes: ShapeJS[];
   overlayLayers: RecomputeOverlayLayer[];
   activeLayerIds: Set<string>;
-  hasHistoricalBounds: boolean;
-  boundsSnapshotLabel: string;
+  boundsStatusText: string;
 }
 
 export function RecomputeMapViewport({
   baseShapes,
   overlayLayers,
   activeLayerIds,
-  hasHistoricalBounds,
-  boundsSnapshotLabel,
+  boundsStatusText,
 }: RecomputeMapViewportProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const rendererRef = useRef<ReturnType<typeof createMapRenderer> | null>(null);
@@ -77,10 +75,10 @@ export function RecomputeMapViewport({
             Map Snapshot
           </div>
           <div className="mt-1 text-sm text-slate-300">
-            Frozen bounds for the selected cycle, with recompute overlays layered on
-            top.
+            Map bounds snapshot plus recompute overlays. Voronoi cycles keep
+            their bounds in the `Cells` overlay instead.
           </div>
-          <div className="mt-1 text-xs text-slate-500">{boundsSnapshotLabel}</div>
+          <div className="mt-1 text-xs text-slate-500">{boundsStatusText}</div>
         </div>
         <div className="flex flex-wrap gap-2">
           <button
@@ -130,12 +128,6 @@ export function RecomputeMapViewport({
 
       <div className="min-h-[420px] bg-slate-950">
         <div ref={containerRef} className="h-full min-h-[420px] w-full" />
-        {!hasHistoricalBounds ? (
-          <div className="border-t border-slate-800 px-4 py-3 text-sm text-amber-300">
-            This cycle predates the current page session, so Cartograph has no
-            frozen bounds snapshot for it.
-          </div>
-        ) : null}
         {overlayLayers.length === 0 ? (
           <div className="border-t border-slate-800 px-4 py-3 text-sm text-slate-500">
             No overlay geometry was derived from this capture yet.

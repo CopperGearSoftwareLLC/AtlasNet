@@ -3,108 +3,19 @@
 #include <algorithm>
 #include <array>
 #include <chrono>
-#include <cmath>
-#include <cstdint>
-#include <limits>
 #include <optional>
 #include <string>
-#include <vector>
+#include <string_view>
 
-#include "Heuristic/Database/HeuristicManifest.hpp"
 #include "InternalDB/InternalDB.hpp"
-#include "Interlink/Database/ServerRegistry.hpp"
-#include "Network/NetworkEnums.hpp"
-#include "Snapshot/SnapshotService.hpp"
 
 namespace
 {
 constexpr std::string_view kRecomputeSnapshotKey = "Heuristic:RecomputeSnapshots";
 constexpr size_t kMaxSnapshotHistory = 64;
-constexpr size_t kGridResolution = 24;
-constexpr size_t kTargetHotspotCount = 5;
+constexpr std::string_view kHotspotRecomputeHeuristicName = "hotspot_voronoi_v1";
+constexpr std::string_view kLegacyRecomputeHeuristicName = "legacy_random_voronoi_v1";
 constexpr std::string_view kInputSchemaName = "seed_generation_v1";
-constexpr float kWorldMinX = -100.0f;
-constexpr float kWorldMaxX = 100.0f;
-constexpr float kWorldMinY = -100.0f;
-constexpr float kWorldMaxY = 100.0f;
-constexpr double kAspectRatio = 1.0;
-
-struct NormalizedPoint
-{
-	double x = 0.0;
-	double y = 0.0;
-};
-
-struct PeakCandidate
-{
-	size_t cellX = 0;
-	size_t cellY = 0;
-	double score = 0.0;
-	double x = 0.0;
-	double y = 0.0;
-};
-
-struct Hotspot
-{
-	double x = 0.0;
-	double y = 0.0;
-	double weight = 0.0;
-	double radius = 0.0;
-};
-
-struct RecomputeContext
-{
-	std::vector<Transform> transforms;
-	std::vector<NormalizedPoint> normalizedPoints;
-	std::vector<Hotspot> hotspots;
-	uint32_t availableServers = 0;
-	std::string targetHeuristicType;
-	int64_t createdAtMs = 0;
-	uint64_t cycleId = 0;
-};
-
-struct RecomputeSnapshotRecord
-{
-	std::string recomputeHeuristic;
-	std::string inputSchema;
-	Json diagnostics = Json::object();
-	Json inputJson = Json::object();
-};
-
-[[nodiscard]] Json ToHotspotJson(const Hotspot& hotspot)
-{
-	return Json{
-		{"x", hotspot.x},
-		{"y", hotspot.y},
-		{"weight", hotspot.weight},
-		{"radius", hotspot.radius},
-	};
-}
-
-[[nodiscard]] double Clamp01(const double value)
-{
-	return std::clamp(value, 0.0, 1.0);
-}
-
-[[nodiscard]] double NormalizeCoordinate(
-	const float value, const float minValue, const float maxValue)
-{
-	const double range =
-		static_cast<double>(maxValue) - static_cast<double>(minValue);
-	if (range <= 0.0)
-	{
-		return 0.5;
-	}
-	return Clamp01(
-		(static_cast<double>(value) - static_cast<double>(minValue)) / range);
-}
-
-[[nodiscard]] size_t ToGridIndex(const double normalized)
-{
-	const double scaled = Clamp01(normalized) * static_cast<double>(kGridResolution);
-	const auto idx = static_cast<size_t>(scaled);
-	return std::min(idx, kGridResolution - 1);
-}
 
 [[nodiscard]] Json MakeEmptySnapshotDocument()
 {
@@ -191,416 +102,157 @@ void WriteJsonValue(const std::string_view key, const Json& value)
 		.count();
 }
 
-[[nodiscard]] uint32_t ResolveAvailableServerCount()
+[[nodiscard]] double NormalizeCoordinate(
+	const float value, const float minValue, const float maxValue)
 {
-	uint32_t shardCount = 0;
-	for (const auto& [id, _entry] : ServerRegistry::Get().GetServers())
+	const double range =
+		static_cast<double>(maxValue) - static_cast<double>(minValue);
+	if (range <= 0.0)
 	{
-		if (id.Type == NetworkIdentityType::eShard)
-		{
-			++shardCount;
-		}
+		return 0.5;
 	}
-
-	if (shardCount > 0)
-	{
-		return shardCount;
-	}
-
-	try
-	{
-		return HeuristicManifest::Get().PullHeuristic(
-			[](const IHeuristic& heuristic) { return heuristic.GetBoundsCount(); });
-	}
-	catch (...)
-	{
-		return 0;
-	}
+	return std::clamp(
+		(static_cast<double>(value) - static_cast<double>(minValue)) / range,
+		0.0,
+		1.0);
 }
 
-[[nodiscard]] std::string ResolveTargetHeuristicType()
-{
-	try
-	{
-		return HeuristicManifest::Get().PullHeuristic(
-			[](const IHeuristic& heuristic)
-			{
-				return std::string(IHeuristic::TypeToString(heuristic.GetType()));
-			});
-	}
-	catch (...)
-	{
-		return "Unknown";
-	}
-}
-
-[[nodiscard]] Json BuildHotspotInputJson(const RecomputeContext& context)
+[[nodiscard]] Json BuildInputJson(const HotspotVoronoiHeuristic& heuristic)
 {
 	Json inputJson = Json::object();
-	inputJson["aspect_ratio"] = kAspectRatio;
-	inputJson["k"] = context.availableServers;
-	inputJson["hotspot_target_count"] = kTargetHotspotCount;
+	const float worldWidth = heuristic.options.NetHalfExtent.x * 2.0f;
+	const float worldHeight = heuristic.options.NetHalfExtent.y * 2.0f;
+	inputJson["aspect_ratio"] =
+		worldHeight > 0.0f ? static_cast<double>(worldWidth / worldHeight) : 1.0;
+	inputJson["k"] = heuristic.GetActiveServerCount();
+	inputJson["hotspot_target_count"] = heuristic.GetHotspotCount();
 	inputJson["hotspots"] = Json::array();
-	for (const Hotspot& hotspot : context.hotspots)
+
+	for (const HotspotVoronoiSample& hotspot : heuristic.GetHotspots())
 	{
-		inputJson["hotspots"].push_back(ToHotspotJson(hotspot));
+		inputJson["hotspots"].push_back(Json{
+			{"x", hotspot.x},
+			{"y", hotspot.y},
+			{"weight", hotspot.weight},
+			{"radius", hotspot.radius},
+		});
+	}
+
+	return inputJson;
+}
+
+[[nodiscard]] Json BuildOutputJson(const HotspotVoronoiHeuristic& heuristic)
+{
+	Json outputJson = Json::object();
+	outputJson["seeds"] = Json::array();
+	outputJson["cells"] = Json::array();
+
+	const float minX = -heuristic.options.NetHalfExtent.x;
+	const float maxX = heuristic.options.NetHalfExtent.x;
+	const float minY = -heuristic.options.NetHalfExtent.y;
+	const float maxY = heuristic.options.NetHalfExtent.y;
+
+	for (const glm::vec2& seed : heuristic.GetSeeds())
+	{
+		outputJson["seeds"].push_back(Json{
+			{"x", NormalizeCoordinate(seed.x, minX, maxX)},
+			{"y", NormalizeCoordinate(seed.y, minY, maxY)},
+		});
+	}
+
+	std::vector<VoronoiBounds> cells;
+	heuristic.GetBounds(cells);
+	for (const VoronoiBounds& cell : cells)
+	{
+		Json cellJson = Json::object();
+		cellJson["id"] = cell.ID;
+		cellJson["vertices"] = Json::array();
+		for (const glm::vec2& vertex : cell.vertices)
+		{
+			cellJson["vertices"].push_back(Json{
+				{"x", NormalizeCoordinate(vertex.x, minX, maxX)},
+				{"y", NormalizeCoordinate(vertex.y, minY, maxY)},
+			});
+		}
+		outputJson["cells"].push_back(std::move(cellJson));
+	}
+
+	return outputJson;
+}
+
+[[nodiscard]] Json BuildLegacyInputJson(
+	const VoronoiHeuristic& heuristic, const uint32_t availableServerCount)
+{
+	Json inputJson = Json::object();
+	const float worldWidth = heuristic.options.NetHalfExtent.x * 2.0f;
+	const float worldHeight = heuristic.options.NetHalfExtent.y * 2.0f;
+	const float minX = -heuristic.options.NetHalfExtent.x;
+	const float maxX = heuristic.options.NetHalfExtent.x;
+	const float minY = -heuristic.options.NetHalfExtent.y;
+	const float maxY = heuristic.options.NetHalfExtent.y;
+
+	inputJson["aspect_ratio"] =
+		worldHeight > 0.0f ? static_cast<double>(worldWidth / worldHeight) : 1.0;
+	inputJson["k"] = availableServerCount;
+	inputJson["points"] = Json::array();
+	for (const glm::vec2& seed : heuristic.GetSeeds())
+	{
+		inputJson["points"].push_back(Json{
+			{"x", NormalizeCoordinate(seed.x, minX, maxX)},
+			{"y", NormalizeCoordinate(seed.y, minY, maxY)},
+		});
 	}
 	return inputJson;
 }
 
-[[nodiscard]] std::vector<RecomputeSnapshotRecord> BuildSnapshotRecords(
-	const RecomputeContext& context)
+[[nodiscard]] Json BuildLegacyOutputJson(const VoronoiHeuristic& heuristic)
 {
-	RecomputeSnapshotRecord hotspotRecord;
-	hotspotRecord.recomputeHeuristic = "entity_hotspots_v1";
-	hotspotRecord.inputSchema = std::string(kInputSchemaName);
-	hotspotRecord.diagnostics = Json{
-		{"entityCount", context.transforms.size()},
-		{"availableServerCount", context.availableServers},
-		{"hotspotTargetCount", kTargetHotspotCount},
-		{"hotspotCount", context.hotspots.size()},
-	};
-	hotspotRecord.inputJson = BuildHotspotInputJson(context);
+	Json outputJson = Json::object();
+	outputJson["seeds"] = Json::array();
+	outputJson["cells"] = Json::array();
 
-	std::vector<RecomputeSnapshotRecord> records;
-	records.push_back(std::move(hotspotRecord));
-	return records;
-}
+	const float minX = -heuristic.options.NetHalfExtent.x;
+	const float maxX = heuristic.options.NetHalfExtent.x;
+	const float minY = -heuristic.options.NetHalfExtent.y;
+	const float maxY = heuristic.options.NetHalfExtent.y;
 
-[[nodiscard]] std::vector<NormalizedPoint> NormalizeTransforms(
-	const std::vector<Transform>& transforms)
-{
-	std::vector<NormalizedPoint> points;
-	points.reserve(transforms.size());
-	for (const Transform& transform : transforms)
+	for (const glm::vec2& seed : heuristic.GetSeeds())
 	{
-		points.push_back({
-			.x = NormalizeCoordinate(transform.position.x, kWorldMinX, kWorldMaxX),
-			.y = NormalizeCoordinate(transform.position.y, kWorldMinY, kWorldMaxY),
+		outputJson["seeds"].push_back(Json{
+			{"x", NormalizeCoordinate(seed.x, minX, maxX)},
+			{"y", NormalizeCoordinate(seed.y, minY, maxY)},
 		});
 	}
-	return points;
-}
 
-[[nodiscard]] std::vector<PeakCandidate> FindPeakCandidates(
-	const std::vector<NormalizedPoint>& points)
-{
-	if (points.empty())
+	std::vector<VoronoiBounds> cells;
+	heuristic.GetBounds(cells);
+	for (const VoronoiBounds& cell : cells)
 	{
-		return {};
-	}
-
-	std::array<double, kGridResolution * kGridResolution> counts{};
-	for (const auto& point : points)
-	{
-		const size_t x = ToGridIndex(point.x);
-		const size_t y = ToGridIndex(point.y);
-		counts[y * kGridResolution + x] += 1.0;
-	}
-
-	std::array<double, kGridResolution * kGridResolution> smoothed{};
-	double maxScore = 0.0;
-	const std::array<std::array<int, 3>, 3> kernel = {{
-		{{1, 2, 1}},
-		{{2, 4, 2}},
-		{{1, 2, 1}},
-	}};
-
-	for (size_t y = 0; y < kGridResolution; ++y)
-	{
-		for (size_t x = 0; x < kGridResolution; ++x)
+		Json cellJson = Json::object();
+		cellJson["id"] = cell.ID;
+		cellJson["vertices"] = Json::array();
+		for (const glm::vec2& vertex : cell.vertices)
 		{
-			double score = 0.0;
-			for (int ky = -1; ky <= 1; ++ky)
-			{
-				for (int kx = -1; kx <= 1; ++kx)
-				{
-					const int nx = static_cast<int>(x) + kx;
-					const int ny = static_cast<int>(y) + ky;
-					if (nx < 0 || ny < 0 ||
-						nx >= static_cast<int>(kGridResolution) ||
-						ny >= static_cast<int>(kGridResolution))
-					{
-						continue;
-					}
-					score += counts[static_cast<size_t>(ny) * kGridResolution +
-									static_cast<size_t>(nx)] *
-							 static_cast<double>(
-								 kernel[static_cast<size_t>(ky + 1)]
-									   [static_cast<size_t>(kx + 1)]);
-				}
-			}
-			score /= 16.0;
-			smoothed[y * kGridResolution + x] = score;
-			maxScore = std::max(maxScore, score);
-		}
-	}
-
-	if (maxScore <= 0.0)
-	{
-		return {};
-	}
-
-	const double minPeakScore = std::max(1.0, maxScore * 0.15);
-	std::vector<PeakCandidate> candidates;
-	candidates.reserve(kTargetHotspotCount * 2);
-
-	for (size_t y = 0; y < kGridResolution; ++y)
-	{
-		for (size_t x = 0; x < kGridResolution; ++x)
-		{
-			const double score = smoothed[y * kGridResolution + x];
-			if (score < minPeakScore)
-			{
-				continue;
-			}
-
-			bool isLocalPeak = true;
-			for (int ny = -1; ny <= 1 && isLocalPeak; ++ny)
-			{
-				for (int nx = -1; nx <= 1; ++nx)
-				{
-					if (nx == 0 && ny == 0)
-					{
-						continue;
-					}
-
-					const int px = static_cast<int>(x) + nx;
-					const int py = static_cast<int>(y) + ny;
-					if (px < 0 || py < 0 ||
-						px >= static_cast<int>(kGridResolution) ||
-						py >= static_cast<int>(kGridResolution))
-					{
-						continue;
-					}
-
-					if (smoothed[static_cast<size_t>(py) * kGridResolution +
-								 static_cast<size_t>(px)] > score)
-					{
-						isLocalPeak = false;
-						break;
-					}
-				}
-			}
-
-			if (!isLocalPeak)
-			{
-				continue;
-			}
-
-			candidates.push_back({
-				.cellX = x,
-				.cellY = y,
-				.score = score,
-				.x = (static_cast<double>(x) + 0.5) /
-					 static_cast<double>(kGridResolution),
-				.y = (static_cast<double>(y) + 0.5) /
-					 static_cast<double>(kGridResolution),
+			cellJson["vertices"].push_back(Json{
+				{"x", NormalizeCoordinate(vertex.x, minX, maxX)},
+				{"y", NormalizeCoordinate(vertex.y, minY, maxY)},
 			});
 		}
+		outputJson["cells"].push_back(std::move(cellJson));
 	}
 
-	std::sort(candidates.begin(), candidates.end(),
-			  [](const PeakCandidate& left, const PeakCandidate& right)
-			  { return left.score > right.score; });
-
-	std::vector<PeakCandidate> deduped;
-	deduped.reserve(std::min(candidates.size(), kTargetHotspotCount));
-	const double minPeakDistance = 2.0 / static_cast<double>(kGridResolution);
-	const double minPeakDistanceSq = minPeakDistance * minPeakDistance;
-
-	for (const PeakCandidate& candidate : candidates)
-	{
-		bool tooClose = false;
-		for (const PeakCandidate& existing : deduped)
-		{
-			const double dx = candidate.x - existing.x;
-			const double dy = candidate.y - existing.y;
-			if ((dx * dx) + (dy * dy) < minPeakDistanceSq)
-			{
-				tooClose = true;
-				break;
-			}
-		}
-		if (tooClose)
-		{
-			continue;
-		}
-		deduped.push_back(candidate);
-		if (deduped.size() >= kTargetHotspotCount)
-		{
-			break;
-		}
-	}
-
-	return deduped;
+	return outputJson;
 }
 
-[[nodiscard]] std::vector<Hotspot> BuildHotspots(
-	const std::vector<NormalizedPoint>& points)
+void AppendSnapshotRecord(Json& doc, Json snapshot)
 {
-	if (points.empty())
-	{
-		return {};
-	}
-
-	std::vector<PeakCandidate> peaks = FindPeakCandidates(points);
-	if (peaks.empty())
-	{
-		peaks.push_back({
-			.cellX = kGridResolution / 2,
-			.cellY = kGridResolution / 2,
-			.score = static_cast<double>(points.size()),
-			.x = 0.5,
-			.y = 0.5,
-		});
-	}
-
-	struct Aggregate
-	{
-		double sumX = 0.0;
-		double sumY = 0.0;
-		size_t count = 0;
-		std::vector<NormalizedPoint> assigned;
-	};
-
-	std::vector<Aggregate> aggregates(peaks.size());
-	for (const auto& point : points)
-	{
-		size_t nearestIndex = 0;
-		double nearestDistanceSq = std::numeric_limits<double>::max();
-		for (size_t i = 0; i < peaks.size(); ++i)
-		{
-			const double dx = point.x - peaks[i].x;
-			const double dy = point.y - peaks[i].y;
-			const double distSq = (dx * dx) + (dy * dy);
-			if (distSq < nearestDistanceSq)
-			{
-				nearestDistanceSq = distSq;
-				nearestIndex = i;
-			}
-		}
-
-		Aggregate& aggregate = aggregates[nearestIndex];
-		aggregate.sumX += point.x;
-		aggregate.sumY += point.y;
-		aggregate.count += 1;
-		aggregate.assigned.push_back(point);
-	}
-
-	std::vector<Hotspot> hotspots;
-	hotspots.reserve(aggregates.size());
-	const double minRadius = 1.0 / static_cast<double>(kGridResolution);
-	const double gridCellDiagonal =
-		std::sqrt(2.0) / static_cast<double>(kGridResolution);
-
-	for (const Aggregate& aggregate : aggregates)
-	{
-		if (aggregate.count == 0)
-		{
-			continue;
-		}
-
-		const double centerX =
-			aggregate.sumX / static_cast<double>(aggregate.count);
-		const double centerY =
-			aggregate.sumY / static_cast<double>(aggregate.count);
-
-		double maxDistance = 0.0;
-		for (const auto& point : aggregate.assigned)
-		{
-			const double dx = point.x - centerX;
-			const double dy = point.y - centerY;
-			maxDistance = std::max(
-				maxDistance, std::sqrt((dx * dx) + (dy * dy)));
-		}
-
-		hotspots.push_back({
-			.x = Clamp01(centerX),
-			.y = Clamp01(centerY),
-			.weight = static_cast<double>(aggregate.count) /
-					  static_cast<double>(points.size()),
-			.radius = std::clamp(
-				maxDistance + (gridCellDiagonal * 0.5), minRadius, 0.5),
-		});
-	}
-
-	std::sort(hotspots.begin(), hotspots.end(),
-			  [](const Hotspot& left, const Hotspot& right)
-			  { return left.weight > right.weight; });
-
-	return hotspots;
-}
-}  // namespace
-
-HotspotSnapshotService::HotspotSnapshotService()
-{
-	computeThread = std::jthread(
-		[this](std::stop_token st) { ComputeThreadLoop(st); });
-}
-
-void HotspotSnapshotService::ComputeThreadLoop(std::stop_token st)
-{
-	using namespace std::chrono;
-	const milliseconds interval(_ATLASNET_HEURISTIC_RECOMPUTE_INTERNAL_MS);
-	while (!st.stop_requested())
-	{
-		const auto startedAt = steady_clock::now();
-		ComputeAndStoreSnapshot();
-
-		const auto elapsed =
-			duration_cast<milliseconds>(steady_clock::now() - startedAt);
-		if (elapsed < interval)
-		{
-			std::this_thread::sleep_for(interval - elapsed);
-		}
-	}
-}
-
-void HotspotSnapshotService::ComputeAndStoreSnapshot()
-{
-	RecomputeContext context;
-	SnapshotService::Get().FetchAllTransforms(context.transforms);
-	context.normalizedPoints = NormalizeTransforms(context.transforms);
-	context.hotspots = BuildHotspots(context.normalizedPoints);
-	context.availableServers = ResolveAvailableServerCount();
-	context.targetHeuristicType = ResolveTargetHeuristicType();
-	context.createdAtMs = NowUnixTimeMs();
-
-	Json doc = LoadSnapshotDocument();
 	Json& snapshots = doc["snapshots"];
 	if (!snapshots.is_array())
 	{
 		snapshots = Json::array();
 	}
 
-	uint64_t nextSnapshotId = doc.value("latestSnapshotId", 0ULL);
-	context.cycleId = doc.value("latestCycleId", 0ULL) + 1ULL;
-	Json latestSnapshot = Json::object();
-	const std::vector<RecomputeSnapshotRecord> records =
-		BuildSnapshotRecords(context);
-
-	for (const RecomputeSnapshotRecord& record : records)
-	{
-		const uint64_t snapshotId = ++nextSnapshotId;
-		Json snapshot = Json::object();
-		snapshot["snapshotId"] = snapshotId;
-		snapshot["cycleId"] = context.cycleId;
-		snapshot["createdAtMs"] = context.createdAtMs;
-		snapshot["recomputeHeuristic"] = record.recomputeHeuristic;
-		snapshot["targetHeuristicType"] = context.targetHeuristicType;
-		snapshot["inputSchema"] = record.inputSchema;
-		snapshot["entityCount"] = context.transforms.size();
-		snapshot["availableServerCount"] = context.availableServers;
-		snapshot["hotspotCount"] = context.hotspots.size();
-		snapshot["diagnostics"] = record.diagnostics;
-		snapshot["input_json"] = record.inputJson;
-		snapshot["output_json"] = nullptr;
-
-		snapshots.push_back(snapshot);
-		latestSnapshot = snapshot;
-	}
-
+	snapshots.push_back(snapshot);
 	if (snapshots.size() > kMaxSnapshotHistory)
 	{
 		const auto removeCount = snapshots.size() - kMaxSnapshotHistory;
@@ -610,14 +262,70 @@ void HotspotSnapshotService::ComputeAndStoreSnapshot()
 		}
 	}
 
-	doc["latestSnapshotId"] = nextSnapshotId;
-	doc["latestCycleId"] = context.cycleId;
-	doc["latestUpdatedMs"] = context.createdAtMs;
-	doc["latest"] = latestSnapshot;
+	doc["latestSnapshotId"] = snapshot["snapshotId"];
+	doc["latestCycleId"] = snapshot["cycleId"];
+	doc["latestUpdatedMs"] = snapshot["createdAtMs"];
+	doc["latest"] = std::move(snapshot);
+}
+}  // namespace
 
+void HotspotSnapshotService::StoreSnapshot(
+	const HotspotVoronoiHeuristic& heuristic, const size_t entityCount)
+{
+	Json doc = LoadSnapshotDocument();
+	const int64_t createdAtMs = NowUnixTimeMs();
+	const uint64_t snapshotId = doc.value("latestSnapshotId", 0ULL) + 1ULL;
+	const uint64_t cycleId = doc.value("latestCycleId", 0ULL) + 1ULL;
+
+	Json snapshot = Json::object();
+	snapshot["snapshotId"] = snapshotId;
+	snapshot["cycleId"] = cycleId;
+	snapshot["createdAtMs"] = createdAtMs;
+	snapshot["recomputeHeuristic"] = std::string(kHotspotRecomputeHeuristicName);
+	snapshot["targetHeuristicType"] =
+		std::string(IHeuristic::TypeToString(heuristic.GetType()));
+	snapshot["inputSchema"] = std::string(kInputSchemaName);
+	snapshot["entityCount"] = entityCount;
+	snapshot["availableServerCount"] = heuristic.GetActiveServerCount();
+	snapshot["hotspotCount"] = heuristic.GetHotspots().size();
+	snapshot["diagnostics"] = Json{
+		{"hotspotTargetCount", heuristic.GetHotspotCount()},
+		{"seedCount", heuristic.GetSeeds().size()},
+	};
+	snapshot["input_json"] = BuildInputJson(heuristic);
+	snapshot["output_json"] = BuildOutputJson(heuristic);
+
+	AppendSnapshotRecord(doc, std::move(snapshot));
 	WriteJsonValue(kRecomputeSnapshotKey, doc);
-	logger.DebugFormatted(
-		"Stored hotspot snapshot cycle {} with {} entities, {} hotspot(s), k={}, variants={}",
-		context.cycleId, context.transforms.size(), context.hotspots.size(),
-		context.availableServers, records.size());
+}
+
+void HotspotSnapshotService::StoreSnapshot(
+	const VoronoiHeuristic& heuristic,
+	const size_t entityCount,
+	const uint32_t availableServerCount)
+{
+	Json doc = LoadSnapshotDocument();
+	const int64_t createdAtMs = NowUnixTimeMs();
+	const uint64_t snapshotId = doc.value("latestSnapshotId", 0ULL) + 1ULL;
+	const uint64_t cycleId = doc.value("latestCycleId", 0ULL) + 1ULL;
+
+	Json snapshot = Json::object();
+	snapshot["snapshotId"] = snapshotId;
+	snapshot["cycleId"] = cycleId;
+	snapshot["createdAtMs"] = createdAtMs;
+	snapshot["recomputeHeuristic"] = std::string(kLegacyRecomputeHeuristicName);
+	snapshot["targetHeuristicType"] =
+		std::string(IHeuristic::TypeToString(heuristic.GetType()));
+	snapshot["inputSchema"] = std::string(kInputSchemaName);
+	snapshot["entityCount"] = entityCount;
+	snapshot["availableServerCount"] = availableServerCount;
+	snapshot["hotspotCount"] = 0;
+	snapshot["diagnostics"] = Json{
+		{"seedCount", heuristic.GetSeeds().size()},
+	};
+	snapshot["input_json"] = BuildLegacyInputJson(heuristic, availableServerCount);
+	snapshot["output_json"] = BuildLegacyOutputJson(heuristic);
+
+	AppendSnapshotRecord(doc, std::move(snapshot));
+	WriteJsonValue(kRecomputeSnapshotKey, doc);
 }

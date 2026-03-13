@@ -24,6 +24,7 @@ class IHeuristic
 		eOctree,
 		eQuadtree,
 		eVoronoi,
+		eHotspotVoronoi,
 		eInvalid
 	};
 	static constexpr const char* TypeToString(Type type) noexcept
@@ -40,6 +41,8 @@ class IHeuristic
 				return "Quadtree";
 			case Type::eVoronoi:
 				return "Voronoi";
+			case Type::eHotspotVoronoi:
+				return "HotspotVoronoi";
 			case Type::eInvalid:
 				return "Invalid";
 			default:
@@ -71,6 +74,11 @@ class IHeuristic
 		if (str == "Voronoi")
 		{
 			outType = Type::eVoronoi;
+			return true;
+		}
+		if (str == "HotspotVoronoi")
+		{
+			outType = Type::eHotspotVoronoi;
 			return true;
 		}
 		if (str == "Invalid")

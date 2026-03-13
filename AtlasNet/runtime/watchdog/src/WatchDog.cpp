@@ -21,11 +21,11 @@
 #include "Global/Serialize/ByteReader.hpp"
 #include "Heuristic/Database/HeuristicManifest.hpp"
 #include "Heuristic/GridHeuristic/GridHeuristic.hpp"
-#include "Heuristic/HotspotSnapshotService.hpp"
 #include "Heuristic/HeuristicService.hpp"
 #include "Heuristic/IBounds.hpp"
 #include "Heuristic/IHeuristic.hpp"
 #include "Heuristic/Quadtree/QuadtreeHeuristic.hpp"
+#include "Heuristic/Voronoi/HotspotVoronoiHeuristic.hpp"
 #include "Heuristic/Voronoi/VoronoiHeuristic.hpp"
 #include "Interlink/Database/HealthManifest.hpp"
 #include "Interlink/Database/ServerRegistry.hpp"
@@ -282,11 +282,10 @@ void WatchDog::Init()
 	Interlink::Get().Init();
 	GlobalEvents::Get().Init();
 	HeuristicService::Ensure();
-	HotspotSnapshotService::Ensure();
 
-	// Legacy grid-cell heuristic is still available as a separate heuristic,
-	// but WatchDog now defaults to the Quadtree heuristic. For Voronoi
-	// testing, you can switch to eVoronoi below.
+	// This legacy WatchDog-local heuristic is no longer the live recompute
+	// path. HeuristicService owns the active runtime heuristic; the block below
+	// remains as legacy/testing-only local state.
 	SwitchHeuristic(IHeuristic::Type::eVoronoi);
 	if (auto voronoi = std::dynamic_pointer_cast<VoronoiHeuristic>(Heuristic))
 	{
@@ -370,6 +369,11 @@ void WatchDog::SwitchHeuristic(IHeuristic::Type newHeuristic)
 		case IHeuristic::Type::eVoronoi:
 		{
 			Heuristic = std::make_shared<VoronoiHeuristic>();
+			break;
+		}
+		case IHeuristic::Type::eHotspotVoronoi:
+		{
+			Heuristic = std::make_shared<HotspotVoronoiHeuristic>();
 			break;
 		}
 		case IHeuristic::Type::eOctree:

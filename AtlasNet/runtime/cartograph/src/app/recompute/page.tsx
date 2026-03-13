@@ -1,7 +1,10 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
-import type { RecomputeSnapshotTelemetry } from '../shared/cartographTypes';
+import type {
+  RecomputeSnapshotTelemetry,
+  ShapeJS,
+} from '../shared/cartographTypes';
 import {
   useHeuristicShapes,
   useRecomputeSnapshots,
@@ -11,7 +14,6 @@ import {
   buildRecomputeOverlayLayers,
   type RecomputeOverlayLayer,
 } from './recomputeOverlayShapes';
-import type { ShapeJS } from '../shared/cartographTypes';
 
 const POLL_INTERVAL_MS = 1000;
 
@@ -72,6 +74,10 @@ function buildCycleGroups(
       }
       return right.cycleId - left.cycleId;
     });
+}
+
+function isVoronoiTarget(type: string | null): boolean {
+  return type === 'Voronoi' || type === 'HotspotVoronoi';
 }
 
 function cloneShape(shape: ShapeJS): ShapeJS {
@@ -180,7 +186,10 @@ export default function RecomputePage() {
     [recompute.snapshots]
   );
   const [selectedCycleId, setSelectedCycleId] = useState<number | null>(null);
-  const [activeLayerIds, setActiveLayerIds] = useState<string[]>([]);
+  const [layerVisibilityById, setLayerVisibilityById] = useState<
+    Record<string, boolean>
+  >({});
+  const [hasUserPinnedSelection, setHasUserPinnedSelection] = useState(false);
   const [capturedBoundsByCycle, setCapturedBoundsByCycle] = useState<
     Record<number, CapturedBoundsSnapshot>
   >({});
@@ -188,15 +197,25 @@ export default function RecomputePage() {
   useEffect(() => {
     if (cycleGroups.length === 0) {
       setSelectedCycleId(null);
+      setHasUserPinnedSelection(false);
       return;
     }
-    if (
-      selectedCycleId == null ||
-      !cycleGroups.some((group) => group.cycleId === selectedCycleId)
-    ) {
+
+    const selectedStillExists = cycleGroups.some(
+      (group) => group.cycleId === selectedCycleId
+    );
+    if (selectedCycleId != null && selectedStillExists) {
+      return;
+    }
+
+    if (hasUserPinnedSelection && selectedCycleId != null && !selectedStillExists) {
+      setHasUserPinnedSelection(false);
+    }
+
+    if (!hasUserPinnedSelection || selectedCycleId == null || !selectedStillExists) {
       setSelectedCycleId(cycleGroups[0].cycleId);
     }
-  }, [cycleGroups, selectedCycleId]);
+  }, [cycleGroups, hasUserPinnedSelection, selectedCycleId]);
 
   useEffect(() => {
     const latestCycle = cycleGroups[0];
@@ -230,27 +249,41 @@ export default function RecomputePage() {
       selectedCycle ? capturedBoundsByCycle[selectedCycle.cycleId] ?? null : null,
     [capturedBoundsByCycle, selectedCycle]
   );
-  const selectedBaseShapes = selectedBoundsSnapshot?.shapes ?? [];
   const overlayLayers = useMemo<RecomputeOverlayLayer[]>(
     () => (selectedCycle ? buildRecomputeOverlayLayers(selectedCycle.snapshots) : []),
     [selectedCycle]
   );
-
-  useEffect(() => {
-    setActiveLayerIds(overlayLayers.map((layer) => layer.id));
-  }, [overlayLayers]);
+  const selectedUsesCellBounds = isVoronoiTarget(selectedCycle?.targetHeuristicType ?? null);
+  const selectedBaseShapes =
+    selectedUsesCellBounds || !selectedBoundsSnapshot
+      ? []
+      : selectedBoundsSnapshot.shapes;
+  const boundsStatusText = selectedUsesCellBounds
+    ? 'Voronoi bounds are rendered through the Cells overlay for this cycle.'
+    : selectedBoundsSnapshot
+      ? `Map bounds captured at ${formatTimestamp(selectedBoundsSnapshot.capturedAtMs)}`
+      : 'No map-bounds snapshot was captured for this cycle in the current session.';
 
   const activeLayerIdSet = useMemo(
-    () => new Set(activeLayerIds),
-    [activeLayerIds]
+    () =>
+      new Set(
+        overlayLayers
+          .filter((layer) => layerVisibilityById[layer.id] !== false)
+          .map((layer) => layer.id)
+      ),
+    [layerVisibilityById, overlayLayers]
   );
 
   const toggleLayer = (layerId: string) => {
-    setActiveLayerIds((previous) =>
-      previous.includes(layerId)
-        ? previous.filter((id) => id !== layerId)
-        : [...previous, layerId]
-    );
+    setLayerVisibilityById((previous) => ({
+      ...previous,
+      [layerId]: previous[layerId] === false,
+    }));
+  };
+
+  const selectCycle = (cycleId: number) => {
+    setHasUserPinnedSelection(true);
+    setSelectedCycleId(cycleId);
   };
 
   return (
@@ -259,8 +292,8 @@ export default function RecomputePage() {
         <div>
           <h1 className="text-2xl font-semibold text-slate-100">Recompute snapshots</h1>
           <p className="mt-1 text-sm text-slate-400">
-            Bounds-first recompute viewer. It reuses the map renderer, then overlays
-            heuristic-specific geometry from the snapshot payloads.
+            Recompute viewer. It snapshots the Map page bounds for each observed
+            cycle, then layers heuristic-specific overlay data on top.
           </p>
         </div>
         <div className="rounded-2xl border border-slate-800 bg-slate-900/70 px-4 py-3 text-right">
@@ -281,8 +314,7 @@ export default function RecomputePage() {
               Captures
             </div>
             <div className="mt-1 text-sm text-slate-300">
-              Select a recompute cycle to inspect its frozen bounds capture and
-              overlay payloads.
+              Select a recompute cycle to inspect its map snapshot and overlay payloads.
             </div>
           </div>
           {cycleGroups.length > 0 ? (
@@ -293,7 +325,7 @@ export default function RecomputePage() {
                   <button
                     key={group.cycleId}
                     type="button"
-                    onClick={() => setSelectedCycleId(group.cycleId)}
+                    onClick={() => selectCycle(group.cycleId)}
                     className={
                       'w-full px-4 py-4 text-left transition ' +
                       (selected
@@ -338,12 +370,7 @@ export default function RecomputePage() {
                 baseShapes={selectedBaseShapes}
                 overlayLayers={overlayLayers}
                 activeLayerIds={activeLayerIdSet}
-                hasHistoricalBounds={selectedBoundsSnapshot != null}
-                boundsSnapshotLabel={
-                  selectedBoundsSnapshot
-                    ? `Captured at ${formatTimestamp(selectedBoundsSnapshot.capturedAtMs)}`
-                    : 'No historical bounds were captured for this cycle.'
-                }
+                boundsStatusText={boundsStatusText}
               />
 
               {overlayLayers.length > 0 ? (
