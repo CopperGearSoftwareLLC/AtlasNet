@@ -1,5 +1,5 @@
 import type { ShapeJS } from '../../shared/cartographTypes';
-import { resolveShapeWorldPolygon } from './shapeGeometry';
+import { resolveShapeWorldPolygon, shapeHasHalfPlaneCell } from './shapeGeometry';
 
 export type MapViewMode = '2d' | '3d';
 export type MapProjectionMode = 'orthographic' | 'perspective';
@@ -82,6 +82,52 @@ const TRANSFER_STATE_LABEL_STYLE: EdgeLabelStyle = {
 
 function clamp(value: number, min: number, max: number): number {
   return Math.min(max, Math.max(min, value));
+}
+
+function pointOnSegment2D(
+  point: { x: number; y: number },
+  start: { x: number; y: number },
+  end: { x: number; y: number },
+  epsilon = 1e-3
+): boolean {
+  const dx = end.x - start.x;
+  const dy = end.y - start.y;
+  const lengthSq = dx * dx + dy * dy;
+  if (lengthSq <= epsilon * epsilon) {
+    return Math.hypot(point.x - start.x, point.y - start.y) <= epsilon;
+  }
+
+  const cross = (point.x - start.x) * dy - (point.y - start.y) * dx;
+  if (Math.abs(cross) > epsilon * Math.sqrt(lengthSq)) {
+    return false;
+  }
+
+  const dot = (point.x - start.x) * dx + (point.y - start.y) * dy;
+  if (dot < -epsilon || dot > lengthSq + epsilon) {
+    return false;
+  }
+
+  return true;
+}
+
+function segmentLiesOnClipBoundary(
+  a: { x: number; y: number },
+  b: { x: number; y: number },
+  clipPolygon: { x: number; y: number }[]
+): boolean {
+  if (clipPolygon.length < 2) {
+    return false;
+  }
+
+  for (let i = 0; i < clipPolygon.length; i += 1) {
+    const start = clipPolygon[i];
+    const end = clipPolygon[(i + 1) % clipPolygon.length];
+    if (pointOnSegment2D(a, start, end) && pointOnSegment2D(b, start, end)) {
+      return true;
+    }
+  }
+
+  return false;
 }
 
 function normalizeInteractionSensitivity(
@@ -406,6 +452,28 @@ export function createMapRenderer({
       }
     }
     return out.length >= 3 ? out : [];
+  }
+
+  function getAxisCullWorldPolygon3D(): { x: number; y: number }[] {
+    const width = canvasWidth();
+    const height = canvasHeight();
+    const aspect = width / Math.max(1, height);
+    const maxAxisSpanFactor = Math.max(1, aspect);
+    const targetPlaneSpanRef =
+      projectionMode === 'perspective'
+        ? Math.max(
+            2,
+            2 * Math.abs(cameraDistance) * Math.tan(fovRad / 2) * maxAxisSpanFactor
+          )
+        : Math.max(2, 2 * Math.abs(orthoHeight) * maxAxisSpanFactor);
+    const halfSpan = targetPlaneSpanRef * 0.9;
+
+    return [
+      { x: cameraTarget.x - halfSpan, y: cameraTarget.z - halfSpan },
+      { x: cameraTarget.x + halfSpan, y: cameraTarget.z - halfSpan },
+      { x: cameraTarget.x + halfSpan, y: cameraTarget.z + halfSpan },
+      { x: cameraTarget.x - halfSpan, y: cameraTarget.z + halfSpan },
+    ];
   }
 
   function getEntityFocusRadius3D(
@@ -1116,20 +1184,35 @@ export function createMapRenderer({
           const worldPts = resolveShapeWorldPolygon(shape, viewportPolygon);
           if (worldPts.length > 0) {
             ctx.restore();
-            ctx.beginPath();
-            ctx.moveTo(
-              worldPts[0].x * scale2D + offsetX,
-              worldPts[0].y * scale2D + offsetY
-            );
-            for (let i = 1; i < worldPts.length; i += 1) {
-              ctx.lineTo(
-                worldPts[i].x * scale2D + offsetX,
-                worldPts[i].y * scale2D + offsetY
+            if (shapeHasHalfPlaneCell(shape)) {
+              for (let i = 0; i < worldPts.length; i += 1) {
+                const start = worldPts[i];
+                const end = worldPts[(i + 1) % worldPts.length];
+                if (segmentLiesOnClipBoundary(start, end, viewportPolygon)) {
+                  continue;
+                }
+                ctx.beginPath();
+                ctx.moveTo(start.x * scale2D + offsetX, start.y * scale2D + offsetY);
+                ctx.lineTo(end.x * scale2D + offsetX, end.y * scale2D + offsetY);
+                ctx.strokeStyle = color;
+                ctx.stroke();
+              }
+            } else {
+              ctx.beginPath();
+              ctx.moveTo(
+                worldPts[0].x * scale2D + offsetX,
+                worldPts[0].y * scale2D + offsetY
               );
+              for (let i = 1; i < worldPts.length; i += 1) {
+                ctx.lineTo(
+                  worldPts[i].x * scale2D + offsetX,
+                  worldPts[i].y * scale2D + offsetY
+                );
+              }
+              ctx.closePath();
+              ctx.strokeStyle = color;
+              ctx.stroke();
             }
-            ctx.closePath();
-            ctx.strokeStyle = color;
-            ctx.stroke();
             continue;
           }
           break;
@@ -1159,7 +1242,8 @@ export function createMapRenderer({
       return;
     }
 
-    const viewportPolygon = getViewportWorldPolygon();
+    const basis = getCameraBasis();
+    const viewportPolygon = getAxisCullWorldPolygon3D();
     for (const shape of shapes) {
       const base = shapePositionToWorld(shape);
       const color = shape.color ?? 'rgba(100, 149, 255, 1)';
@@ -1207,12 +1291,29 @@ export function createMapRenderer({
         case 'polygon': {
           const polygonPts = resolveShapeWorldPolygon(shape, viewportPolygon);
           if (polygonPts.length >= 2) {
-            const worldPts = polygonPts.map((p) => ({
-              x: p.x,
-              y: base.y,
-              z: p.y,
-            }));
-            drawPolyline3D(worldPts, true, color, 1.5);
+            if (shapeHasHalfPlaneCell(shape)) {
+              for (let i = 0; i < polygonPts.length; i += 1) {
+                const start = polygonPts[i];
+                const end = polygonPts[(i + 1) % polygonPts.length];
+                if (segmentLiesOnClipBoundary(start, end, viewportPolygon)) {
+                  continue;
+                }
+                drawLine3D(
+                  { x: start.x, y: base.y, z: start.y },
+                  { x: end.x, y: base.y, z: end.y },
+                  color,
+                  1.5,
+                  basis
+                );
+              }
+            } else {
+              const worldPts = polygonPts.map((p) => ({
+                x: p.x,
+                y: base.y,
+                z: p.y,
+              }));
+              drawPolyline3D(worldPts, true, color, 1.5);
+            }
           }
           break;
         }
