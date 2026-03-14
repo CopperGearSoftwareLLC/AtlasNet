@@ -44,7 +44,7 @@ add_swig_library_for_target(${TARGET_NAME}
         "std::vector<std::string>"
         "std::vector<std::vector<std::string>>"
         "std::vector<EntityLedgerEntry>"
+        "std::vector<StreamEntityLedgerEntry>"
 
     #   "std::unordered_map<BoundsID, ByteReader>"
 )
-

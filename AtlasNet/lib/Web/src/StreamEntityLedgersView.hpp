@@ -12,7 +12,6 @@
 
 #include "Debug/Log.hpp"
 #include "Entity/Packet/LocalEntityListRequestPacket.hpp"
-#include "EntityLedgersView.hpp"
 #include "Global/Misc/UUID.hpp"
 #include "Heuristic/Database/HeuristicManifest.hpp"
 #include "Interlink/Database/ServerRegistry.hpp"
@@ -20,6 +19,7 @@
 #include "Network/NetworkEnums.hpp"
 #include "Network/NetworkIdentity.hpp"
 #include "Network/Packet/PacketManager.hpp"
+#include "StreamEntityLedgerEntry.hpp"
 
 class StreamEntityLedgersView
 {
@@ -27,7 +27,7 @@ class StreamEntityLedgersView
 
 	struct ShardLedgerState
 	{
-		std::vector<EntityLedgerEntry> entries;
+		std::vector<StreamEntityLedgerEntry> entries;
 		std::optional<BoundsID> boundId;
 		Clock::time_point lastRequestAt = Clock::time_point::min();
 		Clock::time_point lastResponseAt = Clock::time_point::min();
@@ -35,8 +35,9 @@ class StreamEntityLedgersView
 		bool awaitingResponse = false;
 	};
 
-	static constexpr auto kRefreshInterval = std::chrono::milliseconds(250);
-	static constexpr auto kRequestTimeout = std::chrono::milliseconds(1500);
+	static constexpr auto kRefreshLoopSleep = std::chrono::milliseconds(5);
+	static constexpr auto kRequestInterval = std::chrono::milliseconds(5);
+	static constexpr auto kRequestTimeout = std::chrono::milliseconds(250);
 	static constexpr auto kSnapshotTTL = std::chrono::milliseconds(5000);
 	static constexpr auto kTimeoutLogInterval = std::chrono::seconds(5);
 
@@ -54,7 +55,7 @@ class StreamEntityLedgersView
 			return;
 		}
 
-		std::vector<EntityLedgerEntry> shardEntries;
+		std::vector<StreamEntityLedgerEntry> shardEntries;
 		shardEntries.reserve(std::get<std::vector<AtlasEntityMinimal>>(p.Response_Entities).size());
 
 		std::optional<BoundsID> boundId = HeuristicManifest::Get().QueryOwnershipState(
@@ -84,7 +85,7 @@ class StreamEntityLedgersView
 
 			for (const auto& ae : std::get<std::vector<AtlasEntityMinimal>>(p.Response_Entities))
 			{
-				EntityLedgerEntry entry;
+				StreamEntityLedgerEntry entry;
 				entry.BoundID = *boundId;
 				entry.ClientID = UUIDGen::ToString(ae.Client_ID);
 				entry.EntityID = UUIDGen::ToString(ae.Entity_ID);
@@ -146,6 +147,12 @@ class StreamEntityLedgersView
 					}
 				}
 
+				if (shardState.lastRequestAt != Clock::time_point::min() &&
+					(now - shardState.lastRequestAt) < kRequestInterval)
+				{
+					continue;
+				}
+
 				shardState.awaitingResponse = true;
 				shardState.lastRequestAt = now;
 				shardsToQuery.push_back(shardId);
@@ -166,7 +173,7 @@ class StreamEntityLedgersView
 		while (!stopToken.stop_requested())
 		{
 			RefreshShardRequests();
-			std::this_thread::sleep_for(kRefreshInterval);
+			std::this_thread::sleep_for(kRefreshLoopSleep);
 		}
 	}
 
@@ -182,7 +189,7 @@ class StreamEntityLedgersView
 
 	~StreamEntityLedgersView() = default;
 
-	void GetEntityLists(std::vector<EntityLedgerEntry>& entities,
+	void GetEntityLists(std::vector<StreamEntityLedgerEntry>& entities,
 						std::chrono::milliseconds timeout = std::chrono::milliseconds(2000))
 	{
 		(void)timeout;

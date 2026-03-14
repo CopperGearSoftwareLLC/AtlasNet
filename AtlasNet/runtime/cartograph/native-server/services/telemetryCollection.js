@@ -13,6 +13,18 @@ function asArray(value) {
   return Array.isArray(value) ? value : [];
 }
 
+function createTelemetryCache(initialValue) {
+  return {
+    value: initialValue,
+    inFlight: null,
+    lastUpdatedAtMs: 0,
+  };
+}
+
+const authorityTelemetryDbCache = createTelemetryCache([]);
+const authorityOwnerMapCache = createTelemetryCache({});
+const networkTelemetryDbCacheByMode = new Map();
+
 async function runTelemetryRead(readLabel, readFn, fallbackValue = []) {
   try {
     return {
@@ -29,6 +41,49 @@ async function runTelemetryRead(readLabel, readFn, fallbackValue = []) {
       error,
     };
   }
+}
+
+function getCachedTelemetrySnapshot(cache) {
+  return Array.isArray(cache.value) ? cache.value : [];
+}
+
+function getCachedTelemetryObject(cache) {
+  return cache.value && typeof cache.value === 'object' ? cache.value : {};
+}
+
+function scheduleCachedTelemetryRead(
+  cache,
+  readLabel,
+  readFn,
+  fallbackValue = [],
+  staleAfterMs = 0
+) {
+  if (
+    staleAfterMs > 0 &&
+    cache.lastUpdatedAtMs > 0 &&
+    Date.now() - cache.lastUpdatedAtMs < staleAfterMs
+  ) {
+    return Promise.resolve({
+      ok: true,
+      value: cache.value,
+      error: null,
+    });
+  }
+
+  if (cache.inFlight) {
+    return cache.inFlight;
+  }
+
+  cache.inFlight = runTelemetryRead(readLabel, readFn, fallbackValue).then((result) => {
+    if (result.ok) {
+      cache.value = result.value;
+      cache.lastUpdatedAtMs = Date.now();
+    }
+    cache.inFlight = null;
+    return result;
+  });
+
+  return cache.inFlight;
 }
 
 function mergeNetworkTelemetryRows(primaryRows, secondaryRows) {
@@ -165,20 +220,26 @@ async function collectNetworkTelemetry({
   networkTelemetry,
   includeLiveIds = true,
 }) {
+  const dbCacheKey = includeLiveIds ? 'with-live-ids' : 'without-live-ids';
+  const dbCache =
+    networkTelemetryDbCacheByMode.get(dbCacheKey) ?? createTelemetryCache([]);
+  networkTelemetryDbCacheByMode.set(dbCacheKey, dbCache);
   const hasAddon = Boolean(
     addon &&
       networkTelemetry &&
       addon.std_vector_std_string_ &&
       addon.std_vector_std_vector_std_string__
   );
-  const databaseReadPromise = runTelemetryRead(
+  const databaseReadPromise = scheduleCachedTelemetryRead(
+    dbCache,
     'network internalDB',
     () =>
       readNetworkTelemetryFromDatabase({
         includeLiveIds,
         dbClientScope: 'network-telemetry',
       }),
-    []
+    [],
+    500
   );
 
   if (!hasAddon) {
@@ -186,24 +247,30 @@ async function collectNetworkTelemetry({
     return asArray(databaseRead.value);
   }
 
-  const addonReadPromise = runTelemetryRead(
+  const addonRead = await runTelemetryRead(
     'network GNS interlink',
     () => readNetworkTelemetry(addon, networkTelemetry, { includeLiveIds }),
     []
   );
-  const [addonRead, databaseRead] = await Promise.all([
-    addonReadPromise,
-    databaseReadPromise,
-  ]);
+  const cachedDatabaseRows = getCachedTelemetrySnapshot(dbCache);
   const mergedRows = mergeNetworkTelemetryRows(
     addonRead.value,
-    databaseRead.value
+    cachedDatabaseRows
   );
   if (mergedRows.length > 0) {
     return mergedRows;
   }
   if (addonRead.ok) {
     return asArray(addonRead.value);
+  }
+
+  const databaseRead = await databaseReadPromise;
+  const fallbackMergedRows = mergeNetworkTelemetryRows(
+    addonRead.value,
+    databaseRead.value
+  );
+  if (fallbackMergedRows.length > 0) {
+    return fallbackMergedRows;
   }
   if (databaseRead.ok) {
     return asArray(databaseRead.value);
@@ -213,12 +280,21 @@ async function collectNetworkTelemetry({
 
 async function collectAuthorityTelemetry({ addon, entityLedgersView }) {
   const hasAddon = Boolean(
-    addon && entityLedgersView && addon.std_vector_EntityLedgerEntry_
+    addon && entityLedgersView && addon.std_vector_StreamEntityLedgerEntry_
   );
-  const databaseReadPromise = runTelemetryRead(
+  const databaseReadPromise = scheduleCachedTelemetryRead(
+    authorityTelemetryDbCache,
     'authority internalDB',
     () => readAuthorityTelemetryFromDatabase({ dbClientScope: 'authority-telemetry' }),
-    []
+    [],
+    1000
+  );
+  const ownerMapReadPromise = scheduleCachedTelemetryRead(
+    authorityOwnerMapCache,
+    'authority ownership map',
+    () => readHeuristicClaimedOwnersFromDatabase({ dbClientScope: 'authority-owners' }),
+    {},
+    500
   );
 
   if (!hasAddon) {
@@ -226,39 +302,34 @@ async function collectAuthorityTelemetry({ addon, entityLedgersView }) {
     return asArray(databaseRead.value);
   }
 
-  const ownerLookupPromise = runTelemetryRead(
-    'authority ownership map',
-    () => readHeuristicClaimedOwnersFromDatabase({ dbClientScope: 'authority-owners' }),
-    {}
-  );
-  const addonReadPromise = runTelemetryRead(
+  const addonRead = await runTelemetryRead(
     'authority GNS interlink',
-    async () => {
-      const ownerLookupRead = await ownerLookupPromise;
-      const ownerByBoundId =
-        ownerLookupRead.value && typeof ownerLookupRead.value === 'object'
-          ? ownerLookupRead.value
-          : {};
-      return readEntityLedgersTelemetry(addon, entityLedgersView, {
-        ownerByBoundId,
-      });
-    },
+    () =>
+      readEntityLedgersTelemetry(addon, entityLedgersView, {
+        ownerByBoundId: getCachedTelemetryObject(authorityOwnerMapCache),
+      }),
     []
   );
-
-  const [addonRead, databaseRead] = await Promise.all([
-    addonReadPromise,
-    databaseReadPromise,
-  ]);
+  const cachedDatabaseRows = getCachedTelemetrySnapshot(authorityTelemetryDbCache);
   const mergedRows = mergeAuthorityTelemetryRows(
     addonRead.value,
-    databaseRead.value
+    cachedDatabaseRows
   );
   if (mergedRows.length > 0) {
     return mergedRows;
   }
   if (addonRead.ok) {
     return asArray(addonRead.value);
+  }
+
+  await ownerMapReadPromise;
+  const databaseRead = await databaseReadPromise;
+  const fallbackMergedRows = mergeAuthorityTelemetryRows(
+    addonRead.value,
+    databaseRead.value
+  );
+  if (fallbackMergedRows.length > 0) {
+    return fallbackMergedRows;
   }
   if (databaseRead.ok) {
     return asArray(databaseRead.value);

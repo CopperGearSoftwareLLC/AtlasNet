@@ -91,7 +91,7 @@ function readOwnerByBoundIdFromHeuristic(addon) {
 }
 
 function readEntityLedgersTelemetry(addon, entityLedgersView, options = {}) {
-  if (!addon || !entityLedgersView || !addon.std_vector_EntityLedgerEntry_) {
+  if (!addon || !entityLedgersView || !addon.std_vector_StreamEntityLedgerEntry_) {
     return [];
   }
 
@@ -99,11 +99,11 @@ function readEntityLedgersTelemetry(addon, entityLedgersView, options = {}) {
     options.ownerByBoundId && typeof options.ownerByBoundId === 'object'
       ? options.ownerByBoundId
       : {};
-  const ownerByBoundIdFallback = readOwnerByBoundIdFromHeuristic(addon);
-  const entities = new addon.std_vector_EntityLedgerEntry_();
+  const entities = new addon.std_vector_StreamEntityLedgerEntry_();
   entityLedgersView.GetEntityLists(entities);
 
   const rows = [];
+  let ownerByBoundIdFallback = null;
   for (let i = 0; i < entities.size(); i += 1) {
     const entry = entities.get(i);
     const entityId = String(
@@ -116,9 +116,15 @@ function readEntityLedgersTelemetry(addon, entityLedgersView, options = {}) {
     const boundId = String(
       readField(entry, ['BoundID', 'boundId', 'BoundId']) ?? ''
     ).trim();
+    const ownerIdFromBoundId = normalizeOwnerId(
+      boundId ? ownerByBoundIdFromDb[boundId] : ''
+    );
+    if (!ownerIdFromBoundId && !ownerByBoundIdFallback) {
+      ownerByBoundIdFallback = readOwnerByBoundIdFromHeuristic(addon);
+    }
     const ownerId =
-      normalizeOwnerId(boundId ? ownerByBoundIdFromDb[boundId] : '') ||
-      ownerByBoundIdFallback.get(boundId) ||
+      ownerIdFromBoundId ||
+      ownerByBoundIdFallback?.get(boundId) ||
       (boundId ? `bound:${boundId}` : 'unknown');
 
     const world = toNumber(readField(entry, ['WorldID', 'worldId', 'WorldId']), 0);

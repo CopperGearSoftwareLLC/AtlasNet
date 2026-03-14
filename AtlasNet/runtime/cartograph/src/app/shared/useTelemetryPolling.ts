@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { startTransition, useCallback, useEffect, useRef, useState } from 'react';
 import type {
   AuthorityEntityTelemetry,
   ShardPlacementTelemetry,
@@ -20,6 +20,7 @@ interface PolledResourceOptions<T> {
   url: string;
   intervalMs: number;
   enabled?: boolean;
+  abortInFlightOnNextPoll?: boolean;
   createInitialValue: () => T;
   mapResponse: (raw: unknown) => T;
   areEqual?: (left: T, right: T) => boolean;
@@ -90,6 +91,7 @@ function usePolledResource<T>({
   url,
   intervalMs,
   enabled = true,
+  abortInFlightOnNextPoll = false,
   createInitialValue,
   mapResponse,
   areEqual,
@@ -115,11 +117,13 @@ function usePolledResource<T>({
   onPollResultRef.current = onPollResult;
 
   const updateData = useCallback((next: T): void => {
-    setData((previous) => {
-      const equals = areEqualRef.current
-        ? areEqualRef.current(previous, next)
-        : Object.is(previous, next);
-      return equals ? previous : next;
+    startTransition(() => {
+      setData((previous) => {
+        const equals = areEqualRef.current
+          ? areEqualRef.current(previous, next)
+          : Object.is(previous, next);
+        return equals ? previous : next;
+      });
     });
   }, []);
 
@@ -130,14 +134,18 @@ function usePolledResource<T>({
     }
 
     let alive = true;
-    let inFlight = false;
     let activeController: AbortController | null = null;
+    let requestSequence = 0;
 
     async function poll() {
-      if (inFlight) {
-        return;
+      if (activeController) {
+        if (!abortInFlightOnNextPoll) {
+          return;
+        }
+        activeController.abort();
       }
-      inFlight = true;
+      requestSequence += 1;
+      const requestId = requestSequence;
       const controller = new AbortController();
       activeController = controller;
       const pollStartedAtMs = Date.now();
@@ -162,7 +170,7 @@ function usePolledResource<T>({
         }
 
         const raw = await response.json();
-        if (!alive) {
+        if (!alive || requestId !== requestSequence) {
           return;
         }
 
@@ -175,6 +183,9 @@ function usePolledResource<T>({
         });
       } catch (err) {
         if (controller.signal.aborted) {
+          return;
+        }
+        if (requestId !== requestSequence) {
           return;
         }
         onExceptionRef.current?.(err);
@@ -191,7 +202,6 @@ function usePolledResource<T>({
         if (activeController === controller) {
           activeController = null;
         }
-        inFlight = false;
       }
     }
 
@@ -214,6 +224,7 @@ function usePolledResource<T>({
   }, [
     enabled,
     intervalMs,
+    abortInFlightOnNextPoll,
     resetOnException,
     resetOnHttpError,
     updateData,
@@ -226,6 +237,7 @@ function usePolledResource<T>({
 interface TelemetryPollingOptions {
   intervalMs: number;
   enabled?: boolean;
+  abortInFlightOnNextPoll?: boolean;
   resetOnException?: boolean;
   resetOnHttpError?: boolean;
   onException?: (err: unknown) => void;
@@ -327,6 +339,7 @@ export function useTransferManifest({
 export function useTransferStateQueue({
   intervalMs,
   enabled = true,
+  abortInFlightOnNextPoll = false,
   resetOnException = false,
   resetOnHttpError = false,
   onException,
@@ -337,6 +350,7 @@ export function useTransferStateQueue({
     url: '/api/transferstatequeue',
     intervalMs,
     enabled,
+    abortInFlightOnNextPoll,
     createInitialValue: () => [],
     mapResponse: parseTransferStateQueueRows,
     resetOnException,
