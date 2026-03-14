@@ -1,6 +1,5 @@
 'use client';
 
-import Link from 'next/link';
 import { useEffect, useMemo, useState } from 'react';
 import { ServerBoundsMinimapSection } from './network/server-bounds/ServerBoundsMinimapSection';
 import type { DatabaseSnapshotResponse } from './shared/cartographTypes';
@@ -193,38 +192,6 @@ export default function OverviewPage() {
           <p className="mt-1 text-sm text-slate-400">
             High-level status across map, clients, workers, network, and database.
           </p>
-        </div>
-        <div className="flex flex-wrap gap-2 text-xs">
-          <Link
-            href="/map"
-            className="rounded-lg border border-slate-700 bg-slate-900 px-3 py-2 text-slate-200 hover:bg-slate-800"
-          >
-            Open Map
-          </Link>
-          <Link
-            href="/clients"
-            className="rounded-lg border border-slate-700 bg-slate-900 px-3 py-2 text-slate-200 hover:bg-slate-800"
-          >
-            Open Clients
-          </Link>
-          <Link
-            href="/workers"
-            className="rounded-lg border border-slate-700 bg-slate-900 px-3 py-2 text-slate-200 hover:bg-slate-800"
-          >
-            Open Workers
-          </Link>
-          <Link
-            href="/database"
-            className="rounded-lg border border-slate-700 bg-slate-900 px-3 py-2 text-slate-200 hover:bg-slate-800"
-          >
-            Open Database
-          </Link>
-          <Link
-            href="/network"
-            className="rounded-lg border border-slate-700 bg-slate-900 px-3 py-2 text-slate-200 hover:bg-slate-800"
-          >
-            Open Network
-          </Link>
         </div>
       </div>
 

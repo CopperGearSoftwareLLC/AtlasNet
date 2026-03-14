@@ -1,7 +1,8 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import type {
+  HeuristicControlState,
   RecomputeSnapshotTelemetry,
   ShapeJS,
 } from '../shared/cartographTypes';
@@ -16,6 +17,13 @@ import {
 } from './recomputeOverlayShapes';
 
 const POLL_INTERVAL_MS = 1000;
+const HEURISTIC_CONTROL_POLL_INTERVAL_MS = 5000;
+
+const EMPTY_HEURISTIC_CONTROL: HeuristicControlState = {
+  currentHeuristicType: null,
+  desiredHeuristicType: null,
+  allowedHeuristicTypes: [],
+};
 
 interface RecomputeCycleGroup {
   cycleId: number;
@@ -24,6 +32,7 @@ interface RecomputeCycleGroup {
   availableServerCount: number;
   targetHeuristicType: string | null;
   snapshots: RecomputeSnapshotTelemetry[];
+  captureSource: 'backend' | 'local';
 }
 
 interface CapturedBoundsSnapshot {
@@ -66,6 +75,7 @@ function buildCycleGroups(
         availableServerCount: representative?.availableServerCount ?? 0,
         targetHeuristicType: representative?.targetHeuristicType ?? null,
         snapshots: sortedSnapshots,
+        captureSource: 'backend',
       };
     })
     .sort((left, right) => {
@@ -77,7 +87,11 @@ function buildCycleGroups(
 }
 
 function isVoronoiTarget(type: string | null): boolean {
-  return type === 'Voronoi' || type === 'HotspotVoronoi';
+  return (
+    type === 'Voronoi' ||
+    type === 'HotspotVoronoi' ||
+    type === 'LlmVoronoi'
+  );
 }
 
 function cloneShape(shape: ShapeJS): ShapeJS {
@@ -93,19 +107,69 @@ function cloneShapes(shapes: ShapeJS[]): ShapeJS[] {
   return shapes.map(cloneShape);
 }
 
+function createShapeFingerprint(
+  shapes: ShapeJS[],
+  heuristicType: string | null
+): string {
+  return JSON.stringify({
+    heuristicType,
+    shapes: shapes.map((shape) => ({
+      id: shape.id ?? null,
+      ownerId: shape.ownerId ?? null,
+      type: shape.type,
+      position: shape.position,
+      radius: shape.radius ?? null,
+      size: shape.size ?? null,
+      points: shape.points ?? null,
+      color: shape.color ?? null,
+      label: shape.label ?? null,
+    })),
+  });
+}
+
 function SnapshotJsonCard({
   snapshot,
 }: {
   snapshot: RecomputeSnapshotTelemetry;
 }) {
   const inputJson = useMemo(
-    () => JSON.stringify(snapshot.inputJsonRaw ?? {}, null, 2),
+    () => {
+      const raw = snapshot.inputJsonRaw ?? {};
+      if (
+        raw &&
+        typeof raw === 'object' &&
+        !Array.isArray(raw) &&
+        typeof raw.prompt === 'string' &&
+        raw.prompt.trim().length > 0
+      ) {
+        return raw.prompt;
+      }
+      return JSON.stringify(raw, null, 2);
+    },
     [snapshot.inputJsonRaw]
   );
-  const outputJson = useMemo(
-    () => JSON.stringify(snapshot.outputJsonRaw ?? {}, null, 2),
-    [snapshot.outputJsonRaw]
-  );
+  const outputJson = useMemo(() => {
+    const raw = snapshot.outputJsonRaw ?? {};
+    if (
+      raw &&
+      typeof raw === 'object' &&
+      !Array.isArray(raw) &&
+      raw.model_completion_json &&
+      typeof raw.model_completion_json === 'object'
+    ) {
+      return JSON.stringify(raw.model_completion_json, null, 2);
+    }
+    if (
+      raw &&
+      typeof raw === 'object' &&
+      !Array.isArray(raw) &&
+      typeof raw.model_completion_raw === 'string' &&
+      raw.model_completion_raw.trim().length > 0
+    ) {
+      return raw.model_completion_raw;
+    }
+    return JSON.stringify(raw, null, 2);
+  }, [snapshot.outputJsonRaw]);
 
   return (
     <article className="rounded-3xl border border-slate-800 bg-slate-900/70 p-5">
@@ -117,6 +181,30 @@ function SnapshotJsonCard({
           <div className="mt-1 text-sm text-slate-300">
             snapshot #{snapshot.snapshotId} | schema={snapshot.inputSchema}
           </div>
+          {snapshot.seedSource || snapshot.inferenceNote ? (
+            <div className="mt-2 flex flex-wrap gap-2 text-xs">
+              {snapshot.seedSource ? (
+                <span className="rounded-full border border-emerald-500/40 bg-emerald-500/10 px-2 py-1 text-emerald-200">
+                  source={snapshot.seedSource}
+                </span>
+              ) : null}
+              {snapshot.inferenceNote ? (
+                <span className="rounded-full border border-slate-700 bg-slate-950/70 px-2 py-1 text-slate-300">
+                  note={snapshot.inferenceNote}
+                </span>
+              ) : null}
+              {snapshot.endpoint ? (
+                <span className="rounded-full border border-slate-700 bg-slate-950/70 px-2 py-1 text-slate-300">
+                  endpoint={snapshot.endpoint}
+                </span>
+              ) : null}
+              {snapshot.modelId ? (
+                <span className="rounded-full border border-slate-700 bg-slate-950/70 px-2 py-1 text-slate-300">
+                  model={snapshot.modelId}
+                </span>
+              ) : null}
+            </div>
+          ) : null}
         </div>
         <div className="text-right text-xs text-slate-500">
           <div>{formatTimestamp(snapshot.createdAtMs)}</div>
@@ -193,15 +281,110 @@ export default function RecomputePage() {
   const [capturedBoundsByCycle, setCapturedBoundsByCycle] = useState<
     Record<number, CapturedBoundsSnapshot>
   >({});
+  const [observedCycleGroups, setObservedCycleGroups] = useState<RecomputeCycleGroup[]>([]);
+  const [heuristicControl, setHeuristicControl] =
+    useState<HeuristicControlState>(EMPTY_HEURISTIC_CONTROL);
+  const [selectedHeuristicType, setSelectedHeuristicType] = useState('');
+  const [heuristicControlBusy, setHeuristicControlBusy] = useState(false);
+  const [heuristicControlMessage, setHeuristicControlMessage] =
+    useState<string | null>(null);
+  const lastObservedFingerprintRef = useRef<string | null>(null);
+  const nextObservedCycleIdRef = useRef(1);
 
   useEffect(() => {
-    if (cycleGroups.length === 0) {
+    let alive = true;
+
+    async function pollHeuristicControl() {
+      try {
+        const response = await fetch('/api/heuristic-control', {
+          cache: 'no-store',
+        });
+        if (!response.ok) {
+          return;
+        }
+
+        const payload = (await response.json()) as HeuristicControlState;
+        if (!alive) {
+          return;
+        }
+
+        setHeuristicControl(payload);
+        setSelectedHeuristicType((previous) => {
+          if (
+            previous &&
+            Array.isArray(payload.allowedHeuristicTypes) &&
+            payload.allowedHeuristicTypes.includes(previous)
+          ) {
+            return previous;
+          }
+          return payload.desiredHeuristicType ?? payload.currentHeuristicType ?? '';
+        });
+      } catch {}
+    }
+
+    void pollHeuristicControl();
+    const intervalId = setInterval(() => {
+      void pollHeuristicControl();
+    }, HEURISTIC_CONTROL_POLL_INTERVAL_MS);
+
+    return () => {
+      alive = false;
+      clearInterval(intervalId);
+    };
+  }, []);
+
+  useEffect(() => {
+    const currentHeuristicType = heuristicControl.currentHeuristicType;
+    if (!currentHeuristicType || baseShapes.length === 0) {
+      return;
+    }
+
+    const nextFingerprint = createShapeFingerprint(baseShapes, currentHeuristicType);
+    if (lastObservedFingerprintRef.current === nextFingerprint) {
+      return;
+    }
+
+    lastObservedFingerprintRef.current = nextFingerprint;
+    const capturedAtMs = Date.now();
+    const cycleId = nextObservedCycleIdRef.current++;
+    const capturedShapes = cloneShapes(baseShapes);
+
+    setCapturedBoundsByCycle((previous) => ({
+      ...previous,
+      [cycleId]: {
+        cycleId,
+        capturedAtMs,
+        shapes: capturedShapes,
+      },
+    }));
+    setObservedCycleGroups((previous) =>
+      [
+        {
+          cycleId,
+          createdAtMs: capturedAtMs,
+          entityCount: 0,
+          availableServerCount: 0,
+          targetHeuristicType: currentHeuristicType,
+          snapshots: [],
+          captureSource: 'local',
+        },
+        ...previous,
+      ].slice(0, 64)
+    );
+  }, [baseShapes, heuristicControl.currentHeuristicType]);
+
+  const displayCycleGroups = isVoronoiTarget(heuristicControl.currentHeuristicType ?? null)
+    ? cycleGroups
+    : observedCycleGroups;
+
+  useEffect(() => {
+    if (displayCycleGroups.length === 0) {
       setSelectedCycleId(null);
       setHasUserPinnedSelection(false);
       return;
     }
 
-    const selectedStillExists = cycleGroups.some(
+    const selectedStillExists = displayCycleGroups.some(
       (group) => group.cycleId === selectedCycleId
     );
     if (selectedCycleId != null && selectedStillExists) {
@@ -213,9 +396,9 @@ export default function RecomputePage() {
     }
 
     if (!hasUserPinnedSelection || selectedCycleId == null || !selectedStillExists) {
-      setSelectedCycleId(cycleGroups[0].cycleId);
+      setSelectedCycleId(displayCycleGroups[0].cycleId);
     }
-  }, [cycleGroups, hasUserPinnedSelection, selectedCycleId]);
+  }, [displayCycleGroups, hasUserPinnedSelection, selectedCycleId]);
 
   useEffect(() => {
     const latestCycle = cycleGroups[0];
@@ -241,8 +424,9 @@ export default function RecomputePage() {
   }, [baseShapes, cycleGroups]);
 
   const selectedCycle = useMemo(
-    () => cycleGroups.find((group) => group.cycleId === selectedCycleId) ?? null,
-    [cycleGroups, selectedCycleId]
+    () =>
+      displayCycleGroups.find((group) => group.cycleId === selectedCycleId) ?? null,
+    [displayCycleGroups, selectedCycleId]
   );
   const selectedBoundsSnapshot = useMemo(
     () =>
@@ -281,6 +465,42 @@ export default function RecomputePage() {
     }));
   };
 
+  async function applyHeuristicType() {
+    if (!selectedHeuristicType || heuristicControlBusy) {
+      return;
+    }
+
+    setHeuristicControlBusy(true);
+    setHeuristicControlMessage(null);
+
+    try {
+      const response = await fetch('/api/heuristic-control', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          heuristicType: selectedHeuristicType,
+        }),
+      });
+      if (!response.ok) {
+        setHeuristicControlMessage(`Set failed (${response.status}).`);
+        return;
+      }
+
+      const payload = (await response.json()) as HeuristicControlState;
+      setHeuristicControl(payload);
+      setSelectedHeuristicType(
+        payload.desiredHeuristicType ?? payload.currentHeuristicType ?? ''
+      );
+      setHeuristicControlMessage('Switch requested.');
+    } catch {
+      setHeuristicControlMessage('Set failed.');
+    } finally {
+      setHeuristicControlBusy(false);
+    }
+  }
+
   const selectCycle = (cycleId: number) => {
     setHasUserPinnedSelection(true);
     setSelectedCycleId(cycleId);
@@ -299,10 +519,12 @@ export default function RecomputePage() {
         <div className="rounded-2xl border border-slate-800 bg-slate-900/70 px-4 py-3 text-right">
           <div className="text-xs uppercase tracking-wide text-slate-500">Latest capture</div>
           <div className="font-mono text-2xl text-slate-100">
-            {formatTimestamp(cycleGroups[0]?.createdAtMs ?? 0)}
+            {formatTimestamp(displayCycleGroups[0]?.createdAtMs ?? 0)}
           </div>
           <div className="text-xs text-slate-500">
-            {cycleGroups[0] ? `cycle=${cycleGroups[0].cycleId}` : 'waiting'}
+            {displayCycleGroups[0]
+              ? `cycle=${displayCycleGroups[0].cycleId}`
+              : 'waiting'}
           </div>
         </div>
       </div>
@@ -317,9 +539,9 @@ export default function RecomputePage() {
               Select a recompute cycle to inspect its map snapshot and overlay payloads.
             </div>
           </div>
-          {cycleGroups.length > 0 ? (
+          {displayCycleGroups.length > 0 ? (
             <div className="divide-y divide-slate-800">
-              {cycleGroups.map((group) => {
+              {displayCycleGroups.map((group) => {
                 const selected = group.cycleId === selectedCycleId;
                 return (
                   <button
@@ -339,17 +561,23 @@ export default function RecomputePage() {
                           Cycle {group.cycleId}
                         </div>
                         <div className="mt-1 text-sm text-slate-200">
-                          {group.entityCount} entities | k={group.availableServerCount}
+                          {group.snapshots.length > 0
+                            ? `${group.entityCount} entities | k=${group.availableServerCount}`
+                            : `${group.targetHeuristicType ?? 'unknown'} bounds snapshot`}
                         </div>
                         <div className="mt-1 text-xs text-slate-500">
-                          {group.snapshots
-                            .map((snapshot) => snapshot.recomputeHeuristic)
-                            .join(' • ')}
+                          {group.snapshots.length > 0
+                            ? group.snapshots
+                                .map((snapshot) => snapshot.recomputeHeuristic)
+                                .join(' • ')
+                            : 'bounds_snapshot'}
                         </div>
                       </div>
                       <div className="text-right text-xs text-slate-500">
                         <div>{formatTimestamp(group.createdAtMs)}</div>
-                        <div>{group.targetHeuristicType ?? 'unknown'}</div>
+                        <div>
+                          {group.targetHeuristicType ?? 'unknown'} | {group.captureSource}
+                        </div>
                       </div>
                     </div>
                   </button>
@@ -358,12 +586,60 @@ export default function RecomputePage() {
             </div>
           ) : (
             <div className="px-4 py-10 text-sm text-slate-500">
-              Waiting for recompute snapshots from the backend service.
+              Waiting for heuristic bounds or recompute snapshots to appear.
             </div>
           )}
         </aside>
 
         <div className="space-y-6">
+          <section className="rounded-3xl border border-slate-800 bg-slate-900/60 p-4">
+            <div className="flex flex-wrap items-end justify-between gap-3">
+              <div>
+                <div className="text-xs uppercase tracking-[0.22em] text-slate-500">
+                  Heuristic Control
+                </div>
+                <div className="mt-1 text-sm text-slate-300">
+                  Request a runtime swap. Watchdog applies it on the next recompute cycle.
+                </div>
+              </div>
+              <div className="text-xs text-slate-500">
+                current={heuristicControl.currentHeuristicType ?? 'unknown'} | desired=
+                {heuristicControl.desiredHeuristicType ?? 'unknown'}
+              </div>
+            </div>
+
+            <div className="mt-4 flex flex-wrap items-center gap-3">
+              <select
+                value={selectedHeuristicType}
+                onChange={(event) => setSelectedHeuristicType(event.target.value)}
+                className="rounded-xl border border-slate-700 bg-slate-950 px-3 py-2 text-sm text-slate-100"
+              >
+                {(heuristicControl.allowedHeuristicTypes.length > 0
+                  ? heuristicControl.allowedHeuristicTypes
+                  : ['Voronoi', 'HotspotVoronoi', 'LlmVoronoi']
+                ).map((type) => (
+                  <option key={type} value={type}>
+                    {type}
+                  </option>
+                ))}
+              </select>
+              <button
+                type="button"
+                onClick={() => {
+                  void applyHeuristicType();
+                }}
+                disabled={!selectedHeuristicType || heuristicControlBusy}
+                className="rounded-xl border border-cyan-500/40 bg-cyan-500/10 px-4 py-2 text-sm text-cyan-200 disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                {heuristicControlBusy ? 'Applying...' : 'Apply'}
+              </button>
+              <span className="text-xs text-slate-500">
+                {heuristicControlMessage ??
+                  'Verify on Map or Recompute after the next cycle.'}
+              </span>
+            </div>
+          </section>
+
           {selectedCycle ? (
             <>
               <RecomputeMapViewport
@@ -404,14 +680,31 @@ export default function RecomputePage() {
                 </div>
               ) : null}
 
-              <div className="space-y-4">
-                {selectedCycle.snapshots.map((snapshot) => (
-                  <SnapshotJsonCard
-                    key={snapshot.snapshotId}
-                    snapshot={snapshot}
-                  />
-                ))}
-              </div>
+              {selectedCycle.snapshots.length > 0 ? (
+                <div className="space-y-4">
+                  {selectedCycle.snapshots.map((snapshot) => (
+                    <SnapshotJsonCard
+                      key={snapshot.snapshotId}
+                      snapshot={snapshot}
+                    />
+                  ))}
+                </div>
+              ) : (
+                <article className="rounded-3xl border border-slate-800 bg-slate-900/70 p-5">
+                  <div className="text-xs uppercase tracking-[0.22em] text-cyan-400">
+                    bounds_snapshot
+                  </div>
+                  <div className="mt-2 text-sm text-slate-300">
+                    This heuristic does not currently publish recompute payload JSON, so
+                    Recompute is showing the captured map bounds for this observed state.
+                  </div>
+                  <div className="mt-3 text-xs text-slate-500">
+                    target={selectedCycle.targetHeuristicType ?? 'unknown'} | source=
+                    {selectedCycle.captureSource} | captured=
+                    {formatTimestamp(selectedCycle.createdAtMs)}
+                  </div>
+                </article>
+              )}
             </>
           ) : (
             <div className="rounded-3xl border border-dashed border-slate-800 px-6 py-16 text-center text-sm text-slate-500">

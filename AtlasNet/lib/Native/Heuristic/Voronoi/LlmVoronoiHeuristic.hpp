@@ -1,48 +1,37 @@
 #pragma once
 
 #include <optional>
+#include <string>
 #include <vector>
 
 #include "Global/pch.hpp"
 #include "Heuristic/IBounds.hpp"
 #include "Heuristic/IHeuristic.hpp"
+#include "Heuristic/Voronoi/HotspotVoronoiHeuristic.hpp"
 #include "Heuristic/Voronoi/VoronoiBounds.hpp"
 
-struct HotspotVoronoiSample
-{
-	double x = 0.0;
-	double y = 0.0;
-	double weight = 0.0;
-	double radius = 0.0;
-};
-
-class HotspotVoronoiHeuristic : public THeuristic<VoronoiBounds>
+class LlmVoronoiHeuristic : public THeuristic<VoronoiBounds>
 {
    public:
-	struct Options
-	{
-		vec2 NetHalfExtent = {100.0f, 100.0f};
-		uint32_t DefaultServerCount = 5;
-		uint32_t HotspotCount = 8;
-		uint32_t DensityGridResolution = 24;
-	} options;
+	using Options = HotspotVoronoiHeuristic::Options;
 
-	HotspotVoronoiHeuristic();
+	Options options;
+
+	LlmVoronoiHeuristic();
 
 	void SetAvailableServerCount(uint32_t count);
 	void SetHotspotCount(uint32_t count);
-	[[nodiscard]] static std::vector<HotspotVoronoiSample> BuildHotspotsFromEntities(
-		const std::span<const Transform>& span, const Options& options);
-	[[nodiscard]] static std::vector<glm::vec2> GenerateAlgorithmicSeeds(
-		const std::vector<HotspotVoronoiSample>& hotspots,
-		uint32_t serverCount,
-		const Options& options);
-	[[nodiscard]] static std::vector<VoronoiBounds> BuildCellsFromSeeds(
-		const std::vector<glm::vec2>& seeds, const Options& options);
 	[[nodiscard]] uint32_t GetActiveServerCount() const;
 	[[nodiscard]] uint32_t GetHotspotCount() const;
 	[[nodiscard]] const std::vector<HotspotVoronoiSample>& GetHotspots() const;
 	[[nodiscard]] const std::vector<glm::vec2>& GetSeeds() const;
+	[[nodiscard]] bool UsedLlamaCpp() const;
+	[[nodiscard]] const std::string& GetInferenceSource() const;
+	[[nodiscard]] const std::string& GetLastInferenceNote() const;
+	[[nodiscard]] const std::string& GetLastEndpointUrl() const;
+	[[nodiscard]] const std::string& GetLastModelId() const;
+	[[nodiscard]] const std::string& GetLastCompletionRaw() const;
+	[[nodiscard]] const std::string& GetLastPrompt() const;
 
 	void Compute(const std::span<const Transform>& span) override;
 	uint32_t GetBoundsCount() const override;
@@ -61,6 +50,13 @@ class HotspotVoronoiHeuristic : public THeuristic<VoronoiBounds>
    private:
 	uint32_t requestedServerCount = 0;
 	uint32_t activeServerCount = 0;
+	bool usedLlamaCpp = false;
+	std::string inferenceSource = "algorithmic_fallback";
+	std::string lastInferenceNote;
+	std::string lastEndpointUrl;
+	std::string lastModelId;
+	std::string lastCompletionRaw;
+	std::string lastPrompt;
 	std::vector<HotspotVoronoiSample> hotspots;
 	std::vector<glm::vec2> seeds;
 	std::vector<VoronoiBounds> cells;

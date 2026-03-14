@@ -20,9 +20,18 @@ void GridHeuristic::Compute(const std::span<const Transform>& span)
 		quads[i] = s;
 	}
 }
-uint32_t GridHeuristic::GetBoundsCount() const {}
-void GridHeuristic::GetBounds(std::vector<GridShape>& out_bounds) const {}
-void GridHeuristic::GetBoundDeltas(std::vector<TBoundDelta<GridShape>>& out_deltas) const {}
+uint32_t GridHeuristic::GetBoundsCount() const
+{
+	return static_cast<uint32_t>(quads.size());
+}
+void GridHeuristic::GetBounds(std::vector<GridShape>& out_bounds) const
+{
+	out_bounds = quads;
+}
+void GridHeuristic::GetBoundDeltas(std::vector<TBoundDelta<GridShape>>& out_deltas) const
+{
+	out_deltas.clear();
+}
 IHeuristic::Type GridHeuristic::GetType() const
 {
 	return IHeuristic::Type::eGridCell;

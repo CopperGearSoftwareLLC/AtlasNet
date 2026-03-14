@@ -741,42 +741,31 @@ void HotspotVoronoiHeuristic::SetHotspotCount(uint32_t count)
 	options.HotspotCount = std::max<uint32_t>(1, count);
 }
 
-uint32_t HotspotVoronoiHeuristic::GetActiveServerCount() const
+std::vector<HotspotVoronoiSample> HotspotVoronoiHeuristic::BuildHotspotsFromEntities(
+	const std::span<const Transform>& span, const Options& options)
 {
-	return activeServerCount;
-}
-
-uint32_t HotspotVoronoiHeuristic::GetHotspotCount() const
-{
-	return options.HotspotCount;
-}
-
-const std::vector<HotspotVoronoiSample>& HotspotVoronoiHeuristic::GetHotspots() const
-{
-	return hotspots;
-}
-
-const std::vector<glm::vec2>& HotspotVoronoiHeuristic::GetSeeds() const
-{
-	return seeds;
-}
-
-void HotspotVoronoiHeuristic::Compute(const std::span<const Transform>& span)
-{
-	activeServerCount =
-		requestedServerCount > 0 ? requestedServerCount : options.DefaultServerCount;
-	activeServerCount = std::max<uint32_t>(1, activeServerCount);
-
 	const std::vector<NormalizedPoint> points = NormalizeTransforms(span, options);
-	hotspots = BuildHotspots(points, options);
-	seeds = GenerateSeedPlacements(hotspots, activeServerCount, options);
+	return BuildHotspots(points, options);
+}
 
+std::vector<glm::vec2> HotspotVoronoiHeuristic::GenerateAlgorithmicSeeds(
+	const std::vector<HotspotVoronoiSample>& hotspots,
+	const uint32_t serverCount,
+	const Options& options)
+{
+	return GenerateSeedPlacements(
+		hotspots, std::max<uint32_t>(1, serverCount), options);
+}
+
+std::vector<VoronoiBounds> HotspotVoronoiHeuristic::BuildCellsFromSeeds(
+	const std::vector<glm::vec2>& seeds, const Options& options)
+{
 	const float minX = -options.NetHalfExtent.x;
 	const float maxX = options.NetHalfExtent.x;
 	const float minY = -options.NetHalfExtent.y;
 	const float maxY = options.NetHalfExtent.y;
 
-	cells.clear();
+	std::vector<VoronoiBounds> cells;
 	cells.reserve(seeds.size());
 
 	for (uint32_t i = 0; i < seeds.size(); ++i)
@@ -811,6 +800,39 @@ void HotspotVoronoiHeuristic::Compute(const std::span<const Transform>& span)
 		bound.vertices = std::move(polygon);
 		cells.push_back(std::move(bound));
 	}
+
+	return cells;
+}
+
+uint32_t HotspotVoronoiHeuristic::GetActiveServerCount() const
+{
+	return activeServerCount;
+}
+
+uint32_t HotspotVoronoiHeuristic::GetHotspotCount() const
+{
+	return options.HotspotCount;
+}
+
+const std::vector<HotspotVoronoiSample>& HotspotVoronoiHeuristic::GetHotspots() const
+{
+	return hotspots;
+}
+
+const std::vector<glm::vec2>& HotspotVoronoiHeuristic::GetSeeds() const
+{
+	return seeds;
+}
+
+void HotspotVoronoiHeuristic::Compute(const std::span<const Transform>& span)
+{
+	activeServerCount =
+		requestedServerCount > 0 ? requestedServerCount : options.DefaultServerCount;
+	activeServerCount = std::max<uint32_t>(1, activeServerCount);
+
+	hotspots = BuildHotspotsFromEntities(span, options);
+	seeds = GenerateAlgorithmicSeeds(hotspots, activeServerCount, options);
+	cells = BuildCellsFromSeeds(seeds, options);
 
 	logger.DebugFormatted(
 		"HotspotVoronoiHeuristic::Compute: entities={} hotspots={} seeds={} bounds={}",

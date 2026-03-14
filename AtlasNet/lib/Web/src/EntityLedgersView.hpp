@@ -53,7 +53,7 @@ class EntityLedgersView
 			[&](const HeuristicManifest::OwnershipStateWrapper& w)
 			{ return w.GetBoundOwner(info.sender); });
 		ASSERT(BoundID.has_value(), "INVALID SCENARIO");
-		ASSERT(BoundID.value() >= 0 && BoundID.value() <= 4, "FUCK");  // Trying to find a Bug
+		ASSERT(BoundID.value() >= 0, "INVALID VORONOI BOUND ID");
 		if (BoundID.has_value())
 		{
 			for (const auto& ae : std::get<std::vector<AtlasEntityMinimal>>(p.Response_Entities))

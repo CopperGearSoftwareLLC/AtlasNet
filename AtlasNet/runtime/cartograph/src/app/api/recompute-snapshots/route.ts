@@ -78,6 +78,34 @@ function parsePayload(raw: unknown): RecomputeSnapshotsResponse {
           Math.floor(toFiniteNumber(entry.availableServerCount, 0))
         ),
         hotspotCount: Math.max(0, Math.floor(toFiniteNumber(entry.hotspotCount, 0))),
+        seedSource:
+          entry.diagnostics &&
+          typeof entry.diagnostics === 'object' &&
+          typeof (entry.diagnostics as Record<string, unknown>).seedSource === 'string'
+            ? ((entry.diagnostics as Record<string, unknown>).seedSource as string).trim() ||
+              null
+            : null,
+        inferenceNote:
+          entry.diagnostics &&
+          typeof entry.diagnostics === 'object' &&
+          typeof (entry.diagnostics as Record<string, unknown>).inferenceNote === 'string'
+            ? ((entry.diagnostics as Record<string, unknown>).inferenceNote as string).trim() ||
+              null
+            : null,
+        endpoint:
+          entry.diagnostics &&
+          typeof entry.diagnostics === 'object' &&
+          typeof (entry.diagnostics as Record<string, unknown>).endpoint === 'string'
+            ? ((entry.diagnostics as Record<string, unknown>).endpoint as string).trim() ||
+              null
+            : null,
+        modelId:
+          entry.diagnostics &&
+          typeof entry.diagnostics === 'object' &&
+          typeof (entry.diagnostics as Record<string, unknown>).modelId === 'string'
+            ? ((entry.diagnostics as Record<string, unknown>).modelId as string).trim() ||
+              null
+            : null,
         inputJson:
           entry.input_json && typeof entry.input_json === 'object' && !Array.isArray(entry.input_json)
             ? {

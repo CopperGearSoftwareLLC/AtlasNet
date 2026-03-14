@@ -26,6 +26,7 @@
 #include "Heuristic/IHeuristic.hpp"
 #include "Heuristic/Quadtree/QuadtreeHeuristic.hpp"
 #include "Heuristic/Voronoi/HotspotVoronoiHeuristic.hpp"
+#include "Heuristic/Voronoi/LlmVoronoiHeuristic.hpp"
 #include "Heuristic/Voronoi/VoronoiHeuristic.hpp"
 #include "Interlink/Database/HealthManifest.hpp"
 #include "Interlink/Database/ServerRegistry.hpp"
@@ -374,6 +375,11 @@ void WatchDog::SwitchHeuristic(IHeuristic::Type newHeuristic)
 		case IHeuristic::Type::eHotspotVoronoi:
 		{
 			Heuristic = std::make_shared<HotspotVoronoiHeuristic>();
+			break;
+		}
+		case IHeuristic::Type::eLlmVoronoi:
+		{
+			Heuristic = std::make_shared<LlmVoronoiHeuristic>();
 			break;
 		}
 		case IHeuristic::Type::eOctree:

@@ -39,6 +39,10 @@ export interface RecomputeSnapshotTelemetry {
   entityCount: number;
   availableServerCount: number;
   hotspotCount: number;
+  seedSource: string | null;
+  inferenceNote: string | null;
+  endpoint: string | null;
+  modelId: string | null;
   inputJson: RecomputeInputJson;
   inputJsonRaw: Record<string, unknown>;
   outputJsonRaw: Record<string, unknown> | null;
@@ -147,6 +151,12 @@ export interface DatabaseSnapshotResponse {
   sources: DatabaseSource[];
   selectedSource: string | null;
   records: DatabaseRecord[];
+}
+
+export interface HeuristicControlState {
+  currentHeuristicType: string | null;
+  desiredHeuristicType: string | null;
+  allowedHeuristicTypes: string[];
 }
 
 export interface WorkerDaemonTelemetry {

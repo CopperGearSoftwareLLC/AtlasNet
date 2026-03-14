@@ -8,22 +8,25 @@
 #include "Global/Misc/Singleton.hpp"
 #include "Heuristic/IHeuristic.hpp"
 #include "Heuristic/Voronoi/VoronoiHeuristic.hpp"
-#include "Heuristic/Voronoi/HotspotVoronoiHeuristic.hpp"
 class HeuristicService : public Singleton<HeuristicService>
 {
 	std::jthread heuristicComputeThread;
 	Log logger = Log("HeuristicService");
 	std::unique_ptr<IHeuristic> activeHeuristic;
+	const std::string desiredHeuristicTypeKey =
+		"Heuristic:DesiredType";
    private:
 	void HeuristicThreadLoop(std::stop_token st);
 
 	void ComputeHeuristic();
+	void SyncDesiredHeuristic();
+	[[nodiscard]] std::unique_ptr<IHeuristic> CreateHeuristic(
+		IHeuristic::Type type) const;
 
    public:
 	HeuristicService()
 	{
-		// activeHeuristic = std::make_unique<VoronoiHeuristic>();
-		activeHeuristic = std::make_unique<HotspotVoronoiHeuristic>();
+		activeHeuristic = std::make_unique<VoronoiHeuristic>();
 		heuristicComputeThread =
 			std::jthread([this](std::stop_token st) { HeuristicThreadLoop(st); });
 	}

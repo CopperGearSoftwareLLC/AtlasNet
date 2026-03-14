@@ -14,6 +14,7 @@ namespace
 constexpr std::string_view kRecomputeSnapshotKey = "Heuristic:RecomputeSnapshots";
 constexpr size_t kMaxSnapshotHistory = 64;
 constexpr std::string_view kHotspotRecomputeHeuristicName = "hotspot_voronoi_v1";
+constexpr std::string_view kLlmRecomputeHeuristicName = "llm_voronoi_v1";
 constexpr std::string_view kLegacyRecomputeHeuristicName = "legacy_random_voronoi_v1";
 constexpr std::string_view kInputSchemaName = "seed_generation_v1";
 
@@ -95,6 +96,61 @@ void WriteJsonValue(const std::string_view key, const Json& value)
 	return doc;
 }
 
+[[nodiscard]] std::optional<Json> ExtractJsonObject(const std::string& raw)
+{
+	size_t start = std::string::npos;
+	int depth = 0;
+	bool inString = false;
+	bool escaped = false;
+
+	for (size_t i = 0; i < raw.size(); ++i)
+	{
+		const char ch = raw[i];
+		if (escaped)
+		{
+			escaped = false;
+			continue;
+		}
+		if (ch == '\\')
+		{
+			escaped = true;
+			continue;
+		}
+		if (ch == '"')
+		{
+			inString = !inString;
+			continue;
+		}
+		if (inString)
+		{
+			continue;
+		}
+		if (ch == '{')
+		{
+			if (depth == 0)
+			{
+				start = i;
+			}
+			++depth;
+		}
+		else if (ch == '}')
+		{
+			--depth;
+			if (depth == 0 && start != std::string::npos)
+			{
+				Json parsed = Json::parse(raw.substr(start, i - start + 1), nullptr, false);
+				if (!parsed.is_discarded() && parsed.is_object())
+				{
+					return parsed;
+				}
+				start = std::string::npos;
+			}
+		}
+	}
+
+	return std::nullopt;
+}
+
 [[nodiscard]] int64_t NowUnixTimeMs()
 {
 	return std::chrono::duration_cast<std::chrono::milliseconds>(
@@ -125,7 +181,6 @@ void WriteJsonValue(const std::string_view key, const Json& value)
 	inputJson["aspect_ratio"] =
 		worldHeight > 0.0f ? static_cast<double>(worldWidth / worldHeight) : 1.0;
 	inputJson["k"] = heuristic.GetActiveServerCount();
-	inputJson["hotspot_target_count"] = heuristic.GetHotspotCount();
 	inputJson["hotspots"] = Json::array();
 
 	for (const HotspotVoronoiSample& hotspot : heuristic.GetHotspots())
@@ -144,6 +199,76 @@ void WriteJsonValue(const std::string_view key, const Json& value)
 [[nodiscard]] Json BuildOutputJson(const HotspotVoronoiHeuristic& heuristic)
 {
 	Json outputJson = Json::object();
+	outputJson["seeds"] = Json::array();
+	outputJson["cells"] = Json::array();
+
+	const float minX = -heuristic.options.NetHalfExtent.x;
+	const float maxX = heuristic.options.NetHalfExtent.x;
+	const float minY = -heuristic.options.NetHalfExtent.y;
+	const float maxY = heuristic.options.NetHalfExtent.y;
+
+	for (const glm::vec2& seed : heuristic.GetSeeds())
+	{
+		outputJson["seeds"].push_back(Json{
+			{"x", NormalizeCoordinate(seed.x, minX, maxX)},
+			{"y", NormalizeCoordinate(seed.y, minY, maxY)},
+		});
+	}
+
+	std::vector<VoronoiBounds> cells;
+	heuristic.GetBounds(cells);
+	for (const VoronoiBounds& cell : cells)
+	{
+		Json cellJson = Json::object();
+		cellJson["id"] = cell.ID;
+		cellJson["vertices"] = Json::array();
+		for (const glm::vec2& vertex : cell.vertices)
+		{
+			cellJson["vertices"].push_back(Json{
+				{"x", NormalizeCoordinate(vertex.x, minX, maxX)},
+				{"y", NormalizeCoordinate(vertex.y, minY, maxY)},
+			});
+		}
+		outputJson["cells"].push_back(std::move(cellJson));
+	}
+
+	return outputJson;
+}
+
+[[nodiscard]] Json BuildInputJson(const LlmVoronoiHeuristic& heuristic)
+{
+	Json inputJson = Json::object();
+	const float worldWidth = heuristic.options.NetHalfExtent.x * 2.0f;
+	const float worldHeight = heuristic.options.NetHalfExtent.y * 2.0f;
+	inputJson["prompt"] = heuristic.GetLastPrompt();
+	inputJson["aspect_ratio"] =
+		worldHeight > 0.0f ? static_cast<double>(worldWidth / worldHeight) : 1.0;
+	inputJson["k"] = heuristic.GetActiveServerCount();
+	inputJson["hotspots"] = Json::array();
+
+	for (const HotspotVoronoiSample& hotspot : heuristic.GetHotspots())
+	{
+		inputJson["hotspots"].push_back(Json{
+			{"x", hotspot.x},
+			{"y", hotspot.y},
+			{"weight", hotspot.weight},
+			{"radius", hotspot.radius},
+		});
+	}
+
+	return inputJson;
+}
+
+[[nodiscard]] Json BuildOutputJson(const LlmVoronoiHeuristic& heuristic)
+{
+	Json outputJson = Json::object();
+	outputJson["model_completion_raw"] = heuristic.GetLastCompletionRaw();
+	if (const std::optional<Json> parsedCompletion =
+			ExtractJsonObject(heuristic.GetLastCompletionRaw());
+		parsedCompletion.has_value())
+	{
+		outputJson["model_completion_json"] = *parsedCompletion;
+	}
 	outputJson["seeds"] = Json::array();
 	outputJson["cells"] = Json::array();
 
@@ -291,6 +416,40 @@ void HotspotSnapshotService::StoreSnapshot(
 	snapshot["diagnostics"] = Json{
 		{"hotspotTargetCount", heuristic.GetHotspotCount()},
 		{"seedCount", heuristic.GetSeeds().size()},
+	};
+	snapshot["input_json"] = BuildInputJson(heuristic);
+	snapshot["output_json"] = BuildOutputJson(heuristic);
+
+	AppendSnapshotRecord(doc, std::move(snapshot));
+	WriteJsonValue(kRecomputeSnapshotKey, doc);
+}
+
+void HotspotSnapshotService::StoreSnapshot(
+	const LlmVoronoiHeuristic& heuristic, const size_t entityCount)
+{
+	Json doc = LoadSnapshotDocument();
+	const int64_t createdAtMs = NowUnixTimeMs();
+	const uint64_t snapshotId = doc.value("latestSnapshotId", 0ULL) + 1ULL;
+	const uint64_t cycleId = doc.value("latestCycleId", 0ULL) + 1ULL;
+
+	Json snapshot = Json::object();
+	snapshot["snapshotId"] = snapshotId;
+	snapshot["cycleId"] = cycleId;
+	snapshot["createdAtMs"] = createdAtMs;
+	snapshot["recomputeHeuristic"] = std::string(kLlmRecomputeHeuristicName);
+	snapshot["targetHeuristicType"] =
+		std::string(IHeuristic::TypeToString(heuristic.GetType()));
+	snapshot["inputSchema"] = std::string(kInputSchemaName);
+	snapshot["entityCount"] = entityCount;
+	snapshot["availableServerCount"] = heuristic.GetActiveServerCount();
+	snapshot["hotspotCount"] = heuristic.GetHotspots().size();
+	snapshot["diagnostics"] = Json{
+		{"hotspotTargetCount", heuristic.GetHotspotCount()},
+		{"seedCount", heuristic.GetSeeds().size()},
+		{"seedSource", heuristic.GetInferenceSource()},
+		{"inferenceNote", heuristic.GetLastInferenceNote()},
+		{"endpoint", heuristic.GetLastEndpointUrl()},
+		{"modelId", heuristic.GetLastModelId()},
 	};
 	snapshot["input_json"] = BuildInputJson(heuristic);
 	snapshot["output_json"] = BuildOutputJson(heuristic);
