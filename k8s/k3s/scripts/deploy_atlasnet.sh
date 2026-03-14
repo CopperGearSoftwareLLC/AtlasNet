@@ -129,6 +129,13 @@ fi
 : "${ATLASNET_HELM_RELEASE_NAME:=atlasnet}"
 : "${ATLASNET_CARTOGRAPH_INGRESS_CLASS_NAME:=nginx}"
 : "${ATLASNET_CARTOGRAPH_INGRESS_HOST:=cartograph.atlasnet.local}"
+: "${ATLASNET_K8S_LLM_ENABLED:=1}"
+: "${ATLASNET_LLM_IMAGE:=ghcr.io/ggml-org/llama.cpp:server}"
+: "${ATLASNET_LLM_SERVICE_PORT:=8080}"
+: "${ATLASNET_LLM_API_FORMAT:=openai}"
+: "${ATLASNET_LLM_MODEL_ID:=huggingface.co/dannys0n/qwen3-1.7b-seed_gen_voronoi:Q4_K_M}"
+: "${ATLASNET_LLM_MODEL_URL:=https://huggingface.co/Dannys0n/Qwen3-1.7B-seed_gen_voronoi/resolve/main/Qwen3-1.7B-seed_gen_voronoi-Q4_K_M.gguf}"
+: "${ATLASNET_LLM_MODEL_FILE_NAME:=Qwen3-1.7B-seed_gen_voronoi-Q4_K_M.gguf}"
 
 if [[ -z "$ATLASNET_CARTOGRAPH_INGRESS_HOST" ]]; then
   die "ATLASNET_CARTOGRAPH_INGRESS_HOST must be set."
@@ -160,6 +167,7 @@ echo " - sandbox server image: $ATLASNET_SANDBOX_SERVER_IMAGE"
 echo " - cartograph image: $ATLASNET_CARTOGRAPH_IMAGE"
 echo " - imagePullPolicy: $ATLASNET_IMAGE_PULL_POLICY"
 echo " - cartograph ingress host: $ATLASNET_CARTOGRAPH_INGRESS_HOST"
+echo " - llm enabled: $ATLASNET_K8S_LLM_ENABLED"
 
 warn_if_mixed_arch_cluster
 ensure_namespace
@@ -175,6 +183,13 @@ helm upgrade --install "$ATLASNET_HELM_RELEASE_NAME" "$CHART_DIR" \
   --set-string images.cartograph="$ATLASNET_CARTOGRAPH_IMAGE" \
   --set-string cartograph.ingress.className="$ATLASNET_CARTOGRAPH_INGRESS_CLASS_NAME" \
   --set-string cartograph.ingress.host="$ATLASNET_CARTOGRAPH_INGRESS_HOST" \
+  --set llm.enabled="$ATLASNET_K8S_LLM_ENABLED" \
+  --set-string llm.image="$ATLASNET_LLM_IMAGE" \
+  --set-string llm.servicePort="$ATLASNET_LLM_SERVICE_PORT" \
+  --set-string llm.apiFormat="$ATLASNET_LLM_API_FORMAT" \
+  --set-string llm.modelId="$ATLASNET_LLM_MODEL_ID" \
+  --set-string llm.modelUrl="$ATLASNET_LLM_MODEL_URL" \
+  --set-string llm.modelFileName="$ATLASNET_LLM_MODEL_FILE_NAME" \
   --wait >/dev/null
 
 # Migration cleanup for earlier revisions where workload kinds differed.
