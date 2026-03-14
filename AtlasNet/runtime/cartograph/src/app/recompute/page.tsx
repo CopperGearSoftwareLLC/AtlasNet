@@ -236,7 +236,7 @@ function SnapshotJsonCard({
       <div className="mt-4 grid gap-3 xl:grid-cols-2">
         <div className="rounded-2xl border border-slate-800 bg-slate-950/80 p-3">
           <div className="mb-2 text-xs uppercase tracking-wide text-slate-500">
-            INPUT_JSON
+            INPUT
           </div>
           <pre className="overflow-x-auto text-xs leading-6 text-slate-200">
             {inputJson}
@@ -244,7 +244,7 @@ function SnapshotJsonCard({
         </div>
         <div className="rounded-2xl border border-slate-800 bg-slate-950/80 p-3">
           <div className="mb-2 text-xs uppercase tracking-wide text-slate-500">
-            OUTPUT_JSON
+            OUTPUT
           </div>
           <pre className="overflow-x-auto text-xs leading-6 text-slate-200">
             {outputJson}
