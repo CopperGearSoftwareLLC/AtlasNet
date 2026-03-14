@@ -310,27 +310,12 @@ async function collectAuthorityTelemetry({ addon, entityLedgersView }) {
       }),
     []
   );
-  const cachedDatabaseRows = getCachedTelemetrySnapshot(authorityTelemetryDbCache);
-  const mergedRows = mergeAuthorityTelemetryRows(
-    addonRead.value,
-    cachedDatabaseRows
-  );
-  if (mergedRows.length > 0) {
-    return mergedRows;
-  }
   if (addonRead.ok) {
     return asArray(addonRead.value);
   }
 
   await ownerMapReadPromise;
   const databaseRead = await databaseReadPromise;
-  const fallbackMergedRows = mergeAuthorityTelemetryRows(
-    addonRead.value,
-    databaseRead.value
-  );
-  if (fallbackMergedRows.length > 0) {
-    return fallbackMergedRows;
-  }
   if (databaseRead.ok) {
     return asArray(databaseRead.value);
   }
