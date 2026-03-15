@@ -15,3 +15,16 @@ cartograph:
     host: cartograph.atlasnet.local
     path: /
     pathType: Prefix
+
+llm:
+  enabled: false
+  image: ghcr.io/ggml-org/llama.cpp:server
+  servicePort: 8080
+  endpoint: ""
+  apiFormat: openai
+  modelId: huggingface.co/dannys0n/qwen3-1.7b-seed_gen_voronoi:Q4_K_M
+  modelUrl: https://huggingface.co/Dannys0n/Qwen3-1.7B-seed_gen_voronoi/resolve/main/Qwen3-1.7B-seed_gen_voronoi-Q4_K_M.gguf
+  modelFileName: Qwen3-1.7B-seed_gen_voronoi-Q4_K_M.gguf
+  pvcSize: 8Gi
+  contextSize: 4096
+  threads: 4

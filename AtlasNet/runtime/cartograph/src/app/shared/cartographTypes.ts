@@ -23,6 +23,45 @@ export interface ShapeJS {
   label?: string;
 }
 
+export interface HotspotInput {
+  x: number;
+  y: number;
+  weight: number;
+  radius: number;
+}
+
+export interface RecomputeInputJson {
+  aspectRatio?: number;
+  k?: number;
+  hotspots?: HotspotInput[];
+  [key: string]: unknown;
+}
+
+export interface RecomputeSnapshotTelemetry {
+  snapshotId: number;
+  cycleId: number;
+  createdAtMs: number;
+  recomputeHeuristic: string;
+  targetHeuristicType: string | null;
+  inputSchema: string;
+  entityCount: number;
+  availableServerCount: number;
+  hotspotCount: number;
+  seedSource: string | null;
+  inferenceNote: string | null;
+  endpoint: string | null;
+  modelId: string | null;
+  inputJson: RecomputeInputJson;
+  inputJsonRaw: Record<string, unknown>;
+  outputJsonRaw: Record<string, unknown> | null;
+}
+
+export interface RecomputeSnapshotsResponse {
+  latestSnapshotId: number;
+  latestUpdatedMs: number | null;
+  snapshots: RecomputeSnapshotTelemetry[];
+}
+
 export interface ConnectionTelemetry {
   shardId?: string | null;
   IdentityId: string;
@@ -120,6 +159,12 @@ export interface DatabaseSnapshotResponse {
   sources: DatabaseSource[];
   selectedSource: string | null;
   records: DatabaseRecord[];
+}
+
+export interface HeuristicControlState {
+  currentHeuristicType: string | null;
+  desiredHeuristicType: string | null;
+  allowedHeuristicTypes: string[];
 }
 
 export interface WorkerDaemonTelemetry {

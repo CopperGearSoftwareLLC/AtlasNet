@@ -21,6 +21,8 @@
 #include "Heuristic/IBounds.hpp"
 #include "Heuristic/IHeuristic.hpp"
 #include "Heuristic/Quadtree/QuadtreeHeuristic.hpp"
+#include "Heuristic/Voronoi/HotspotVoronoiHeuristic.hpp"
+#include "Heuristic/Voronoi/LlmVoronoiHeuristic.hpp"
 #include "Heuristic/Voronoi/VoronoiBounds.hpp"
 #include "Heuristic/Voronoi/VoronoiHeuristic.hpp"
 #include "InternalDB/InternalDB.hpp"
@@ -158,6 +160,14 @@ void HeuristicManifest::Internal_ParseHeuristic(IHeuristic::Type type, const std
 			break;
 		case IHeuristic::Type::eVoronoi:
 			localHeuristicCache.CachedHeuristic = std::make_unique<VoronoiHeuristic>();
+			break;
+		case IHeuristic::Type::eHotspotVoronoi:
+			localHeuristicCache.CachedHeuristic =
+				std::make_unique<HotspotVoronoiHeuristic>();
+			break;
+		case IHeuristic::Type::eLlmVoronoi:
+			localHeuristicCache.CachedHeuristic =
+				std::make_unique<LlmVoronoiHeuristic>();
 			break;
 
 		default:

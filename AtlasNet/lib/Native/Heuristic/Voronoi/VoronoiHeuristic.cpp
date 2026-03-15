@@ -19,6 +19,11 @@ void VoronoiHeuristic::SetSeedCount(uint32_t count)
 	options.SeedCount = count;
 }
 
+const std::vector<glm::vec2>& VoronoiHeuristic::GetSeeds() const
+{
+	return _seeds;
+}
+
 void VoronoiHeuristic::Compute(const std::span<const Transform>& span)
 {
 	(void)span;

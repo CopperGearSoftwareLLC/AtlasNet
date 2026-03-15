@@ -5,6 +5,16 @@
 {{- $shardImage := required "values.images.shard is required" .Values.images.shard -}}
 {{- $cartographImage := required "values.images.cartograph is required" .Values.images.cartograph -}}
 {{- $internaldbImage := required "values.images.internaldb is required" .Values.images.internaldb -}}
+{{- $llmEnabled := default false .Values.llm.enabled -}}
+{{- $llmImage := default "ghcr.io/ggml-org/llama.cpp:server" .Values.llm.image -}}
+{{- $llmServicePort := int (default 8080 .Values.llm.servicePort) -}}
+{{- $llmEndpoint := default "" .Values.llm.endpoint -}}
+{{- $llmApiFormat := default "openai" .Values.llm.apiFormat -}}
+{{- $llmModelId := default "huggingface.co/dannys0n/qwen3-1.7b-seed_gen_voronoi:Q4_K_M" .Values.llm.modelId -}}
+{{- $llmModelFileName := default "model.gguf" .Values.llm.modelFileName -}}
+{{- $llmPvcSize := default "8Gi" .Values.llm.pvcSize -}}
+{{- $llmContextSize := int (default 4096 .Values.llm.contextSize) -}}
+{{- $llmThreads := int (default 4 .Values.llm.threads) -}}
 apiVersion: v1
 kind: ServiceAccount
 metadata:
@@ -172,6 +182,18 @@ spec:
               value: internaldb
             - name: INTERNAL_REDIS_PORT
               value: "6379"
+            {{- if or $llmEnabled $llmEndpoint }}
+            - name: ATLASNET_LLM_ENDPOINT
+              value: {{ default (printf "http://atlasnet-llm:%d/v1/chat/completions" $llmServicePort) $llmEndpoint | quote }}
+            {{- end }}
+            {{- if or $llmEnabled $llmApiFormat }}
+            - name: ATLASNET_LLM_API_FORMAT
+              value: {{ $llmApiFormat | quote }}
+            {{- end }}
+            {{- if or $llmEnabled $llmModelId }}
+            - name: ATLASNET_LLM_MODEL_ID
+              value: {{ $llmModelId | quote }}
+            {{- end }}
           ports:
             - name: interlink
               containerPort: 25555
@@ -496,3 +518,106 @@ spec:
       protocol: UDP
       port: 2555
       targetPort: interlink
+{{- if $llmEnabled }}
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: atlasnet-llm-model-cache
+  namespace: {{ .Release.Namespace }}
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: {{ $llmPvcSize | quote }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: atlasnet-llm
+  namespace: {{ .Release.Namespace }}
+spec:
+  selector:
+    app: atlasnet-llm
+  ports:
+    - name: http
+      port: {{ $llmServicePort }}
+      targetPort: http
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: atlasnet-llm
+  namespace: {{ .Release.Namespace }}
+  labels:
+    app: atlasnet-llm
+    atlasnet.role: llm
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app: atlasnet-llm
+  template:
+    metadata:
+      labels:
+        app: atlasnet-llm
+        atlasnet.role: llm
+    spec:
+      initContainers:
+        - name: model-download
+          image: curlimages/curl:8.12.1
+          imagePullPolicy: IfNotPresent
+          command:
+            - sh
+            - -c
+            - |
+              set -eu
+              mkdir -p /models
+              if [ ! -s "/models/{{ $llmModelFileName }}" ]; then
+                curl -L --fail --retry 3 --output "/models/{{ $llmModelFileName }}" "{{ required "values.llm.modelUrl is required when llm.enabled=true" .Values.llm.modelUrl }}"
+              fi
+          volumeMounts:
+            - name: model-cache
+              mountPath: /models
+      containers:
+        - name: llm
+          image: {{ $llmImage | quote }}
+          imagePullPolicy: {{ $imagePullPolicy | quote }}
+          env:
+            - name: LLAMA_ARG_MODEL
+              value: {{ printf "/models/%s" $llmModelFileName | quote }}
+            - name: LLAMA_ARG_HOST
+              value: "0.0.0.0"
+            - name: LLAMA_ARG_PORT
+              value: {{ printf "%d" $llmServicePort | quote }}
+            - name: LLAMA_ARG_CTX_SIZE
+              value: {{ printf "%d" $llmContextSize | quote }}
+            - name: LLAMA_ARG_THREADS
+              value: {{ printf "%d" $llmThreads | quote }}
+          ports:
+            - name: http
+              containerPort: {{ $llmServicePort }}
+              protocol: TCP
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: http
+            initialDelaySeconds: 5
+            periodSeconds: 5
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: http
+            initialDelaySeconds: 15
+            periodSeconds: 10
+          volumeMounts:
+            - name: model-cache
+              mountPath: /models
+      volumes:
+        - name: model-cache
+          persistentVolumeClaim:
+            claimName: atlasnet-llm-model-cache
+{{- end }}

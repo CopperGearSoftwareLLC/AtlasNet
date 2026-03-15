@@ -189,6 +189,12 @@ function normalizeHeuristicTypeName(raw) {
   if (text === 'voronoi') {
     return 'Voronoi';
   }
+  if (text === 'hotspotvoronoi' || text === 'ehotspotvoronoi') {
+    return 'HotspotVoronoi';
+  }
+  if (text === 'llmvoronoi' || text === 'ellmvoronoi') {
+    return 'LlmVoronoi';
+  }
   if (text === 'gridcell' || text === 'grid' || text === 'egridcell') {
     return 'GridCell';
   }
@@ -196,6 +202,14 @@ function normalizeHeuristicTypeName(raw) {
     return 'Quadtree';
   }
   return normalizeText(raw) || null;
+}
+
+function isVoronoiHeuristicType(type) {
+  return (
+    type === 'Voronoi' ||
+    type === 'HotspotVoronoi' ||
+    type === 'LlmVoronoi'
+  );
 }
 
 function parseBoundIdText(raw) {
@@ -382,7 +396,7 @@ function decodeHeuristicBoundsFromBinary(raw, heuristicType) {
   }
 
   const type = normalizeHeuristicTypeName(heuristicType);
-  const isVoronoi = type === 'Voronoi';
+  const isVoronoi = isVoronoiHeuristicType(type);
   let offset = 8;
   const bounds = [];
 
@@ -1160,7 +1174,7 @@ async function readHeuristicShapesFromDatabase() {
 
       const shapes = [];
       if (decodedBounds.length > 0) {
-        const isVoronoi = heuristicType === 'Voronoi';
+        const isVoronoi = isVoronoiHeuristicType(heuristicType);
         for (const bound of decodedBounds) {
           const boundId = String(bound?.id ?? '').trim();
           if (!boundId) {
@@ -1201,7 +1215,7 @@ async function readHeuristicShapesFromDatabase() {
           continue;
         }
         let shape = null;
-        if (legacyHeuristicType === 'Voronoi') {
+        if (isVoronoiHeuristicType(legacyHeuristicType)) {
           const decoded = decodeVoronoiBounds(value.BoundsData64);
           if (decoded) {
             shape = toVoronoiShape(decoded, '', 'rgba(255, 149, 100, 1)');
@@ -1233,7 +1247,7 @@ async function readHeuristicShapesFromDatabase() {
           }
         }
         let shape = null;
-        if (legacyHeuristicType === 'Voronoi') {
+        if (isVoronoiHeuristicType(legacyHeuristicType)) {
           const decoded = decodeVoronoiBounds(value.BoundsData64);
           if (decoded) {
             shape = toVoronoiShape(decoded, ownerId, 'rgba(100, 255, 149, 1)');

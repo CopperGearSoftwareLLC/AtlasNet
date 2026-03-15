@@ -13,7 +13,6 @@
 #include <unordered_set>
 
 // #include "Entity/EntityHandoff/Telemetry/HandoffTransferManifest.hpp"
-#include "Docker/DockerIO.hpp"
 #include "Entity/Entity.hpp"
 #include "Entity/Transform.hpp"
 #include "Events/Events/Debug/LogEvent.hpp"
@@ -25,6 +24,8 @@
 #include "Heuristic/IBounds.hpp"
 #include "Heuristic/IHeuristic.hpp"
 #include "Heuristic/Quadtree/QuadtreeHeuristic.hpp"
+#include "Heuristic/Voronoi/HotspotVoronoiHeuristic.hpp"
+#include "Heuristic/Voronoi/LlmVoronoiHeuristic.hpp"
 #include "Heuristic/Voronoi/VoronoiHeuristic.hpp"
 #include "Interlink/Database/HealthManifest.hpp"
 #include "Interlink/Database/ServerRegistry.hpp"
@@ -280,12 +281,12 @@ void WatchDog::Init()
 		});
 	Interlink::Get().Init();
 	GlobalEvents::Get().Init();
-	// HeuristicService is the active recompute/publish path for heuristic data.
 	HeuristicService::Ensure();
 
+	// HeuristicService is the active recompute/publish path for heuristic data.
 	// The local WatchDog heuristic instance remains available for ad-hoc
-	// debugging, but it does not publish while WatchDog::ComputeHeuristic()
-	// stays disabled.
+	// debugging and testing, but it is not the live runtime publisher while
+	// WatchDog::ComputeHeuristic() stays disabled.
 	SwitchHeuristic(IHeuristic::Type::eVoronoi);
 	if (auto voronoi = std::dynamic_pointer_cast<VoronoiHeuristic>(Heuristic))
 	{
@@ -369,6 +370,16 @@ void WatchDog::SwitchHeuristic(IHeuristic::Type newHeuristic)
 		case IHeuristic::Type::eVoronoi:
 		{
 			Heuristic = std::make_shared<VoronoiHeuristic>();
+			break;
+		}
+		case IHeuristic::Type::eHotspotVoronoi:
+		{
+			Heuristic = std::make_shared<HotspotVoronoiHeuristic>();
+			break;
+		}
+		case IHeuristic::Type::eLlmVoronoi:
+		{
+			Heuristic = std::make_shared<LlmVoronoiHeuristic>();
 			break;
 		}
 		case IHeuristic::Type::eOctree:

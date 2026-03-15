@@ -26,6 +26,7 @@ class VoronoiHeuristic : public THeuristic<VoronoiBounds>
 
 	// Allows callers (e.g. WatchDog) to request a seed count.
 	void SetSeedCount(uint32_t count);
+	[[nodiscard]] const std::vector<glm::vec2>& GetSeeds() const;
 
 	// IHeuristic interface
 	void Compute(const std::span<const Transform>& span) override;

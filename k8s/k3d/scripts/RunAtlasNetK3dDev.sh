@@ -27,6 +27,14 @@ CARTOGRAPH_LOOPBACK_PORT_FALLBACK="${ATLASNET_K3D_CARTOGRAPH_LOOPBACK_PORT_FALLB
 CARTOGRAPH_INSPECT_PORT="${ATLASNET_K3D_CARTOGRAPH_INSPECT_PORT:-9229}"
 CARTOGRAPH_INSPECT_PORT_FALLBACK="${ATLASNET_K3D_CARTOGRAPH_INSPECT_PORT_FALLBACK:-19229}"
 HELM_RELEASE_NAME="${ATLASNET_HELM_RELEASE_NAME:-atlasnet}"
+LLM_IN_CLUSTER_ENABLED="${ATLASNET_K3D_LLM_IN_CLUSTER_ENABLED:-1}"
+LLM_IMAGE="${ATLASNET_K3D_LLM_IMAGE:-${ATLASNET_LLM_IMAGE:-ghcr.io/ggml-org/llama.cpp:server}}"
+LLM_SERVICE_PORT="${ATLASNET_K3D_LLM_SERVICE_PORT:-8080}"
+LLM_MODEL_URL="${ATLASNET_K3D_LLM_MODEL_URL:-${ATLASNET_LLM_MODEL_URL:-https://huggingface.co/Dannys0n/Qwen3-1.7B-seed_gen_voronoi/resolve/main/Qwen3-1.7B-seed_gen_voronoi-Q4_K_M.gguf}}"
+LLM_MODEL_FILE_NAME="${ATLASNET_K3D_LLM_MODEL_FILE_NAME:-${ATLASNET_LLM_MODEL_FILE_NAME:-Qwen3-1.7B-seed_gen_voronoi-Q4_K_M.gguf}}"
+LLM_ENDPOINT="${ATLASNET_K3D_LLM_ENDPOINT:-${ATLASNET_LLM_ENDPOINT:-}}"
+LLM_API_FORMAT="${ATLASNET_K3D_LLM_API_FORMAT:-${ATLASNET_LLM_API_FORMAT:-openai}}"
+LLM_MODEL_ID="${ATLASNET_K3D_LLM_MODEL_ID:-${ATLASNET_LLM_MODEL_ID:-huggingface.co/dannys0n/qwen3-1.7b-seed_gen_voronoi:Q4_K_M}}"
 HOST_KUBECONFIG_PATH=""
 ACTIVE_CARTOGRAPH_LOOPBACK_PORT=""
 ACTIVE_CARTOGRAPH_INSPECT_PORT=""
@@ -218,6 +226,11 @@ write_host_kubeconfig() {
 }
 
 write_host_kubeconfig
+
+if [[ "$LLM_IN_CLUSTER_ENABLED" == "0" && -z "$LLM_ENDPOINT" ]]; then
+    echo "Warning: k3d in-cluster LLM is disabled and no external LLM endpoint is set."
+    echo "         Set ATLASNET_K3D_LLM_ENDPOINT or ATLASNET_LLM_ENDPOINT to use LlmVoronoi."
+fi
 
 is_pid_running() {
     local pid="${1:-}"
@@ -730,6 +743,14 @@ helm template "$HELM_RELEASE_NAME" "$CHART_DIR" \
     --set-string images.cartograph="$CARTOGRAPH_IMAGE_NAME" \
     --set-string cartograph.ingress.className="$CARTOGRAPH_INGRESS_CLASS_NAME" \
     --set-string cartograph.ingress.host="$CARTOGRAPH_INGRESS_HOST" \
+    --set llm.enabled="$LLM_IN_CLUSTER_ENABLED" \
+    --set-string llm.image="$LLM_IMAGE" \
+    --set-string llm.servicePort="$LLM_SERVICE_PORT" \
+    --set-string llm.endpoint="$LLM_ENDPOINT" \
+    --set-string llm.apiFormat="$LLM_API_FORMAT" \
+    --set-string llm.modelId="$LLM_MODEL_ID" \
+    --set-string llm.modelUrl="$LLM_MODEL_URL" \
+    --set-string llm.modelFileName="$LLM_MODEL_FILE_NAME" \
     >"$TEMP_MANIFEST"
 
 if [[ "$KUBECTL_MODE" == "incluster" ]]; then

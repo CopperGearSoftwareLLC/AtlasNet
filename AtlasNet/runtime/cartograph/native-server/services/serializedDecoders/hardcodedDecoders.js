@@ -736,7 +736,10 @@ function decodeHeuristicDataRawValue(raw, heuristicTypeHint = '') {
   try {
     const count = Number(value.readBigUInt64BE(0));
     const typeHint = String(heuristicTypeHint || '').trim().toLowerCase();
-    const preferVoronoi = typeHint === 'voronoi';
+    const preferVoronoi =
+      typeHint === 'voronoi' ||
+      typeHint === 'hotspotvoronoi' ||
+      typeHint === 'llmvoronoi';
 
     const primary = preferVoronoi
       ? tryDecodeVoronoiHeuristicRaw(value, count)
