@@ -147,13 +147,23 @@ std::optional<std::string> ResolveEndpointUrl()
 		return normalize(*explicitEndpoint);
 	}
 
-	const std::string host =
-		GetNonEmptyEnv("ATLASNET_LLM_SERVICE_HOST").value_or("atlasnet-llm");
-	const auto port = GetNonEmptyEnv("ATLASNET_LLM_SERVICE_PORT").value_or("8080");
 	const auto path = GetNonEmptyEnv("ATLASNET_LLM_ENDPOINT_PATH").value_or(
 		GetNonEmptyEnv("ATLASNET_LLM_API_FORMAT").value_or("openai") == "openai"
 			? "/v1/chat/completions"
 			: "/completion");
+
+	if (const auto dockerMode = GetNonEmptyEnv("ATLASNET_DOCKER_MODE");
+		dockerMode.has_value() && *dockerMode != "0" && *dockerMode != "false")
+	{
+		const std::string host =
+			GetNonEmptyEnv("ATLASNET_LLM_DOCKER_HOST").value_or("172.17.0.1");
+		const auto port = GetNonEmptyEnv("ATLASNET_LLM_DOCKER_PORT").value_or("12434");
+		return normalize(std::format("http://{}:{}{}", host, port, path));
+	}
+
+	const std::string host =
+		GetNonEmptyEnv("ATLASNET_LLM_SERVICE_HOST").value_or("atlasnet-llm");
+	const auto port = GetNonEmptyEnv("ATLASNET_LLM_SERVICE_PORT").value_or("8080");
 	return normalize(std::format("http://{}:{}{}", host, port, path));
 }
 
