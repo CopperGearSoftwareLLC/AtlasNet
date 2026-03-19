@@ -12,6 +12,7 @@ class SandboxClient
     std::optional<AtlasEntityID> MyID;
 
     std::optional<GLFWwindow *> window;
+    
 
     std::vector<vec3> other_entities;
     vec2 CameraPos = {0,0};

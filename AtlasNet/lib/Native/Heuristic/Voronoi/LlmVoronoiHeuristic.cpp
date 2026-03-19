@@ -580,7 +580,7 @@ const std::string& LlmVoronoiHeuristic::GetLastPrompt() const
 	return lastPrompt;
 }
 
-void LlmVoronoiHeuristic::Compute(const std::span<const Transform>& span)
+void LlmVoronoiHeuristic::Compute(const std::span<const AtlasTransform>& span)
 {
 	const std::vector<glm::vec2> previousSeeds = seeds;
 	const std::vector<VoronoiBounds> previousCells = cells;

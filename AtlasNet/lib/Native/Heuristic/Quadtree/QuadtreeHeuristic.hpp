@@ -33,7 +33,7 @@ class QuadtreeHeuristic : public THeuristic<GridShape>
 	void SetTargetLeafCount(uint32_t count);
 
 	// IHeuristic interface
-	void Compute(const std::span<const Transform>& span) override;
+	void Compute(const std::span<const AtlasTransform>& span) override;
 	uint32_t GetBoundsCount() const override;
 	void GetBounds(std::vector<GridShape>& out_bounds) const override;
 	void GetBoundDeltas(

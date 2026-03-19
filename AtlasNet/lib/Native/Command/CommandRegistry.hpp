@@ -4,6 +4,7 @@
 #include <cstdint>
 #include <functional>
 #include <memory>
+#include <stdexcept>
 #include <string_view>
 #include <type_traits>
 #include <typeindex>
@@ -15,7 +16,6 @@
 
 class CommandRegistry : public Singleton<CommandRegistry>
 {
-
 	using FactoryFn = std::unique_ptr<INetCommand> (*)();
 	Log logger = Log("CommandRegistry");
 	boost::container::flat_map<CommandID, FactoryFn> factories;
@@ -37,10 +37,21 @@ class CommandRegistry : public Singleton<CommandRegistry>
 
 	std::unique_ptr<INetCommand> MakeFromID(CommandID ID)
 	{
-		ASSERT(factories.contains(ID), "INVALID ID, TYPE DOES NOT EXIST");
+		if (!factories.contains(ID))
+		{
+			logger.ErrorFormatted("COMMAND ID {} NOT REGISTERED", ID);
+			logger.ErrorFormatted("Existing Commands:");
+
+			for (const auto& com : factories)
+			{
+				std::unique_ptr<INetCommand> c = com.second();
+				logger.DebugFormatted("{} : {}", com.first, c->GetCommandName());
+			}
+
+			throw std::runtime_error("COMMAND ID NOT REGISTERED");
+		}
 		return factories.at(ID)();
 	}
-
 };
 
 #define ATLASNET_REGISTER_COMMAND(Type)                 \

@@ -23,9 +23,9 @@ class SnapshotService : public Singleton<SnapshotService>
 		std::unordered_map<BoundsID, std::vector<AtlasEntity>>& data);
 
 	void FetchBoundsTransformList(
-		std::unordered_map<BoundsID, std::vector<Transform>>& transforms);
+		std::unordered_map<BoundsID, std::vector<AtlasTransform>>& transforms);
 
-	void FetchAllTransforms(std::vector<Transform>& transforms);
+	void FetchAllTransforms(std::vector<AtlasTransform>& transforms);
 
    private:
 	void SnapshotThreadLoop(std::stop_token st);

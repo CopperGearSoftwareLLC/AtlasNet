@@ -69,14 +69,14 @@ class ATLASNET_API IAtlasNetServer : public AtlasNetInterface
 	Simple get local entities
 	*/
 
-	[[nodiscard]] AtlasEntityHandle AtlasNet_CreateEntity(const Transform& t,
+	[[nodiscard]] AtlasEntityHandle AtlasNet_CreateEntity(const AtlasTransform& t,
 														  std::span<const uint8_t> metadata = {});
 	[[nodiscard]] AtlasEntityHandle AtlasNet_CreateClientEntity(
-		ClientID c_id, const Transform& t, std::span<const uint8_t> metadata = {});
+		ClientID c_id, const AtlasTransform& t, std::span<const uint8_t> metadata = {});
 	struct ClientSpawnInfo
 	{
 		Client client;
-		Transform spawnLocation;  // Determined by handshake service
+		AtlasTransform spawnLocation;  // Determined by handshake service
 	};
 	virtual void OnClientSpawn(const ClientSpawnInfo& c, const AtlasEntityMinimal& entity,
 							   AtlasEntityPayload& payload) = 0;
@@ -90,6 +90,6 @@ class ATLASNET_API IAtlasNetServer : public AtlasNetInterface
 
    private:
 	std::optional<ServerCommandBus> commandbus;
-	AtlasEntity Internal_CreateEntity(const Transform& t, std::span<const uint8_t> metadata = {});
+	AtlasEntity Internal_CreateEntity(const AtlasTransform& t, std::span<const uint8_t> metadata = {});
 	void ShardLogicEntry(std::stop_token st);
 };

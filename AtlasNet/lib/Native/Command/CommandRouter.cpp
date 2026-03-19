@@ -121,7 +121,7 @@ void CommandRouter::OnClientSwitchPacket(const ClientSwitchPacket& packet,
 
 					for (const auto& clientID : transferMap.at(packet.TransferID))
 					{
-						RoutingMap.at(clientID) = info.sender.ID;
+						RoutingMap[clientID] = info.sender.ID;
 						RoutesPaused.erase(clientID);
 					}
 					transferMap.erase(packet.TransferID);

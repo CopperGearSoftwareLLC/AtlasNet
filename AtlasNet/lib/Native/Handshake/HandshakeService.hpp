@@ -28,7 +28,7 @@ class HandshakeService : public Singleton<HandshakeService>
 	struct ClientVerifyReply
 	{
 		ClientVerifyStatus status;
-		Transform SpawnWorldLocation;
+		AtlasTransform SpawnWorldLocation;
 	};
 	void OnClientConnect(const Client& c)
 	{
@@ -58,12 +58,12 @@ class HandshakeService : public Singleton<HandshakeService>
 		std::uniform_real_distribution<float> dist(-100.0f, 0.0f);
 		ClientVerifyReply reply;
 		reply.status = ClientVerifyStatus::eAccepted;
-		reply.SpawnWorldLocation.position.x = dist(gen);
-		reply.SpawnWorldLocation.position.y = dist(gen);
+		reply.SpawnWorldLocation.position.x = 0.0f;
+		reply.SpawnWorldLocation.position.y = 0.0f;
 		reply.SpawnWorldLocation.position.z = 0.0f;
 		return reply;
 	}
-	[[nodiscard]] std::optional<NetworkIdentity> DetermineShard(const Transform& t)
+	[[nodiscard]] std::optional<NetworkIdentity> DetermineShard(const AtlasTransform& t)
 	{
 		return HeuristicManifest::Get().PullHeuristic(
 			[&](const IHeuristic& h) -> std::optional<NetworkIdentity>

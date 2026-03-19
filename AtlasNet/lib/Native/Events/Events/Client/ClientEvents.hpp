@@ -25,7 +25,7 @@ struct ClientConnectEvent : public IEvent
 	Client client;
 	NetworkIdentity ConnectedProxy;
 	NetworkIdentity ConnectedShard;
-	Transform SpawnLocation;
+	AtlasTransform SpawnLocation;
 	void Serialize(ByteWriter& bw) const override
 	{
 		client.Serialize(bw);

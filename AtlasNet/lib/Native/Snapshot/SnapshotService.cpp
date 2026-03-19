@@ -105,7 +105,7 @@ void SnapshotService::FetchEntityListSnapshot(
 	}
 }
 void SnapshotService::FetchBoundsTransformList(
-	std::unordered_map<BoundsID, std::vector<Transform>>& transforms)
+	std::unordered_map<BoundsID, std::vector<AtlasTransform>>& transforms)
 {
 	transforms.clear();
 	const std::unordered_map<std::string, std::string> keyvals =
@@ -115,16 +115,16 @@ void SnapshotService::FetchBoundsTransformList(
 	for (const auto& [Key, Val] : keyvals)
 	{
 		const BoundsID ID = std::stoi(Key);
-		transforms.emplace(ID, std::vector<Transform>{});
+		transforms.emplace(ID, std::vector<AtlasTransform>{});
 		auto& vec = transforms.at(ID);
 		ByteReader br(Val);
 		while (br.remaining())
 		{
-			vec.emplace_back(Transform{}).Deserialize(br);
+			vec.emplace_back(AtlasTransform{}).Deserialize(br);
 		}
 	}
 }
-void SnapshotService::FetchAllTransforms(std::vector<Transform>& transforms)
+void SnapshotService::FetchAllTransforms(std::vector<AtlasTransform>& transforms)
 {
 	transforms.clear();
 	const std::unordered_map<std::string, std::string> keyvals =
@@ -135,7 +135,7 @@ void SnapshotService::FetchAllTransforms(std::vector<Transform>& transforms)
 		ByteReader br(Val);
 		while (br.remaining())
 		{
-			transforms.emplace_back(Transform{}).Deserialize(br);
+			transforms.emplace_back(AtlasTransform{}).Deserialize(br);
 		}
 	}
 }

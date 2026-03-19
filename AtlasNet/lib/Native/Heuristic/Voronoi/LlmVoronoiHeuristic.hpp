@@ -33,7 +33,7 @@ class LlmVoronoiHeuristic : public THeuristic<VoronoiBounds>
 	[[nodiscard]] const std::string& GetLastCompletionRaw() const;
 	[[nodiscard]] const std::string& GetLastPrompt() const;
 
-	void Compute(const std::span<const Transform>& span) override;
+	void Compute(const std::span<const AtlasTransform>& span) override;
 	uint32_t GetBoundsCount() const override;
 	void GetBounds(std::vector<VoronoiBounds>& out_bounds) const override;
 	void GetBoundDeltas(

@@ -44,7 +44,7 @@ void TransferCoordinator::ParseEntitiesForTargets()
 	{
 		AtlasEntityID entityID;
 		std::optional<ClientID> clientID;
-		std::optional<Transform> transform;
+		std::optional<AtlasTransform> transform;
 		std::optional<BoundsID> boundsID;
 	};
 	std::vector<EntityProcessData> processedEntities;
@@ -56,7 +56,7 @@ void TransferCoordinator::ParseEntitiesForTargets()
 
 		// Read entity from EntityLedger outside our lock
 		data.transform = EntityLedger::Get()._ReadLock(
-			[&]() -> std::optional<Transform>
+			[&]() -> std::optional<AtlasTransform>
 			{
 				if (EntityLedger::Get().ExistsEntity(entityID))
 				{

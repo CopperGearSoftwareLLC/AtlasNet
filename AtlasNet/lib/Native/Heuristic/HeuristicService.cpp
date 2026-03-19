@@ -126,7 +126,7 @@ void HeuristicService::HeuristicThreadLoop(std::stop_token st)
 void HeuristicService::ComputeHeuristic()
 {
 	SyncDesiredHeuristic();
-	std::vector<Transform> transforms;
+	std::vector<AtlasTransform> transforms;
 	SnapshotService::Get().FetchAllTransforms(transforms);
 	const uint32_t resolvedServerCount = ResolveAvailableServerCount();
 

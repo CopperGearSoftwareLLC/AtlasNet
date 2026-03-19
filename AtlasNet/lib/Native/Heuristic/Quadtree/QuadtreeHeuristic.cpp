@@ -17,7 +17,7 @@ void QuadtreeHeuristic::SetTargetLeafCount(uint32_t count)
 	options.TargetLeafCount = count;
 }
 
-void QuadtreeHeuristic::Compute(const std::span<const Transform>& span)
+void QuadtreeHeuristic::Compute(const std::span<const AtlasTransform>& span)
 {
 	// Quadtree-style subdivision: start from a single root region covering the
 	// legacy grid area and repeatedly subdivide nodes into 4 children until we

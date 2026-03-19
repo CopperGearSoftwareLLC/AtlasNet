@@ -57,7 +57,7 @@ void SandboxServer::Run()
 			float y = r * std::sin(theta);
 
 			vec3 velocityVec = vec3(x, y, 0);
-			Transform t;
+			AtlasTransform t;
 			t.position = vec3(0, 0, 0);
 			ByteWriter metadataWriter;
 			metadataWriter.vec3(velocityVec);

@@ -19,7 +19,7 @@ struct AtlasEntityMinimal : AtlasObject
 	virtual ~AtlasEntityMinimal() = default;
 
 	AtlasEntityID Entity_ID;
-	Transform transform;
+	AtlasTransform transform;
 	bool IsClient = false;
 	ClientID Client_ID;
 	uint64_t PacketSeq = 0;	 // Sequence ID of last update packet

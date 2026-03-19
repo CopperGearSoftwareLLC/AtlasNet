@@ -12,7 +12,7 @@ set(CMAKE_CXX_EXTENSIONS OFF)
 set(CMAKE_POSITION_INDEPENDENT_CODE ON)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
-option(SANDBOX_ADD_CLIENT        "Include AtlasNet" OFF)
+option(SANDBOX_ADD_CLIENT        "Include AtlasNet" ON)
 
 add_subdirectory(lib)
 add_subdirectory(server)
@@ -29,6 +29,9 @@ add_custom_target(sandbox_atlasnet_run_k3d
      USES_TERMINAL
      DEPENDS SandboxServerDockerBuild AtlasnetDockerBuild_Fast 
      )
+
+DEFINE_CUSTOM_TARGET(sandbox_atlasnet_run_Docker_v2 ${SANDBOX_SERVER_IMAGE_NAME})
+DEFINE_CUSTOM_VALGRIND_TARGET(sandbox_atlasnet_run_Docker_v2 ${SANDBOX_SERVER_IMAGE_NAME})
 
 add_custom_target(sandbox_atlasnet_run_Docker
      COMMAND ${CMAKE_COMMAND} -E chdir ${CMAKE_SOURCE_DIR}/Dev ${CMAKE_SOURCE_DIR}/Dev/RunAtlasNetDevStack.sh atlasnet_dev ${SANDBOX_SERVER_IMAGE_NAME}

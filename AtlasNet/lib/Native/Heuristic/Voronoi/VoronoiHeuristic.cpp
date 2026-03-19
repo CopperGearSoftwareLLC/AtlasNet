@@ -76,7 +76,7 @@ const std::vector<glm::vec2>& VoronoiHeuristic::GetSeeds() const
 	return _seeds;
 }
 
-void VoronoiHeuristic::Compute(const std::span<const Transform>& span)
+void VoronoiHeuristic::Compute(const std::span<const AtlasTransform>& span)
 {
 	(void)span;
 

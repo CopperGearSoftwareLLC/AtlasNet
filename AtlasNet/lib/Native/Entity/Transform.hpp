@@ -6,7 +6,7 @@
 #include "Global/pch.hpp"
 #include "Transform.hpp"
 
-struct Transform : AtlasObject
+struct AtlasTransform : AtlasObject
 {
 	using WorldIndex = uint16_t;
 	WorldIndex world = 0;

@@ -7,7 +7,7 @@
 #include "Global/Serialize/ByteWriter.hpp"
 #include "Heuristic/IBounds.hpp"
 GridHeuristic::GridHeuristic() {}
-void GridHeuristic::Compute(const std::span<const Transform>& span)
+void GridHeuristic::Compute(const std::span<const AtlasTransform>& span)
 {
 	quads.resize(4);
 	for (int i = 0; i < 4; i++)

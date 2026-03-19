@@ -32,7 +32,7 @@ class HotspotVoronoiHeuristic : public THeuristic<VoronoiBounds>
 	void SetAvailableServerCount(uint32_t count);
 	void SetHotspotCount(uint32_t count);
 	[[nodiscard]] static std::vector<HotspotVoronoiSample> BuildHotspotsFromEntities(
-		const std::span<const Transform>& span, const Options& options);
+		const std::span<const AtlasTransform>& span, const Options& options);
 	[[nodiscard]] static std::vector<glm::vec2> GenerateAlgorithmicSeeds(
 		const std::vector<HotspotVoronoiSample>& hotspots,
 		uint32_t serverCount,
@@ -44,7 +44,7 @@ class HotspotVoronoiHeuristic : public THeuristic<VoronoiBounds>
 	[[nodiscard]] const std::vector<HotspotVoronoiSample>& GetHotspots() const;
 	[[nodiscard]] const std::vector<glm::vec2>& GetSeeds() const;
 
-	void Compute(const std::span<const Transform>& span) override;
+	void Compute(const std::span<const AtlasTransform>& span) override;
 	uint32_t GetBoundsCount() const override;
 	void GetBounds(std::vector<VoronoiBounds>& out_bounds) const override;
 	void GetBoundDeltas(

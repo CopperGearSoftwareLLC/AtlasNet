@@ -63,7 +63,7 @@ struct PeakCandidate
 }
 
 [[nodiscard]] std::vector<NormalizedPoint> NormalizeTransforms(
-	const std::span<const Transform>& transforms,
+	const std::span<const AtlasTransform>& transforms,
 	const HotspotVoronoiHeuristic::Options& options)
 {
 	std::vector<NormalizedPoint> points;
@@ -74,7 +74,7 @@ struct PeakCandidate
 	const float minY = -options.NetHalfExtent.y;
 	const float maxY = options.NetHalfExtent.y;
 
-	for (const Transform& transform : transforms)
+	for (const AtlasTransform& transform : transforms)
 	{
 		points.push_back({
 			.x = NormalizeCoordinate(transform.position.x, minX, maxX),
@@ -742,7 +742,7 @@ void HotspotVoronoiHeuristic::SetHotspotCount(uint32_t count)
 }
 
 std::vector<HotspotVoronoiSample> HotspotVoronoiHeuristic::BuildHotspotsFromEntities(
-	const std::span<const Transform>& span, const Options& options)
+	const std::span<const AtlasTransform>& span, const Options& options)
 {
 	const std::vector<NormalizedPoint> points = NormalizeTransforms(span, options);
 	return BuildHotspots(points, options);
@@ -813,7 +813,7 @@ const std::vector<glm::vec2>& HotspotVoronoiHeuristic::GetSeeds() const
 	return seeds;
 }
 
-void HotspotVoronoiHeuristic::Compute(const std::span<const Transform>& span)
+void HotspotVoronoiHeuristic::Compute(const std::span<const AtlasTransform>& span)
 {
 	activeServerCount =
 		requestedServerCount > 0 ? requestedServerCount : options.DefaultServerCount;

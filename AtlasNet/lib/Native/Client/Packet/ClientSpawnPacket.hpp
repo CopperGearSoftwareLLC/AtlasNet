@@ -28,7 +28,7 @@ struct ClientSpawnPacket : public TPacket<ClientSpawnPacket, "ClientSpawnPacket"
 		struct NewClientData
 		{
 			Client client;
-			Transform spawn_Location;
+			AtlasTransform spawn_Location;
 		};
 		boost::container::small_vector<NewClientData, 10> incomingClients;
 		void Serialize(ByteWriter& bw) const override

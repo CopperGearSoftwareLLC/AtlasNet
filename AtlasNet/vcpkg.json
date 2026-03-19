@@ -5,6 +5,8 @@
     "nlohmann-json",
     "boost-type-traits",
     "boost-uuid",
+    "boost-geometry",
+    "boost-graph",
     "boost-multi-index",
     "boost-container",
     "boost-describe",
@@ -15,6 +17,8 @@
     "node-addon-api",
     "curl",
     "zlib",
+    "tweeny",
+    "stb",
     "gperftools",
     {
       "name": "redis-plus-plus",

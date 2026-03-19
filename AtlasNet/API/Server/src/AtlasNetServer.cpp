@@ -70,7 +70,7 @@ void IAtlasNetServer::AtlasNet_Initialize()
 	commandbus.emplace();
 }
 
-AtlasEntityHandle IAtlasNetServer::AtlasNet_CreateEntity(const Transform &t,
+AtlasEntityHandle IAtlasNetServer::AtlasNet_CreateEntity(const AtlasTransform &t,
 														 std::span<const uint8_t> metadata)
 {
 	AtlasEntity e = Internal_CreateEntity(t, metadata);
@@ -78,7 +78,7 @@ AtlasEntityHandle IAtlasNetServer::AtlasNet_CreateEntity(const Transform &t,
 	AtlasEntityHandle H;
 	return H;
 }
-AtlasEntityHandle IAtlasNetServer::AtlasNet_CreateClientEntity(ClientID c_id, const Transform &t,
+AtlasEntityHandle IAtlasNetServer::AtlasNet_CreateClientEntity(ClientID c_id, const AtlasTransform &t,
 															   std::span<const uint8_t> metadata)
 {
 	AtlasEntity e = Internal_CreateEntity(t, metadata);
@@ -88,7 +88,7 @@ AtlasEntityHandle IAtlasNetServer::AtlasNet_CreateClientEntity(ClientID c_id, co
 	AtlasEntityHandle H;
 	return H;
 }
-AtlasEntity IAtlasNetServer::Internal_CreateEntity(const Transform &t,
+AtlasEntity IAtlasNetServer::Internal_CreateEntity(const AtlasTransform &t,
 												   std::span<const uint8_t> metadata)
 {
 	AtlasEntity e;

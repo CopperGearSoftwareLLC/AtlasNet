@@ -117,7 +117,7 @@ class IHeuristic
 	virtual ~IHeuristic() = default;
 	[[nodiscard]] virtual Type GetType() const = 0;
 	
-	virtual void Compute(const std::span<const Transform>& span) = 0;
+	virtual void Compute(const std::span<const AtlasTransform>& span) = 0;
 
 	virtual uint32_t GetBoundsCount() const = 0;
 	/** */
