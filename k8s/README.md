@@ -6,7 +6,7 @@ This folder contains all Kubernetes-related tooling for AtlasNet.
 - `charts/atlasnet/`: shared AtlasNet runtime Helm chart (single source of truth for workloads).
 - `k3s/`: remote/homelab k3s cluster automation (`make` targets + scripts).
 - `k3d/`: local k3d dev-cluster scripts (used by CMake sandbox targets).
-- `pi-native/`: Raspberry Pi build/push helper Makefile.
+- `pi-native/`: native ARM64 build/push helper, now used for AWS CodeBuild as well as local ARM hosts.
 
 ## Typical Workflows
 ### Local dev cluster (k3d)

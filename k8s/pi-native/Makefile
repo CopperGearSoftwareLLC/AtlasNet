@@ -1,67 +1,73 @@
-#
-# Native arm64 (Pi) build helper for AtlasNet
-#
-# Usage on the Pi:
-#   cd k8s/pi-native
-#   make deps           # (optional) install build deps via apt
-#   make vcpkg          # clone + bootstrap vcpkg into /opt/vcpkg
-#   make configure      # configure CMake for arm64 with vcpkg
-#   make fix-docker-dns # buildx container DNS needs fixing
-#   make build-core     # build core AtlasNet runtimes
-#   make build-docker   # (optional) build local Docker images via CopyDockerfile
-#	make push-docker    # push docker images to docker hub
+SHELL := /usr/bin/env bash
 
-.PHONY: deps vcpkg configure build-core build-docker push-docker fix-docker-dns all
+.PHONY: help deps vcpkg configure build-core build-images verify-images docker-login push-images ci print-summary all
 
-# Adjust if you prefer a different install location on the Pi.
-VCPKG_ROOT ?= /opt/vcpkg
-
-# AtlasNet repo root is two levels up from this directory.
 ATLASNET_ROOT := $(abspath ../..)
+BUILD_DIR ?= $(ATLASNET_ROOT)/build-arm64-codebuild
+VCPKG_ROOT ?= /opt/vcpkg
+BUILDKITD_CONFIG ?= $(ATLASNET_ROOT)/AtlasNet/docker/buildkitd.pi.toml
+CMAKE_BUILD_TYPE ?= Release
+JOBS ?= 4
 
-# Separate build dir for Pi native builds (keeps devcontainer build tree separate).
-BUILD_DIR ?= $(ATLASNET_ROOT)/build-pi
-
-# Docker Hub / image publishing settings (edit these or override via env)
-# On the Pi we default to pushing the ARM64-specific tag so it won't overwrite the multi-arch deploy tag.
 DOCKERHUB_NAMESPACE ?=
-ATLASNET_IMAGE_TAG ?= latest-arm64
+DOCKERHUB_USERNAME ?=
+DOCKERHUB_TOKEN ?=
+ATLASNET_IMAGE_TAG ?= latest
+ATLASNET_IMAGE_TAG_AMD64 ?= latest-amd64
+ATLASNET_IMAGE_TAG_ARM64 ?= latest-arm64
+ATLASNET_WATCHDOG_IMAGE ?= $(DOCKERHUB_NAMESPACE)/watchdog:$(ATLASNET_IMAGE_TAG_ARM64)
+ATLASNET_PROXY_IMAGE ?= $(DOCKERHUB_NAMESPACE)/proxy:$(ATLASNET_IMAGE_TAG_ARM64)
+ATLASNET_CARTOGRAPH_IMAGE ?= $(DOCKERHUB_NAMESPACE)/cartograph:$(ATLASNET_IMAGE_TAG_ARM64)
+ATLASNET_SANDBOX_SERVER_IMAGE ?= $(DOCKERHUB_NAMESPACE)/sandbox-server:$(ATLASNET_IMAGE_TAG_ARM64)
 
-all: build-core
+APT_PACKAGES := \
+	build-essential clang clangd \
+	cmake ninja-build pkg-config ccache \
+	git curl wget unzip zip tar \
+	python3 python3-pip \
+	uuid-dev libuv1-dev libssl-dev zlib1g-dev \
+	protobuf-compiler libprotobuf-dev \
+	autoconf automake libtool m4 \
+	libxrandr-dev libxinerama-dev libxcursor-dev libxi-dev libxmu-dev \
+	libgl-dev libglu1-mesa-dev libglm-dev \
+	nlohmann-json3-dev libcurl4-openssl-dev \
+	swig nodejs npm docker.io
+
+ifeq ($(shell id -u),0)
+SUDO :=
+else
+SUDO := sudo
+endif
+
+all: build-images
+
+help:
+	@printf '%s\n' \
+	  'AtlasNet native ARM64 builder (legacy path: k8s/pi-native).' \
+	  '' \
+	  'Common targets:' \
+	  '  make deps          # install Ubuntu packages used by local ARM64/CodeBuild builds' \
+	  '  make configure     # configure the ARM64 CMake build tree' \
+	  '  make build-images  # build watchdog/proxy/cartograph/sandbox-server Docker images' \
+	  '  make push-images   # tag and push ARM64 images to Docker Hub' \
+	  '  make ci            # full CodeBuild flow: build, login, push, summary'
 
 deps:
-	@echo "==> Installing system build dependencies + Docker (requires sudo)..."
-	sudo apt-get update
-	sudo apt-get install -y \
-	  build-essential clang clangd \
-	  cmake ninja-build pkg-config \
-	  git curl wget unzip zip \
-	  python3 python3-pip \
-	  uuid-dev libuv1-dev libssl-dev zlib1g-dev \
-	  protobuf-compiler libprotobuf-dev \
-	  autoconf automake libtool m4 \
-	  libxrandr-dev libxinerama-dev libxcursor-dev libxi-dev \
-	  swig nodejs npm \
-	  docker.io
-	@echo "==> Ensuring current user is in 'docker' group (may require re-login)..."
-	sudo usermod -aG docker "$$USER" || true
-	@echo "==> System dependencies + Docker installed (or already present)."
-
-fix-docker-dns:
-	@echo "==> Configuring Docker daemon DNS to use public resolvers (requires sudo)..."
-	sudo mkdir -p /etc/docker
-	printf '%s\n' '{' '"dns": ["1.1.1.1", "8.8.8.8"]' '}' | sed '2s/^/  /' | sudo tee /etc/docker/daemon.json >/dev/null
-	sudo systemctl restart docker
-	@echo "==> Docker daemon restarted with updated DNS settings."
-	@echo "==> Removing atlasnet-builder buildx builder so it can be recreated with new DNS..."
-	docker buildx rm atlasnet-builder >/dev/null 2>&1 || true
-	@echo "==> Done. Next build will recreate the buildx builder with updated DNS."
+	@echo "==> Installing Ubuntu packages required for native ARM64 builds..."
+	$(SUDO) apt-get update
+	$(SUDO) apt-get install -y --no-install-recommends $(APT_PACKAGES)
+	@if ! docker buildx version >/dev/null 2>&1; then \
+	  echo "==> Installing Docker buildx plugin..."; \
+	  $(SUDO) apt-get install -y docker-buildx || $(SUDO) apt-get install -y docker-buildx-plugin; \
+	fi
+	$(SUDO) rm -rf /var/lib/apt/lists/*
+	@echo "==> System dependencies installed."
 
 vcpkg:
 	@echo "==> Ensuring vcpkg exists at $(VCPKG_ROOT)..."
 	if [ ! -d "$(VCPKG_ROOT)" ]; then \
-	  sudo mkdir -p "$(VCPKG_ROOT)"; \
-	  sudo chown "$$USER":"$$USER" "$(VCPKG_ROOT)"; \
+	  $(SUDO) mkdir -p "$(VCPKG_ROOT)"; \
+	  $(SUDO) chown "$$USER":"$$(id -gn)" "$(VCPKG_ROOT)"; \
 	fi
 	if [ ! -d "$(VCPKG_ROOT)/.git" ]; then \
 	  git clone https://github.com/microsoft/vcpkg.git "$(VCPKG_ROOT)"; \
@@ -70,10 +76,11 @@ vcpkg:
 	@echo "==> vcpkg bootstrapped at $(VCPKG_ROOT)."
 
 configure: deps vcpkg
-	@echo "==> Configuring CMake for native arm64 build in $(BUILD_DIR)..."
+	@echo "==> Configuring ARM64 CMake build in $(BUILD_DIR)..."
 	mkdir -p "$(BUILD_DIR)"
 	cd "$(BUILD_DIR)" && cmake \
 	  -G Ninja \
+	  -DCMAKE_BUILD_TYPE="$(CMAKE_BUILD_TYPE)" \
 	  -DCMAKE_TOOLCHAIN_FILE="$(VCPKG_ROOT)/scripts/buildsystems/vcpkg.cmake" \
 	  -DVCPKG_MANIFEST_DIR="$(ATLASNET_ROOT)/AtlasNet" \
 	  -DVCPKG_TARGET_TRIPLET=arm64-linux \
@@ -81,37 +88,56 @@ configure: deps vcpkg
 	  -DCMAKE_C_COMPILER=clang \
 	  -DCMAKE_CXX_COMPILER=clang++ \
 	  "$(ATLASNET_ROOT)"
-	@echo "==> CMake configure completed for arm64."
+	@echo "==> CMake configure completed for ARM64."
 
 build-core: configure
-	@echo "==> Building core AtlasNet runtimes for arm64 (this may take a while on a Pi 5)..."
-	cmake --build "$(BUILD_DIR)" --target watchdog proxy shard -- -j2
-	@echo "==> Core AtlasNet targets built (watchdog, proxy, shard)."
+	@echo "==> Building native ARM64 binaries required by the Docker image targets..."
+	cmake --build "$(BUILD_DIR)" --target watchdog proxy Web_swig SandboxServer -- -j"$(JOBS)"
+	@echo "==> Core runtime binaries built."
 
-build-docker: build-core
-	@echo "==> Staging binaries and building local Docker images (arm64) via CMake target AtlasnetDockerBuild_Fast..."
-	BUILDKITD_CONFIG="$(ATLASNET_ROOT)/AtlasNet/docker/buildkitd.pi.toml" cmake --build "$(BUILD_DIR)" --target AtlasnetDockerBuild_Fast -- -j2
-	@echo "==> Docker images built using CopyDockerfile (arm64 local images: watchdog, proxy, shard, cartograph)."
+build-images: configure
+	@echo "==> Building ARM64 Docker images via CMake targets AtlasnetDockerBuild_Fast + SandboxServerDockerBuild..."
+	BUILDKITD_CONFIG="$(BUILDKITD_CONFIG)" cmake --build "$(BUILD_DIR)" --target AtlasnetDockerBuild_Fast SandboxServerDockerBuild -- -j"$(JOBS)"
+	@echo "==> ARM64 Docker images built: watchdog, proxy, cartograph, sandbox-server."
 
-push-docker:
-	@echo "==> Preparing to push arm64 images to Docker Hub..."
-	@if [ -z "$(DOCKERHUB_NAMESPACE)" ]; then \
-	  echo "ERROR: DOCKERHUB_NAMESPACE must be set in the environment (e.g. your Docker Hub username)."; \
-	  exit 1; \
-	fi
-	@if [ -z "$(ATLASNET_IMAGE_TAG)" ]; then \
-	  echo "ERROR: ATLASNET_IMAGE_TAG must be set in the environment (e.g. latest or v0.1.0)."; \
-	  exit 1; \
-	fi
-	@echo "==> Using existing Docker credentials (make sure you are logged in with 'docker login')."
-	@echo "==> Tagging local images for $(DOCKERHUB_NAMESPACE) with tag $(ATLASNET_IMAGE_TAG) ..."
-	docker tag watchdog:latest   "$(DOCKERHUB_NAMESPACE)/watchdog:$(ATLASNET_IMAGE_TAG)"
-	docker tag proxy:latest      "$(DOCKERHUB_NAMESPACE)/proxy:$(ATLASNET_IMAGE_TAG)"
-	docker tag shard:latest      "$(DOCKERHUB_NAMESPACE)/shard:$(ATLASNET_IMAGE_TAG)"
-	docker tag cartograph:latest "$(DOCKERHUB_NAMESPACE)/cartograph:$(ATLASNET_IMAGE_TAG)"
-	@echo "==> Pushing images to Docker Hub..."
-	docker push "$(DOCKERHUB_NAMESPACE)/watchdog:$(ATLASNET_IMAGE_TAG)"
-	docker push "$(DOCKERHUB_NAMESPACE)/proxy:$(ATLASNET_IMAGE_TAG)"
-	docker push "$(DOCKERHUB_NAMESPACE)/shard:$(ATLASNET_IMAGE_TAG)"
-	docker push "$(DOCKERHUB_NAMESPACE)/cartograph:$(ATLASNET_IMAGE_TAG)"
-	@echo "==> Done. Published arm64 images to Docker Hub namespace '$(DOCKERHUB_NAMESPACE)' with tag '$(ATLASNET_IMAGE_TAG)'."
+verify-images:
+	@echo "==> Verifying expected local Docker images exist..."
+	docker image inspect watchdog:latest >/dev/null
+	docker image inspect proxy:latest >/dev/null
+	docker image inspect cartograph:latest >/dev/null
+	docker image inspect sandbox-server:latest >/dev/null
+	@echo "==> Verified local Docker images are present."
+
+docker-login:
+	@test -n "$(DOCKERHUB_USERNAME)" || { echo "ERROR: DOCKERHUB_USERNAME is required."; exit 1; }
+	@test -n "$(DOCKERHUB_TOKEN)" || { echo "ERROR: DOCKERHUB_TOKEN is required."; exit 1; }
+	@echo "==> Logging into Docker Hub as $(DOCKERHUB_USERNAME)..."
+	@printf '%s' "$(DOCKERHUB_TOKEN)" | docker login --username "$(DOCKERHUB_USERNAME)" --password-stdin
+
+push-images: verify-images
+	@test -n "$(DOCKERHUB_NAMESPACE)" || { echo "ERROR: DOCKERHUB_NAMESPACE is required."; exit 1; }
+	@echo "==> Tagging ARM64 images for namespace $(DOCKERHUB_NAMESPACE)..."
+	docker tag watchdog:latest "$(ATLASNET_WATCHDOG_IMAGE)"
+	docker tag proxy:latest "$(ATLASNET_PROXY_IMAGE)"
+	docker tag cartograph:latest "$(ATLASNET_CARTOGRAPH_IMAGE)"
+	docker tag sandbox-server:latest "$(ATLASNET_SANDBOX_SERVER_IMAGE)"
+	@echo "==> Pushing ARM64 images to Docker Hub..."
+	docker push "$(ATLASNET_WATCHDOG_IMAGE)"
+	docker push "$(ATLASNET_PROXY_IMAGE)"
+	docker push "$(ATLASNET_CARTOGRAPH_IMAGE)"
+	docker push "$(ATLASNET_SANDBOX_SERVER_IMAGE)"
+	@echo "==> Done. Published ARM64 images."
+
+print-summary:
+	@printf '%s\n' \
+	  '' \
+	  'Published ARM64 images:' \
+	  "  - $(ATLASNET_WATCHDOG_IMAGE)" \
+	  "  - $(ATLASNET_PROXY_IMAGE)" \
+	  "  - $(ATLASNET_CARTOGRAPH_IMAGE)" \
+	  "  - $(ATLASNET_SANDBOX_SERVER_IMAGE)" \
+	  '' \
+	  'Next step after amd64 images exist:' \
+	  '  make -C k8s/k3s atlasnet-merge-manifests'
+
+ci: build-images verify-images docker-login push-images print-summary

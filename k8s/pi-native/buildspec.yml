@@ -1,0 +1,34 @@
+version: 0.2
+
+env:
+  shell: bash
+
+phases:
+  install:
+    commands:
+      - set -euo pipefail
+      - echo "Starting AtlasNet ARM64 CodeBuild on $(date -u)"
+      - echo "Source version: ${CODEBUILD_RESOLVED_SOURCE_VERSION:-unknown}"
+      - echo "Detected architecture: $(uname -m)"
+
+  pre_build:
+    commands:
+      - test "$(uname -m)" = "aarch64" || { echo "ERROR: This project must run on an ARM64 CodeBuild environment."; exit 1; }
+      - test -n "${DOCKERHUB_NAMESPACE:-}" || { echo "ERROR: Set DOCKERHUB_NAMESPACE in the CodeBuild project."; exit 1; }
+      - test -n "${DOCKERHUB_USERNAME:-}" || { echo "ERROR: Set DOCKERHUB_USERNAME in the CodeBuild project."; exit 1; }
+      - test -n "${DOCKERHUB_TOKEN:-}" || { echo "ERROR: Set DOCKERHUB_TOKEN in the CodeBuild project via Secrets Manager."; exit 1; }
+      - docker version
+      - docker info
+
+  build:
+    commands:
+      - CMAKE_BUILD_TYPE="${CMAKE_BUILD_TYPE:-Release}" ATLASNET_IMAGE_TAG="${ATLASNET_IMAGE_TAG:-latest}" ATLASNET_IMAGE_TAG_AMD64="${ATLASNET_IMAGE_TAG_AMD64:-latest-amd64}" ATLASNET_IMAGE_TAG_ARM64="${ATLASNET_IMAGE_TAG_ARM64:-latest-arm64}" JOBS="${JOBS:-4}" make -C k8s/pi-native ci
+
+  post_build:
+    commands:
+      - echo "AtlasNet ARM64 CodeBuild finished on $(date -u)"
+
+cache:
+  paths:
+    - /opt/vcpkg/**/*
+    - /root/.cache/**/*
