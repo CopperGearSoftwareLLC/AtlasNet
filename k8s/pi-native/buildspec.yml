@@ -6,10 +6,10 @@ phases:
       - 'echo "Starting minimal dependency sanity check"'
       - 'echo "Architecture: $(uname -m)"'
       - 'if [ -f /etc/os-release ]; then cat /etc/os-release; fi'
-      - 'if command -v dnf >/dev/null 2>&1; then echo "Using dnf to install perl + compiler toolchain"; dnf install -y perl gcc gcc-c++ make; elif command -v yum >/dev/null 2>&1; then echo "Using yum to install perl + compiler toolchain"; yum install -y perl gcc gcc-c++ make; elif command -v apt-get >/dev/null 2>&1; then echo "Using apt-get to install perl + compiler toolchain"; apt-get update; apt-get install -y perl build-essential; else echo "No supported package manager found"; exit 1; fi'
+      - 'if command -v dnf >/dev/null 2>&1; then echo "Using dnf to install perl + compiler toolchain + CMake/Ninja"; dnf install -y perl gcc gcc-c++ make cmake ninja-build; elif command -v yum >/dev/null 2>&1; then echo "Using yum to install perl + compiler toolchain + CMake/Ninja"; yum install -y perl gcc gcc-c++ make cmake3 ninja-build; elif command -v apt-get >/dev/null 2>&1; then echo "Using apt-get to install perl + compiler toolchain + CMake/Ninja"; apt-get update; apt-get install -y perl build-essential cmake ninja-build; else echo "No supported package manager found"; exit 1; fi'
   build:
     commands:
-      - 'echo "Verifying perl + compiler toolchain installation"'
+      - 'echo "Verifying perl + compiler toolchain + CMake/Ninja installation"'
       - 'command -v perl'
       - 'perl -v'
       - 'command -v gcc'
@@ -18,3 +18,5 @@ phases:
       - 'g++ --version'
       - 'command -v make'
       - 'make --version'
+      - 'if command -v cmake >/dev/null 2>&1; then cmake --version; elif command -v cmake3 >/dev/null 2>&1; then cmake3 --version; else echo "cmake not found"; exit 1; fi'
+      - 'if command -v ninja >/dev/null 2>&1; then ninja --version; elif command -v ninja-build >/dev/null 2>&1; then ninja-build --version; else echo "ninja not found"; exit 1; fi'
