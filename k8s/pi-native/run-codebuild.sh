@@ -23,6 +23,17 @@ echo "Starting AtlasNet ARM64 CodeBuild on $(date -u)"
 echo "Source version ${CODEBUILD_RESOLVED_SOURCE_VERSION-unknown}"
 echo "Detected architecture $(uname -m)"
 
+SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
+LOCAL_ENV_FILE="$SCRIPT_DIR/codebuild.env"
+
+if [[ -f "$LOCAL_ENV_FILE" ]]; then
+  echo "Loading local environment from $LOCAL_ENV_FILE"
+  set -a
+  # shellcheck disable=SC1090
+  source "$LOCAL_ENV_FILE"
+  set +a
+fi
+
 if [[ -f /etc/os-release ]]; then
   # shellcheck disable=SC1091
   . /etc/os-release

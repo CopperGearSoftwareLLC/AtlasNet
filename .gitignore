@@ -8,5 +8,6 @@ logs
 k8s/k3d/.kube/
 /build-local
 k8s/k3s/.env
+k8s/pi-native/codebuild.env
 /AtlasNet/.vcpkg-temp
 /AtlasNet/build/vcpkg_installed

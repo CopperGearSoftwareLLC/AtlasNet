@@ -14,9 +14,10 @@ Those are the same image names the current `k8s/k3s` deploy flow expects.
 ## Files
 
 - `Makefile` - local and CI build/push entrypoints
-- `buildspec.yml` - AWS CodeBuild buildspec
-- `run-codebuild.sh` - shell entrypoint used by the buildspec to avoid YAML quoting issues
-- `codebuild.env.example` - non-secret environment variable template
+- `buildspec.yml` - AWS CodeBuild buildspec; point the CodeBuild project at `k8s/pi-native/buildspec.yml`
+- `run-codebuild.sh` - shell entrypoint used by the buildspec and by optional local native runs
+- `codebuild.env.example` - checked-in non-secret environment variable template
+- `codebuild.env` - optional untracked local file loaded automatically by `run-codebuild.sh` when present
 
 ## What This Replaces
 
@@ -192,10 +193,10 @@ If you ever have a local ARM64 machine and want to test the same flow before usi
 ```bash
 cp k8s/pi-native/codebuild.env.example k8s/pi-native/codebuild.env
 $EDITOR k8s/pi-native/codebuild.env
-set -a && source k8s/pi-native/codebuild.env && set +a
-make -C k8s/pi-native build-images
-make -C k8s/pi-native push-images
+bash k8s/pi-native/run-codebuild.sh
 ```
+
+`run-codebuild.sh` automatically loads `k8s/pi-native/codebuild.env` if it exists. Keep secrets like `DOCKERHUB_TOKEN` out of that file unless you intentionally want them stored locally.
 
 ## Troubleshooting
 
