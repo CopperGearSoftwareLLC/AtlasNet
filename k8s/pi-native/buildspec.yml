@@ -20,17 +20,35 @@ phases:
           node --version
           swig -version | head -n 2
         '
-      - 'echo "Bootstrapping vcpkg and installing standalone openssl inside atlasnet-devcontainer-ci"'
+      - 'echo "Running AtlasNet dependency install and CMake configure inside atlasnet-devcontainer-ci"'
       - |
-        docker run --rm atlasnet-devcontainer-ci bash -lc '
-          set -euo pipefail
-          export HOME=/tmp/codebuild-home
-          export XDG_CACHE_HOME="$HOME/.cache"
-          mkdir -p "$HOME" "$XDG_CACHE_HOME" /tmp/vcpkg-test
-          curl -fsSL https://github.com/microsoft/vcpkg/archive/refs/tags/2026.01.16.tar.gz \
-            | tar -xz --strip-components=1 -C /tmp/vcpkg-test
-          cd /tmp/vcpkg-test
-          ./bootstrap-vcpkg.sh -disableMetrics
-          ./vcpkg version
-          ./vcpkg install openssl --triplet=arm64-linux
-        '
+        docker run --rm \
+          -v "$CODEBUILD_SRC_DIR:/workspace" \
+          -w /workspace \
+          atlasnet-devcontainer-ci bash -lc '
+            set -euo pipefail
+            export HOME=/tmp/codebuild-home
+            export XDG_CACHE_HOME="$HOME/.cache"
+            export VCPKG_DISABLE_METRICS=1
+            mkdir -p "$HOME" "$XDG_CACHE_HOME" /tmp/vcpkg-test /tmp/vcpkg-atlas-installed /tmp/atlasnet-configure
+            curl -fsSL https://github.com/microsoft/vcpkg/archive/refs/tags/2026.01.16.tar.gz \
+              | tar -xz --strip-components=1 -C /tmp/vcpkg-test
+            cd /tmp/vcpkg-test
+            ./bootstrap-vcpkg.sh -disableMetrics
+            ./vcpkg version
+            ./vcpkg install \
+              --triplet=arm64-linux \
+              --x-manifest-root=/workspace/AtlasNet \
+              --x-install-root=/tmp/vcpkg-atlas-installed
+            cmake -S /workspace -B /tmp/atlasnet-configure \
+              -G Ninja \
+              -DCMAKE_MAKE_PROGRAM=/usr/bin/ninja \
+              -DCMAKE_BUILD_TYPE=Release \
+              -DCMAKE_TOOLCHAIN_FILE=/tmp/vcpkg-test/scripts/buildsystems/vcpkg.cmake \
+              -DVCPKG_MANIFEST_DIR=/workspace/AtlasNet \
+              -DVCPKG_INSTALLED_DIR=/tmp/vcpkg-atlas-installed \
+              -DVCPKG_TARGET_TRIPLET=arm64-linux \
+              -DSANDBOX_ADD_CLIENT=ON \
+              -DCMAKE_C_COMPILER=gcc \
+              -DCMAKE_CXX_COMPILER=g++
+          '
