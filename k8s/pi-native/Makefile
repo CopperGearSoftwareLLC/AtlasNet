@@ -39,7 +39,7 @@ DNF_PACKAGES := \
 	cmake ninja-build pkgconf-pkg-config ccache \
 	git curl wget unzip zip tar \
 	python3 python3-pip \
-	libuuid-devel libuv-devel openssl-devel zlib-devel kernel-headers \
+	libuuid-devel libuv-devel openssl-devel zlib-devel kernel-headers kernel-devel glibc-headers \
 	protobuf-compiler protobuf-devel \
 	autoconf automake libtool m4 \
 	libXrandr-devel libXinerama-devel libXcursor-devel libXi-devel libXmu-devel \
@@ -51,7 +51,7 @@ YUM_PACKAGES := \
 	cmake3 ninja-build pkgconfig ccache \
 	git curl wget unzip zip tar \
 	python3 python3-pip \
-	libuuid-devel libuv-devel openssl-devel zlib-devel kernel-headers \
+	libuuid-devel libuv-devel openssl-devel zlib-devel kernel-headers kernel-devel glibc-headers \
 	protobuf-compiler protobuf-devel \
 	autoconf automake libtool m4 \
 	libXrandr-devel libXinerama-devel libXcursor-devel libXi-devel libXmu-devel \
@@ -94,8 +94,8 @@ deps:
 	  echo "==> Detected dnf-based environment."; \
 	  $(SUDO) dnf install -y $(DNF_PACKAGES); \
 	  $(SUDO) dnf install -y glm-devel nlohmann-json-devel || true; \
-	  rpm -q kernel-headers >/dev/null 2>&1 || { echo "ERROR: kernel-headers was not installed."; exit 1; }; \
-	  rpm -q kernel-headers; \
+	  rpm -q kernel-headers kernel-devel glibc-headers >/dev/null 2>&1 || { echo "ERROR: kernel/glibc headers were not installed."; exit 1; }; \
+	  rpm -q kernel-headers kernel-devel glibc-headers; \
 	  $(SUDO) systemctl enable docker >/dev/null 2>&1 || true; \
 	  $(SUDO) systemctl start docker >/dev/null 2>&1 || true; \
 	  if ! docker buildx version >/dev/null 2>&1; then \
@@ -106,8 +106,8 @@ deps:
 	  echo "==> Detected yum-based environment (Amazon Linux 2 style)."; \
 	  $(SUDO) yum install -y $(YUM_PACKAGES); \
 	  $(SUDO) yum install -y nodejs npm || true; \
-	  rpm -q kernel-headers >/dev/null 2>&1 || { echo "ERROR: kernel-headers was not installed."; exit 1; }; \
-	  rpm -q kernel-headers; \
+	  rpm -q kernel-headers kernel-devel glibc-headers >/dev/null 2>&1 || { echo "ERROR: kernel/glibc headers were not installed."; exit 1; }; \
+	  rpm -q kernel-headers kernel-devel glibc-headers; \
 	  if command -v amazon-linux-extras >/dev/null 2>&1 && ! command -v npm >/dev/null 2>&1; then \
 	    $(SUDO) amazon-linux-extras install -y nodejs || true; \
 	  fi; \

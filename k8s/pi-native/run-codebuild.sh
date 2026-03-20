@@ -40,6 +40,17 @@ export VCPKG_DISABLE_METRICS=1
 mkdir -p "$XDG_CACHE_HOME" "$VCPKG_DOWNLOADS"
 
 echo "Using HOME $HOME"
+for header_path in \
+  /usr/include/linux/version.h \
+  /usr/include/linux/limits.h \
+  /usr/include/asm/errno.h \
+  /usr/include/openssl/opensslconf.h; do
+  if [[ -e "$header_path" ]]; then
+    echo "Found header $header_path"
+  else
+    echo "Missing header $header_path"
+  fi
+done
 
 if [[ "$(uname -m)" != "aarch64" ]]; then
   echo "ERROR: This project must run on an ARM64 CodeBuild environment."
