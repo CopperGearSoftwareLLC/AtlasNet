@@ -45,6 +45,18 @@ DNF_PACKAGES := \
 	mesa-libGL-devel mesa-libGLU-devel \
 	libcurl-devel swig nodejs npm docker
 
+YUM_PACKAGES := \
+	gcc gcc-c++ clang \
+	cmake3 ninja-build pkgconfig ccache \
+	git curl wget unzip zip tar \
+	python3 python3-pip \
+	libuuid-devel libuv-devel openssl-devel zlib-devel \
+	protobuf-compiler protobuf-devel \
+	autoconf automake libtool m4 \
+	libXrandr-devel libXinerama-devel libXcursor-devel libXi-devel libXmu-devel \
+	mesa-libGL-devel mesa-libGLU-devel \
+	libcurl-devel swig
+
 ifeq ($(shell id -u),0)
 SUDO :=
 else
@@ -58,7 +70,7 @@ help:
 	  'AtlasNet native ARM64 builder (legacy path: k8s/pi-native).' \
 	  '' \
 	  'Common targets:' \
-	  '  make deps          # install Ubuntu packages used by local ARM64/CodeBuild builds' \
+	  '  make deps          # install host packages used by local ARM64/CodeBuild builds' \
 	  '  make configure     # configure the ARM64 CMake build tree' \
 	  '  make build-images  # build watchdog/proxy/cartograph/sandbox-server Docker images' \
 	  '  make push-images   # tag and push ARM64 images to Docker Hub' \
@@ -85,8 +97,26 @@ deps:
 	    echo "==> Docker buildx not reported separately; continuing with the Docker CLI plugin bundled in the environment."; \
 	  fi; \
 	  $(SUDO) dnf clean all; \
+	elif command -v yum >/dev/null 2>&1; then \
+	  echo "==> Detected yum-based environment (Amazon Linux 2 style)."; \
+	  $(SUDO) yum install -y $(YUM_PACKAGES); \
+	  $(SUDO) yum install -y nodejs npm || true; \
+	  if command -v amazon-linux-extras >/dev/null 2>&1 && ! command -v npm >/dev/null 2>&1; then \
+	    $(SUDO) amazon-linux-extras install -y nodejs || true; \
+	  fi; \
+	  if ! command -v cmake >/dev/null 2>&1 && command -v cmake3 >/dev/null 2>&1; then \
+	    echo "==> Creating cmake shim for cmake3..."; \
+	    $(SUDO) ln -sf "$$(command -v cmake3)" /usr/local/bin/cmake; \
+	  fi; \
+	  if ! command -v ninja >/dev/null 2>&1 && command -v ninja-build >/dev/null 2>&1; then \
+	    echo "==> Creating ninja shim for ninja-build..."; \
+	    $(SUDO) ln -sf "$$(command -v ninja-build)" /usr/local/bin/ninja; \
+	  fi; \
+	  $(SUDO) systemctl enable docker >/dev/null 2>&1 || true; \
+	  $(SUDO) systemctl start docker >/dev/null 2>&1 || true; \
+	  $(SUDO) yum clean all; \
 	else \
-	  echo "ERROR: Unsupported package manager. Expected apt-get or dnf."; \
+	  echo "ERROR: Unsupported package manager. Expected apt-get, dnf, or yum."; \
 	  exit 1; \
 	fi
 	@echo "==> System dependencies installed."
