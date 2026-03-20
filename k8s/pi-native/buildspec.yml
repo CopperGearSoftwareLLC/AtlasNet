@@ -40,3 +40,7 @@ phases:
       - 'curl -fsSL https://github.com/microsoft/vcpkg/archive/refs/tags/2026.01.16.tar.gz | tar -xz --strip-components=1 -C /tmp/vcpkg-test'
       - 'cd /tmp/vcpkg-test && ./bootstrap-vcpkg.sh'
       - '/tmp/vcpkg-test/vcpkg version'
+      - 'echo "Installing standalone openssl for arm64-linux via vcpkg"'
+      - 'VCPKG_DISABLE_METRICS=1 /tmp/vcpkg-test/vcpkg install openssl --triplet=arm64-linux'
+      - 'find /tmp/vcpkg-test/buildtrees/openssl -maxdepth 1 -type f -name "*.log" -print | sort'
+      - 'for log in /tmp/vcpkg-test/buildtrees/openssl/*.log; do if [ -f "$log" ]; then echo "==> Tail of $log"; tail -n 80 "$log" || true; echo "==> End tail of $log"; fi; done'
