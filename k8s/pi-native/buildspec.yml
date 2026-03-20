@@ -52,3 +52,6 @@ phases:
       - 'echo "Installing a small AtlasNet dependency subset via vcpkg"'
       - 'set +e; VCPKG_DISABLE_METRICS=1 /tmp/vcpkg-test/vcpkg install libuv "hiredis[ssl]" --triplet=arm64-linux; status=$?; set -e; echo "AtlasNet subset install exit status: $status"; if [ "$status" -ne 0 ]; then exit "$status"; fi'
       - '/tmp/vcpkg-test/vcpkg list'
+      - 'echo "Installing redis-plus-plus with AtlasNet feature set via vcpkg"'
+      - 'set +e; VCPKG_DISABLE_METRICS=1 /tmp/vcpkg-test/vcpkg install "redis-plus-plus[tls,cxx17,async,async-std]" --triplet=arm64-linux; status=$?; set -e; echo "redis-plus-plus install exit status: $status"; if [ "$status" -ne 0 ]; then exit "$status"; fi'
+      - '/tmp/vcpkg-test/vcpkg list | grep -E "redis-plus-plus|hiredis|libuv|openssl"'
