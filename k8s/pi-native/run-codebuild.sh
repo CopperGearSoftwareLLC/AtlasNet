@@ -1,6 +1,24 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+dump_vcpkg_failure_logs() {
+  local status="$1"
+  local vcpkg_root="${VCPKG_ROOT-/opt/vcpkg/2026.01.16}"
+  local buildtrees_dir="$vcpkg_root/buildtrees"
+
+  echo "AtlasNet ARM64 CodeBuild failed with status $status"
+
+  if [[ -d "$buildtrees_dir/openssl" ]]; then
+    while IFS= read -r log_file; do
+      echo "==> Tail of $log_file"
+      tail -n 120 "$log_file" || true
+      echo "==> End tail of $log_file"
+    done < <(find "$buildtrees_dir/openssl" -maxdepth 1 -type f -name '*.log' | sort)
+  fi
+}
+
+trap 'status=$?; if [[ $status -ne 0 ]]; then dump_vcpkg_failure_logs "$status"; fi' EXIT
+
 echo "Starting AtlasNet ARM64 CodeBuild on $(date -u)"
 echo "Source version ${CODEBUILD_RESOLVED_SOURCE_VERSION-unknown}"
 echo "Detected architecture $(uname -m)"
