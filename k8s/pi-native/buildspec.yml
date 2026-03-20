@@ -6,4 +6,17 @@ phases:
       - 'echo "Building .devcontainer/Dockerfile as the CI build environment"'
       - 'docker build -t atlasnet-devcontainer-ci -f .devcontainer/Dockerfile .devcontainer'
       - 'echo "Running smoke test inside atlasnet-devcontainer-ci"'
-      - 'docker run --rm atlasnet-devcontainer-ci bash -lc "set -euo pipefail; perl -MTime::Piece -e '\''print qq(Time::Piece $Time::Piece::VERSION\n)'\''; gcc --version; g++ --version; cmake --version; ninja --version; git --version; curl --version; python3 --version; node --version; swig -version | head -n 2"'
+      - |
+        docker run --rm atlasnet-devcontainer-ci bash -lc '
+          set -euo pipefail
+          perl -MTime::Piece -e "print qq(Time::Piece $Time::Piece::VERSION\n)"
+          gcc --version
+          g++ --version
+          cmake --version
+          ninja --version
+          git --version
+          curl --version
+          python3 --version
+          node --version
+          swig -version | head -n 2
+        '
