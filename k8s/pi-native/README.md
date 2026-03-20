@@ -15,6 +15,7 @@ Those are the same image names the current `k8s/k3s` deploy flow expects.
 
 - `Makefile` - local and CI build/push entrypoints
 - `buildspec.yml` - AWS CodeBuild buildspec
+- `run-codebuild.sh` - shell entrypoint used by the buildspec to avoid YAML quoting issues
 - `codebuild.env.example` - non-secret environment variable template
 
 ## What This Replaces
@@ -69,18 +70,20 @@ Use these settings:
    your GitHub repo through `CodeConnections`
 3. Source version:
    the branch you want to publish from, usually `main`
-4. Environment image:
+4. Provisioning model:
+   `On-demand`
+5. Compute:
+   `EC2`
+6. Running mode:
+   `Instance`
+7. Environment image:
    `Managed image`
-5. Operating system:
-   `Ubuntu`
-6. Compute:
-   choose an `ARM64 / Graviton` environment
-7. Compute size:
+8. Compute size:
    start with at least `8 vCPU / 16 GiB` if available, or the closest larger size you see
-8. Privileged mode:
-   `Enabled`
+9. Image:
+   keep the default ARM EC2 managed image AWS selects for the instance host
 
-Privileged mode is required because this build uses Docker to produce and push images.
+In instance mode, AWS currently provisions an ARM EC2 host image rather than the Ubuntu container image you may see in container mode. The helper in this directory now supports both Ubuntu `apt` and Amazon Linux `dnf`, so instance mode is fine.
 
 For the rest:
 
@@ -198,7 +201,7 @@ make -C k8s/pi-native push-images
 - `docker: Cannot connect to the Docker daemon`
   Enable `Privileged mode` in the CodeBuild project.
 - `apt-get: command not found`
-  Use an Ubuntu managed image, not Amazon Linux.
+  The project is probably using Amazon Linux instance mode. That is supported now; make sure the latest `k8s/pi-native/Makefile` is committed on the branch CodeBuild is using.
 - Build runs out of memory or times out
   Increase the ARM64 compute size.
 - Docker Hub push fails with auth errors

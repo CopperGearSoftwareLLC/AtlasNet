@@ -33,6 +33,18 @@ APT_PACKAGES := \
 	nlohmann-json3-dev libcurl4-openssl-dev \
 	swig nodejs npm docker.io
 
+DNF_PACKAGES := \
+	gcc gcc-c++ clang \
+	cmake ninja-build pkgconf-pkg-config ccache \
+	git curl wget unzip zip tar \
+	python3 python3-pip \
+	libuuid-devel libuv-devel openssl-devel zlib-devel \
+	protobuf-compiler protobuf-devel \
+	autoconf automake libtool m4 \
+	libXrandr-devel libXinerama-devel libXcursor-devel libXi-devel libXmu-devel \
+	mesa-libGL-devel mesa-libGLU-devel \
+	libcurl-devel swig nodejs npm docker
+
 ifeq ($(shell id -u),0)
 SUDO :=
 else
@@ -53,14 +65,30 @@ help:
 	  '  make ci            # full CodeBuild flow: build, login, push, summary'
 
 deps:
-	@echo "==> Installing Ubuntu packages required for native ARM64 builds..."
-	$(SUDO) apt-get update
-	$(SUDO) apt-get install -y --no-install-recommends $(APT_PACKAGES)
-	@if ! docker buildx version >/dev/null 2>&1; then \
-	  echo "==> Installing Docker buildx plugin..."; \
-	  $(SUDO) apt-get install -y docker-buildx || $(SUDO) apt-get install -y docker-buildx-plugin; \
+	@echo "==> Installing system packages required for native ARM64 builds..."
+	@if command -v apt-get >/dev/null 2>&1; then \
+	  echo "==> Detected apt-based environment."; \
+	  $(SUDO) apt-get update; \
+	  $(SUDO) apt-get install -y --no-install-recommends $(APT_PACKAGES); \
+	  if ! docker buildx version >/dev/null 2>&1; then \
+	    echo "==> Installing Docker buildx plugin..."; \
+	    $(SUDO) apt-get install -y docker-buildx || $(SUDO) apt-get install -y docker-buildx-plugin; \
+	  fi; \
+	  $(SUDO) rm -rf /var/lib/apt/lists/*; \
+	elif command -v dnf >/dev/null 2>&1; then \
+	  echo "==> Detected dnf-based environment."; \
+	  $(SUDO) dnf install -y $(DNF_PACKAGES); \
+	  $(SUDO) dnf install -y glm-devel nlohmann-json-devel || true; \
+	  $(SUDO) systemctl enable docker >/dev/null 2>&1 || true; \
+	  $(SUDO) systemctl start docker >/dev/null 2>&1 || true; \
+	  if ! docker buildx version >/dev/null 2>&1; then \
+	    echo "==> Docker buildx not reported separately; continuing with the Docker CLI plugin bundled in the environment."; \
+	  fi; \
+	  $(SUDO) dnf clean all; \
+	else \
+	  echo "ERROR: Unsupported package manager. Expected apt-get or dnf."; \
+	  exit 1; \
 	fi
-	$(SUDO) rm -rf /var/lib/apt/lists/*
 	@echo "==> System dependencies installed."
 
 vcpkg:
