@@ -135,9 +135,12 @@ vcpkg:
 
 configure: deps vcpkg
 	@echo "==> Configuring ARM64 CMake build in $(BUILD_DIR)..."
-	mkdir -p "$(BUILD_DIR)"
+	@NINJA_BIN="$$(command -v ninja 2>/dev/null || command -v ninja-build 2>/dev/null || true)"; \
+	test -n "$$NINJA_BIN" || { echo "ERROR: Ninja was not found after dependency installation."; exit 1; }; \
+	mkdir -p "$(BUILD_DIR)"; \
 	cd "$(BUILD_DIR)" && cmake \
 	  -G Ninja \
+	  -DCMAKE_MAKE_PROGRAM="$$NINJA_BIN" \
 	  -DCMAKE_BUILD_TYPE="$(CMAKE_BUILD_TYPE)" \
 	  -DCMAKE_TOOLCHAIN_FILE="$(VCPKG_ROOT)/scripts/buildsystems/vcpkg.cmake" \
 	  -DVCPKG_MANIFEST_DIR="$(ATLASNET_ROOT)/AtlasNet" \
