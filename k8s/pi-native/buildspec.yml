@@ -20,7 +20,7 @@ phases:
           node --version
           swig -version | head -n 2
         '
-      - 'echo "Running AtlasNet dependency install and CMake configure inside atlasnet-devcontainer-ci"'
+      - 'echo "Running AtlasNet dependency install, CMake configure, and core native build inside atlasnet-devcontainer-ci"'
       - |
         docker run --rm \
           -v "$CODEBUILD_SRC_DIR:/workspace" \
@@ -51,4 +51,7 @@ phases:
               -DSANDBOX_ADD_CLIENT=ON \
               -DCMAKE_C_COMPILER=gcc \
               -DCMAKE_CXX_COMPILER=g++
+            cmake --build /tmp/atlasnet-configure \
+              --target watchdog proxy Web_swig SandboxServer \
+              -- -j4
           '
