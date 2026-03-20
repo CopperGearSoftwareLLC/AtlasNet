@@ -142,7 +142,7 @@ In CodeBuild:
 The buildspec will:
 
 1. Install the Ubuntu packages needed for your CMake and Docker image targets.
-2. Bootstrap `vcpkg`.
+2. Bootstrap the pinned `vcpkg` release used by the Dockerfiles (`2026.01.16` by default).
 3. Configure an ARM64 build tree.
 4. Run:
    - `AtlasnetDockerBuild_Fast`
@@ -202,6 +202,8 @@ make -C k8s/pi-native push-images
   Enable `Privileged mode` in the CodeBuild project.
 - `apt-get: command not found`
   The project is probably using Amazon Linux instance mode. That is supported now; make sure the latest `k8s/pi-native/Makefile` is committed on the branch CodeBuild is using.
+- The log stops around an early Boost package and never shows the actual failure
+  The Makefile now prints the tail of `build-arm64-codebuild/vcpkg-manifest-install.log` plus nearby CMake logs so CodeBuild exposes the real error instead of the first 240 lines.
 - Build runs out of memory or times out
   Increase the ARM64 compute size.
 - Docker Hub push fails with auth errors

@@ -4,7 +4,8 @@ SHELL := /usr/bin/env bash
 
 ATLASNET_ROOT := $(abspath ../..)
 BUILD_DIR ?= $(ATLASNET_ROOT)/build-arm64-codebuild
-VCPKG_ROOT ?= /opt/vcpkg
+VCPKG_VERSION ?= 2026.01.16
+VCPKG_ROOT ?= /opt/vcpkg/$(VCPKG_VERSION)
 BUILDKITD_CONFIG ?= $(ATLASNET_ROOT)/AtlasNet/docker/buildkitd.pi.toml
 CMAKE_BUILD_TYPE ?= Release
 JOBS ?= 4
@@ -122,16 +123,25 @@ deps:
 	@echo "==> System dependencies installed."
 
 vcpkg:
-	@echo "==> Ensuring vcpkg exists at $(VCPKG_ROOT)..."
-	if [ ! -d "$(VCPKG_ROOT)" ]; then \
+	@echo "==> Ensuring pinned vcpkg $(VCPKG_VERSION) exists at $(VCPKG_ROOT)..."
+	@VCPKG_PARENT_DIR="$$(dirname "$(VCPKG_ROOT)")"; \
+	$(SUDO) mkdir -p "$$VCPKG_PARENT_DIR"; \
+	$(SUDO) chown "$$USER":"$$(id -gn)" "$$VCPKG_PARENT_DIR"; \
+	if [ ! -f "$(VCPKG_ROOT)/scripts/buildsystems/vcpkg.cmake" ]; then \
+	  TMP_DIR="$$(mktemp -d)"; \
+	  trap 'rm -rf "$$TMP_DIR"' EXIT; \
+	  echo "==> Downloading vcpkg $(VCPKG_VERSION)..."; \
+	  curl -fsSL "https://github.com/microsoft/vcpkg/archive/refs/tags/$(VCPKG_VERSION).tar.gz" \
+	    | tar -xz --strip-components=1 -C "$$TMP_DIR"; \
+	  $(SUDO) rm -rf "$(VCPKG_ROOT)"; \
 	  $(SUDO) mkdir -p "$(VCPKG_ROOT)"; \
-	  $(SUDO) chown "$$USER":"$$(id -gn)" "$(VCPKG_ROOT)"; \
-	fi
-	if [ ! -d "$(VCPKG_ROOT)/.git" ]; then \
-	  git clone https://github.com/microsoft/vcpkg.git "$(VCPKG_ROOT)"; \
+	  $(SUDO) cp -a "$$TMP_DIR"/. "$(VCPKG_ROOT)/"; \
+	  $(SUDO) chown -R "$$USER":"$$(id -gn)" "$(VCPKG_ROOT)"; \
+	  trap - EXIT; \
+	  rm -rf "$$TMP_DIR"; \
 	fi
 	cd "$(VCPKG_ROOT)" && ./bootstrap-vcpkg.sh
-	@echo "==> vcpkg bootstrapped at $(VCPKG_ROOT)."
+	@echo "==> vcpkg $(VCPKG_VERSION) bootstrapped at $(VCPKG_ROOT)."
 
 configure: deps vcpkg
 	@echo "==> Configuring ARM64 CMake build in $(BUILD_DIR)..."
@@ -152,12 +162,22 @@ configure: deps vcpkg
 	    LOG_FILE="$(BUILD_DIR)/vcpkg-manifest-install.log"; \
 	    echo "==> CMake configure failed."; \
 	    if [ -f "$$LOG_FILE" ]; then \
-	      echo "==> Begin $$LOG_FILE"; \
-	      sed -n '1,240p' "$$LOG_FILE"; \
-	      echo "==> End $$LOG_FILE"; \
+	      echo "==> Tail of $$LOG_FILE"; \
+	      tail -n 240 "$$LOG_FILE"; \
+	      echo "==> End tail of $$LOG_FILE"; \
 	    else \
 	      echo "==> vcpkg manifest log not found at $$LOG_FILE"; \
 	    fi; \
+	    for EXTRA_LOG in \
+	      "$(BUILD_DIR)/CMakeFiles/CMakeError.log" \
+	      "$(BUILD_DIR)/CMakeFiles/CMakeOutput.log" \
+	      "$(BUILD_DIR)/CMakeFiles/CMakeConfigureLog.yaml"; do \
+	      if [ -f "$$EXTRA_LOG" ]; then \
+	        echo "==> Tail of $$EXTRA_LOG"; \
+	        tail -n 120 "$$EXTRA_LOG"; \
+	        echo "==> End tail of $$EXTRA_LOG"; \
+	      fi; \
+	    done; \
 	    exit 1; \
 	  }
 	@echo "==> CMake configure completed for ARM64."
