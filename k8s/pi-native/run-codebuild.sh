@@ -11,6 +11,18 @@ if [[ -f /etc/os-release ]]; then
   echo "Detected OS ${PRETTY_NAME-unknown}"
 fi
 
+if [[ -z "${HOME-}" || ! -d "${HOME-}" || ! -r "${HOME-}" || ! -w "${HOME-}" ]]; then
+  export HOME=/tmp/codebuild-home
+fi
+
+mkdir -p "$HOME"
+export XDG_CACHE_HOME="${XDG_CACHE_HOME-$HOME/.cache}"
+export VCPKG_DOWNLOADS="${VCPKG_DOWNLOADS-$XDG_CACHE_HOME/vcpkg/downloads}"
+export VCPKG_DISABLE_METRICS=1
+mkdir -p "$XDG_CACHE_HOME" "$VCPKG_DOWNLOADS"
+
+echo "Using HOME $HOME"
+
 if [[ "$(uname -m)" != "aarch64" ]]; then
   echo "ERROR: This project must run on an ARM64 CodeBuild environment."
   exit 1
