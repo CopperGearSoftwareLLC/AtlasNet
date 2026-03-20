@@ -6,10 +6,10 @@ phases:
       - 'echo "Starting minimal dependency sanity check"'
       - 'echo "Architecture: $(uname -m)"'
       - 'if [ -f /etc/os-release ]; then cat /etc/os-release; fi'
-      - 'if command -v dnf >/dev/null 2>&1; then echo "Using dnf to install perl + compiler toolchain + CMake/Ninja + fetch tools + python3"; dnf install -y perl gcc gcc-c++ make cmake ninja-build git curl tar zip unzip python3; elif command -v yum >/dev/null 2>&1; then echo "Using yum to install perl + compiler toolchain + CMake/Ninja + fetch tools + python3"; yum install -y perl gcc gcc-c++ make cmake3 ninja-build git curl tar zip unzip python3; elif command -v apt-get >/dev/null 2>&1; then echo "Using apt-get to install perl + compiler toolchain + CMake/Ninja + fetch tools + python3"; apt-get update; apt-get install -y perl build-essential cmake ninja-build git curl tar zip unzip python3; else echo "No supported package manager found"; exit 1; fi'
+      - 'if command -v dnf >/dev/null 2>&1; then echo "Using dnf to install perl + compiler toolchain + CMake/Ninja + fetch tools + python3 + linux headers"; dnf install -y perl gcc gcc-c++ make cmake ninja-build git curl tar zip unzip python3 kernel-headers glibc-headers; elif command -v yum >/dev/null 2>&1; then echo "Using yum to install perl + compiler toolchain + CMake/Ninja + fetch tools + python3 + linux headers"; yum install -y perl gcc gcc-c++ make cmake3 ninja-build git curl tar zip unzip python3 kernel-headers glibc-headers; elif command -v apt-get >/dev/null 2>&1; then echo "Using apt-get to install perl + compiler toolchain + CMake/Ninja + fetch tools + python3 + linux headers"; apt-get update; apt-get install -y perl build-essential cmake ninja-build git curl tar zip unzip python3 linux-libc-dev; else echo "No supported package manager found"; exit 1; fi'
   build:
     commands:
-      - 'echo "Verifying perl + compiler toolchain + CMake/Ninja + fetch tools + python3 installation"'
+      - 'echo "Verifying perl + compiler toolchain + CMake/Ninja + fetch tools + python3 + linux headers installation"'
       - 'command -v perl'
       - 'perl -v'
       - 'command -v gcc'
@@ -32,6 +32,9 @@ phases:
       - 'unzip -v | head -n 2'
       - 'command -v python3'
       - 'python3 --version'
+      - 'if command -v rpm >/dev/null 2>&1; then rpm -q kernel-headers glibc-headers || true; fi'
+      - 'if command -v dpkg-query >/dev/null 2>&1; then dpkg-query -W linux-libc-dev || true; fi'
+      - 'for header in /usr/include/linux/version.h /usr/include/linux/limits.h; do if [ -e "$header" ]; then echo "Found $header"; else echo "Missing $header"; fi; done'
       - 'echo "Bootstrapping pinned vcpkg release"'
       - 'rm -rf /tmp/vcpkg-test && mkdir -p /tmp/vcpkg-test'
       - 'curl -fsSL https://github.com/microsoft/vcpkg/archive/refs/tags/2026.01.16.tar.gz | tar -xz --strip-components=1 -C /tmp/vcpkg-test'
