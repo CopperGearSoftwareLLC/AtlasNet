@@ -26,7 +26,7 @@ APT_PACKAGES := \
 	cmake ninja-build pkg-config ccache \
 	git curl wget unzip zip tar \
 	python3 python3-pip \
-	uuid-dev libuv1-dev libssl-dev zlib1g-dev \
+	uuid-dev libuv1-dev libssl-dev zlib1g-dev linux-libc-dev \
 	protobuf-compiler libprotobuf-dev \
 	autoconf automake libtool m4 \
 	libxrandr-dev libxinerama-dev libxcursor-dev libxi-dev libxmu-dev \
@@ -39,7 +39,7 @@ DNF_PACKAGES := \
 	cmake ninja-build pkgconf-pkg-config ccache \
 	git curl wget unzip zip tar \
 	python3 python3-pip \
-	libuuid-devel libuv-devel openssl-devel zlib-devel \
+	libuuid-devel libuv-devel openssl-devel zlib-devel kernel-headers \
 	protobuf-compiler protobuf-devel \
 	autoconf automake libtool m4 \
 	libXrandr-devel libXinerama-devel libXcursor-devel libXi-devel libXmu-devel \
@@ -51,7 +51,7 @@ YUM_PACKAGES := \
 	cmake3 ninja-build pkgconfig ccache \
 	git curl wget unzip zip tar \
 	python3 python3-pip \
-	libuuid-devel libuv-devel openssl-devel zlib-devel \
+	libuuid-devel libuv-devel openssl-devel zlib-devel kernel-headers \
 	protobuf-compiler protobuf-devel \
 	autoconf automake libtool m4 \
 	libXrandr-devel libXinerama-devel libXcursor-devel libXi-devel libXmu-devel \
