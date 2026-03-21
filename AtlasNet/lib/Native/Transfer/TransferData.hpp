@@ -1,10 +1,14 @@
 #pragma once
 
+#include <chrono>
+#include <optional>
+
 #include <boost/describe/enum.hpp>
 
 #include "Client/Client.hpp"
 #include "Entity/Entity.hpp"
 #include "Global/Misc/UUID.hpp"
+#include "Heuristic/IBounds.hpp"
 #include "Network/NetworkIdentity.hpp"
 using TransferID = UUID;
 enum class TransferMode
@@ -32,7 +36,9 @@ struct EntityTransferData
 	TransferMode transferMode;
 	EntityTransferStage stage = EntityTransferStage::eNone;
 	boost::container::small_vector<AtlasEntityID, 32> entityIDs;
-	// bool WaitingOnResponse = false;
+	boost::container::small_vector<AtlasEntity, 32> cachedSnapshots;
+	std::optional<BoundsID> sourceBoundID;
+	std::chrono::steady_clock::time_point LastStageAt = std::chrono::steady_clock::now();
 };
 
 enum class ClientTransferStage

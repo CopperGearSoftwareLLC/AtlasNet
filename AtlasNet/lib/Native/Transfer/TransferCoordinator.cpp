@@ -8,20 +8,244 @@
 #include "Client/Database/ClientManifest.hpp"
 #include "Entity/Entity.hpp"
 #include "Entity/EntityLedger.hpp"
+#include "Entity/GlobalEntityLedger.hpp"
 #include "Entity/Transform.hpp"
 #include "Global/Misc/UUID.hpp"
 #include "Global/pch.hpp"
 #include "Heuristic/Database/HeuristicManifest.hpp"
 #include "Heuristic/IHeuristic.hpp"
+#include "Heuristic/BoundLeaser.hpp"
 #include "Interlink/Interlink.hpp"
+#include "Interlink/Database/HealthManifest.hpp"
 #include "Network/NetworkCredentials.hpp"
 #include "Network/NetworkEnums.hpp"
 #include "Network/NetworkIdentity.hpp"
+#include "Snapshot/SnapshotService.hpp"
 #include "Transfer/Packet/ClientSwitchPacket.hpp"
 #include "Transfer/Packet/ClientTransferPacket.hpp"
 #include "Transfer/Packet/EntityTransferPacket.hpp"
 #include "Transfer/TransferData.hpp"
 #include "Transfer/TransferManifest.hpp"
+
+namespace
+{
+constexpr auto kEntityTransferRetryInterval = std::chrono::milliseconds(250);
+}
+
+void TransferCoordinator::SendEntityPreparePacket(const EntityTransferData& transfer)
+{
+	EntityTransferPacket etPacket;
+	etPacket.TransferID = transfer.ID;
+	etPacket.stage = EntityTransferStage::ePrepare;
+
+	auto& PacketData = etPacket.Data.emplace<EntityTransferPacket::PrepareStageData>();
+	PacketData.entityIDs = transfer.entityIDs;
+
+	Interlink::Get().SendMessage(transfer.shard, etPacket, NetworkMessageSendFlag::eReliableNow);
+}
+
+void TransferCoordinator::SendEntityCommitPacket(const EntityTransferData& transfer)
+{
+	EntityTransferPacket response;
+	response.TransferID = transfer.ID;
+	response.stage = EntityTransferStage::eCommit;
+	auto& commitData = response.Data.emplace<EntityTransferPacket::CommitStageData>();
+	for (const AtlasEntity& entity : transfer.cachedSnapshots)
+	{
+		commitData.entitySnapshots.push_back({entity, entity.TransferGeneration});
+	}
+
+	Interlink::Get().SendMessage(transfer.shard, response, NetworkMessageSendFlag::eReliableNow);
+}
+
+void TransferCoordinator::FinalizeSendingEntityTransfer(const EntityTransferData& transfer)
+{
+	_WriteLock(
+		[&]()
+		{
+			for (const auto& entityID : transfer.entityIDs)
+			{
+				EntitiesInTransfer.erase(entityID);
+			}
+			EntityTransfers.erase(transfer.ID);
+		});
+
+	if (transfer.sourceBoundID.has_value())
+	{
+		for (const auto& entityID : transfer.entityIDs)
+		{
+			SnapshotService::Get().DeleteBoundEntitySnapshot(*transfer.sourceBoundID, entityID);
+		}
+	}
+}
+
+void TransferCoordinator::RollbackSendingEntityTransfer(const EntityTransferData& transfer)
+{
+	for (const AtlasEntity& entity : transfer.cachedSnapshots)
+	{
+		if (EntityLedger::Get().ExistsEntity(entity.Entity_ID))
+		{
+			continue;
+		}
+		EntityLedger::Get().AddEntity(entity);
+	}
+
+	_WriteLock(
+		[&]()
+		{
+			for (const auto& entityID : transfer.entityIDs)
+			{
+				EntitiesInTransfer.erase(entityID);
+			}
+			EntityTransfers.erase(transfer.ID);
+		});
+}
+
+void TransferCoordinator::AbortSendingEntityTransfer(const EntityTransferData& transfer)
+{
+	_WriteLock(
+		[&]()
+		{
+			for (const auto& entityID : transfer.entityIDs)
+			{
+				EntitiesInTransfer.erase(entityID);
+			}
+			EntityTransfers.erase(transfer.ID);
+		});
+}
+
+bool TransferCoordinator::DoesTargetOwnTransferredEntities(const EntityTransferData& transfer) const
+{
+	for (const AtlasEntityID& entityID : transfer.entityIDs)
+	{
+		const std::optional<ShardID> owner = GlobalEntityLedger::Get().GetEntityOwnerShard(entityID);
+		if (!owner.has_value() || owner.value() != transfer.shard.ID)
+		{
+			return false;
+		}
+	}
+	return true;
+}
+
+void TransferCoordinator::HandleEntityTransferTimeouts()
+{
+	std::vector<EntityTransferData> entityTransfers;
+	_ReadLock(
+		[&]()
+		{
+			entityTransfers.reserve(EntityTransfers.size());
+			for (const auto& [transferID, transfer] : EntityTransfers)
+			{
+				(void)transferID;
+				entityTransfers.push_back(transfer);
+			}
+		});
+
+	if (entityTransfers.empty())
+	{
+		return;
+	}
+
+	std::vector<std::string> livePeerKeys;
+	HealthManifest::Get().GetLivePings(livePeerKeys);
+	std::unordered_set<NetworkIdentity> livePeerSet;
+	livePeerSet.reserve(livePeerKeys.size());
+	for (const std::string& livePeerKey : livePeerKeys)
+	{
+		ByteReader reader(livePeerKey);
+		NetworkIdentity identity;
+		identity.Deserialize(reader);
+		livePeerSet.insert(std::move(identity));
+	}
+	const auto now = std::chrono::steady_clock::now();
+
+	for (const EntityTransferData& transfer : entityTransfers)
+	{
+		if (now - transfer.LastStageAt < kEntityTransferRetryInterval)
+		{
+			continue;
+		}
+
+		const bool peerLive = livePeerSet.contains(transfer.shard);
+		if (transfer.transferMode == TransferMode::eReceiving)
+		{
+			if (!peerLive)
+			{
+				logger.WarningFormatted(
+					"Dropping orphaned receiving entity transfer {} from {} after peer became stale",
+					UUIDGen::ToString(transfer.ID), transfer.shard.ToString());
+				_WriteLock([&]() { EntityTransfers.erase(transfer.ID); });
+			}
+			continue;
+		}
+
+		switch (transfer.stage)
+		{
+			case EntityTransferStage::ePrepare:
+			{
+				if (!peerLive)
+				{
+					logger.WarningFormatted(
+						"Aborting entity transfer {} before commit because target {} is no longer "
+						"live",
+						UUIDGen::ToString(transfer.ID), transfer.shard.ToString());
+					AbortSendingEntityTransfer(transfer);
+					break;
+				}
+
+				SendEntityPreparePacket(transfer);
+				_WriteLock(
+					[&]()
+					{
+						if (auto it = EntityTransfers.find(transfer.ID); it != EntityTransfers.end())
+						{
+							it->second.LastStageAt = now;
+						}
+					});
+			}
+			break;
+
+			case EntityTransferStage::eCommit:
+			{
+				if (DoesTargetOwnTransferredEntities(transfer))
+				{
+					logger.WarningFormatted(
+						"Finalizing entity transfer {} after target {} already owns the entities",
+						UUIDGen::ToString(transfer.ID), transfer.shard.ToString());
+					FinalizeSendingEntityTransfer(transfer);
+					break;
+				}
+
+				if (!peerLive)
+				{
+					logger.WarningFormatted(
+						"Rolling back entity transfer {} because target {} is no longer live",
+						UUIDGen::ToString(transfer.ID), transfer.shard.ToString());
+					RollbackSendingEntityTransfer(transfer);
+					break;
+				}
+
+				SendEntityCommitPacket(transfer);
+				_WriteLock(
+					[&]()
+					{
+						if (auto it = EntityTransfers.find(transfer.ID); it != EntityTransfers.end())
+						{
+							it->second.LastStageAt = now;
+						}
+					});
+			}
+			break;
+
+			case EntityTransferStage::eNone:
+			case EntityTransferStage::eReady:
+			case EntityTransferStage::eComplete:
+			default:
+				break;
+		}
+	}
+}
+
 void TransferCoordinator::ParseEntitiesForTargets()
 {
 	// Stage 1: Snapshot all entities to process under lock
@@ -138,6 +362,10 @@ void TransferCoordinator::ParseEntitiesForTargets()
 					transfer.transferMode = TransferMode::eSending;
 					transfer.shard = NetworkIdentity::MakeIDShard(ownershipIt->second);
 					transfer.entityIDs.push_back(e.entityID);
+					if (BoundLeaser::Get().HasBound())
+					{
+						transfer.sourceBoundID = BoundLeaser::Get().GetBoundID();
+					}
 					EntitiesInTransfer.insert({e.entityID, transfer.ID});
 				}
 			}
@@ -167,17 +395,9 @@ void TransferCoordinator::TransferTick()
 	// Stage 2: Process entity transfers outside lock
 	for (auto& PreTransfer : entityTransfersToSend)
 	{
-		EntityTransferPacket etPacket;
-		etPacket.TransferID = PreTransfer.ID;
-		etPacket.stage = EntityTransferStage::ePrepare;
-
-		auto& PacketData = etPacket.Data.emplace<EntityTransferPacket::PrepareStageData>();
-		PacketData.entityIDs = PreTransfer.entityIDs;
-
-		Interlink::Get().SendMessage(PreTransfer.shard, etPacket,
-									 NetworkMessageSendFlag::eReliableNow);
-
+		SendEntityPreparePacket(PreTransfer);
 		PreTransfer.stage = EntityTransferStage::ePrepare;
+		PreTransfer.LastStageAt = std::chrono::steady_clock::now();
 		TransferManifest::Get().QueueEntityTransferStage(PreTransfer,
 														 EntityTransferStage::ePrepare);
 
@@ -237,6 +457,7 @@ void TransferCoordinator::OnEntityTransferPacketArrival(const EntityTransferPack
 			data.shard = info.sender;
 			data.transferMode = TransferMode::eReceiving;
 			data.stage = EntityTransferStage::eReady;
+			data.LastStageAt = std::chrono::steady_clock::now();
 
 			// Send response
 			EntityTransferPacket response;
@@ -248,7 +469,7 @@ void TransferCoordinator::OnEntityTransferPacketArrival(const EntityTransferPack
 			TransferManifest::Get().QueueEntityTransferStage(data, EntityTransferStage::eReady);
 
 			// Stage 3: Update internal state under lock
-			_WriteLock([&]() { EntityTransfers.insert({data.ID, data}); });
+			_WriteLock([&]() { EntityTransfers.insert_or_assign(data.ID, data); });
 		}
 		break;
 
@@ -263,23 +484,49 @@ void TransferCoordinator::OnEntityTransferPacketArrival(const EntityTransferPack
 					UUIDGen::ToString(p.TransferID));
 				return;
 			}
+			if (transferEntrySnapshot.stage == EntityTransferStage::eCommit)
+			{
+				SendEntityCommitPacket(transferEntrySnapshot);
+				_WriteLock(
+					[&]()
+					{
+						auto& entry = EntityTransfers.at(p.TransferID);
+						entry.LastStageAt = std::chrono::steady_clock::now();
+					});
+				return;
+			}
+
 			// Collect snapshots from EntityLedger outside lock
-			EntityTransferPacket::CommitStageData commitData;
+			boost::container::small_vector<AtlasEntity, 32> cachedSnapshots;
+			const std::optional<BoundsID> sourceBoundID =
+				transferEntrySnapshot.sourceBoundID.has_value() ? transferEntrySnapshot.sourceBoundID
+																: (BoundLeaser::Get().HasBound()
+																	   ? std::optional<BoundsID>(
+																			 BoundLeaser::Get().GetBoundID())
+																	   : std::nullopt);
 			for (const AtlasEntityID EntityID : transferEntrySnapshot.entityIDs)
 			{
 				if (!EntityLedger::Get().ExistsEntity(EntityID))
+				{
 					continue;
-				commitData.entitySnapshots.push_back(
-					{EntityLedger::Get().GetAndEraseEntity(EntityID)});
+				}
+
+				AtlasEntity entity = EntityLedger::Get().GetAndEraseEntityForTransfer(EntityID);
+				++entity.TransferGeneration;
+				if (sourceBoundID.has_value())
+				{
+					SnapshotService::Get().UpsertBoundEntitySnapshot(*sourceBoundID, entity);
+				}
+				cachedSnapshots.push_back(entity);
 			}
 
-			EntityTransferPacket response;
-			response.TransferID = p.TransferID;
-			response.stage = EntityTransferStage::eCommit;
-			response.Data.emplace<EntityTransferPacket::CommitStageData>(std::move(commitData));
+			EntityTransferData stagedTransfer = transferEntrySnapshot;
+			stagedTransfer.stage = EntityTransferStage::eCommit;
+			stagedTransfer.cachedSnapshots = cachedSnapshots;
+			stagedTransfer.sourceBoundID = sourceBoundID;
+			stagedTransfer.LastStageAt = std::chrono::steady_clock::now();
 
-			Interlink::Get().SendMessage(info.sender, response,
-										 NetworkMessageSendFlag::eReliableNow);
+			SendEntityCommitPacket(stagedTransfer);
 			TransferManifest::Get().QueueEntityTransferStage(transferEntrySnapshot,
 															 EntityTransferStage::eCommit);
 
@@ -288,20 +535,45 @@ void TransferCoordinator::OnEntityTransferPacketArrival(const EntityTransferPack
 				[&]()
 				{
 					auto& entry = EntityTransfers.at(p.TransferID);
-					entry.stage = EntityTransferStage::eCommit;
+					entry = std::move(stagedTransfer);
 				});
 		}
 		break;
 
 		case EntityTransferStage::eCommit:
 		{
-			ASSERT(hasTransfer, "No internal record for this transfer");
+			EntityTransferData transferEventData;
+			if (hasTransfer)
+			{
+				transferEventData = transferEntrySnapshot;
+			}
+			else
+			{
+				transferEventData.ID = p.TransferID;
+				transferEventData.shard = info.sender;
+				transferEventData.transferMode = TransferMode::eReceiving;
+				transferEventData.stage = EntityTransferStage::eCommit;
+				for (const auto& data : p.GetAsCommitStage().entitySnapshots)
+				{
+					transferEventData.entityIDs.push_back(data.Snapshot.Entity_ID);
+				}
+				logger.WarningFormatted(
+					"Received stateless entity commit for transfer {}; applying commit anyway",
+					UUIDGen::ToString(p.TransferID));
+			}
 
 			// Stage 2: Apply snapshots to EntityLedger outside lock
 			const auto& commitData = p.GetAsCommitStage();
 			for (const auto& Data : commitData.entitySnapshots)
 			{
-				EntityLedger::Get().AddEntity(Data.Snapshot);
+				AtlasEntity entity = Data.Snapshot;
+				entity.TransferGeneration =
+					std::max(entity.TransferGeneration, static_cast<uint64_t>(Data.Generation));
+				if (EntityLedger::Get().ExistsEntity(entity.Entity_ID))
+				{
+					continue;
+				}
+				EntityLedger::Get().AddEntity(entity);
 			}
 
 			// Acknowledge commit back to source so it can clear EntitiesInTransfer.
@@ -311,7 +583,7 @@ void TransferCoordinator::OnEntityTransferPacketArrival(const EntityTransferPack
 			completeResponse.SetAsCompleteStage();
 			Interlink::Get().SendMessage(info.sender, completeResponse,
 										 NetworkMessageSendFlag::eReliableNow);
-			TransferManifest::Get().QueueEntityTransferStage(transferEntrySnapshot,
+			TransferManifest::Get().QueueEntityTransferStage(transferEventData,
 															 EntityTransferStage::eComplete);
 
 			// Stage 3: Remove internal record under lock
@@ -321,16 +593,15 @@ void TransferCoordinator::OnEntityTransferPacketArrival(const EntityTransferPack
 
 		case EntityTransferStage::eComplete:
 		{
-			ASSERT(hasTransfer, "No internal record for this transfer");
-
-			// Stage 2: Remove entities from EntitiesInTransfer outside lock
-			for (const auto& eID : transferEntrySnapshot.entityIDs)
+			if (!hasTransfer)
 			{
-				_WriteLock([&]() { EntitiesInTransfer.erase(eID); });
+				logger.WarningFormatted(
+					"Received EntityTransferPacket in Complete Stage for unknown transfer ID {}",
+					UUIDGen::ToString(p.TransferID));
+				return;
 			}
 
-			// Stage 3: Remove transfer entry
-			_WriteLock([&]() { EntityTransfers.erase(p.TransferID); });
+			FinalizeSendingEntityTransfer(transferEntrySnapshot);
 		}
 		break;
 	}
@@ -511,6 +782,7 @@ void TransferCoordinator::TransferThreadEntry(std::stop_token st)
 	{
 		ParseEntitiesForTargets();
 		TransferTick();
+		HandleEntityTransferTimeouts();
 		std::this_thread::sleep_for(std::chrono::milliseconds(50));
 	}
 }

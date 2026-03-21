@@ -138,16 +138,23 @@ void EntityLedger::AddEntity(const AtlasEntity& e)
 												  e.Entity_ID);
 	SnapshotService::Get().UpsertClaimedBoundEntitySnapshot(e);
 }
-void EntityLedger::_EraseEntity(AtlasEntityID ID)
+void EntityLedger::_EraseEntity(AtlasEntityID ID, bool preserveEntityRecord, bool preserveSnapshot)
 {
-	SnapshotService::Get().DeleteClaimedBoundEntitySnapshot(ID);
 	const auto f = entities.find(ID);
+	ASSERT(f != entities.end(), "Invalid Entity ID");
+	if (!preserveSnapshot)
+	{
+		SnapshotService::Get().DeleteClaimedBoundEntitySnapshot(ID);
+	}
 	if (f->second.IsClient)
 	{
 		clients.erase(f->second.Client_ID);
 	}
 	entities.erase(f);
-	GlobalEntityLedger::Get().DeleteEntityRecord(NetworkCredentials::Get().GetID().ID, ID);
+	if (!preserveEntityRecord)
+	{
+		GlobalEntityLedger::Get().DeleteEntityRecord(NetworkCredentials::Get().GetID().ID, ID);
+	}
 }
 void EntityLedger::OnEntityHandleFetchRequest(const EntityHandleFetchRequestPacket& packet,
 											  const PacketManager::PacketInfo& info)

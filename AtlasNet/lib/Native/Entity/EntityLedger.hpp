@@ -36,7 +36,8 @@ class EntityLedger : public Singleton<EntityLedger>
 		return clients.find(cid) != clients.end() ? std::optional<AtlasEntityID>(clients.at(cid))
 												  : std::nullopt;
 	}
-	void _EraseEntity(AtlasEntityID ID);
+	void _EraseEntity(AtlasEntityID ID, bool preserveEntityRecord = false,
+					  bool preserveSnapshot = false);
 	bool _ExistsEntity(AtlasEntityID ID) const { return entities.contains(ID); }
 
    public:
@@ -150,6 +151,16 @@ class EntityLedger : public Singleton<EntityLedger>
 			{
 				AtlasEntity e = _GetEntity(ID);
 				_EraseEntity(ID);
+				return e;
+			});
+	}
+	[[nodiscard]] AtlasEntity GetAndEraseEntityForTransfer(AtlasEntityID ID)
+	{
+		return _WriteLock(
+			[&]()
+			{
+				AtlasEntity e = _GetEntity(ID);
+				_EraseEntity(ID, true, true);
 				return e;
 			});
 	}

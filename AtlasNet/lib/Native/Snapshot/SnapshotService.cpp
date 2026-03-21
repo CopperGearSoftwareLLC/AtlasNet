@@ -15,6 +15,7 @@
 #include "Heuristic/BoundLeaser.hpp"
 #include "Heuristic/IBounds.hpp"
 #include "InternalDB/InternalDB.hpp"
+#include "Interlink/Database/HealthManifest.hpp"
 #include "Network/NetworkCredentials.hpp"
 
 namespace
@@ -103,6 +104,16 @@ void SnapshotService::RemoveBoundSnapshotIndex(BoundsID boundID)
 	(void)InternalDB::Get()->HDel(kEntitySnapshotBoundsIndexHashTable, {SerializeBoundID(boundID)});
 }
 
+void SnapshotService::UpsertBoundEntitySnapshot(BoundsID boundID, const AtlasEntity& entity)
+{
+	TouchBoundSnapshotIndex(boundID);
+
+	ByteWriter entityWriter;
+	entity.Serialize(entityWriter);
+	UpsertPerEntitySnapshotPayload(boundID, SerializeEntityID(entity.Entity_ID),
+								   entityWriter.as_string_view());
+}
+
 void SnapshotService::UpsertClaimedBoundEntitySnapshot(const AtlasEntity& entity)
 {
 	if (!BoundLeaser::Get().HasBound())
@@ -110,13 +121,19 @@ void SnapshotService::UpsertClaimedBoundEntitySnapshot(const AtlasEntity& entity
 		return;
 	}
 
-	const BoundsID boundID = BoundLeaser::Get().GetBoundID();
-	TouchBoundSnapshotIndex(boundID);
+	UpsertBoundEntitySnapshot(BoundLeaser::Get().GetBoundID(), entity);
+}
 
-	ByteWriter entityWriter;
-	entity.Serialize(entityWriter);
-	UpsertPerEntitySnapshotPayload(boundID, SerializeEntityID(entity.Entity_ID),
-								   entityWriter.as_string_view());
+void SnapshotService::DeleteBoundEntitySnapshot(BoundsID boundID, const AtlasEntityID& entityID)
+{
+	const std::string entityField = SerializeEntityID(entityID);
+	DeletePerEntitySnapshotPayload(boundID, entityField);
+
+	if (InternalDB::Get()->HLen(EntityEntrySnapshotHashKey(boundID)) == 0)
+	{
+		(void)InternalDB::Get()->DelKey(EntityEntrySnapshotHashKey(boundID));
+		RemoveBoundSnapshotIndex(boundID);
+	}
 }
 
 void SnapshotService::DeleteClaimedBoundEntitySnapshot(const AtlasEntityID& entityID)
@@ -126,15 +143,7 @@ void SnapshotService::DeleteClaimedBoundEntitySnapshot(const AtlasEntityID& enti
 		return;
 	}
 
-	const BoundsID boundID = BoundLeaser::Get().GetBoundID();
-	const std::string entityField = SerializeEntityID(entityID);
-	DeletePerEntitySnapshotPayload(boundID, entityField);
-
-	if (InternalDB::Get()->HLen(EntityEntrySnapshotHashKey(boundID)) == 0)
-	{
-		(void)InternalDB::Get()->DelKey(EntityEntrySnapshotHashKey(boundID));
-		RemoveBoundSnapshotIndex(boundID);
-	}
+	DeleteBoundEntitySnapshot(BoundLeaser::Get().GetBoundID(), entityID);
 }
 
 void SnapshotService::RecoverClaimedBoundSnapshotIfNeeded()
@@ -163,12 +172,38 @@ bool SnapshotService::RecoverBoundSnapshot(BoundsID boundID)
 	if (!perEntityPayloads.empty())
 	{
 		size_t recoveredCount = 0;
+		size_t skippedLiveOwnedElsewhereCount = 0;
+		size_t recoveredFromDeadOwnerCount = 0;
+		const ShardID selfShardID = NetworkCredentials::Get().GetID().ID;
+		std::vector<std::string> livePeerKeys;
+		HealthManifest::Get().GetLivePings(livePeerKeys);
+		std::unordered_set<NetworkIdentity> livePeerSet;
+		livePeerSet.reserve(livePeerKeys.size());
+		for (const std::string& livePeerKey : livePeerKeys)
+		{
+			ByteReader livePeerReader(livePeerKey);
+			NetworkIdentity livePeerIdentity;
+			livePeerIdentity.Deserialize(livePeerReader);
+			livePeerSet.insert(std::move(livePeerIdentity));
+		}
 		for (const auto& [entityIDStr, payload] : perEntityPayloads)
 		{
 			(void)entityIDStr;
 			ByteReader reader(payload);
 			AtlasEntity entity;
 			entity.Deserialize(reader);
+			const std::optional<ShardID> ownerShard =
+				GlobalEntityLedger::Get().GetEntityOwnerShard(entity.Entity_ID);
+			if (ownerShard.has_value() && ownerShard.value() != selfShardID)
+			{
+				const NetworkIdentity ownerIdentity = NetworkIdentity::MakeIDShard(*ownerShard);
+				if (livePeerSet.contains(ownerIdentity))
+				{
+					++skippedLiveOwnedElsewhereCount;
+					continue;
+				}
+				++recoveredFromDeadOwnerCount;
+			}
 			if (EntityLedger::Get().ExistsEntity(entity.Entity_ID))
 			{
 				continue;
@@ -178,10 +213,16 @@ bool SnapshotService::RecoverBoundSnapshot(BoundsID boundID)
 			++recoveredCount;
 		}
 
-			logger.WarningFormatted(
-				"Recovered {} entities for claimed bound {} from per-entity database snapshot",
-				recoveredCount, boundID);
-			return true;
+			if (recoveredCount > 0 || skippedLiveOwnedElsewhereCount > 0 ||
+				recoveredFromDeadOwnerCount > 0)
+			{
+				logger.WarningFormatted(
+					"Recovered {} entities for claimed bound {} from per-entity database snapshot "
+					"(skipped {} live-owned elsewhere, reclaimed {} from dead owners)",
+					recoveredCount, boundID, skippedLiveOwnedElsewhereCount,
+					recoveredFromDeadOwnerCount);
+			}
+		return recoveredCount > 0;
 	}
 
 	logger.DebugFormatted("No entity snapshot found for bound {}", boundID);

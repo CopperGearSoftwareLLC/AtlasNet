@@ -76,6 +76,13 @@ class TransferCoordinator : public Singleton<TransferCoordinator>
 
 	void ParseEntitiesForTargets();
 	void TransferTick();
+	void HandleEntityTransferTimeouts();
+	void SendEntityPreparePacket(const EntityTransferData& transfer);
+	void SendEntityCommitPacket(const EntityTransferData& transfer);
+	void FinalizeSendingEntityTransfer(const EntityTransferData& transfer);
+	void RollbackSendingEntityTransfer(const EntityTransferData& transfer);
+	void AbortSendingEntityTransfer(const EntityTransferData& transfer);
+	bool DoesTargetOwnTransferredEntities(const EntityTransferData& transfer) const;
 	void OnEntityTransferPacketArrival(const EntityTransferPacket& p,
 									   const PacketManager::PacketInfo& info);
 	void OnClientTransferPacketArrival(const ClientTransferPacket& p,

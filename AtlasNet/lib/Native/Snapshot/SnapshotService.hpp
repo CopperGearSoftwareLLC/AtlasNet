@@ -25,7 +25,9 @@ class SnapshotService : public Singleton<SnapshotService>
    public:
 	SnapshotService();
 	void RecoverClaimedBoundSnapshotIfNeeded();
+	void UpsertBoundEntitySnapshot(BoundsID boundID, const AtlasEntity& entity);
 	void UpsertClaimedBoundEntitySnapshot(const AtlasEntity& entity);
+	void DeleteBoundEntitySnapshot(BoundsID boundID, const AtlasEntityID& entityID);
 	void DeleteClaimedBoundEntitySnapshot(const AtlasEntityID& entityID);
 
 	void FetchEntityListSnapshot(
@@ -36,11 +38,11 @@ class SnapshotService : public Singleton<SnapshotService>
 
 	void FetchAllTransforms(std::vector<AtlasTransform>& transforms);
 
-	private:
-		void SnapshotThreadLoop(std::stop_token st);
-		bool RecoverBoundSnapshot(BoundsID boundID);
-		void ReconcileClaimedBoundEntityRecords();
-		void UploadSnapshot();
-		void TouchBoundSnapshotIndex(BoundsID boundID);
-		void RemoveBoundSnapshotIndex(BoundsID boundID);
+   private:
+	void SnapshotThreadLoop(std::stop_token st);
+	bool RecoverBoundSnapshot(BoundsID boundID);
+	void ReconcileClaimedBoundEntityRecords();
+	void UploadSnapshot();
+	void TouchBoundSnapshotIndex(BoundsID boundID);
+	void RemoveBoundSnapshotIndex(BoundsID boundID);
 };
