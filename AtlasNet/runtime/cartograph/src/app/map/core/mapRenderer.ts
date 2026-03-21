@@ -130,6 +130,22 @@ function segmentLiesOnClipBoundary(
   return false;
 }
 
+const SEGMENT_KEY_PRECISION = 1000;
+
+function quantizeSegmentCoordinate(value: number): number {
+  return Math.round(value * SEGMENT_KEY_PRECISION);
+}
+
+function segmentPointKey(point: { x: number; y: number }): string {
+  return `${quantizeSegmentCoordinate(point.x)}:${quantizeSegmentCoordinate(point.y)}`;
+}
+
+function segmentKey(a: { x: number; y: number }, b: { x: number; y: number }): string {
+  const aKey = segmentPointKey(a);
+  const bKey = segmentPointKey(b);
+  return aKey < bKey ? `${aKey}|${bKey}` : `${bKey}|${aKey}`;
+}
+
 function normalizeInteractionSensitivity(
   value: number,
   fallback: number
@@ -1155,6 +1171,7 @@ export function createMapRenderer({
     }
 
     const viewportPolygon = getViewportWorldPolygon();
+    const drawnPolygonSegments = new Map<string, number>();
     for (const shape of shapes) {
       const x = shape.position.x * scale2D + offsetX;
       const y = shape.position.y * scale2D + offsetY;
@@ -1185,32 +1202,25 @@ export function createMapRenderer({
           const worldPts = resolveShapeWorldPolygon(shape, viewportPolygon);
           if (worldPts.length > 0) {
             ctx.restore();
-            if (shapeHasHalfPlaneCell(shape)) {
-              for (let i = 0; i < worldPts.length; i += 1) {
-                const start = worldPts[i];
-                const end = worldPts[(i + 1) % worldPts.length];
-                if (segmentLiesOnClipBoundary(start, end, viewportPolygon)) {
-                  continue;
-                }
-                ctx.beginPath();
-                ctx.moveTo(start.x * scale2D + offsetX, start.y * scale2D + offsetY);
-                ctx.lineTo(end.x * scale2D + offsetX, end.y * scale2D + offsetY);
-                ctx.strokeStyle = color;
-                ctx.stroke();
+            for (let i = 0; i < worldPts.length; i += 1) {
+              const start = worldPts[i];
+              const end = worldPts[(i + 1) % worldPts.length];
+              if (
+                shapeHasHalfPlaneCell(shape) &&
+                segmentLiesOnClipBoundary(start, end, viewportPolygon)
+              ) {
+                continue;
               }
-            } else {
+              const key = segmentKey(start, end);
+              const priority = Math.max(0, shape.boundaryPriority ?? 0);
+              const previousPriority = drawnPolygonSegments.get(key);
+              if (previousPriority != null && previousPriority >= priority) {
+                continue;
+              }
+              drawnPolygonSegments.set(key, priority);
               ctx.beginPath();
-              ctx.moveTo(
-                worldPts[0].x * scale2D + offsetX,
-                worldPts[0].y * scale2D + offsetY
-              );
-              for (let i = 1; i < worldPts.length; i += 1) {
-                ctx.lineTo(
-                  worldPts[i].x * scale2D + offsetX,
-                  worldPts[i].y * scale2D + offsetY
-                );
-              }
-              ctx.closePath();
+              ctx.moveTo(start.x * scale2D + offsetX, start.y * scale2D + offsetY);
+              ctx.lineTo(end.x * scale2D + offsetX, end.y * scale2D + offsetY);
               ctx.strokeStyle = color;
               ctx.stroke();
             }
@@ -1245,6 +1255,7 @@ export function createMapRenderer({
 
     const basis = getCameraBasis();
     const viewportPolygon = getAxisCullWorldPolygon3D();
+    const drawnPolygonSegments = new Map<string, number>();
     for (const shape of shapes) {
       const base = shapePositionToWorld(shape);
       const color = shape.color ?? 'rgba(100, 149, 255, 1)';
@@ -1292,28 +1303,29 @@ export function createMapRenderer({
         case 'polygon': {
           const polygonPts = resolveShapeWorldPolygon(shape, viewportPolygon);
           if (polygonPts.length >= 2) {
-            if (shapeHasHalfPlaneCell(shape)) {
-              for (let i = 0; i < polygonPts.length; i += 1) {
-                const start = polygonPts[i];
-                const end = polygonPts[(i + 1) % polygonPts.length];
-                if (segmentLiesOnClipBoundary(start, end, viewportPolygon)) {
-                  continue;
-                }
-                drawLine3D(
-                  { x: start.x, y: base.y, z: start.y },
-                  { x: end.x, y: base.y, z: end.y },
-                  color,
-                  1.5,
-                  basis
-                );
+            for (let i = 0; i < polygonPts.length; i += 1) {
+              const start = polygonPts[i];
+              const end = polygonPts[(i + 1) % polygonPts.length];
+              if (
+                shapeHasHalfPlaneCell(shape) &&
+                segmentLiesOnClipBoundary(start, end, viewportPolygon)
+              ) {
+                continue;
               }
-            } else {
-              const worldPts = polygonPts.map((p) => ({
-                x: p.x,
-                y: base.y,
-                z: p.y,
-              }));
-              drawPolyline3D(worldPts, true, color, 1.5);
+              const key = segmentKey(start, end);
+              const priority = Math.max(0, shape.boundaryPriority ?? 0);
+              const previousPriority = drawnPolygonSegments.get(key);
+              if (previousPriority != null && previousPriority >= priority) {
+                continue;
+              }
+              drawnPolygonSegments.set(key, priority);
+              drawLine3D(
+                { x: start.x, y: base.y, z: start.y },
+                { x: end.x, y: base.y, z: end.y },
+                color,
+                1.5,
+                basis
+              );
             }
           }
           break;

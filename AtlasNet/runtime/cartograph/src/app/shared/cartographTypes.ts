@@ -21,6 +21,7 @@ export interface ShapeJS {
   halfPlanes?: HalfPlane2[];
   color?: string;
   label?: string;
+  boundaryPriority?: number;
 }
 
 export interface HotspotInput {

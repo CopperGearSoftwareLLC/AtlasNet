@@ -47,8 +47,10 @@ class TransferManifest : public Singleton<TransferManifest>
 		event.stage = stage;
 		switch (stage)
 		{
-			case EntityTransferStage::eReady:
 			case EntityTransferStage::eCommit:
+				event.state = "source";
+				break;
+			case EntityTransferStage::eReady:
 			case EntityTransferStage::eComplete:
 				event.state = "target";
 				break;

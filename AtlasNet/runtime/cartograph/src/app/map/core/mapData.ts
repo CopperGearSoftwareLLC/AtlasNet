@@ -53,6 +53,7 @@ const SHARD_BOUNDS_PADDING = 2;
 const SHARD_BOUNDS_FALLBACK_HALF_SIZE = 8;
 const NON_HOVERED_ENTITY_DIM_FACTOR = 0.22;
 const DEFAULT_SHAPE_COLOR = 'rgba(100, 149, 255, 1)';
+const STALE_SHARD_BOUNDARY_COLOR = 'rgba(239, 68, 68, 0.95)';
 
 const UUID_PATTERN =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -667,6 +668,33 @@ export function buildFilteredBaseShapes(args: {
       return shape;
     }
     return withShapeOpacity(shape, NON_HOVERED_ENTITY_DIM_FACTOR);
+  });
+}
+
+export function applyShardBoundaryStatus(args: {
+  baseShapes: ShapeJS[];
+  liveShardIdSet: Set<string>;
+}): ShapeJS[] {
+  const { baseShapes, liveShardIdSet } = args;
+
+  return baseShapes.map((shape) => {
+    const ownerId = normalizeShardId(shape.ownerId ?? '');
+    if (!isShardIdentity(ownerId)) {
+      return shape;
+    }
+
+    if (liveShardIdSet.has(ownerId)) {
+      return {
+        ...shape,
+        boundaryPriority: Math.max(0, shape.boundaryPriority ?? 0),
+      };
+    }
+
+    return {
+      ...shape,
+      color: STALE_SHARD_BOUNDARY_COLOR,
+      boundaryPriority: Math.max(2, shape.boundaryPriority ?? 0),
+    };
   });
 }
 

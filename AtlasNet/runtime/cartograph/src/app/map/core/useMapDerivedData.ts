@@ -7,6 +7,7 @@ import type {
   TransferManifestTelemetry,
 } from '../../shared/cartographTypes';
 import {
+  applyShardBoundaryStatus,
   buildHoveredShardEdgeLabels,
   buildFilteredBaseShapes,
   buildOverlayShapes,
@@ -66,15 +67,6 @@ export function useMapDerivedData({
     [authorityEntities]
   );
 
-  const filteredBaseShapes = useMemo(
-    () =>
-      buildFilteredBaseShapes({
-        baseShapes,
-        filteredShardIdSet,
-      }),
-    [baseShapes, filteredShardIdSet]
-  );
-
   const shardAnchorPositions = useMemo(
     () => computeShardAnchorPositions(baseShapes),
     [baseShapes]
@@ -98,6 +90,24 @@ export function useMapDerivedData({
   const networkNodeIdSet = useMemo(
     () => new Set(networkNodeIds),
     [networkNodeIds]
+  );
+
+  const statusAwareBaseShapes = useMemo(
+    () =>
+      applyShardBoundaryStatus({
+        baseShapes,
+        liveShardIdSet: networkNodeIdSet,
+      }),
+    [baseShapes, networkNodeIdSet]
+  );
+
+  const filteredBaseShapes = useMemo(
+    () =>
+      buildFilteredBaseShapes({
+        baseShapes: statusAwareBaseShapes,
+        filteredShardIdSet,
+      }),
+    [filteredShardIdSet, statusAwareBaseShapes]
   );
 
   const projectedShardPositions = useMemo(
