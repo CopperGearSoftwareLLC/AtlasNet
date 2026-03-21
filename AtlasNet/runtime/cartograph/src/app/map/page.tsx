@@ -465,25 +465,17 @@ export default function MapPage() {
     setPlaybackPaused(true);
   }
 
-  function stepPlaybackFrame(direction: 1 | -1): void {
-    if (!playbackFrames || playbackFrames.length === 0) {
+  function stepPlaybackTick(direction: 1 | -1): void {
+    if (!playbackActive) {
       return;
     }
 
     setPlaybackPaused(true);
 
     setPlaybackCursorMs((previousCursorMs) => {
-      const currentIndex = getFrameIndexAtCursor(playbackFrames, previousCursorMs);
-      if (currentIndex < 0) {
-        return previousCursorMs;
-      }
-
-      const nextIndex =
-        direction > 0
-          ? Math.min(playbackFrames.length - 1, currentIndex + 1)
-          : Math.max(0, currentIndex - 1);
-      const nextFrame = playbackFrames[nextIndex];
-      return nextFrame ? nextFrame.capturedAtMs : previousCursorMs;
+      const snappedCursorMs = snapToNearestTickMs(previousCursorMs, playbackTimeTickMs);
+      const nextCursorMs = snappedCursorMs + direction * playbackTimeTickMs;
+      return Math.max(playbackStartMs, Math.min(playbackEndMs, nextCursorMs));
     });
   }
 
@@ -790,8 +782,8 @@ export default function MapPage() {
           onPlayForward={playForward}
           onPlayReverse={playReverse}
           onPause={pausePlayback}
-          onStepForward={() => stepPlaybackFrame(1)}
-          onStepReverse={() => stepPlaybackFrame(-1)}
+          onStepForward={() => stepPlaybackTick(1)}
+          onStepReverse={() => stepPlaybackTick(-1)}
           timeTickMs={playbackTimeTickMs}
           minTimeTickMs={MIN_PLAYBACK_TIME_TICK_MS}
           maxTimeTickMs={MAX_PLAYBACK_TIME_TICK_MS}

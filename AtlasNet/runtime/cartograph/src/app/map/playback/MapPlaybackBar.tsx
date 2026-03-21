@@ -80,7 +80,7 @@ export function MapPlaybackBar({
       <button
         type="button"
         onClick={onStepReverse}
-        title="Step back one frame"
+        title={`Step back one tick (${(timeTickMs / 1000).toFixed(2)}s)`}
         style={{
           border: '1px solid rgba(148, 163, 184, 0.45)',
           borderRadius: 6,
@@ -149,7 +149,7 @@ export function MapPlaybackBar({
       <button
         type="button"
         onClick={onStepForward}
-        title="Step forward one frame"
+        title={`Step forward one tick (${(timeTickMs / 1000).toFixed(2)}s)`}
         style={{
           border: '1px solid rgba(148, 163, 184, 0.45)',
           borderRadius: 6,
@@ -177,7 +177,7 @@ export function MapPlaybackBar({
         type="range"
         min={0}
         max={durationMs}
-        step={Math.max(1, Math.floor(timeTickMs))}
+        step={Math.max(1, timeTickMs)}
         value={relativeMs}
         onChange={(event) =>
           onSeek(
