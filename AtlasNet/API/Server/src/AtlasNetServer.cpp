@@ -26,6 +26,7 @@
 #include "Network/NetworkCredentials.hpp"
 #include "Network/NetworkIdentity.hpp"
 #include "Snapshot/SnapshotService.hpp"
+#include "Snapshot/TemporaryMigrationService.hpp"
 
 // namespace
 //{
@@ -43,8 +44,6 @@ void IAtlasNetServer::AtlasNet_Initialize()
 	NetworkManifest::Get().ScheduleNetworkPings();
 	HealthManifest::Get().ScheduleHealthPings();
 	GlobalEvents::Get().Init();
-	DockerEvents::Get().Init(
-		DockerEventsInit{.OnShutdownRequest = [](SignalType signal) { GetInstance().Shutdown(); }});
 	GlobalEvents::Get().Subscribe<LogEvent>(
 		[&](const LogEvent &e) { logger->DebugFormatted("Received LogEvent: {}", e.message); });
 
@@ -54,6 +53,16 @@ void IAtlasNetServer::AtlasNet_Initialize()
 	EntityLedger::Get().Init();
 	ClientLedger::Ensure();
 	SnapshotService::Ensure();
+	TemporaryMigrationService::Ensure();
+	DockerEvents::Get().Init(
+		DockerEventsInit{
+			.OnShutdownRequest =
+				[](SignalType signal)
+				{
+					(void)signal;
+					TemporaryMigrationService::Get().TriggerForCurrentShardSigterm();
+					GetInstance().Shutdown();
+				}});
 	GlobalEvents::Get().Subscribe<ClientConnectEvent>(
 		[this](const ClientConnectEvent &e)
 		{
@@ -73,6 +82,13 @@ void IAtlasNetServer::AtlasNet_Initialize()
 
 void IAtlasNetServer::Shutdown()
 {
+	if (shutdownRequested.exchange(true))
+	{
+		return;
+	}
+
+	TemporaryMigrationService::Get().TriggerForCurrentShardSigterm();
+	TemporaryMigrationService::Get().Shutdown();
 	Interlink::Get().Shutdown();
 }
 

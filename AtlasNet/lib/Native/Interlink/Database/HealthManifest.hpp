@@ -60,7 +60,13 @@ class HealthManifest : public Singleton<HealthManifest>
 					std::this_thread::sleep_for(
 						std::chrono::milliseconds(_HEALTH_CHECK_INTERVAL_MS));
 				}
-			});
+				});
+	}
+	void RemovePingByIdentity(const NetworkIdentity& key)
+	{
+		ByteWriter bw;
+		key.Serialize(bw);
+		RemovePing(std::string(bw.as_string_view()));
 	}
 	//=================================
 	//===          CHECK            ===

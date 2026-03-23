@@ -1,4 +1,5 @@
 #pragma once
+#include <atomic>
 #include <stop_token>
 #include <thread>
 #include <unordered_set>
@@ -90,6 +91,7 @@ class ATLASNET_API IAtlasNetServer : public AtlasNetInterface
 	}
 
    private:
+	std::atomic_bool shutdownRequested = false;
    [[nodiscard]] AtlasEntityHandle Internal_CreateClientEntity(
 		ClientID c_id, const AtlasTransform& t, std::span<const uint8_t> metadata = {});
 	std::optional<ServerCommandBus> commandbus;

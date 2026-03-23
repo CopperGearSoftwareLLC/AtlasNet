@@ -101,7 +101,7 @@ void RTSServer::Run()
 void RTSServer::Shutdown()
 {
 	ShouldShutdown = true;
-	Interlink::Get().Shutdown();
+	IAtlasNetServer::Shutdown();
 }
 
 void RTSServer::OnClientCameraMoveCommand(const NetClientIntentHeader& header,

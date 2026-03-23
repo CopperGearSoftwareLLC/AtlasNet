@@ -111,6 +111,12 @@ SnapshotService::SnapshotService()
 	snapshotThread = std::jthread([this](std::stop_token st) { SnapshotThreadLoop(st); });
 };
 
+void SnapshotService::FlushClaimedBoundSnapshot()
+{
+	std::lock_guard lock(recoveryMutex);
+	UploadSnapshot();
+}
+
 void SnapshotService::TouchBoundSnapshotIndex(BoundsID boundID)
 {
 	(void)InternalDB::Get()->HSet(kEntitySnapshotBoundsIndexHashTable, SerializeBoundID(boundID),

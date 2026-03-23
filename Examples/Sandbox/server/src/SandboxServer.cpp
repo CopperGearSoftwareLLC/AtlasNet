@@ -175,7 +175,7 @@ void SandboxServer::Run()
 void SandboxServer::Shutdown()
 {
 	ShouldShutdown = true;
-	Interlink::Get().Shutdown();
+	IAtlasNetServer::Shutdown();
 }
 
 void SandboxServer::OnClientSpawn(const ClientSpawnInfo& c, const AtlasEntityMinimal& entity,

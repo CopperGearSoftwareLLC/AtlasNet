@@ -25,6 +25,7 @@ class SnapshotService : public Singleton<SnapshotService>
 
    public:
 	SnapshotService();
+	void FlushClaimedBoundSnapshot();
 	void RecoverClaimedBoundSnapshotIfNeeded();
 	void UpsertBoundEntitySnapshot(BoundsID boundID, const AtlasEntity& entity);
 	void UpsertClaimedBoundEntitySnapshot(const AtlasEntity& entity);
