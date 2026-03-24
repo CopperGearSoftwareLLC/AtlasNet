@@ -22,6 +22,7 @@
 #include "Network/NetworkCredentials.hpp"
 #include "Snapshot/Packet/TemporaryMigrationTriggerPacket.hpp"
 #include "Snapshot/SnapshotService.hpp"
+#include "Transfer/TransferCoordinator.hpp"
 
 namespace
 {
@@ -154,6 +155,25 @@ void TemporaryMigrationService::TriggerForCurrentShardSigterm()
 	HealthManifest::Get().RemovePingByIdentity(selfID);
 	const bool requeued = HeuristicManifest::Get().ReleaseClaimedBound(selfID);
 	BoundLeaser::Get().ClearClaimedBound();
+	std::vector<AtlasEntityID> entityIDsToDrain;
+	EntityLedger::Get().ForEachEntityRead(
+		std::execution::seq,
+		[&](const AtlasEntity& entity)
+		{
+			if (TransferCoordinator::Get().IsEntityInTransfer(entity.Entity_ID))
+			{
+				return;
+			}
+			entityIDsToDrain.push_back(entity.Entity_ID);
+		});
+	for (const AtlasEntityID& entityID : entityIDsToDrain)
+	{
+		if (!EntityLedger::Get().ExistsEntity(entityID))
+		{
+			continue;
+		}
+		EntityLedger::Get().EraseEntity(entityID);
+	}
 	TemporaryMigrationTriggerPacket triggerPacket;
 	triggerPacket.releasedBoundID = boundID;
 	for (const NetworkIdentity& liveShardPeer : CollectLiveShardPeers())
@@ -168,8 +188,8 @@ void TemporaryMigrationService::TriggerForCurrentShardSigterm()
 	}
 
 	logger.WarningFormatted(
-		"Prepared shard {} and bound {} for temporary migration on shutdown (requeued={})",
-		selfID.ToString(), boundID, requeued ? "true" : "false");
+		"Prepared shard {} and bound {} for temporary migration (requeued={}, drained={})",
+		selfID.ToString(), boundID, requeued ? "true" : "false", entityIDsToDrain.size());
 }
 
 bool TemporaryMigrationService::TryClaimRecoveredEntityOwnership(

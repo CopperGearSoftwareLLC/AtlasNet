@@ -25,15 +25,26 @@ class BoundLeaser : public Singleton<BoundLeaser>
 	{
 		while (!st.stop_requested())
 		{
-			if (!HasBound())
+			std::optional<BoundsID> claimedBoundID;
+			{
+				std::lock_guard lock(ClaimedBoundMutex);
+				claimedBoundID = ClaimedBoundID;
+			}
+
+			if (!claimedBoundID.has_value())
 			{
 				ClaimBound();
+			}
+			else
+			{
+				ValidateClaimedBound(claimedBoundID.value());
 			}
 			std::this_thread::sleep_for(std::chrono::milliseconds(100));
 		}
 	}
 
 	void ClaimBound();
+	void ValidateClaimedBound(BoundsID claimedBoundID);
 	void ClearInvalidClaimedBound(BoundsID claimedBoundID);
 
    public:
