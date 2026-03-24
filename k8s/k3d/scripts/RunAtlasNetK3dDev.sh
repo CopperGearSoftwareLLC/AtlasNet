@@ -153,12 +153,48 @@ wait_for_ports_free() {
     exit 1
 }
 
+count_cluster_role_nodes() {
+    local role="$1"
+    docker ps -a --format '{{.Names}}' 2>/dev/null | awk -v prefix="k3d-${CLUSTER_NAME}-${role}-" '
+        index($0, prefix) == 1 && $0 ~ ("^" prefix "[0-9]+$") { count++ }
+        END { print count + 0 }
+    '
+}
+
+# k3d can leave a "cluster" registered in metadata while every node is stopped (host reboot,
+# `docker stop`, OOM kill / exit 137). In that state nothing listens on the published API port and
+# both external and in-cluster kubectl fail until `k3d cluster start`.
+k3d_cluster_core_running() {
+    docker ps --format '{{.Names}}' 2>/dev/null | grep -Fxq "k3d-${CLUSTER_NAME}-server-0" \
+        && docker ps --format '{{.Names}}' 2>/dev/null | grep -Fxq "k3d-${CLUSTER_NAME}-serverlb"
+}
+
+ensure_k3d_cluster_running() {
+    if k3d_cluster_core_running; then
+        return 0
+    fi
+    echo "==> k3d cluster '$CLUSTER_NAME' exists but core containers are not running."
+    echo "==> Starting cluster (after reboot, manual stop, or node OOM, etc.)..."
+    k3d cluster start "$CLUSTER_NAME" --wait
+}
+
 CLUSTER_EXISTS=0
 if k3d cluster get "$CLUSTER_NAME" >/dev/null 2>&1; then
     CLUSTER_EXISTS=1
 fi
 
 remove_swarm_leftovers
+
+if ((CLUSTER_EXISTS == 1)); then
+    existing_server_count="$(count_cluster_role_nodes server)"
+    existing_agent_count="$(count_cluster_role_nodes agent)"
+    if ((existing_server_count != K3D_SERVER_COUNT || existing_agent_count != K3D_AGENT_COUNT)); then
+        echo "==> Existing k3d cluster '$CLUSTER_NAME' topology (${existing_server_count} servers, ${existing_agent_count} agents) does not match requested (${K3D_SERVER_COUNT} servers, ${K3D_AGENT_COUNT} agents)."
+        echo "==> Recreating cluster '$CLUSTER_NAME' to apply the new topology..."
+        k3d cluster delete "$CLUSTER_NAME"
+        CLUSTER_EXISTS=0
+    fi
+fi
 
 echo "==> Ensuring k3d cluster '$CLUSTER_NAME' exists (servers=${K3D_SERVER_COUNT}, agents=${K3D_AGENT_COUNT})..."
 if ((CLUSTER_EXISTS == 0)); then
@@ -173,6 +209,7 @@ if ((CLUSTER_EXISTS == 0)); then
         --volume "/var/run/docker.sock:/var/run/docker.sock@all"
 else
     echo "==> k3d cluster '$CLUSTER_NAME' already exists."
+    ensure_k3d_cluster_running
 fi
 
 write_host_kubeconfig() {
@@ -479,12 +516,30 @@ setup_external_kubectl() {
     server_url="$(kubectl --kubeconfig "$TEMP_KUBECONFIG" config view --minify -o jsonpath='{.clusters[0].cluster.server}')"
 
     # In dev containers k3d can emit 0.0.0.0:<api-port>, which is not a reachable destination.
-    if [[ "$server_url" =~ ^https://0\.0\.0\.0:([0-9]+)$ ]]; then
+    # Prefer a TCP-reachable host: 127.0.0.1 first (correct for --network=host devcontainers and
+    # host-native runs). host.docker.internal is needed for bridge-networked containers but can
+    # fail under host networking when it resolves to the bridge gateway instead of loopback.
+    if [[ -n "${ATLASNET_K3D_KUBE_API_SERVER:-}" ]]; then
+        echo "==> Rewriting kube API endpoint '$server_url' -> '${ATLASNET_K3D_KUBE_API_SERVER}' (ATLASNET_K3D_KUBE_API_SERVER)"
+        kubectl --kubeconfig "$TEMP_KUBECONFIG" config set-cluster "$cluster" --server "${ATLASNET_K3D_KUBE_API_SERVER}" >/dev/null
+    elif [[ "$server_url" =~ ^https://0\.0\.0\.0:([0-9]+)$ ]]; then
         local api_port api_host fixed_server
         api_port="${BASH_REMATCH[1]}"
-        api_host="127.0.0.1"
-        if getent hosts host.docker.internal >/dev/null 2>&1; then
-            api_host="host.docker.internal"
+        api_host=""
+        for candidate in "127.0.0.1" "host.docker.internal"; do
+            if [[ "$candidate" == "host.docker.internal" ]] && ! getent hosts host.docker.internal >/dev/null 2>&1; then
+                continue
+            fi
+            if external_endpoint_tcp_reachable "https://${candidate}:${api_port}"; then
+                api_host="$candidate"
+                break
+            fi
+        done
+        if [[ -z "$api_host" ]]; then
+            api_host="127.0.0.1"
+            if getent hosts host.docker.internal >/dev/null 2>&1; then
+                api_host="host.docker.internal"
+            fi
         fi
         fixed_server="https://${api_host}:${api_port}"
         echo "==> Rewriting kube API endpoint '$server_url' -> '$fixed_server'"
@@ -521,7 +576,14 @@ setup_incluster_kubectl() {
         return 1
     fi
 
-    KUBECTL=(docker exec -i "$server_node" kubectl --kubeconfig /etc/rancher/k3s/k3s.yaml)
+    if docker exec -i "$server_node" sh -c 'command -v kubectl >/dev/null 2>&1'; then
+        KUBECTL=(docker exec -i "$server_node" kubectl --kubeconfig /etc/rancher/k3s/k3s.yaml)
+    elif docker exec -i "$server_node" sh -c 'command -v k3s >/dev/null 2>&1'; then
+        KUBECTL=(docker exec -i "$server_node" k3s kubectl --kubeconfig /etc/rancher/k3s/k3s.yaml)
+    else
+        return 1
+    fi
+
     if ! "${KUBECTL[@]}" --request-timeout=3s get --raw=/readyz >/dev/null 2>&1; then
         return 1
     fi
@@ -534,6 +596,9 @@ setup_incluster_kubectl() {
 if ! setup_external_kubectl; then
     if ! setup_incluster_kubectl; then
         echo "Error: Kubernetes API for cluster '$CLUSTER_NAME' is not reachable via external or in-cluster kubectl." >&2
+        if ! k3d_cluster_core_running; then
+            echo "Hint: k3d nodes may be stopped (check: docker ps -a --filter name=k3d-${CLUSTER_NAME}). Try: k3d cluster start ${CLUSTER_NAME} --wait" >&2
+        fi
         if ! command -v kubectl >/dev/null 2>&1; then
             echo "Hint: install kubectl (devcontainer feature ghcr.io/devcontainers/features/kubectl-helm-minikube:1)." >&2
         fi
