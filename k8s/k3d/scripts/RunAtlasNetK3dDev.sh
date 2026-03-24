@@ -9,8 +9,8 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 K3D_DIR="$(cd "${SCRIPT_DIR}/.." && pwd)"
 REPO_ROOT="$(cd "${K3D_DIR}/../.." && pwd)"
 CHART_DIR="${REPO_ROOT}/k8s/charts/atlasnet"
-K3D_SERVER_COUNT="${ATLASNET_K3D_SERVERS:-1}"
-K3D_AGENT_COUNT="${ATLASNET_K3D_AGENTS:-2}"
+K3D_SERVER_COUNT="${ATLASNET_K3D_SERVERS:-3}"
+K3D_AGENT_COUNT="${ATLASNET_K3D_AGENTS:-0}"
 PORT_WAIT_TIMEOUT="${ATLASNET_K3D_PORT_WAIT_TIMEOUT:-15}"
 SERVER_NODE_NAME="${ATLASNET_SERVER_NODE_NAME:-k3d-${CLUSTER_NAME}-server-0}"
 SKIP_RESTART_ON_FRESH_CLUSTER="${ATLASNET_K3D_SKIP_RESTART_ON_FRESH_CLUSTER:-1}"
@@ -153,12 +153,31 @@ wait_for_ports_free() {
     exit 1
 }
 
+count_cluster_role_nodes() {
+    local role="$1"
+    docker ps -a --format '{{.Names}}' 2>/dev/null | awk -v prefix="k3d-${CLUSTER_NAME}-${role}-" '
+        index($0, prefix) == 1 && $0 ~ ("^" prefix "[0-9]+$") { count++ }
+        END { print count + 0 }
+    '
+}
+
 CLUSTER_EXISTS=0
 if k3d cluster get "$CLUSTER_NAME" >/dev/null 2>&1; then
     CLUSTER_EXISTS=1
 fi
 
 remove_swarm_leftovers
+
+if ((CLUSTER_EXISTS == 1)); then
+    existing_server_count="$(count_cluster_role_nodes server)"
+    existing_agent_count="$(count_cluster_role_nodes agent)"
+    if ((existing_server_count != K3D_SERVER_COUNT || existing_agent_count != K3D_AGENT_COUNT)); then
+        echo "==> Existing k3d cluster '$CLUSTER_NAME' topology (${existing_server_count} servers, ${existing_agent_count} agents) does not match requested (${K3D_SERVER_COUNT} servers, ${K3D_AGENT_COUNT} agents)."
+        echo "==> Recreating cluster '$CLUSTER_NAME' to apply the new topology..."
+        k3d cluster delete "$CLUSTER_NAME"
+        CLUSTER_EXISTS=0
+    fi
+fi
 
 echo "==> Ensuring k3d cluster '$CLUSTER_NAME' exists (servers=${K3D_SERVER_COUNT}, agents=${K3D_AGENT_COUNT})..."
 if ((CLUSTER_EXISTS == 0)); then
@@ -282,10 +301,6 @@ ensure_cartograph_port_forward() {
         echo "Warning: kubectl is not installed; skipping Cartograph loopback port-forward."
         return 0
     fi
-    if ! command -v python3 >/dev/null 2>&1; then
-        echo "Warning: python3 is not installed; skipping Cartograph loopback port-forward."
-        return 0
-    fi
     if [[ -z "${HOST_KUBECONFIG_PATH:-}" || ! -s "$HOST_KUBECONFIG_PATH" ]]; then
         echo "Warning: host kubeconfig is unavailable; skipping Cartograph loopback port-forward."
         return 0
@@ -305,41 +320,33 @@ ensure_cartograph_port_forward() {
 
     : >"$PORT_FORWARD_LOG_FILE"
     rm -f "$PORT_FORWARD_PID_FILE"
-    pf_pid="$(python3 - <<'PY' "$HOST_KUBECONFIG_PATH" "$NAMESPACE" "$ACTIVE_CARTOGRAPH_LOOPBACK_PORT" "$ACTIVE_CARTOGRAPH_INSPECT_PORT" "$PORT_FORWARD_LOG_FILE" "$PORT_FORWARD_PID_FILE"
-import subprocess
-import sys
+    (
+        child_pid=""
+        cleanup() {
+            if [[ -n "${child_pid:-}" ]] && kill -0 "$child_pid" >/dev/null 2>&1; then
+                kill "$child_pid" >/dev/null 2>&1 || true
+                wait "$child_pid" 2>/dev/null || true
+            fi
+            exit 0
+        }
+        trap cleanup INT TERM
 
-kubeconfig, namespace, http_port, inspect_port, log_path, pid_path = sys.argv[1:]
-
-with open(log_path, "ab", buffering=0) as log_fp, open("/dev/null", "rb", buffering=0) as devnull:
-    proc = subprocess.Popen(
-        [
-            "kubectl",
-            "--kubeconfig",
-            kubeconfig,
-            "-n",
-            namespace,
-            "port-forward",
-            "service/atlasnet-cartograph",
-            f"{http_port}:3000",
-            f"{inspect_port}:9229",
-        ],
-        stdin=devnull,
-        stdout=log_fp,
-        stderr=subprocess.STDOUT,
-        close_fds=True,
-        start_new_session=True,
-    )
-
-with open(pid_path, "w", encoding="utf-8") as pid_fp:
-    pid_fp.write(f"{proc.pid}\n")
-
-print(proc.pid)
-PY
-)" || {
-        echo "Error: failed to launch Cartograph loopback port-forward." >&2
-        return 1
-    }
+        while true; do
+            kubectl \
+                --kubeconfig "$HOST_KUBECONFIG_PATH" \
+                -n "$NAMESPACE" \
+                port-forward \
+                service/atlasnet-cartograph \
+                "${ACTIVE_CARTOGRAPH_LOOPBACK_PORT}:3000" \
+                "${ACTIVE_CARTOGRAPH_INSPECT_PORT}:9229" &
+            child_pid=$!
+            wait "$child_pid" || true
+            child_pid=""
+            sleep 1
+        done
+    ) >>"$PORT_FORWARD_LOG_FILE" 2>&1 &
+    pf_pid="$!"
+    printf '%s\n' "$pf_pid" >"$PORT_FORWARD_PID_FILE"
 
     for _attempt in {1..50}; do
         if port_in_use "$ACTIVE_CARTOGRAPH_LOOPBACK_PORT" && port_in_use "$ACTIVE_CARTOGRAPH_INSPECT_PORT"; then
@@ -767,7 +774,7 @@ else
 fi
 # Migration cleanup: workloads moved kinds across revisions.
 kctl -n "$NAMESPACE" delete daemonset atlasnet-watchdog --ignore-not-found >/dev/null || true
-kctl -n "$NAMESPACE" delete deployment atlasnet-cartograph --ignore-not-found >/dev/null || true
+kctl -n "$NAMESPACE" delete daemonset atlasnet-cartograph --ignore-not-found >/dev/null || true
 kctl -n "$NAMESPACE" delete deployment atlasnet-proxy --ignore-not-found >/dev/null || true
 # Shard deployment is declared with replicas=0 and is expected to be scaled by Watchdog.
 # On a fresh cluster, initial apply already starts the latest pods; skip extra rollout restarts by default.
