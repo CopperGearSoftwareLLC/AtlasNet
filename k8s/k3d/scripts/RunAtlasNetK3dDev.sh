@@ -15,6 +15,8 @@ PORT_WAIT_TIMEOUT="${ATLASNET_K3D_PORT_WAIT_TIMEOUT:-15}"
 SERVER_NODE_NAME="${ATLASNET_SERVER_NODE_NAME:-k3d-${CLUSTER_NAME}-server-0}"
 SKIP_RESTART_ON_FRESH_CLUSTER="${ATLASNET_K3D_SKIP_RESTART_ON_FRESH_CLUSTER:-1}"
 CORE_ROLLOUT_MODE="${ATLASNET_K3D_CORE_ROLLOUT_MODE:-parallel}"
+CORE_ROLLOUT_TIMEOUT="${ATLASNET_K3D_CORE_ROLLOUT_TIMEOUT:-180s}"
+INTERNALDB_ROLLOUT_TIMEOUT="${ATLASNET_K3D_INTERNALDB_ROLLOUT_TIMEOUT:-420s}"
 WAIT_FOR_SHARD_READY="${ATLASNET_K3D_WAIT_FOR_SHARD_READY:-1}"
 IMAGE_PULL_POLICY="${ATLASNET_IMAGE_PULL_POLICY:-IfNotPresent}"
 WATCHDOG_IMAGE_NAME="${ATLASNET_WATCHDOG_IMAGE:-watchdog:latest}"
@@ -26,6 +28,9 @@ CARTOGRAPH_LOOPBACK_PORT="${ATLASNET_K3D_CARTOGRAPH_LOOPBACK_PORT:-3000}"
 CARTOGRAPH_LOOPBACK_PORT_FALLBACK="${ATLASNET_K3D_CARTOGRAPH_LOOPBACK_PORT_FALLBACK:-13000}"
 CARTOGRAPH_INSPECT_PORT="${ATLASNET_K3D_CARTOGRAPH_INSPECT_PORT:-9229}"
 CARTOGRAPH_INSPECT_PORT_FALLBACK="${ATLASNET_K3D_CARTOGRAPH_INSPECT_PORT_FALLBACK:-19229}"
+PROXY_STABLE_UUID="${ATLASNET_K3D_PROXY_STABLE_UUID:-8fd1f5e7-9865-4eb7-9a3b-bfd71a2c4140}"
+PROXY_PUBLIC_HOST="${ATLASNET_K3D_PROXY_PUBLIC_HOST:-127.0.0.1}"
+PROXY_PUBLIC_PORT="${ATLASNET_K3D_PROXY_PUBLIC_PORT:-2555}"
 HELM_RELEASE_NAME="${ATLASNET_HELM_RELEASE_NAME:-atlasnet}"
 LLM_IN_CLUSTER_ENABLED="${ATLASNET_K3D_LLM_IN_CLUSTER_ENABLED:-1}"
 LLM_IMAGE="${ATLASNET_K3D_LLM_IMAGE:-${ATLASNET_LLM_IMAGE:-ghcr.io/ggml-org/llama.cpp:server}}"
@@ -614,13 +619,27 @@ wait_for_app_rollout() {
     while IFS= read -r workload; do
         [[ -z "$workload" ]] && continue
         found=1
-        kctl -n "$NAMESPACE" rollout status "$workload" --timeout="$timeout"
+        if [[ "$workload" == statefulset/* ]]; then
+            kctl -n "$NAMESPACE" rollout status "$workload" --timeout="$timeout"
+            kctl -n "$NAMESPACE" wait --for=condition=Ready pod -l "app=${app}" --timeout=60s >/dev/null
+        else
+            kctl -n "$NAMESPACE" rollout status "$workload" --timeout="$timeout"
+        fi
     done < <(resolve_rollout_workloads "$app")
 
     if ((found == 0)); then
         echo "Error: no rollout workload found for app '$app' in namespace '$NAMESPACE'." >&2
         exit 1
     fi
+}
+
+print_app_debug() {
+    local app="$1"
+    echo "==> Debug for app '${app}' in namespace '${NAMESPACE}':" >&2
+    kctl -n "$NAMESPACE" get all -l "app=${app}" -o wide >&2 || true
+    kctl -n "$NAMESPACE" get pvc -l "app=${app}" >&2 || true
+    kctl -n "$NAMESPACE" describe pod -l "app=${app}" >&2 || true
+    kctl -n "$NAMESPACE" get events --sort-by='.lastTimestamp' 2>/dev/null | tail -n 40 >&2 || true
 }
 
 wait_for_apps_rollout_parallel() {
@@ -642,6 +661,7 @@ wait_for_apps_rollout_parallel() {
 
     for idx in "${!pids[@]}"; do
         if ! wait "${pids[$idx]}"; then
+            print_app_debug "${names[$idx]}"
             echo "Error: rollout wait failed for app '${names[$idx]}'." >&2
             exit 1
         fi
@@ -748,6 +768,9 @@ helm template "$HELM_RELEASE_NAME" "$CHART_DIR" \
     --set-string images.proxy="$PROXY_IMAGE_NAME" \
     --set-string images.shard="$SHARD_IMAGE_NAME" \
     --set-string images.cartograph="$CARTOGRAPH_IMAGE_NAME" \
+    --set-string proxy.stableId="$PROXY_STABLE_UUID" \
+    --set-string proxy.publicHost="$PROXY_PUBLIC_HOST" \
+    --set-string proxy.publicPort="$PROXY_PUBLIC_PORT" \
     --set-string cartograph.ingress.className="$CARTOGRAPH_INGRESS_CLASS_NAME" \
     --set-string cartograph.ingress.host="$CARTOGRAPH_INGRESS_HOST" \
     --set llm.enabled="$LLM_IN_CLUSTER_ENABLED" \
@@ -775,7 +798,7 @@ fi
 # Migration cleanup: workloads moved kinds across revisions.
 kctl -n "$NAMESPACE" delete daemonset atlasnet-watchdog --ignore-not-found >/dev/null || true
 kctl -n "$NAMESPACE" delete daemonset atlasnet-cartograph --ignore-not-found >/dev/null || true
-kctl -n "$NAMESPACE" delete deployment atlasnet-proxy --ignore-not-found >/dev/null || true
+kctl -n "$NAMESPACE" delete statefulset atlasnet-proxy --ignore-not-found >/dev/null || true
 # Shard deployment is declared with replicas=0 and is expected to be scaled by Watchdog.
 # On a fresh cluster, initial apply already starts the latest pods; skip extra rollout restarts by default.
 if ((CLUSTER_EXISTS == 0)) && [[ "$SKIP_RESTART_ON_FRESH_CLUSTER" == "1" ]]; then
@@ -788,16 +811,16 @@ else
 fi
 echo "==> Waiting for core workloads..."
 if [[ "$CORE_ROLLOUT_MODE" == "parallel" ]]; then
-    wait_for_apps_rollout_parallel "180s" \
-        "atlasnet-internaldb" \
+    wait_for_app_rollout "atlasnet-internaldb" "$INTERNALDB_ROLLOUT_TIMEOUT"
+    wait_for_apps_rollout_parallel "$CORE_ROLLOUT_TIMEOUT" \
         "atlasnet-watchdog" \
         "atlasnet-proxy" \
         "atlasnet-cartograph"
 else
-    wait_for_app_rollout "atlasnet-internaldb" "180s"
-    wait_for_app_rollout "atlasnet-watchdog" "180s"
-    wait_for_app_rollout "atlasnet-proxy" "180s"
-    wait_for_app_rollout "atlasnet-cartograph" "180s"
+    wait_for_app_rollout "atlasnet-internaldb" "$INTERNALDB_ROLLOUT_TIMEOUT"
+    wait_for_app_rollout "atlasnet-watchdog" "$CORE_ROLLOUT_TIMEOUT"
+    wait_for_app_rollout "atlasnet-proxy" "$CORE_ROLLOUT_TIMEOUT"
+    wait_for_app_rollout "atlasnet-cartograph" "$CORE_ROLLOUT_TIMEOUT"
 fi
 
 if [[ "$WAIT_FOR_SHARD_READY" == "1" ]]; then
@@ -841,5 +864,5 @@ echo "Cluster '$CLUSTER_NAME' is ready."
 echo "Cartograph: http://${CARTOGRAPH_INGRESS_HOST}"
 echo "Cartograph loopback: http://127.0.0.1:${ACTIVE_CARTOGRAPH_LOOPBACK_PORT}"
 echo "Cartograph inspect loopback: 127.0.0.1:${ACTIVE_CARTOGRAPH_INSPECT_PORT}"
-echo "Proxy UDP: 127.0.0.1:2555"
+echo "Proxy UDP: ${PROXY_PUBLIC_HOST}:${PROXY_PUBLIC_PORT}"
 echo "InternalDB: Cluster-internal service (internaldb:6379)"

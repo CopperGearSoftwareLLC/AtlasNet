@@ -5,6 +5,8 @@ import type { RecomputeSnapshotsResponse } from '../../shared/cartographTypes';
 const SNAPSHOT_KEY = 'Heuristic:RecomputeSnapshots';
 const LEGACY_SNAPSHOT_KEY = 'Heuristic:HotspotSnapshots';
 const CONNECT_TIMEOUT_MS = 700;
+const RETRY_BASE_DELAY_MS = 250;
+const RETRY_MAX_DELAY_MS = 2000;
 
 const EMPTY_RESPONSE: RecomputeSnapshotsResponse = {
   latestSnapshotId: 0,
@@ -20,7 +22,11 @@ function createInternalDbClient() {
     connectTimeout: CONNECT_TIMEOUT_MS,
     maxRetriesPerRequest: 0,
     enableOfflineQueue: false,
-    retryStrategy: null,
+    retryStrategy(times) {
+      const baseDelay = Number(process.env.REDIS_RETRY_BASE_DELAY_MS || RETRY_BASE_DELAY_MS);
+      const maxDelay = Number(process.env.REDIS_RETRY_MAX_DELAY_MS || RETRY_MAX_DELAY_MS);
+      return Math.min(baseDelay * Math.max(1, 2 ** (times - 1)), maxDelay);
+    },
   });
 }
 

@@ -9,6 +9,16 @@ images:
   cartograph: cartograph:latest
   internaldb: valkey/valkey-bundle:latest
 
+proxy:
+  stableId: 8fd1f5e7-9865-4eb7-9a3b-bfd71a2c4140
+  publicHost: 127.0.0.1
+  publicPort: 2555
+
+internaldb:
+  persistence:
+    size: 8Gi
+    storageClassName: ""
+
 cartograph:
   ingress:
     className: nginx

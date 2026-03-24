@@ -1,10 +1,15 @@
-{{- $serverNodeName := required "values.serverNodeName is required" .Values.serverNodeName -}}
+{{- $serverNodeName := default "" .Values.serverNodeName -}}
 {{- $imagePullPolicy := default "IfNotPresent" .Values.imagePullPolicy -}}
 {{- $watchdogImage := required "values.images.watchdog is required" .Values.images.watchdog -}}
 {{- $proxyImage := required "values.images.proxy is required" .Values.images.proxy -}}
 {{- $shardImage := required "values.images.shard is required" .Values.images.shard -}}
 {{- $cartographImage := required "values.images.cartograph is required" .Values.images.cartograph -}}
 {{- $internaldbImage := required "values.images.internaldb is required" .Values.images.internaldb -}}
+{{- $proxyStableId := default "8fd1f5e7-9865-4eb7-9a3b-bfd71a2c4140" .Values.proxy.stableId -}}
+{{- $proxyPublicHost := default "127.0.0.1" .Values.proxy.publicHost -}}
+{{- $proxyPublicPort := int (default 2555 .Values.proxy.publicPort) -}}
+{{- $internaldbStorageSize := default "8Gi" .Values.internaldb.persistence.size -}}
+{{- $internaldbStorageClassName := default "" .Values.internaldb.persistence.storageClassName -}}
 {{- $llmEnabled := default false .Values.llm.enabled -}}
 {{- $llmImage := default "ghcr.io/ggml-org/llama.cpp:server" .Values.llm.image -}}
 {{- $llmServicePort := int (default 8080 .Values.llm.servicePort) -}}
@@ -127,6 +132,7 @@ metadata:
   labels:
     app: atlasnet-watchdog
     atlasnet.role: watchdog
+    atlasnet.singleton-service: "true"
 spec:
   replicas: 1
   strategy:
@@ -139,6 +145,7 @@ spec:
       labels:
         app: atlasnet-watchdog
         atlasnet.role: watchdog
+        atlasnet.singleton-service: "true"
     spec:
       serviceAccountName: atlasnet-watchdog
       affinity:
@@ -151,11 +158,14 @@ spec:
               - matchExpressions:
                   - key: node-role.kubernetes.io/master
                     operator: Exists
-              - matchExpressions:
-                  - key: kubernetes.io/hostname
-                    operator: In
-                    values:
-                      - {{ $serverNodeName | quote }}
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+            - weight: 100
+              podAffinityTerm:
+                topologyKey: kubernetes.io/hostname
+                labelSelector:
+                  matchLabels:
+                    atlasnet.singleton-service: "true"
       tolerations:
         - key: node-role.kubernetes.io/control-plane
           operator: Exists
@@ -219,6 +229,15 @@ spec:
         atlasnet.role: shard
     spec:
       affinity:
+        nodeAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            nodeSelectorTerms:
+              - matchExpressions:
+                  - key: node-role.kubernetes.io/control-plane
+                    operator: Exists
+              - matchExpressions:
+                  - key: node-role.kubernetes.io/master
+                    operator: Exists
         podAntiAffinity:
           preferredDuringSchedulingIgnoredDuringExecution:
             - weight: 100
@@ -227,6 +246,13 @@ spec:
                 labelSelector:
                   matchLabels:
                     app: atlasnet-shard
+      tolerations:
+        - key: node-role.kubernetes.io/control-plane
+          operator: Exists
+          effect: NoSchedule
+        - key: node-role.kubernetes.io/master
+          operator: Exists
+          effect: NoSchedule
       topologySpreadConstraints:
         - maxSkew: 1
           topologyKey: kubernetes.io/hostname
@@ -260,17 +286,32 @@ spec:
               containerPort: 25555
               protocol: UDP
 ---
+apiVersion: v1
+kind: Service
+metadata:
+  name: atlasnet-internaldb-headless
+  namespace: {{ .Release.Namespace }}
+spec:
+  clusterIP: None
+  selector:
+    app: atlasnet-internaldb
+  ports:
+    - name: redis
+      protocol: TCP
+      port: 6379
+      targetPort: redis
+---
 apiVersion: apps/v1
-kind: Deployment
+kind: StatefulSet
 metadata:
   name: atlasnet-internaldb
   namespace: {{ .Release.Namespace }}
   labels:
     app: atlasnet-internaldb
+    atlasnet.singleton-service: "true"
 spec:
+  serviceName: atlasnet-internaldb-headless
   replicas: 1
-  strategy:
-    type: Recreate
   selector:
     matchLabels:
       app: atlasnet-internaldb
@@ -278,7 +319,33 @@ spec:
     metadata:
       labels:
         app: atlasnet-internaldb
+        atlasnet.singleton-service: "true"
     spec:
+      affinity:
+        nodeAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            nodeSelectorTerms:
+              - matchExpressions:
+                  - key: node-role.kubernetes.io/control-plane
+                    operator: Exists
+              - matchExpressions:
+                  - key: node-role.kubernetes.io/master
+                    operator: Exists
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+            - weight: 100
+              podAffinityTerm:
+                topologyKey: kubernetes.io/hostname
+                labelSelector:
+                  matchLabels:
+                    atlasnet.singleton-service: "true"
+      tolerations:
+        - key: node-role.kubernetes.io/control-plane
+          operator: Exists
+          effect: NoSchedule
+        - key: node-role.kubernetes.io/master
+          operator: Exists
+          effect: NoSchedule
       containers:
         - name: internaldb
           image: {{ $internaldbImage | quote }}
@@ -287,6 +354,8 @@ spec:
             - valkey-server
             - --appendonly
             - "yes"
+            - --dir
+            - /data
             - --port
             - "6379"
             - --loadmodule
@@ -297,6 +366,39 @@ spec:
             - name: redis
               containerPort: 6379
               protocol: TCP
+          readinessProbe:
+            exec:
+              command:
+                - valkey-cli
+                - -p
+                - "6379"
+                - ping
+            initialDelaySeconds: 2
+            periodSeconds: 5
+          livenessProbe:
+            exec:
+              command:
+                - valkey-cli
+                - -p
+                - "6379"
+                - ping
+            initialDelaySeconds: 10
+            periodSeconds: 10
+          volumeMounts:
+            - name: internaldb-data
+              mountPath: /data
+  volumeClaimTemplates:
+    - metadata:
+        name: internaldb-data
+      spec:
+        accessModes:
+          - ReadWriteOnce
+        {{- if $internaldbStorageClassName }}
+        storageClassName: {{ $internaldbStorageClassName | quote }}
+        {{- end }}
+        resources:
+          requests:
+            storage: {{ $internaldbStorageSize | quote }}
 ---
 apiVersion: v1
 kind: Service
@@ -335,6 +437,7 @@ metadata:
   namespace: {{ .Release.Namespace }}
   labels:
     app: atlasnet-cartograph
+    atlasnet.singleton-service: "true"
 spec:
   replicas: 1
   strategy:
@@ -346,6 +449,7 @@ spec:
     metadata:
       labels:
         app: atlasnet-cartograph
+        atlasnet.singleton-service: "true"
     spec:
       serviceAccountName: atlasnet-cartograph
       affinity:
@@ -358,11 +462,14 @@ spec:
               - matchExpressions:
                   - key: node-role.kubernetes.io/master
                     operator: Exists
-              - matchExpressions:
-                  - key: kubernetes.io/hostname
-                    operator: In
-                    values:
-                      - {{ $serverNodeName | quote }}
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+            - weight: 100
+              podAffinityTerm:
+                topologyKey: kubernetes.io/hostname
+                labelSelector:
+                  matchLabels:
+                    atlasnet.singleton-service: "true"
       tolerations:
         - key: node-role.kubernetes.io/control-plane
           operator: Exists
@@ -374,6 +481,10 @@ spec:
         - name: cartograph
           image: {{ $cartographImage | quote }}
           imagePullPolicy: {{ $imagePullPolicy | quote }}
+          command:
+            - sh
+            - -c
+            - exec npm run start:all
           env:
             - name: POD_NAMESPACE
               valueFrom:
@@ -387,6 +498,10 @@ spec:
               value: internaldb
             - name: INTERNAL_REDIS_PORT
               value: "6379"
+            - name: REDIS_RETRY_BASE_DELAY_MS
+              value: "250"
+            - name: REDIS_RETRY_MAX_DELAY_MS
+              value: "2000"
           ports:
             - name: http
               containerPort: 3000
@@ -394,6 +509,23 @@ spec:
             - name: inspect
               containerPort: 9229
               protocol: TCP
+          startupProbe:
+            httpGet:
+              path: /
+              port: http
+            failureThreshold: 60
+            periodSeconds: 5
+          readinessProbe:
+            httpGet:
+              path: /
+              port: http
+            periodSeconds: 5
+          livenessProbe:
+            httpGet:
+              path: /
+              port: http
+            initialDelaySeconds: 20
+            periodSeconds: 10
 ---
 apiVersion: v1
 kind: Service
@@ -435,17 +567,17 @@ spec:
                   number: 3000
 ---
 apiVersion: apps/v1
-kind: StatefulSet
+kind: Deployment
 metadata:
   name: atlasnet-proxy
   namespace: {{ .Release.Namespace }}
   labels:
     app: atlasnet-proxy
+    atlasnet.singleton-service: "true"
 spec:
-  serviceName: atlasnet-proxy-headless
   replicas: 1
-  updateStrategy:
-    type: RollingUpdate
+  strategy:
+    type: Recreate
   selector:
     matchLabels:
       app: atlasnet-proxy
@@ -453,27 +585,31 @@ spec:
     metadata:
       labels:
         app: atlasnet-proxy
+        atlasnet.singleton-service: "true"
     spec:
       affinity:
         nodeAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            nodeSelectorTerms:
+              - matchExpressions:
+                  - key: node-role.kubernetes.io/control-plane
+                    operator: Exists
+              - matchExpressions:
+                  - key: node-role.kubernetes.io/master
+                    operator: Exists
+        podAntiAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            - topologyKey: kubernetes.io/hostname
+              labelSelector:
+                matchLabels:
+                  app: atlasnet-internaldb
           preferredDuringSchedulingIgnoredDuringExecution:
             - weight: 100
-              preference:
-                matchExpressions:
-                  - key: node-role.kubernetes.io/control-plane
-                    operator: DoesNotExist
-            - weight: 100
-              preference:
-                matchExpressions:
-                  - key: node-role.kubernetes.io/master
-                    operator: DoesNotExist
-            - weight: 50
-              preference:
-                matchExpressions:
-                  - key: kubernetes.io/hostname
-                    operator: NotIn
-                    values:
-                      - {{ $serverNodeName | quote }}
+              podAffinityTerm:
+                topologyKey: kubernetes.io/hostname
+                labelSelector:
+                  matchLabels:
+                    atlasnet.singleton-service: "true"
       tolerations:
         - key: node-role.kubernetes.io/control-plane
           operator: Exists
@@ -488,10 +624,16 @@ spec:
           env:
             - name: HANDSHAKE_SERVICE_ENABLE
               value: "1"
+            - name: ATLASNET_PROXY_STABLE_UUID
+              value: {{ $proxyStableId | quote }}
             - name: POD_IP
               valueFrom:
                 fieldRef:
                   fieldPath: status.podIP
+            - name: INTERLINK_PUBLIC_IP
+              value: {{ $proxyPublicHost | quote }}
+            - name: INTERLINK_PUBLIC_PORT
+              value: {{ printf "%d" $proxyPublicPort | quote }}
             - name: INTERNAL_REDIS_SERVICE_NAME
               value: internaldb
             - name: INTERNAL_REDIS_PORT
@@ -566,6 +708,7 @@ metadata:
   labels:
     app: atlasnet-llm
     atlasnet.role: llm
+    atlasnet.singleton-service: "true"
 spec:
   replicas: 1
   strategy:
@@ -578,7 +721,33 @@ spec:
       labels:
         app: atlasnet-llm
         atlasnet.role: llm
+        atlasnet.singleton-service: "true"
     spec:
+      affinity:
+        nodeAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            nodeSelectorTerms:
+              - matchExpressions:
+                  - key: node-role.kubernetes.io/control-plane
+                    operator: Exists
+              - matchExpressions:
+                  - key: node-role.kubernetes.io/master
+                    operator: Exists
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+            - weight: 100
+              podAffinityTerm:
+                topologyKey: kubernetes.io/hostname
+                labelSelector:
+                  matchLabels:
+                    atlasnet.singleton-service: "true"
+      tolerations:
+        - key: node-role.kubernetes.io/control-plane
+          operator: Exists
+          effect: NoSchedule
+        - key: node-role.kubernetes.io/master
+          operator: Exists
+          effect: NoSchedule
       initContainers:
         - name: model-download
           image: curlimages/curl:8.12.1

@@ -4,6 +4,8 @@ const SNAPSHOT_CONNECT_TIMEOUT_MS = 700;
 const MAX_PAYLOAD_CHARS = 32 * 1024;
 const MAX_KEYS_PER_DB = 2000;
 const SCAN_COUNT = 200;
+const REDIS_RETRY_BASE_DELAY_MS = 250;
+const REDIS_RETRY_MAX_DELAY_MS = 2000;
 
 function getDatabaseTargets() {
   return [
@@ -22,6 +24,23 @@ function getDatabaseTargets() {
   ];
 }
 
+function createRedisConnectionOptions(target, connectTimeout) {
+  return {
+    host: target.host,
+    port: target.port,
+    lazyConnect: true,
+    connectTimeout,
+    maxRetriesPerRequest: 0,
+    enableOfflineQueue: false,
+    retryStrategy(times) {
+      const baseDelay = Number(process.env.REDIS_RETRY_BASE_DELAY_MS || REDIS_RETRY_BASE_DELAY_MS);
+      const maxDelay = Number(process.env.REDIS_RETRY_MAX_DELAY_MS || REDIS_RETRY_MAX_DELAY_MS);
+      const nextDelay = baseDelay * Math.max(1, 2 ** (times - 1));
+      return Math.min(nextDelay, maxDelay);
+    },
+  };
+}
+
 module.exports = {
   DEFAULT_PORT,
   PROBE_CONNECT_TIMEOUT_MS,
@@ -29,5 +48,8 @@ module.exports = {
   MAX_PAYLOAD_CHARS,
   MAX_KEYS_PER_DB,
   SCAN_COUNT,
+  REDIS_RETRY_BASE_DELAY_MS,
+  REDIS_RETRY_MAX_DELAY_MS,
+  createRedisConnectionOptions,
   getDatabaseTargets,
 };

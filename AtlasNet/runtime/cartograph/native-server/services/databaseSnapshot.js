@@ -5,6 +5,7 @@ const {
   SCAN_COUNT,
   PROBE_CONNECT_TIMEOUT_MS,
   SNAPSHOT_CONNECT_TIMEOUT_MS,
+  createRedisConnectionOptions,
 } = require('../config');
 const {
   decodeRedisDisplayValue,
@@ -46,15 +47,7 @@ function formatZSetPayload(valuesWithScores) {
 }
 
 function createRedisClient(target, connectTimeout) {
-  return new Redis({
-    host: target.host,
-    port: target.port,
-    lazyConnect: true,
-    connectTimeout,
-    maxRetriesPerRequest: 0,
-    enableOfflineQueue: false,
-    retryStrategy: null,
-  });
+  return new Redis(createRedisConnectionOptions(target, connectTimeout));
 }
 
 function toFiniteNumber(value, fallback) {

@@ -200,31 +200,44 @@ void HeuristicService::HeuristicThreadLoop(std::stop_token st)
 	auto nextIntervalComputeAt = steady_clock::now();
 	while (!st.stop_requested())
 	{
-		const RecomputeMode mode = ResolveRecomputeMode();
-		const milliseconds interval = ResolveRecomputeInterval();
-		const auto now = steady_clock::now();
-
-		switch (mode)
+		try
 		{
-			case RecomputeMode::eInterval:
-				if (now >= nextIntervalComputeAt)
-				{
-					logger.DebugFormatted("Computing Heuristic (interval mode)");
-					ComputeHeuristic();
+			const RecomputeMode mode = ResolveRecomputeMode();
+			const milliseconds interval = ResolveRecomputeInterval();
+			const auto now = steady_clock::now();
+
+			switch (mode)
+			{
+				case RecomputeMode::eInterval:
+					if (now >= nextIntervalComputeAt)
+					{
+						logger.DebugFormatted("Computing Heuristic (interval mode)");
+						ComputeHeuristic();
+						nextIntervalComputeAt = steady_clock::now() + interval;
+					}
+					break;
+				case RecomputeMode::eManual:
 					nextIntervalComputeAt = steady_clock::now() + interval;
-				}
-				break;
-			case RecomputeMode::eManual:
-				nextIntervalComputeAt = steady_clock::now() + interval;
-				if (ConsumeManualRecomputeRequest())
-				{
-					logger.DebugFormatted("Computing Heuristic (manual mode)");
-					ComputeHeuristic();
-				}
-				break;
-			case RecomputeMode::eLoad:
-				nextIntervalComputeAt = steady_clock::now() + interval;
-				break;
+					if (ConsumeManualRecomputeRequest())
+					{
+						logger.DebugFormatted("Computing Heuristic (manual mode)");
+						ComputeHeuristic();
+					}
+					break;
+				case RecomputeMode::eLoad:
+					nextIntervalComputeAt = steady_clock::now() + interval;
+					break;
+			}
+		}
+		catch (const std::exception& ex)
+		{
+			logger.ErrorFormatted("Heuristic control loop failed: {}", ex.what());
+			nextIntervalComputeAt = steady_clock::now() + seconds(1);
+		}
+		catch (...)
+		{
+			logger.Error("Heuristic control loop failed with unknown exception.");
+			nextIntervalComputeAt = steady_clock::now() + seconds(1);
 		}
 
 		std::this_thread::sleep_for(kControlLoopSleep);

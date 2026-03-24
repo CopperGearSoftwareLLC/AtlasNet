@@ -7,6 +7,8 @@ const RECOMPUTE_MODE_KEY = 'Heuristic:RecomputeMode';
 const RECOMPUTE_INTERVAL_MS_KEY = 'Heuristic:RecomputeIntervalMs';
 const RECOMPUTE_REQUEST_KEY = 'Heuristic:RecomputeRequest';
 const CONNECT_TIMEOUT_MS = 700;
+const RETRY_BASE_DELAY_MS = 250;
+const RETRY_MAX_DELAY_MS = 2000;
 const DEFAULT_RECOMPUTE_INTERVAL_MS = 5000;
 const ALLOWED_TYPES = new Set([
   'GridCell',
@@ -25,7 +27,11 @@ function createInternalDbClient() {
     connectTimeout: CONNECT_TIMEOUT_MS,
     maxRetriesPerRequest: 0,
     enableOfflineQueue: false,
-    retryStrategy: null,
+    retryStrategy(times) {
+      const baseDelay = Number(process.env.REDIS_RETRY_BASE_DELAY_MS || RETRY_BASE_DELAY_MS);
+      const maxDelay = Number(process.env.REDIS_RETRY_MAX_DELAY_MS || RETRY_MAX_DELAY_MS);
+      return Math.min(baseDelay * Math.max(1, 2 ** (times - 1)), maxDelay);
+    },
   });
 }
 

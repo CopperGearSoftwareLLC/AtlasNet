@@ -3,11 +3,14 @@
 #include <steam/isteamnetworkingsockets.h>
 #include <steam/steamnetworkingtypes.h>
 
+#include <atomic>
 #include <condition_variable>
 #include <iostream>
 #include <mutex>
+#include <optional>
 #include <thread>
 
+#include "Client/Client.hpp"
 #include "Debug/Log.hpp"
 #include "Global/Misc/Singleton.hpp"
 #include "Network/Connection.hpp"
@@ -36,8 +39,12 @@ class ClientLink : public Singleton<ClientLink>
 	void SendMessage(const std::shared_ptr<IPacket>& packet, NetworkMessageSendFlag sendFlag);
 
    private:
+	void ApplyClientIdentity(const ClientID& clientID);
+	void BeginConnectAttempt(const IPAddress& address);
 	void OnConnected(SteamNetConnectionStatusChangedCallback_t* pInfo);
 	void Update();
+	void RemoveConnection(HSteamNetConnection connection);
+	void ScheduleReconnect();
 
 	void InitGNS();
 
@@ -55,6 +62,9 @@ class ClientLink : public Singleton<ClientLink>
 	std::mutex mutex;
 	std::condition_variable connectedCV;
 	bool ConnectedToAtlasNet = false;
+	bool ConnectAttemptFinished = false;
+	std::atomic_bool ConnectLoopActive = false;
+	std::optional<IPAddress> LastKnownAddress;
 
 	struct IndexByState
 	{

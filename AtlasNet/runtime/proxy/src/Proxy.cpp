@@ -1,5 +1,6 @@
 #include "Proxy.hpp"
 
+#include <cstdlib>
 #include <thread>
 
 #include "Command/CommandRouter.hpp"
@@ -10,6 +11,27 @@
 #include "Interlink/Interlink.hpp"
 #include "Interlink/Telemetry/NetworkManifest.hpp"
 #include "Network/NetworkCredentials.hpp"
+
+namespace
+{
+UUID ResolveProxyIdentity()
+{
+	if (const char* stableIdText = std::getenv("ATLASNET_PROXY_STABLE_UUID");
+		stableIdText != nullptr && stableIdText[0] != '\0')
+	{
+		try
+		{
+			return UUIDGen::FromString(stableIdText);
+		}
+		catch (const std::exception&)
+		{
+		}
+	}
+
+	return UUIDGen::Gen();
+}
+}  // namespace
+
 void Proxy::Run()
 {
 	logger->Debug("Init");	// hello
@@ -30,7 +52,7 @@ void Proxy::Run()
 void Proxy::Init()
 {
 	CrashHandler::Get().Init();
-	NetworkCredentials::Make(NetworkIdentity(NetworkIdentityType::eProxy, UUIDGen::Gen()));
+	NetworkCredentials::Make(NetworkIdentity(NetworkIdentityType::eProxy, ResolveProxyIdentity()));
 
 	Interlink::Get().Init();
 	CommandRouter::Ensure();

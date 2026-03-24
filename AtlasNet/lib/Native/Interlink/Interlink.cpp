@@ -61,6 +61,8 @@ static void SteamNetConnectionStatusChanged(SteamNetConnectionStatusChangedCallb
 
 namespace
 {
+constexpr auto kInterlinkReconnectDelay = std::chrono::seconds(1);
+
 std::optional<std::string> GetNonEmptyEnv(const char* key)
 {
 	const char* value = std::getenv(key);
@@ -250,7 +252,10 @@ void Interlink::SendMessage(const NetworkIdentity &who, const std::shared_ptr<IP
 	{
 		logger.DebugFormatted("Connection to \"{}\" was not established, connecting...",
 							  who.ToString());
-		EstablishConnectionTo(who);
+		if (!EstablishConnectionTo(who))
+		{
+			ScheduleReconnectTo(who);
+		}
 		QueueMessageOnConnect();
 		return;
 	}
@@ -275,7 +280,10 @@ void Interlink::SendMessage(const NetworkIdentity &who, const std::shared_ptr<IP
 	{
 		// race: connection disappeared after earlier check; queue and attempt reconnect
 		logger.DebugFormatted("Connection {} disappeared, queuing", who.ToString());
-		EstablishConnectionTo(who);
+		if (!EstablishConnectionTo(who))
+		{
+			ScheduleReconnectTo(who);
+		}
 		QueueMessageOnConnect();
 		return;
 	}
@@ -293,7 +301,10 @@ void Interlink::SendMessage(const NetworkIdentity &who, const std::shared_ptr<IP
 		{
 			logger.DebugFormatted("Connection to {} state is {} , connecting...", who.ToString(),
 								  boost::describe::enum_to_string(state, "unknown"));
-			EstablishConnectionTo(who);
+			if (!EstablishConnectionTo(who))
+			{
+				ScheduleReconnectTo(who);
+			}
 			QueueMessageOnConnect();
 			return;
 		}
@@ -373,6 +384,46 @@ void Interlink::GenerateNewConnections()
 					networkInterface->CloseConnection(conn, 0, "Stale after connect", false);
 				}
 			});
+	}
+}
+
+void Interlink::ScheduleReconnectTo(const NetworkIdentity& id, std::chrono::milliseconds delay)
+{
+	if (!id.IsInternal() || id == NetworkCredentials::Get().GetID())
+	{
+		return;
+	}
+
+	const auto retryAt = std::chrono::steady_clock::now() + delay;
+	_WriteLock([&]() { ReconnectAfter[id] = retryAt; });
+}
+
+void Interlink::MaintainScheduledConnections()
+{
+	std::vector<NetworkIdentity> dueTargets;
+	const auto now = std::chrono::steady_clock::now();
+
+	_WriteLock(
+		[&]()
+		{
+			for (auto it = ReconnectAfter.begin(); it != ReconnectAfter.end();)
+			{
+				if (it->second > now)
+				{
+					++it;
+					continue;
+				}
+				dueTargets.push_back(it->first);
+				it = ReconnectAfter.erase(it);
+			}
+		});
+
+	for (const auto& id : dueTargets)
+	{
+		if (!EstablishConnectionTo(id))
+		{
+			ScheduleReconnectTo(id, kInterlinkReconnectDelay);
+		}
 	}
 }
 
@@ -482,11 +533,17 @@ void Interlink::CallbackOnClosedByPear(SteamCBInfo info)
 											  "Connection closed by peer. aka you", true);
 			bySteam.erase(it);
 		});
+	if (closedID.IsInternal() && closedID != NetworkCredentials::Get().GetID())
+	{
+		ScheduleReconnectTo(closedID);
+	}
 }
 
 void Interlink::CallbackOnProblemDetectedLocally(SteamCBInfo info)
 {
 	auto &bySteam = Connections.get<IndexByHSteamNetConnection>();
+	NetworkIdentity closedID;
+	bool shouldReconnect = false;
 
 	bool exists = _ReadLock([&]() { return bySteam.find(info->m_hConn) != bySteam.end(); });
 	if (!exists)
@@ -501,12 +558,18 @@ void Interlink::CallbackOnProblemDetectedLocally(SteamCBInfo info)
 			auto it = bySteam.find(info->m_hConn);
 			if (it != bySteam.end())
 			{
-				NetworkIdentity closedID = it->target;
+				closedID = it->target;
 				logger.DebugFormatted("Connection problem detected locally for: {}",
 									  closedID.ToString());
+				shouldReconnect = closedID.IsInternal() &&
+								  closedID != NetworkCredentials::Get().GetID();
 				bySteam.erase(it);
 			}
 		});
+	if (shouldReconnect)
+	{
+		ScheduleReconnectTo(closedID);
+	}
 }
 
 void Interlink::CallbackOnConnected(SteamCBInfo info)
@@ -566,6 +629,7 @@ void Interlink::CallbackOnConnected(SteamCBInfo info)
 				target = v->target;
 				isInternal = v->IsInternal();
 			}
+			ReconnectAfter.erase(target);
 		});
 
 	// assign to pollgroup (call outside locks)
@@ -828,19 +892,19 @@ void Interlink::Init()
 	{
 		case NetworkIdentityType::eShard:
 		{
-			EstablishConnectionTo(NetworkIdentity::MakeIDWatchDog());
+			ScheduleReconnectTo(NetworkIdentity::MakeIDWatchDog(), std::chrono::milliseconds(0));
 		}
 		break;
 
 		case NetworkIdentityType::eProxy:
 		{
-			EstablishConnectionTo(NetworkIdentity::MakeIDWatchDog());
+			ScheduleReconnectTo(NetworkIdentity::MakeIDWatchDog(), std::chrono::milliseconds(0));
 		}
 		break;
 
 		case NetworkIdentityType::eCartograph:
 		{
-			EstablishConnectionTo(NetworkIdentity::MakeIDWatchDog());
+			ScheduleReconnectTo(NetworkIdentity::MakeIDWatchDog(), std::chrono::milliseconds(0));
 		}
 		break;
 		case NetworkIdentityType::eWatchDog:
@@ -949,26 +1013,10 @@ bool Interlink::EstablishConnectionTo(const NetworkIdentity &id)
 	{
 		auto IP = ServerRegistry::Get().GetIPOfID(id);
 
-		for (int i = 0; i < 5 && !IP.has_value(); i++)
-		{
-			logger.ErrorFormatted(
-				"IP not found for {} in Server Registry. Trying again in 1 second", id.ToString());
-			std::this_thread::sleep_for(std::chrono::seconds(1));
-			IP = ServerRegistry::Get().GetIPOfID(id);
-		}
-
 		if (!IP.has_value())
 		{
-			logger.ErrorFormatted(
-				"Failed to establish connection after 5 tries. IP not found in Server Registry {}",
-				id.ToString());
-			logger.DebugFormatted("All entries in Server Registry:");
-			for (const auto &[SID, Entry] : ServerRegistry::Get().GetServers())
-			{
-				logger.DebugFormatted(" - {} at {}", Entry.identifier.ToString(),
-									  Entry.address.ToString());
-			}
-
+			logger.DebugFormatted("IP not yet found for {} in Server Registry. Will retry.",
+								  id.ToString());
 			return false;
 		}
 
@@ -978,6 +1026,7 @@ bool Interlink::EstablishConnectionTo(const NetworkIdentity &id)
 		conn.SetNewState(ConnectionState::ePreConnecting);
 
 		_WriteLock([&]() { Connections.insert(conn); });
+		_WriteLock([&]() { ReconnectAfter.erase(id); });
 
 		logger.DebugFormatted("Establishing internal connection to {}", id.ToString());
 		return true;
@@ -1041,6 +1090,7 @@ void Interlink::DebugPrint()
 
 void Interlink::Tick()
 {
+	MaintainScheduledConnections();
 	GenerateNewConnections();
 	ReceiveMessages();
 	networkInterface->RunCallbacks();  // process events
@@ -1132,6 +1182,30 @@ void Interlink::OnClientConnected(const Connection &c)
 		GlobalEvents::Get().Dispatch(cce);
 
 		HandshakeService::Get().OnClientConnect(client);
+	}
+	else
+	{
+		Client client;
+		client.ID = c.target.ID;
+		client.ip = c.address;
+		ClientManifest::Get().InsertClient(client);
+
+		const bool hasExistingSession =
+			ClientManifest::Get().GetClientEntityID(client.ID).has_value() &&
+			ClientManifest::Get().GetClientShard(client.ID).has_value();
+		if (hasExistingSession)
+		{
+			ClientManifest::Get().AssignProxyClient(client.ID, NetworkCredentials::Get().GetID());
+			logger.DebugFormatted("Resumed existing client session for {}",
+								  UUIDGen::ToString(client.ID));
+		}
+		else
+		{
+			logger.DebugFormatted(
+				"Client {} reconnected without persisted routing state; falling back to handshake",
+				UUIDGen::ToString(client.ID));
+			HandshakeService::Get().OnClientConnect(client);
+		}
 	}
 }
 void Interlink::CloseAllConnections(int reason) {}

@@ -16,6 +16,13 @@ cmake --build build --target sandbox_atlasnet_run_k3d
 cmake --build build --target sandbox_atlasnet_run_k3d_fast
 ```
 
+HA validation:
+```bash
+k8s/k3d/scripts/ValidateAtlasNetK3dHA.sh
+```
+
+Details: `k8s/k3d/HA_VALIDATION.md`
+
 ### Remote/homelab cluster (k3s)
 From `k8s/k3s`:
 ```bash

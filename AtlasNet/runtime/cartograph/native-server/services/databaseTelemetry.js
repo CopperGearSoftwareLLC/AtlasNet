@@ -2,7 +2,11 @@ const Redis = require('ioredis');
 const { formatUuid } = require('./serializedDecoders/format');
 const { readHashPairsRaw } = require('./serializedDecoders/rawRedisReads');
 const { buildNetworkTelemetry } = require('./networkTelemetry');
-const { getDatabaseTargets, SNAPSHOT_CONNECT_TIMEOUT_MS } = require('../config');
+const {
+  createRedisConnectionOptions,
+  getDatabaseTargets,
+  SNAPSHOT_CONNECT_TIMEOUT_MS,
+} = require('../config');
 
 const AUTHORITY_TELEMETRY_KEY = 'Authority_Telemetry';
 const HEALTH_PING_KEY = 'Health_Ping';
@@ -57,15 +61,7 @@ function getInternalDatabaseTarget() {
 }
 
 function createRedisClient(target, connectTimeout) {
-  return new Redis({
-    host: target.host,
-    port: target.port,
-    lazyConnect: true,
-    connectTimeout,
-    maxRetriesPerRequest: 0,
-    enableOfflineQueue: false,
-    retryStrategy: null,
-  });
+  return new Redis(createRedisConnectionOptions(target, connectTimeout));
 }
 
 function resolveInternalDbClientScope(rawScope) {

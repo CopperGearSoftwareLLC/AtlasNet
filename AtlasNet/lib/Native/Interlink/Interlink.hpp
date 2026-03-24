@@ -1,4 +1,5 @@
 #pragma once
+#include <chrono>
 #include <memory>
 #include <shared_mutex>
 #include <thread>
@@ -74,6 +75,8 @@ class Interlink : public Singleton<Interlink>
 	std::unordered_map<NetworkIdentity,
 					   std::vector<std::pair<std::shared_ptr<IPacket>, NetworkMessageSendFlag>>>
 		QueuedPacketsOnConnect;
+	std::unordered_map<NetworkIdentity, std::chrono::steady_clock::time_point>
+		ReconnectAfter;
 	Log logger = Log("Interlink");
 	ISteamNetworkingSockets *networkInterface;
 	std::optional<HSteamListenSocket> ListeningSocket;
@@ -107,7 +110,10 @@ class Interlink : public Singleton<Interlink>
 
    private:
 	void GenerateNewConnections();
+	void MaintainScheduledConnections();
 	void OnDebugOutput(ESteamNetworkingSocketsDebugOutputType eType, const char *pszMsg);
+	void ScheduleReconnectTo(const NetworkIdentity& id,
+							 std::chrono::milliseconds delay = std::chrono::seconds(1));
 
 	template <typename... Args>
 	void Debug(std::string_view fmt, Args &&...args) const

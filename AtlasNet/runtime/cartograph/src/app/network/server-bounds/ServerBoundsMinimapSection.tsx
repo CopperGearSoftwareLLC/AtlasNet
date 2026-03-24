@@ -119,12 +119,13 @@ function MiniShardMap({
       </div>
     );
   }
+  const bounds = globalBounds;
 
   const width = 200;
   const height = 118;
   const pad = 8;
-  const spanX = Math.max(1, globalBounds.maxX - globalBounds.minX);
-  const spanY = Math.max(1, globalBounds.maxY - globalBounds.minY);
+  const spanX = Math.max(1, bounds.maxX - bounds.minX);
+  const spanY = Math.max(1, bounds.maxY - bounds.minY);
   const scale = Math.min((width - pad * 2) / spanX, (height - pad * 2) / spanY);
   const contentWidth = spanX * scale;
   const contentHeight = spanY * scale;
@@ -132,11 +133,11 @@ function MiniShardMap({
   const offsetY = (height - contentHeight) / 2;
 
   function toX(x: number): number {
-    return offsetX + (x - globalBounds.minX) * scale;
+    return offsetX + (x - bounds.minX) * scale;
   }
 
   function toY(y: number): number {
-    return height - (offsetY + (y - globalBounds.minY) * scale);
+    return height - (offsetY + (y - bounds.minY) * scale);
   }
 
   return (

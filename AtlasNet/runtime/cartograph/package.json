@@ -9,6 +9,7 @@
     "build:web": "next build",
     "build:native": "",
     "start": "next start",
+    "start:all": "concurrently -n NEXT,NATIVE -c cyan,green \"next start -H 0.0.0.0 -p 3000\" \"node native-server/native-server.js\"",
     "lint": "eslint",
     "postinstall": "npm install --prefix native-server"
   },

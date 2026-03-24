@@ -1,7 +1,9 @@
 #pragma once
 #include <sw/redis++/subscriber.h>
 
+#include <chrono>
 #include <iostream>
+#include <optional>
 #include <stop_token>
 #include <thread>
 #include <type_traits>
@@ -33,12 +35,13 @@ class GlobalEvents : public Singleton<GlobalEvents>
 	std::unordered_map<EventTypeID, std::vector<EventCallFn>>
 		event_subscriptions;
 	GlobalEvents() = default;
-	sw::redis::Subscriber redisSubscriber = InternalDB::Get()->Subscriber();
+	std::optional<sw::redis::Subscriber> redisSubscriber;
 	void Init()
 	{
 		logger.Debug("Event System Init");
+		redisSubscriber.emplace(InternalDB::Get()->Subscriber());
 
-		redisSubscriber.on_message(
+		redisSubscriber->on_message(
 			[this](std::string channel, std::string msg)
 			{
 				logger.DebugFormatted("Event {} received", channel);
@@ -55,7 +58,7 @@ class GlobalEvents : public Singleton<GlobalEvents>
 					f(*event);
 				}
 			});
-		redisSubscriber.on_meta(
+		redisSubscriber->on_meta(
 			[](sw::redis::Subscriber::MsgType type,
 			   const std::optional<std::string>& channel, long long count)
 			{
@@ -77,7 +80,20 @@ class GlobalEvents : public Singleton<GlobalEvents>
 				}
 				while (!st.stop_requested())
 				{
-					Update();
+					try
+					{
+						Update();
+					}
+					catch (const std::exception& ex)
+					{
+						logger.ErrorFormatted("Event consume loop failed: {}", ex.what());
+						std::this_thread::sleep_for(std::chrono::milliseconds(250));
+					}
+					catch (...)
+					{
+						logger.Error("Event consume loop failed with unknown exception.");
+						std::this_thread::sleep_for(std::chrono::milliseconds(250));
+					}
 				}
 			});
 		EventSystemInit.store(true, std::memory_order_release);
@@ -95,7 +111,7 @@ class GlobalEvents : public Singleton<GlobalEvents>
 		const std::string_view EventName =
 			EventRegistry::Get().GetEventName<T>();
 
-		redisSubscriber.subscribe(EventName);
+		redisSubscriber->subscribe(EventName);
 
 		EventCallFn wrapper = [func =
 								   std::forward<F>(f)](const IEvent& e) -> void
@@ -124,5 +140,12 @@ class GlobalEvents : public Singleton<GlobalEvents>
 	}
 
    private:
-	void Update() { redisSubscriber.consume(); }
+	void Update()
+	{
+		if (!redisSubscriber.has_value())
+		{
+			return;
+		}
+		redisSubscriber->consume();
+	}
 };

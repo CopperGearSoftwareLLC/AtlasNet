@@ -273,10 +273,11 @@ export function createMapRenderer({
   onPointerWorldPosition: initialOnPointerWorldPosition,
 }: DrawOptions) {
   const canvas = document.createElement('canvas');
-  const ctx = canvas.getContext('2d');
-  if (!ctx) {
+  const renderingContext = canvas.getContext('2d');
+  if (!renderingContext) {
     throw new Error('Failed to create map renderer context.');
   }
+  const ctx: CanvasRenderingContext2D = renderingContext;
   canvas.style.touchAction = 'none';
   canvas.style.userSelect = 'none';
   canvas.tabIndex = 0;

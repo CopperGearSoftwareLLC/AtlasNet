@@ -4,6 +4,7 @@
 #include <steam/isteamnetworkingutils.h>
 #include <steam/steamnetworkingsockets.h>
 
+#include <chrono>
 #include <stdexcept>
 #include <stop_token>
 #include <thread>
@@ -37,6 +38,17 @@ void ClientLink::OnSteamNetConnectionStatusChanged(SteamNetConnectionStatusChang
 		case k_ESteamNetworkingConnectionState_ClosedByPeer:
 
 			logger.Debug("k_ESteamNetworkingConnectionState_ClosedByPeer");
+			{
+				std::lock_guard<std::mutex> lock(mutex);
+				RemoveConnection(pInfo->m_hConn);
+				ConnectedToAtlasNet = false;
+				ConnectAttemptFinished = true;
+			}
+			connectedCV.notify_all();
+			if (!ConnectLoopActive.load())
+			{
+				ScheduleReconnect();
+			}
 			break;
 		case k_ESteamNetworkingConnectionState_ProblemDetectedLocally:
 
@@ -44,6 +56,17 @@ void ClientLink::OnSteamNetConnectionStatusChanged(SteamNetConnectionStatusChang
 			logger.ErrorFormatted("[GNS] ProblemDetectedLocally. desc='{}' reason={} debug='{}'",
 								  pInfo->m_info.m_szConnectionDescription,
 								  (int)pInfo->m_info.m_eEndReason, pInfo->m_info.m_szEndDebug);
+			{
+				std::lock_guard<std::mutex> lock(mutex);
+				RemoveConnection(pInfo->m_hConn);
+				ConnectedToAtlasNet = false;
+				ConnectAttemptFinished = true;
+			}
+			connectedCV.notify_all();
+			if (!ConnectLoopActive.load())
+			{
+				ScheduleReconnect();
+			}
 			break;
 		case k_ESteamNetworkingConnectionState_FinWait:
 			logger.Debug("k_ESteamNetworkingConnectionState_FinWait");
@@ -58,11 +81,26 @@ void ClientLink::OnSteamNetConnectionStatusChanged(SteamNetConnectionStatusChang
 			break;
 	}
 }
-void ClientLink::ConnectToAtlasNet(const IPAddress &address)
+void ClientLink::ApplyClientIdentity(const ClientID& clientID)
+{
+	ByteWriter bw;
+	NetworkIdentity myBaseID;
+	myBaseID.Type = NetworkIdentityType::eGameClient;
+	myBaseID.ID = clientID;
+	myBaseID.Serialize(bw);
+	const auto IdentityByteStream = std::string(bw.as_string_view());
+	logger.Debug("Settings Networking Identity");
+	SteamNetworkingIdentity identity;
+	const bool SetIdentity =
+		identity.SetGenericBytes(IdentityByteStream.data(), IdentityByteStream.size());
+	ASSERT(SetIdentity, "Failed Identity set");
+	SteamNetworkingSockets()->ResetIdentity(&identity);
+}
+void ClientLink::BeginConnectAttempt(const IPAddress& address)
 {
 	SteamNetworkingConfigValue_t opt[1];
 	opt[0].SetPtr(k_ESteamNetworkingConfig_Callback_ConnectionStatusChanged,
-				  (void *)SteamNetConnectionStatusChanged);
+				  (void*)SteamNetConnectionStatusChanged);
 
 	HSteamNetConnection conn =
 		SteamNetworkingSockets()->ConnectByIPAddress(address.ToSteamIPAddr(), 1, opt);
@@ -80,26 +118,54 @@ void ClientLink::ConnectToAtlasNet(const IPAddress &address)
 	c.target = NetworkIdentityType::eAtlasNetInitial;
 
 	Connections.insert(c);
-	std::unique_lock<std::mutex> lock(mutex);
+}
+void ClientLink::ConnectToAtlasNet(const IPAddress &address)
+{
+	{
+		std::lock_guard<std::mutex> lock(mutex);
+		LastKnownAddress = address;
+	}
 
-	// Wait until ready == true
-	connectedCV.wait(lock, [this] { return ConnectedToAtlasNet; });
+	bool expected = false;
+	if (!ConnectLoopActive.compare_exchange_strong(expected, true))
+	{
+		std::unique_lock<std::mutex> lock(mutex);
+		connectedCV.wait(lock, [this] { return ConnectedToAtlasNet || !ConnectLoopActive.load(); });
+		return;
+	}
+
+	while (true)
+	{
+		{
+			std::lock_guard<std::mutex> lock(mutex);
+			if (ConnectedToAtlasNet)
+			{
+				break;
+			}
+			ConnectAttemptFinished = false;
+		}
+
+		BeginConnectAttempt(address);
+
+		std::unique_lock<std::mutex> lock(mutex);
+		connectedCV.wait(lock, [this] { return ConnectedToAtlasNet || ConnectAttemptFinished; });
+		if (ConnectedToAtlasNet)
+		{
+			break;
+		}
+
+		lock.unlock();
+		std::this_thread::sleep_for(std::chrono::milliseconds(1000));
+	}
+
+	ConnectLoopActive = false;
+	connectedCV.notify_all();
 }
 void ClientLink::Init()
 {
 	InitGNS();
-	ByteWriter bw;
-	NetworkIdentity myBaseID;
-	myBaseID.Type = NetworkIdentityType::eGameClient;
-	myBaseID.ID = UUID();
-	myBaseID.Serialize(bw);
-	const auto IdentityByteStream = std::string(bw.as_string_view());
-	logger.Debug("Settings Networking Identity");
-	SteamNetworkingIdentity identity;
-	const bool SetIdentity =
-		identity.SetGenericBytes(IdentityByteStream.data(), IdentityByteStream.size());
-	ASSERT(SetIdentity, "Failed Identity set");
-	SteamNetworkingSockets()->ResetIdentity(&identity);
+	ApplyClientIdentity(ClientCredentials::Exists() ? ClientCredentials::Get().GetClientID()
+													: ClientID{});
 	SteamNetworkingUtils()->SetDebugOutputFunction(
 		k_ESteamNetworkingSocketsDebugOutputType_Warning,
 		[](ESteamNetworkingSocketsDebugOutputType eType, const char *pszMsg)
@@ -133,10 +199,15 @@ void ClientLink::OnClientIDAssignedPacket(const ClientIDAssignPacket &clientIDPa
 	logger.DebugFormatted("Received packet assigning ID to {} ",
 						  clientIDPacket.AssignedClientID.ToString());
 	ClientID id = clientIDPacket.AssignedClientID.ID;
-	ClientCredentials::Make(id);
+	if (!ClientCredentials::Exists())
+	{
+		ClientCredentials::Make(id);
+	}
+	ApplyClientIdentity(id);
 	{
 		std::lock_guard<std::mutex> lock(mutex);
 		ConnectedToAtlasNet = true;
+		ConnectAttemptFinished = true;
 	}
 	connectedCV.notify_one();
 }
@@ -211,6 +282,38 @@ void ClientLink::OnConnected(SteamNetConnectionStatusChangedCallback_t *pInfo)
 						   });
 		ManagingProxy = realIdentity;
 	}
+	if (ClientCredentials::Exists())
+	{
+		{
+			std::lock_guard<std::mutex> lock(mutex);
+			ConnectedToAtlasNet = true;
+			ConnectAttemptFinished = true;
+		}
+		connectedCV.notify_all();
+	}
+}
+void ClientLink::RemoveConnection(HSteamNetConnection connection)
+{
+	auto &bySteamCon = Connections.get<IndexByHSteamNetConnection>();
+	const auto it = bySteamCon.find(connection);
+	if (it != bySteamCon.end())
+	{
+		bySteamCon.erase(it);
+	}
+}
+void ClientLink::ScheduleReconnect()
+{
+	std::optional<IPAddress> address;
+	{
+		std::lock_guard<std::mutex> lock(mutex);
+		address = LastKnownAddress;
+	}
+	if (!address.has_value())
+	{
+		return;
+	}
+
+	std::thread([this, address = *address]() { ConnectToAtlasNet(address); }).detach();
 }
 void ClientLink::SendMessage(const std::shared_ptr<IPacket> &packet,
 							 NetworkMessageSendFlag sendFlag)

@@ -1,5 +1,6 @@
 #include "NetworkManifest.hpp"
 #include "Network/NetworkCredentials.hpp"
+#include <iostream>
 void NetworkManifest::ScheduleNetworkPings()
 {
 	//
@@ -8,7 +9,19 @@ void NetworkManifest::ScheduleNetworkPings()
 		{
 			while (!st.stop_requested())
 			{
-				NetworkManifest::Get().TelemetryUpdate(NetworkCredentials::Get().GetID());
+				try
+				{
+					NetworkManifest::Get().TelemetryUpdate(NetworkCredentials::Get().GetID());
+				}
+				catch (const std::exception& ex)
+				{
+					std::cerr << "Network telemetry update failed: " << ex.what() << std::endl;
+				}
+				catch (...)
+				{
+					std::cerr << "Network telemetry update failed with unknown exception."
+							  << std::endl;
+				}
 				std::this_thread::sleep_for(
 					std::chrono::milliseconds(_NETWORK_TELEMETRY_PING_INTERVAL_MS));
 			}

@@ -1,5 +1,6 @@
 #pragma once
 #include <chrono>
+#include <iostream>
 #include <thread>
 #include <utility>
 
@@ -27,7 +28,18 @@ class HealthManifest : public Singleton<HealthManifest>
 			{
 				while (!st.stop_requested())
 				{
-					HealthManifest::Get().HealthUpdate(NetworkCredentials::Get().GetID());
+					try
+					{
+						HealthManifest::Get().HealthUpdate(NetworkCredentials::Get().GetID());
+					}
+					catch (const std::exception& ex)
+					{
+						std::cerr << "Health ping update failed: " << ex.what() << std::endl;
+					}
+					catch (...)
+					{
+						std::cerr << "Health ping update failed with unknown exception." << std::endl;
+					}
 					std::this_thread::sleep_for(
 						std::chrono::milliseconds(_HEALTH_PING_INTERVAL_MS));
 				}
@@ -41,21 +53,32 @@ class HealthManifest : public Singleton<HealthManifest>
 			{
 				while (!st.stop_requested())
 				{
-					static std::vector<std::string> expired_pings;
-					HealthManifest::Get().GetExpiredPings(expired_pings);
-					if (!expired_pings.empty())
+					try
 					{
-						for (const auto expired_key : expired_pings)
+						static std::vector<std::string> expired_pings;
+						HealthManifest::Get().GetExpiredPings(expired_pings);
+						if (!expired_pings.empty())
 						{
-							ByteReader br(expired_key);
-							NetworkIdentity id;
-							id.Deserialize(br);
-							//ASSERT(
-							//	expired_ID.has_value(),
-							//	std::format("Failed to parse key in expired pings: {}", expired_key)
-							//		.c_str());
-							onHealthCheckFail(id,expired_key);
+							for (const auto expired_key : expired_pings)
+							{
+								ByteReader br(expired_key);
+								NetworkIdentity id;
+								id.Deserialize(br);
+								//ASSERT(
+								//	expired_ID.has_value(),
+								//	std::format("Failed to parse key in expired pings: {}", expired_key)
+								//		.c_str());
+								onHealthCheckFail(id,expired_key);
+							}
 						}
+					}
+					catch (const std::exception& ex)
+					{
+						std::cerr << "Health check loop failed: " << ex.what() << std::endl;
+					}
+					catch (...)
+					{
+						std::cerr << "Health check loop failed with unknown exception." << std::endl;
 					}
 					std::this_thread::sleep_for(
 						std::chrono::milliseconds(_HEALTH_CHECK_INTERVAL_MS));

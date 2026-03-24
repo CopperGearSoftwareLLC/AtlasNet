@@ -32,6 +32,8 @@ RUN apt-get install -y nodejs
 RUN node -v
 COPY --from=atlasnetsdk /atlasnet/cartograph /atlasnet/
 WORKDIR /atlasnet
-RUN npm install
+RUN npm install --include=dev && npm run build:web
+RUN mkdir -p /atlasnet/nextjs/native
 COPY --from=atlasnetsdk /atlasnet/Web.node /atlasnet/nextjs/native/Web.node
-ENTRYPOINT ["npm", "run", "dev:all"]
+ENV NODE_ENV=production
+ENTRYPOINT ["npm", "run", "start:all"]
