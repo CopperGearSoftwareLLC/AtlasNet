@@ -275,6 +275,8 @@ void SnapshotService::RecoverClaimedBoundSnapshotIfNeeded()
 	const BoundsID boundID = BoundLeaser::Get().GetBoundID();
 	if (recoveredBoundID.has_value() && recoveredBoundID.value() == boundID)
 	{
+		RecoverMissedEntitiesForClaimedBound();
+		ReconcileClaimedBoundEntityRecords();
 		return;
 	}
 

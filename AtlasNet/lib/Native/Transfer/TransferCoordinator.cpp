@@ -21,6 +21,7 @@
 #include "Network/NetworkEnums.hpp"
 #include "Network/NetworkIdentity.hpp"
 #include "Snapshot/SnapshotService.hpp"
+#include "Snapshot/TemporaryMigrationService.hpp"
 #include "Transfer/Packet/ClientSwitchPacket.hpp"
 #include "Transfer/Packet/ClientTransferPacket.hpp"
 #include "Transfer/Packet/EntityTransferPacket.hpp"
@@ -30,6 +31,12 @@
 namespace
 {
 constexpr auto kEntityTransferRetryInterval = std::chrono::milliseconds(250);
+
+bool CanAcceptIncomingEntityTransfer()
+{
+	return BoundLeaser::Get().HasBound() &&
+		   !TemporaryMigrationService::Get().IsMigrationInProgress();
+}
 }
 
 void TransferCoordinator::SendEntityPreparePacket(const EntityTransferData& transfer)
@@ -450,6 +457,15 @@ void TransferCoordinator::OnEntityTransferPacketArrival(const EntityTransferPack
 
 		case EntityTransferStage::ePrepare:
 		{
+			if (!CanAcceptIncomingEntityTransfer())
+			{
+				logger.WarningFormatted(
+					"Ignoring entity transfer prepare {} from {} because this shard is not "
+					"accepting handoffs right now",
+					UUIDGen::ToString(p.TransferID), info.sender.ToString());
+				return;
+			}
+
 			EntityTransferData data;
 			const auto& predataData = p.GetAsPrepareStage();
 			data.entityIDs = predataData.entityIDs;
@@ -542,6 +558,15 @@ void TransferCoordinator::OnEntityTransferPacketArrival(const EntityTransferPack
 
 		case EntityTransferStage::eCommit:
 		{
+			if (!CanAcceptIncomingEntityTransfer())
+			{
+				logger.WarningFormatted(
+					"Ignoring entity transfer commit {} from {} because this shard is not "
+					"accepting handoffs right now",
+					UUIDGen::ToString(p.TransferID), info.sender.ToString());
+				return;
+			}
+
 			EntityTransferData transferEventData;
 			if (hasTransfer)
 			{

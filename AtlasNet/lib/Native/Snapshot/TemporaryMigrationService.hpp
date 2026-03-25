@@ -1,5 +1,6 @@
 #pragma once
 
+#include <atomic>
 #include <mutex>
 #include <optional>
 #include <stop_token>
@@ -18,11 +19,16 @@ class TemporaryMigrationService : public Singleton<TemporaryMigrationService>
 {
 	Log logger = Log("TemporaryMigrationService");
 	std::jthread adoptionThread;
+	std::atomic_bool migrationInProgress = false;
 	std::mutex migrationMutex;
 	PacketManager::Subscription migrationTriggerSubscription;
 
    public:
 	TemporaryMigrationService();
+	bool IsMigrationInProgress() const
+	{
+		return migrationInProgress.load(std::memory_order_acquire);
+	}
 	void TriggerForCurrentShardSigterm();
 	void Shutdown();
 

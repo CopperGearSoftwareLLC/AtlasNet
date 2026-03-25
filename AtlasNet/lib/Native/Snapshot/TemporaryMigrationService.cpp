@@ -30,6 +30,23 @@ namespace
 constexpr auto kAdoptionScanInterval = std::chrono::milliseconds(250);
 constexpr auto kEntityRecoveryLeaseTtl = std::chrono::seconds(5);
 
+class ScopedMigrationFlag
+{
+   public:
+	explicit ScopedMigrationFlag(std::atomic_bool& flag) : flag(flag)
+	{
+		flag.store(true, std::memory_order_release);
+	}
+
+	~ScopedMigrationFlag()
+	{
+		flag.store(false, std::memory_order_release);
+	}
+
+   private:
+	std::atomic_bool& flag;
+};
+
 std::string SerializeEntityID(const AtlasEntityID& entityID)
 {
 	return UUIDGen::ToString(entityID);
@@ -149,6 +166,7 @@ void TemporaryMigrationService::TriggerForCurrentShardSigterm()
 	{
 		return;
 	}
+	ScopedMigrationFlag migrationFlag(migrationInProgress);
 
 	const NetworkIdentity selfID = NetworkCredentials::Get().GetID();
 	const BoundsID boundID = BoundLeaser::Get().GetBoundID();
