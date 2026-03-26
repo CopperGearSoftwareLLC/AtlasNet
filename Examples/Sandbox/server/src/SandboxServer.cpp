@@ -1,5 +1,6 @@
 #include "SandboxServer.hpp"
 
+#include <array>
 #include <chrono>
 #include <execution>
 #include <thread>
@@ -26,6 +27,42 @@
 #include "Interlink/Database/HealthManifest.hpp"
 #include "Network/NetworkCredentials.hpp"
 #include "Snapshot/SnapshotService.hpp"
+
+namespace
+{
+constexpr int kInitialSandboxEntityCount = 100;
+constexpr std::string_view kInitialSandboxSeedLeaseKey = "Sandbox:InitialEntitySeedLease";
+constexpr auto kInitialSandboxSeedLeaseTtl = std::chrono::seconds(30);
+
+bool TryAcquireInitialSandboxSeedLease()
+{
+	const std::string selfShardID = UUIDGen::ToString(NetworkCredentials::Get().GetID().ID);
+	const std::string ttlSeconds = std::to_string(kInitialSandboxSeedLeaseTtl.count());
+
+	const auto response = InternalDB::Get()->WithSync(
+		[&](auto& r)
+		{
+			std::array<std::string, 6> cmd = {"SET", std::string(kInitialSandboxSeedLeaseKey),
+											  selfShardID, "NX", "EX", ttlSeconds};
+			return r.command(cmd.begin(), cmd.end());
+		});
+	return response && response->str != nullptr;
+}
+
+bool RefreshInitialSandboxSeedLeaseIfOwner()
+{
+	const std::string selfShardID = UUIDGen::ToString(NetworkCredentials::Get().GetID().ID);
+	const std::optional<std::string> leaseOwner =
+		InternalDB::Get()->Get(kInitialSandboxSeedLeaseKey);
+	if (!leaseOwner.has_value() || leaseOwner.value() != selfShardID)
+	{
+		return false;
+	}
+
+	(void)InternalDB::Get()->Expire(kInitialSandboxSeedLeaseKey, kInitialSandboxSeedLeaseTtl);
+	return true;
+}
+}  // namespace
 
 void SandboxServer::Run()
 {
@@ -177,7 +214,7 @@ void SandboxServer::Run()
 				std::this_thread::sleep_for(std::chrono::milliseconds(250));
 				continue;
 			}
-			if (boundID == 0 && entityOwnerEntries == 0 && localEntityCount == 0)
+			if (boundID == 0 && entityOwnerEntries < kInitialSandboxEntityCount)
 			{
 				if (!areShardTransfersReadyForBootstrap())
 				{
@@ -185,10 +222,35 @@ void SandboxServer::Run()
 					continue;
 				}
 
+				if (!TryAcquireInitialSandboxSeedLease() && !RefreshInitialSandboxSeedLeaseIfOwner())
+				{
+					std::this_thread::sleep_for(std::chrono::milliseconds(100));
+					continue;
+				}
+
+				vec3 spawnCenter = vec3(0, 0, 0);
+				bool hasSpawnCenter = false;
+				BoundLeaser::Get().GetBound(
+					[&](const IBounds& bound)
+					{
+						spawnCenter = bound.GetCenter();
+						hasSpawnCenter = true;
+					});
+				if (!hasSpawnCenter || !BoundLeaser::Get().HasBound() ||
+					BoundLeaser::Get().GetBoundID() != boundID)
+				{
+					logger.Warning(
+						"Sandbox shard could not resolve its claimed bound center during init; retrying bootstrap.");
+					std::this_thread::sleep_for(std::chrono::milliseconds(100));
+					continue;
+				}
+
+				const int remainingEntityCount =
+					static_cast<int>(kInitialSandboxEntityCount - entityOwnerEntries);
 				size_t spawnedEntityCount = 0;
 				std::mt19937 rng(std::random_device{}());
 				std::uniform_real_distribution<float> dist(0.0f, 1.0f);
-				for (int i = 0; i < 100; i++)
+				for (int i = 0; i < remainingEntityCount; i++)
 				{
 					float z = dist(rng) * 2.0f - 1.0f;					 // z in [-1, 1]
 					float theta = dist(rng) * 2.0f * glm::pi<float>();	 // angle around Z
@@ -200,17 +262,9 @@ void SandboxServer::Run()
 
 					vec3 velocityVec = vec3(x, y, 0);
 					AtlasTransform t;
-					t.position = vec3(0, 0, 0);
-					// Fallback if k3d shard-to-shard bootstrap remains unreliable:
-					// vec3 spawnCenter = vec3(0, 0, 0);
-					// BoundLeaser::Get().GetBound(
-					// 	[&](const IBounds& bound)
-					// 	{
-					// 		spawnCenter = bound.GetCenter();
-					// 	});
-					// const float spawnRadius = dist(rng) * 5.0f;
-					// t.position =
-					// 	spawnCenter + vec3(std::cos(theta), std::sin(theta), 0.0f) * spawnRadius;
+					const float spawnRadius = dist(rng) * 5.0f;
+					t.position =
+						spawnCenter + vec3(std::cos(theta), std::sin(theta), 0.0f) * spawnRadius;
 					ByteWriter metadataWriter;
 					metadataWriter.vec3(velocityVec);
 					AtlasNet_CreateEntity(t, metadataWriter.bytes());
