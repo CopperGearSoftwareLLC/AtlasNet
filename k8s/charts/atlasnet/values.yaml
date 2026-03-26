@@ -10,6 +10,7 @@ images:
   internaldb: valkey/valkey-bundle:latest
 
 cartograph:
+  mode: development
   ingress:
     className: nginx
     host: cartograph.atlasnet.local

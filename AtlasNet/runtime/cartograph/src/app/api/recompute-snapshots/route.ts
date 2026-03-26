@@ -20,7 +20,7 @@ function createInternalDbClient() {
     connectTimeout: CONNECT_TIMEOUT_MS,
     maxRetriesPerRequest: 0,
     enableOfflineQueue: false,
-    retryStrategy: null,
+    retryStrategy: () => null,
   });
 }
 

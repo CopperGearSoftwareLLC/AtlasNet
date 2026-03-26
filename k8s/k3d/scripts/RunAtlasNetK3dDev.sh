@@ -806,6 +806,7 @@ helm template "$HELM_RELEASE_NAME" "$CHART_DIR" \
     --set-string images.proxy="$PROXY_IMAGE_NAME" \
     --set-string images.shard="$SHARD_IMAGE_NAME" \
     --set-string images.cartograph="$CARTOGRAPH_IMAGE_NAME" \
+    --set-string cartograph.mode="development" \
     --set-string cartograph.ingress.className="$CARTOGRAPH_INGRESS_CLASS_NAME" \
     --set-string cartograph.ingress.host="$CARTOGRAPH_INGRESS_HOST" \
     --set llm.enabled="$LLM_IN_CLUSTER_ENABLED" \
