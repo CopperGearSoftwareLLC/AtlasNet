@@ -826,6 +826,7 @@ else
 fi
 
 echo "==> Applying Kubernetes manifest..."
+kctl -n "$NAMESPACE" delete daemonset atlasnet-cartograph --ignore-not-found >/dev/null || true
 if [[ "$KUBECTL_MODE" == "incluster" ]]; then
     cat "$TEMP_MANIFEST" | "${KUBECTL[@]}" apply -f - >/dev/null
 else
@@ -833,7 +834,7 @@ else
 fi
 # Migration cleanup: workloads moved kinds across revisions.
 kctl -n "$NAMESPACE" delete daemonset atlasnet-watchdog --ignore-not-found >/dev/null || true
-kctl -n "$NAMESPACE" delete deployment atlasnet-cartograph --ignore-not-found >/dev/null || true
+kctl -n "$NAMESPACE" delete daemonset atlasnet-cartograph --ignore-not-found >/dev/null || true
 kctl -n "$NAMESPACE" delete deployment atlasnet-proxy --ignore-not-found >/dev/null || true
 # Shard deployment is declared with replicas=0 and is expected to be scaled by Watchdog.
 # On a fresh cluster, initial apply already starts the latest pods; skip extra rollout restarts by default.

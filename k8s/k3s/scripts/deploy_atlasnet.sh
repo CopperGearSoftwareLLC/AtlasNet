@@ -173,6 +173,9 @@ warn_if_mixed_arch_cluster
 ensure_namespace
 configure_dockerhub_pull_secret
 
+# Migration cleanup that must happen before Helm when workload kinds changed.
+kubectl -n "$ATLASNET_K8S_NAMESPACE" delete daemonset atlasnet-cartograph --ignore-not-found >/dev/null || true
+
 helm upgrade --install "$ATLASNET_HELM_RELEASE_NAME" "$CHART_DIR" \
   --namespace "$ATLASNET_K8S_NAMESPACE" \
   --set-string serverNodeName="$SERVER_NODE_NAME" \
@@ -195,14 +198,14 @@ helm upgrade --install "$ATLASNET_HELM_RELEASE_NAME" "$CHART_DIR" \
 
 # Migration cleanup for earlier revisions where workload kinds differed.
 kubectl -n "$ATLASNET_K8S_NAMESPACE" delete daemonset atlasnet-watchdog --ignore-not-found >/dev/null || true
-kubectl -n "$ATLASNET_K8S_NAMESPACE" delete deployment atlasnet-cartograph --ignore-not-found >/dev/null || true
+kubectl -n "$ATLASNET_K8S_NAMESPACE" delete daemonset atlasnet-cartograph --ignore-not-found >/dev/null || true
 kubectl -n "$ATLASNET_K8S_NAMESPACE" delete deployment atlasnet-proxy --ignore-not-found >/dev/null || true
 
 echo "Waiting for core workloads ..."
 kubectl -n "$ATLASNET_K8S_NAMESPACE" rollout status deployment/atlasnet-internaldb --timeout=180s
 kubectl -n "$ATLASNET_K8S_NAMESPACE" rollout status deployment/atlasnet-watchdog --timeout=180s
 kubectl -n "$ATLASNET_K8S_NAMESPACE" rollout status statefulset/atlasnet-proxy --timeout=180s
-kubectl -n "$ATLASNET_K8S_NAMESPACE" rollout status daemonset/atlasnet-cartograph --timeout=180s
+kubectl -n "$ATLASNET_K8S_NAMESPACE" rollout status deployment/atlasnet-cartograph --timeout=180s
 
 if [[ "$ATLASNET_WAIT_FOR_SHARD_READY" == "true" ]]; then
   wait_for_shard_ready

@@ -352,15 +352,16 @@ spec:
       targetPort: redis
 ---
 apiVersion: apps/v1
-kind: DaemonSet
+kind: Deployment
 metadata:
   name: atlasnet-cartograph
   namespace: {{ .Release.Namespace }}
   labels:
     app: atlasnet-cartograph
 spec:
-  updateStrategy:
-    type: RollingUpdate
+  replicas: 1
+  strategy:
+    type: Recreate
   selector:
     matchLabels:
       app: atlasnet-cartograph
@@ -370,21 +371,6 @@ spec:
         app: atlasnet-cartograph
     spec:
       serviceAccountName: atlasnet-cartograph
-      affinity:
-        nodeAffinity:
-          requiredDuringSchedulingIgnoredDuringExecution:
-            nodeSelectorTerms:
-              - matchExpressions:
-                  - key: node-role.kubernetes.io/control-plane
-                    operator: Exists
-              - matchExpressions:
-                  - key: node-role.kubernetes.io/master
-                    operator: Exists
-              - matchExpressions:
-                  - key: kubernetes.io/hostname
-                    operator: In
-                    values:
-                      - {{ $serverNodeName | quote }}
       tolerations:
         - key: node-role.kubernetes.io/control-plane
           operator: Exists
