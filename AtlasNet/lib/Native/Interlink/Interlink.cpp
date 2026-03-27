@@ -1,5 +1,6 @@
 #include "Interlink.hpp"
 
+#include <csignal>
 #include <steam/isteamnetworkingsockets.h>
 #include <steam/steamtypes.h>
 
@@ -186,6 +187,35 @@ IPAddress BuildInterlinkAddress(const std::string& ip, const PortType port)
 	IPAddress address;
 	address.Parse(ip + ":" + std::to_string(port));
 	return address;
+}
+
+void RequestShardTerminationAfterWatchdogLoss(Log& logger, const NetworkIdentity& disconnectedID)
+{
+	if (NetworkCredentials::Get().GetID().Type != NetworkIdentityType::eShard ||
+		disconnectedID != NetworkIdentity::MakeIDWatchDog())
+	{
+		return;
+	}
+
+	static std::atomic_bool terminationRequested = false;
+	if (terminationRequested.exchange(true))
+	{
+		return;
+	}
+
+	logger.ErrorFormatted(
+		"[Interlink] Lost watchdog connection from shard {}. Requesting process termination.",
+		NetworkCredentials::Get().GetID().ToString());
+
+	std::thread(
+		[]()
+		{
+			std::this_thread::sleep_for(std::chrono::seconds(2));
+			std::_Exit(EXIT_FAILURE);
+		})
+		.detach();
+
+	std::raise(SIGTERM);
 }
 }  // namespace
 
@@ -478,15 +508,19 @@ void Interlink::CallbackOnClosedByPear(SteamCBInfo info)
 			}
 			closedID = it->target;
 			logger.DebugFormatted("Connection closed by peer: {}", closedID.ToString());
-			networkInterface->CloseConnection(info->m_hConn, 0,
-											  "Connection closed by peer. aka you", true);
-			bySteam.erase(it);
-		});
+				networkInterface->CloseConnection(info->m_hConn, 0,
+												  "Connection closed by peer. aka you", true);
+				bySteam.erase(it);
+			});
+
+	RequestShardTerminationAfterWatchdogLoss(logger, closedID);
 }
 
 void Interlink::CallbackOnProblemDetectedLocally(SteamCBInfo info)
 {
 	auto &bySteam = Connections.get<IndexByHSteamNetConnection>();
+	NetworkIdentity closedID;
+	bool hadClosedID = false;
 
 	bool exists = _ReadLock([&]() { return bySteam.find(info->m_hConn) != bySteam.end(); });
 	if (!exists)
@@ -495,18 +529,24 @@ void Interlink::CallbackOnProblemDetectedLocally(SteamCBInfo info)
 		return;
 	}
 
-	_WriteLock(
-		[&]()
-		{
-			auto it = bySteam.find(info->m_hConn);
-			if (it != bySteam.end())
+		_WriteLock(
+			[&]()
 			{
-				NetworkIdentity closedID = it->target;
-				logger.DebugFormatted("Connection problem detected locally for: {}",
-									  closedID.ToString());
-				bySteam.erase(it);
-			}
-		});
+				auto it = bySteam.find(info->m_hConn);
+				if (it != bySteam.end())
+				{
+					closedID = it->target;
+					hadClosedID = true;
+					logger.DebugFormatted("Connection problem detected locally for: {}",
+										  closedID.ToString());
+					bySteam.erase(it);
+				}
+			});
+
+	if (hadClosedID)
+	{
+		RequestShardTerminationAfterWatchdogLoss(logger, closedID);
+	}
 }
 
 void Interlink::CallbackOnConnected(SteamCBInfo info)

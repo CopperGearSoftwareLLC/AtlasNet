@@ -22,6 +22,8 @@
 #include "Heuristic/Database/HeuristicManifest.hpp"
 #include "Heuristic/GridHeuristic/GridHeuristic.hpp"
 #include "Interlink/Database/HealthManifest.hpp"
+#include "Interlink/Database/NodeManifest.hpp"
+#include "Interlink/Database/ServerRegistry.hpp"
 #include "Interlink/Telemetry/NetworkManifest.hpp"
 #include "Network/NetworkCredentials.hpp"
 #include "Network/NetworkIdentity.hpp"
@@ -86,9 +88,14 @@ void IAtlasNetServer::Shutdown()
 		return;
 	}
 
+	const NetworkIdentity selfID = NetworkCredentials::Get().GetID();
 	TemporaryMigrationService::Get().BeginProcessTermination();
+	HealthManifest::Get().RemovePingByIdentity(selfID);
 	HealthManifest::Get().Shutdown();
 	TemporaryMigrationService::Get().TriggerForCurrentShardSigterm();
+	NetworkManifest::Get().RemoveTelemetry(selfID);
+	ServerRegistry::Get().DeRegisterSelf(selfID);
+	NodeManifest::Get().DeregisterShard(selfID);
 	TemporaryMigrationService::Get().Shutdown();
 	Interlink::Get().Shutdown();
 }

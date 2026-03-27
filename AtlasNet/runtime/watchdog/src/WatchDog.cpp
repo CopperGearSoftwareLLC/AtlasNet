@@ -28,6 +28,7 @@
 #include "Heuristic/Voronoi/LlmVoronoiHeuristic.hpp"
 #include "Heuristic/Voronoi/VoronoiHeuristic.hpp"
 #include "Interlink/Database/HealthManifest.hpp"
+#include "Interlink/Database/NodeManifest.hpp"
 #include "Interlink/Database/ServerRegistry.hpp"
 #include "Interlink/Interlink.hpp"
 #include "Interlink/InterlinkEnums.hpp"
@@ -272,13 +273,17 @@ void WatchDog::Init()
 			{
 				logger->DebugFormatted("Requeued claimed bounds for {}", ID_fail.ToString());
 			}
-			HealthManifest::Get().RemovePing(key);
-			if (ID_fail.IsInternal() && ID_fail != NetworkCredentials::Get().GetID())
-			{
-				NetworkManifest::Get().RemoveTelemetry(ID_fail);
-				ServerRegistry::Get().DeRegisterSelf(ID_fail);
-			}
-		});
+				HealthManifest::Get().RemovePing(key);
+				if (ID_fail.IsInternal() && ID_fail != NetworkCredentials::Get().GetID())
+				{
+					NetworkManifest::Get().RemoveTelemetry(ID_fail);
+					ServerRegistry::Get().DeRegisterSelf(ID_fail);
+					if (ID_fail.Type == NetworkIdentityType::eShard)
+					{
+						NodeManifest::Get().DeregisterShard(ID_fail);
+					}
+				}
+			});
 	Interlink::Get().Init();
 	GlobalEvents::Get().Init();
 	HeuristicService::Ensure();
