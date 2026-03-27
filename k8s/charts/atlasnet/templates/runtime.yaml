@@ -210,6 +210,9 @@ spec:
         - key: {{ $internaldbUnreachableTaintKey | quote }}
           operator: Exists
           effect: NoSchedule
+        - key: {{ $internaldbUnreachableTaintKey | quote }}
+          operator: Exists
+          effect: NoExecute
       containers:
         - name: netcheck
           image: nicolaka/netshoot:v0.13
@@ -326,6 +329,9 @@ spec:
         - key: {{ $internaldbUnreachableTaintKey | quote }}
           operator: Exists
           effect: NoSchedule
+        - key: {{ $internaldbUnreachableTaintKey | quote }}
+          operator: Exists
+          effect: NoExecute
       containers:
         - name: controller
           image: nicolaka/netshoot:v0.13
@@ -422,15 +428,18 @@ spec:
                     fi
                   fi
 
-                  if [ "$status" = "healthy" ]; then
-                    new_taints="$(printf '%s' "$node_json" | jq -c --arg key "$TAINT_KEY" '(.spec.taints // []) | map(select(.key != $key))')"
-                  else
-                    new_taints="$(printf '%s' "$node_json" | jq -c --arg key "$TAINT_KEY" '(.spec.taints // []) + [{"key":$key,"value":"true","effect":"NoSchedule"}] | unique_by(.key + ":" + .effect)')"
-                  fi
-
                   expected_taint=""
                   if [ "$status" != "healthy" ]; then
                     expected_taint="NoSchedule"
+                    if [ "$reason" = "node-unreachable" ]; then
+                      expected_taint="NoExecute"
+                    fi
+                  fi
+
+                  if [ "$status" = "healthy" ]; then
+                    new_taints="$(printf '%s' "$node_json" | jq -c --arg key "$TAINT_KEY" '(.spec.taints // []) | map(select(.key != $key))')"
+                  else
+                    new_taints="$(printf '%s' "$node_json" | jq -c --arg key "$TAINT_KEY" --arg effect "$expected_taint" '(.spec.taints // []) | map(select(.key != $key)) + [{"key":$key,"value":"true","effect":$effect}] | unique_by(.key + ":" + .effect)')"
                   fi
 
                   if [ "$tainted" != "$expected_taint" ] || [ "$node_status" != "$status" ] || [ "$node_reason" != "$reason" ]; then
@@ -497,6 +506,9 @@ spec:
         - key: {{ $internaldbUnreachableTaintKey | quote }}
           operator: Exists
           effect: NoSchedule
+        - key: {{ $internaldbUnreachableTaintKey | quote }}
+          operator: Exists
+          effect: NoExecute
       containers:
         - name: watchdog
           image: {{ $watchdogImage | quote }}
@@ -562,11 +574,11 @@ spec:
         - key: node.kubernetes.io/not-ready
           operator: Exists
           effect: NoExecute
-          tolerationSeconds: {{ $nodeLossTolerationSeconds }}
+          tolerationSeconds: 0
         - key: node.kubernetes.io/unreachable
           operator: Exists
           effect: NoExecute
-          tolerationSeconds: {{ $nodeLossTolerationSeconds }}
+          tolerationSeconds: 0
       affinity:
         podAntiAffinity:
           preferredDuringSchedulingIgnoredDuringExecution:
@@ -681,6 +693,9 @@ spec:
         - key: {{ $internaldbUnreachableTaintKey | quote }}
           operator: Exists
           effect: NoSchedule
+        - key: {{ $internaldbUnreachableTaintKey | quote }}
+          operator: Exists
+          effect: NoExecute
       containers:
         - name: internaldb
           image: {{ $internaldbImage | quote }}
@@ -777,6 +792,9 @@ spec:
         - key: {{ $internaldbUnreachableTaintKey | quote }}
           operator: Exists
           effect: NoSchedule
+        - key: {{ $internaldbUnreachableTaintKey | quote }}
+          operator: Exists
+          effect: NoExecute
       containers:
         - name: cartograph
           image: {{ $cartographImage | quote }}
@@ -923,6 +941,9 @@ spec:
         - key: {{ $internaldbUnreachableTaintKey | quote }}
           operator: Exists
           effect: NoSchedule
+        - key: {{ $internaldbUnreachableTaintKey | quote }}
+          operator: Exists
+          effect: NoExecute
       affinity:
         nodeAffinity:
           requiredDuringSchedulingIgnoredDuringExecution:
@@ -1063,6 +1084,9 @@ spec:
         - key: {{ $internaldbUnreachableTaintKey | quote }}
           operator: Exists
           effect: NoSchedule
+        - key: {{ $internaldbUnreachableTaintKey | quote }}
+          operator: Exists
+          effect: NoExecute
       initContainers:
         - name: model-download
           image: curlimages/curl:8.12.1
