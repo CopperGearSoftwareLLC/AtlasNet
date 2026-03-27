@@ -99,23 +99,7 @@ class HealthManifest : public Singleton<HealthManifest>
 	//=================================
 	//===          PING             ===
 	//=================================
-
-	void HealthUpdate(const NetworkIdentity& identifier)
-	{
-		ByteWriter bw;
-		identifier.Serialize(bw);
-
-		const double now = InternalDB::Get()->GetTimeNowSeconds();
-
-		const double TTL = now + _HEALTH_PING_TIMESTAMP_LIFE_MS*0.001;
-
-		const auto setResult = InternalDB::Get()->HSet(HealthPingTable, bw.as_string_view(), std::to_string(TTL));
-		if (setResult != 0)
-		{
-			std::printf("Failed to update health in Health Manifest. HSET result: %lli",setResult);
-		}
-	
-	}
+	void HealthUpdate(const NetworkIdentity& identifier);
 };
 template <typename KeyType>
 inline void HealthManifest::RemovePing(const KeyType& key)
