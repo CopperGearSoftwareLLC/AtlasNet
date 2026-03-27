@@ -240,12 +240,21 @@ EOF
     fi
   done
 
-  ssh -i "$SSH_KEY" \
-    -o BatchMode=yes \
-    -o StrictHostKeyChecking=accept-new \
-    -o ConnectTimeout=5 \
-    "${PRIMARY_SERVER_USER_DEFAULT}@${PRIMARY_SERVER_IP}" \
-    "cat '$primary_manifest_path'" | kubectl apply -f - >/dev/null
+  if [[ "$K3SUP_USE_SUDO" == "true" ]]; then
+    ssh -i "$SSH_KEY" \
+      -o BatchMode=yes \
+      -o StrictHostKeyChecking=accept-new \
+      -o ConnectTimeout=5 \
+      "${PRIMARY_SERVER_USER_DEFAULT}@${PRIMARY_SERVER_IP}" \
+      "sudo cat '$primary_manifest_path'" | kubectl apply -f - >/dev/null
+  else
+    ssh -i "$SSH_KEY" \
+      -o BatchMode=yes \
+      -o StrictHostKeyChecking=accept-new \
+      -o ConnectTimeout=5 \
+      "${PRIMARY_SERVER_USER_DEFAULT}@${PRIMARY_SERVER_IP}" \
+      "cat '$primary_manifest_path'" | kubectl apply -f - >/dev/null
+  fi
 
   kubectl -n kube-system rollout status deployment/coredns --timeout=180s >/dev/null
 }
