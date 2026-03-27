@@ -1,5 +1,6 @@
 #include "SandboxServer.hpp"
 
+#include <array>
 #include <chrono>
 #include <execution>
 #include <thread>
@@ -13,7 +14,6 @@
 #include "Entity/Entity.hpp"
 #include "Entity/EntityHandle.hpp"
 #include "Entity/EntityLedger.hpp"
-#include "Entity/Packet/LocalEntityListRequestPacket.hpp"
 #include "Entity/Transform.hpp"
 #include "Events/Events/Client/ClientEvents.hpp"
 #include "Events/GlobalEvents.hpp"
@@ -23,9 +23,29 @@
 #include "Global/pch.hpp"
 #include "Heuristic/BoundLeaser.hpp"
 #include "InternalDB/InternalDB.hpp"
-#include "Interlink/Database/HealthManifest.hpp"
-#include "Network/NetworkCredentials.hpp"
 #include "Snapshot/SnapshotService.hpp"
+
+namespace
+{
+constexpr int kInitialSandboxEntityCount = 100;
+constexpr std::string_view kInitialSandboxSeedCounterKey = "Sandbox:InitialEntitySeedCounter";
+
+bool TryClaimInitialSandboxSeedCounter()
+{
+	const auto response = InternalDB::Get()->WithSync(
+		[&](auto& r)
+		{
+			std::array<std::string, 3> cmd = {"GETSET",
+											  std::string(kInitialSandboxSeedCounterKey), "1"};
+			return r.command(cmd.begin(), cmd.end());
+		});
+
+	return !response || response->type == REDIS_REPLY_NIL ||
+		   (response->type == REDIS_REPLY_STRING && response->str != nullptr &&
+			std::string_view(response->str, static_cast<size_t>(response->len)) == "0") ||
+		   (response->type == REDIS_REPLY_INTEGER && response->integer == 0);
+}
+}  // namespace
 
 void SandboxServer::Run()
 {
@@ -42,109 +62,6 @@ void SandboxServer::Run()
 								  UUIDGen::ToString(e.client.ID), e.client.ip.ToString(),
 								  e.ConnectedProxy.ToString());
 		});
-
-	using InitClock = std::chrono::steady_clock;
-	std::mutex shardTransferProbeMutex;
-	std::unordered_map<NetworkIdentity, InitClock::time_point> lastShardTransferProbeAt;
-	std::unordered_map<NetworkIdentity, InitClock::time_point> lastShardTransferResponseAt;
-	InitClock::time_point lastTransferReadinessLogAt = InitClock::time_point::min();
-	const auto shardTransferProbeSubscription =
-		Interlink::Get().GetPacketManager().Subscribe<LocalEntityListRequestPacket>(
-			[&](const LocalEntityListRequestPacket& packet, const PacketManager::PacketInfo& info)
-			{
-				if (packet.status != LocalEntityListRequestPacket::MsgStatus::eResponse ||
-					info.sender.Type != NetworkIdentityType::eShard ||
-					info.sender == NetworkCredentials::Get().GetID())
-				{
-					return;
-				}
-
-				std::lock_guard<std::mutex> lock(shardTransferProbeMutex);
-				lastShardTransferResponseAt[info.sender] = InitClock::now();
-			});
-
-	const auto areShardTransfersReadyForBootstrap =
-		[&]() -> bool
-		{
-			const NetworkIdentity selfID = NetworkCredentials::Get().GetID();
-			std::vector<std::string> livePeerKeys;
-			HealthManifest::Get().GetLivePings(livePeerKeys);
-
-			std::vector<NetworkIdentity> liveShardPeers;
-			liveShardPeers.reserve(livePeerKeys.size());
-			for (const std::string& livePeerKey : livePeerKeys)
-			{
-				ByteReader livePeerReader(livePeerKey);
-				NetworkIdentity livePeerIdentity;
-				livePeerIdentity.Deserialize(livePeerReader);
-				if (livePeerIdentity.Type != NetworkIdentityType::eShard || livePeerIdentity == selfID)
-				{
-					continue;
-				}
-				liveShardPeers.push_back(livePeerIdentity);
-			}
-
-			if (liveShardPeers.empty())
-			{
-				return true;
-			}
-
-			LocalEntityListRequestPacket probePacket;
-			probePacket.status = LocalEntityListRequestPacket::MsgStatus::eQuery;
-			probePacket.Request_IncludeMetadata = false;
-
-			const auto now = InitClock::now();
-			bool allPeersReady = true;
-			size_t readyPeerCount = 0;
-
-			for (const auto& peerID : liveShardPeers)
-			{
-				bool sendProbe = false;
-				bool peerReady = false;
-				{
-					std::lock_guard<std::mutex> lock(shardTransferProbeMutex);
-					const auto probeIt = lastShardTransferProbeAt.find(peerID);
-					const auto responseIt = lastShardTransferResponseAt.find(peerID);
-					const bool responseAfterProbe =
-						responseIt != lastShardTransferResponseAt.end() &&
-						(probeIt == lastShardTransferProbeAt.end() ||
-						 responseIt->second >= probeIt->second);
-					peerReady = responseAfterProbe && Interlink::Get().IsConnectedTo(peerID);
-					if (!peerReady &&
-						(probeIt == lastShardTransferProbeAt.end() ||
-						 (now - probeIt->second) >= std::chrono::milliseconds(250)))
-					{
-						lastShardTransferProbeAt[peerID] = now;
-						sendProbe = true;
-					}
-				}
-
-				if (peerReady)
-				{
-					++readyPeerCount;
-					continue;
-				}
-
-				allPeersReady = false;
-				if (sendProbe)
-				{
-					Interlink::Get().SendMessage(peerID, probePacket,
-												 NetworkMessageSendFlag::eReliableNow);
-				}
-			}
-
-			if (!allPeersReady &&
-				(lastTransferReadinessLogAt == InitClock::time_point::min() ||
-				 (now - lastTransferReadinessLogAt) >= std::chrono::seconds(1)))
-			{
-				logger.DebugFormatted(
-					"Sandbox shard bootstrap is waiting for shard transfer readiness: {}/{} peers ready.",
-					readyPeerCount, liveShardPeers.size());
-				lastTransferReadinessLogAt = now;
-			}
-
-			return allPeersReady;
-		};
 
 	bool initialEntitySeedHandled = false;
 	while (!ShouldShutdown && !initialEntitySeedHandled)
@@ -169,7 +86,6 @@ void SandboxServer::Run()
 			}
 
 			const BoundsID boundID = BoundLeaser::Get().GetBoundID();
-			const long long entityOwnerEntries = InternalDB::Get()->HLen("Entity:EntityOwner");
 			const size_t localEntityCount = EntityLedger::Get().GetEntityCount();
 			if (!BoundLeaser::Get().HasBound() || BoundLeaser::Get().GetBoundID() != boundID)
 			{
@@ -177,18 +93,38 @@ void SandboxServer::Run()
 				std::this_thread::sleep_for(std::chrono::milliseconds(250));
 				continue;
 			}
-			if (boundID == 0 && entityOwnerEntries == 0 && localEntityCount == 0)
+			if (boundID == 0 && localEntityCount == 0)
 			{
-				if (!areShardTransfersReadyForBootstrap())
+				vec3 spawnCenter = vec3(0, 0, 0);
+				bool hasSpawnCenter = false;
+				BoundLeaser::Get().GetBound(
+					[&](const IBounds& bound)
+					{
+						spawnCenter = bound.GetCenter();
+						hasSpawnCenter = true;
+					});
+				if (!hasSpawnCenter || !BoundLeaser::Get().HasBound() ||
+					BoundLeaser::Get().GetBoundID() != boundID)
 				{
+					logger.Warning(
+						"Sandbox shard could not resolve its claimed bound center during init; retrying bootstrap.");
 					std::this_thread::sleep_for(std::chrono::milliseconds(100));
+					continue;
+				}
+
+				if (!TryClaimInitialSandboxSeedCounter())
+				{
+					logger.DebugFormatted(
+						"Skipping initial sandbox entity spawn. Bound {} did not win the atomic seed claim.",
+						boundID);
+					initialEntitySeedHandled = true;
 					continue;
 				}
 
 				size_t spawnedEntityCount = 0;
 				std::mt19937 rng(std::random_device{}());
 				std::uniform_real_distribution<float> dist(0.0f, 1.0f);
-				for (int i = 0; i < 100; i++)
+				for (int i = 0; i < kInitialSandboxEntityCount; i++)
 				{
 					float z = dist(rng) * 2.0f - 1.0f;					 // z in [-1, 1]
 					float theta = dist(rng) * 2.0f * glm::pi<float>();	 // angle around Z
@@ -200,32 +136,24 @@ void SandboxServer::Run()
 
 					vec3 velocityVec = vec3(x, y, 0);
 					AtlasTransform t;
-					t.position = vec3(0, 0, 0);
-					// Fallback if k3d shard-to-shard bootstrap remains unreliable:
-					// vec3 spawnCenter = vec3(0, 0, 0);
-					// BoundLeaser::Get().GetBound(
-					// 	[&](const IBounds& bound)
-					// 	{
-					// 		spawnCenter = bound.GetCenter();
-					// 	});
-					// const float spawnRadius = dist(rng) * 5.0f;
-					// t.position =
-					// 	spawnCenter + vec3(std::cos(theta), std::sin(theta), 0.0f) * spawnRadius;
+					const float spawnRadius = dist(rng) * 5.0f;
+					t.position =
+						spawnCenter + vec3(std::cos(theta), std::sin(theta), 0.0f) * spawnRadius;
 					ByteWriter metadataWriter;
 					metadataWriter.vec3(velocityVec);
 					AtlasNet_CreateEntity(t, metadataWriter.bytes());
 					++spawnedEntityCount;
 				}
 				logger.DebugFormatted(
-					"Seeded {} initial sandbox entities on bound {} after shard transfer readiness succeeded. Local entity count is now {}.",
+					"Seeded {} initial sandbox entities on bound {} after winning the atomic seed claim. Local entity count is now {}.",
 					spawnedEntityCount, boundID,
 					EntityLedger::Get().GetEntityCount());
 			}
 			else
 			{
 				logger.DebugFormatted(
-					"Skipping initial sandbox entity spawn. Bound ID: {} Entity:EntityOwner entries: {} local entities: {}",
-					boundID, entityOwnerEntries, localEntityCount);
+					"Skipping initial sandbox entity spawn. Bound ID: {} local entities: {}",
+					boundID, localEntityCount);
 			}
 
 			initialEntitySeedHandled = true;
