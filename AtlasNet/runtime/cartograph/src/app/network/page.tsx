@@ -88,6 +88,7 @@ export default function NetworkTelemetryPage() {
   const latestTelemetry = useNetworkTelemetry({
     intervalMs: telemetryPollIntervalMs,
     enabled: ENABLE_NETWORK_TELEMETRY,
+    includeLiveIds: false,
     resetOnException: false,
     resetOnHttpError: false,
     onHttpError: () => {

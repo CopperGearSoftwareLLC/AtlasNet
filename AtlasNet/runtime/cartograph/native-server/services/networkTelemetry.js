@@ -81,6 +81,7 @@ function buildNetworkTelemetry(ids, rows, options = {}) {
   const liveIdSet = new Set(normalizedIds);
 
   const rowsByShard = new Map();
+  const inferredNodeIds = new Set();
   if (Array.isArray(rows)) {
     for (const row of rows) {
       if (!Array.isArray(row) || row.length < 13) {
@@ -91,6 +92,11 @@ function buildNetworkTelemetry(ids, rows, options = {}) {
       const shardId = String(decoded.shardId ?? decoded.IdentityId ?? '').trim();
       if (shardId.length === 0) {
         continue;
+      }
+      inferredNodeIds.add(shardId);
+      const targetId = String(decoded.targetId ?? '').trim();
+      if (targetId.length > 0) {
+        inferredNodeIds.add(targetId);
       }
       if (includeLiveIds && liveIdSet.size > 0 && !liveIdSet.has(shardId)) {
         continue;
@@ -112,12 +118,12 @@ function buildNetworkTelemetry(ids, rows, options = {}) {
     orderedShardIds.push(id);
   }
   if (!includeLiveIds || liveIdSet.size === 0) {
-    for (const shardId of Array.from(rowsByShard.keys()).sort()) {
-      if (seen.has(shardId)) {
+    for (const nodeId of Array.from(inferredNodeIds.values()).sort()) {
+      if (seen.has(nodeId)) {
         continue;
       }
-      seen.add(shardId);
-      orderedShardIds.push(shardId);
+      seen.add(nodeId);
+      orderedShardIds.push(nodeId);
     }
   }
 
