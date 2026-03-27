@@ -301,6 +301,41 @@ async function readLiveShardHealthSnapshot(client) {
   return { liveShardIds, liveShardFieldKeys };
 }
 
+async function readLiveInternalHealthSnapshot(client) {
+  const fieldKeys =
+    typeof client.hkeysBuffer === 'function'
+      ? await client.hkeysBuffer(HEALTH_PING_KEY)
+      : await client.hkeys(HEALTH_PING_KEY);
+
+  const liveIds = [];
+  const liveFieldKeys = [];
+  if (!Array.isArray(fieldKeys) || fieldKeys.length === 0) {
+    return { liveIds, liveFieldKeys };
+  }
+
+  const nowSeconds = Date.now() / 1000;
+  for (const rawField of fieldKeys) {
+    const identity = decodeNetworkIdentity(rawField).trim();
+    if (!identity || identity.startsWith('eGameClient') || identity.startsWith('eInvalid')) {
+      continue;
+    }
+
+    const rawExpiry =
+      typeof client.hgetBuffer === 'function'
+        ? await client.hgetBuffer(HEALTH_PING_KEY, rawField)
+        : await client.hget(HEALTH_PING_KEY, rawField);
+    const expiresAtSeconds = parseHealthExpirySeconds(rawExpiry);
+    if (expiresAtSeconds == null || expiresAtSeconds <= nowSeconds) {
+      continue;
+    }
+
+    liveIds.push(identity);
+    liveFieldKeys.push(rawField);
+  }
+
+  return { liveIds, liveFieldKeys };
+}
+
 function parseGridShapeBoundsRaw(raw, offset) {
   if (!Buffer.isBuffer(raw) || offset + GRID_SHAPE_SERIALIZED_SIZE_BYTES > raw.length) {
     return null;
@@ -1102,10 +1137,10 @@ async function readNetworkTelemetryFromDatabase(options = {}) {
   const clientScope = options.dbClientScope || 'network-telemetry';
   return (
     (await withInternalDatabase(async (client) => {
-      const liveShardIds = [];
+      const liveIds = [];
       if (includeLiveIds) {
-        const healthSnapshot = await readLiveShardHealthSnapshot(client);
-        liveShardIds.push(...healthSnapshot.liveShardIds);
+        const healthSnapshot = await readLiveInternalHealthSnapshot(client);
+        liveIds.push(...healthSnapshot.liveIds);
       }
 
       const allTelemetry = await client.hgetall(NETWORK_TELEMETRY_KEY);
@@ -1127,7 +1162,7 @@ async function readNetworkTelemetryFromDatabase(options = {}) {
         }
       }
 
-      return buildNetworkTelemetry(liveShardIds, rows);
+      return buildNetworkTelemetry(liveIds, rows);
     }, { clientScope })) || []
   );
 }

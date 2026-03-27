@@ -24,7 +24,8 @@ void NetworkTelemetry::GetLivePingIDs(std::vector<std::string>& out_live_ids, st
         NetworkIdentity id;
         id.Deserialize(br);
 
-        if (id.Type != NetworkIdentityType::eShard) {
+        if (!id.IsInternal() || id.Type == NetworkIdentityType::eInvalid ||
+            id.Type == NetworkIdentityType::eAtlasNetInitial) {
             continue;
         }
 
