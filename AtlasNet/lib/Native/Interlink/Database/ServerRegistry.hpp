@@ -25,6 +25,8 @@ class ServerRegistry:public Singleton<ServerRegistry>
     std::optional<IPAddress> GetIPOfID(const NetworkIdentity& ID);
     bool ExistsInRegistry(const NetworkIdentity& ID) const;
     void ClearAll();
+    size_t PruneEntriesMissingHealthPings(
+		const std::unordered_map<std::string, double>& healthPings, double nowSeconds);
     //std::optional<NetworkIdentity> GetIDOfIP(IPAddress ID,bool IgnorePort);
     void RegisterPublicAddress(const NetworkIdentity& ID, const IPAddress& address);
     std::optional<IPAddress> GetPublicAddress(const NetworkIdentity& ID);

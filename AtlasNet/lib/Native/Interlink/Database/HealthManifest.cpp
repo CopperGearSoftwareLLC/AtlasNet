@@ -113,6 +113,10 @@ void HealthManifest::HealthUpdate(const NetworkIdentity& identifier)
 	try
 	{
 		RefreshServerRegistryFromHealthPing(identifier);
+
+		std::unordered_map<std::string, double> allPings;
+		HealthManifest::Get().GetAllPings(allPings);
+		ServerRegistry::Get().PruneEntriesMissingHealthPings(allPings, now);
 	}
 	catch (...)
 	{
