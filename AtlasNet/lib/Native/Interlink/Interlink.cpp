@@ -189,6 +189,76 @@ IPAddress BuildInterlinkAddress(const std::string& ip, const PortType port)
 	return address;
 }
 
+void RefreshShardPresenceInDatabase(Log& logger)
+{
+	if (NetworkCredentials::Get().GetID().Type != NetworkIdentityType::eShard)
+	{
+		return;
+	}
+
+	const std::string advertiseIp = ResolveInterlinkAdvertiseIp();
+	if (advertiseIp.empty())
+	{
+		logger.Warning(
+			"[Interlink] Skipping shard presence refresh because advertise IP could not be resolved.");
+		return;
+	}
+
+	ServerRegistry::Get().RegisterSelf(NetworkCredentials::Get().GetID(),
+									   BuildInterlinkAddress(advertiseIp, _PORT_INTERLINK));
+
+	NodeManifestEntry entry;
+	if (const auto nodeName = GetNonEmptyEnv("NODE_NAME"); nodeName.has_value())
+	{
+		entry.nodeName = *nodeName;
+	}
+	if (const auto podName = GetNonEmptyEnv("POD_NAME"); podName.has_value())
+	{
+		entry.podName = *podName;
+	}
+	if (const auto podIp = GetNonEmptyEnv("POD_IP"); podIp.has_value())
+	{
+		entry.podIP = *podIp;
+	}
+	else
+	{
+		entry.podIP = advertiseIp;
+	}
+
+	if (entry.nodeName.empty() || entry.podName.empty())
+	{
+		try
+		{
+			if (const auto swarmPlacement = ResolveSwarmPlacementInfoFromDocker();
+				swarmPlacement.has_value())
+			{
+				if (entry.nodeName.empty() && !swarmPlacement->nodeName.empty())
+				{
+					entry.nodeName = swarmPlacement->nodeName;
+				}
+				if (entry.podName.empty() && !swarmPlacement->taskName.empty())
+				{
+					entry.podName = swarmPlacement->taskName;
+				}
+			}
+		}
+		catch (const std::exception& ex)
+		{
+			logger.DebugFormatted("[Interlink] Failed to resolve swarm placement metadata: {}",
+								  ex.what());
+		}
+		catch (...)
+		{
+			logger.Debug("[Interlink] Failed to resolve swarm placement metadata.");
+		}
+	}
+
+	NodeManifest::Get().RegisterShardNode(NetworkCredentials::Get().GetID(), entry);
+	logger.DebugFormatted("[Interlink] Refreshed shard presence for {} on node '{}' pod '{}'",
+						  NetworkCredentials::Get().GetID().ToString(), entry.nodeName,
+						  entry.podName);
+}
+
 void RequestShardTerminationAfterWatchdogLoss(Log& logger, const NetworkIdentity& disconnectedID)
 {
 	if (NetworkCredentials::Get().GetID().Type != NetworkIdentityType::eShard ||
@@ -627,6 +697,11 @@ void Interlink::CallbackOnConnected(SteamCBInfo info)
 	else
 	{
 		logger.DebugFormatted(" - {} Connected", target.ToString());
+		if (NetworkCredentials::Get().GetID().Type == NetworkIdentityType::eShard &&
+			target == NetworkIdentity::MakeIDWatchDog())
+		{
+			RefreshShardPresenceInDatabase(logger);
+		}
 	}
 
 	// deliver queued messages: move out queued messages under write lock, then release and send
