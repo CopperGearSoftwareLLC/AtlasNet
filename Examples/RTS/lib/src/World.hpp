@@ -4,12 +4,14 @@
 #include <boost/container/flat_map.hpp>
 #include <boost/geometry.hpp>
 #include <memory>
+#include <mutex>
 #include <type_traits>
 #include <unordered_map>
 
 #include "Entity.hpp"
 #include "EntityID.hpp"
 #include "Global/Misc/Singleton.hpp"
+#include "Global/Misc/UUID.hpp"
 #include "Global/pch.hpp"
 namespace bg = boost::geometry;
 namespace bgi = boost::geometry::index;
@@ -21,15 +23,16 @@ using RTree3f = bgi::rtree<Value3f, bgi::quadratic<16>>;
 class World : public Singleton<World>
 {
 	boost::container::flat_map<EntityID, std::unique_ptr<Entity>> entities;
+	std::mutex entityMutex;
 	RTree3f aabbTree;
-	std::atomic<EntityID> NextEntityID = 0;
 
    public:
 	template <typename T>
 		requires std::is_base_of_v<Entity, T>
 	[[nodiscard]] T& CreateEntity()
 	{
-		EntityID ID = NextEntityID++;
+		std::unique_lock<std::mutex> lock(entityMutex);
+		EntityID ID = UUIDGen::Gen();
 
 		std::unique_ptr<Entity> newEntity = std::make_unique<T>(ID);
 		ASSERT(newEntity, "Failed to create entity");
@@ -47,30 +50,49 @@ class World : public Singleton<World>
 		ASSERT(e, "FAILED CAST");
 		return *e;
 	}
+
+	template <typename T>
+		requires std::is_base_of_v<Entity, T>
+		T* TryGetEntity(EntityID ID)
+	{
+		if (!entities.contains(ID))
+
+			return nullptr;
+		T* e = dynamic_cast<T*>(entities.at(ID).get());
+		return e;
+	}
+	void DeleteEntity(EntityID ID)
+	{
+		std::unique_lock<std::mutex> lock(entityMutex);
+		ASSERT(entities.contains(ID), "INVALID ID");
+		entities.erase(ID);
+	}
 	void UpdateAllTransforms();
 	void DebugMenu();
 	void DebugDrawAABBTree();
 	void UpdateAll(float deltaTime);
 
-	#ifdef RTS_CLIENT
-	void RenderAll();		
-	#endif
+#ifdef RTS_CLIENT
+	void RenderAll();
+#endif
 	template <typename FN>
 		requires std::is_invocable_v<FN, Entity&>
 	void ForEachEntity(FN&& f)
 	{
+		std::unique_lock<std::mutex> lock(entityMutex);
 		for (auto& [ID, en] : entities)
 		{
 			f(*en);
 		}
 	}
-	const decltype(aabbTree)& GetAABBTree() const 
-	{return aabbTree;}
+	const decltype(aabbTree)& GetAABBTree() const { return aabbTree; }
 	std::optional<EntityID> Raycast(const glm::vec2& ndc, const glm::mat4& viewProj);
+
+	bool QueryBox(const Box3f& box, std::vector<EntityID>& outEntities) const;
 
    private:
 	void UpdateEntityRecursive(Entity& entity, float deltaTime);
-		#ifdef RTS_CLIENT
-		void RenderEntityRecursive(Entity& entity);
-		#endif
+#ifdef RTS_CLIENT
+	void RenderEntityRecursive(Entity& entity);
+#endif
 };

@@ -1,7 +1,10 @@
 #include "WorkerEntity.hpp"
 
+#include "PlayerColors.hpp"
+
 #ifdef RTS_CLIENT
 #include <GL/gl.h>
+
 #include "Entities/Camera.hpp"
 #include "GL/VertexArray.hpp"
 #endif
@@ -27,7 +30,7 @@ Worker::Worker(EntityID _ID)
 	vao.SetAttribute(0, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(float), (void*)0);
 	vao.Unbind();
 #endif
-	SetCollider(AABB3f(vec3(-1)+vec3(0,1,0), vec3(1)+vec3(0,1,0)));
+	SetCollider(AABB3f(vec3(-1) + vec3(0, 1, 0), vec3(1) + vec3(0, 1, 0)));
 }
 #ifdef RTS_CLIENT
 void Worker::Render()

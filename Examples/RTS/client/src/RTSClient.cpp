@@ -1,8 +1,11 @@
 #include "RTSClient.hpp"
 
+#include <algorithm>
+#include <boost/geometry/algorithms/detail/expand/interface.hpp>
 #include <glm/gtc/quaternion.hpp>
 #include <iostream>
 #include <thread>
+#include <vector>
 
 #include "AtlasNetClient.hpp"
 #include "Debug/DebugDraw.hpp"
@@ -11,13 +14,16 @@
 #include "Entities/FloorEntity.hpp"
 #include "Entities/WorkerEntity.hpp"
 #include "Entity.hpp"
+#include "EntityID.hpp"
 #include "GLFW/glfw3.h"
 #include "Global/pch.hpp"
 #include "PlayerColors.hpp"
 #include "Window.hpp"
 #include "World.hpp"
+#include "commands/GameStateCommand.hpp"
 #include "commands/PlayerAssignStateCommand.hpp"
 #include "commands/PlayerCameraMoveCommand.hpp"
+#include "commands/WorkerMoveCommand.hpp"
 #include "imgui.h"
 #include "imgui_internal.h"
 
@@ -38,9 +44,11 @@ int main(int argc, char** argv)
 void RTSClient::Run(const IPAddress& address)
 {
 	Window::Ensure();
-
+	DebugDraw::Ensure();
 	Window::Get().PreRender();
+
 	camera = &World::Get().CreateEntity<Camera>();
+
 	camera->SetPerspective(false);
 	camera->transform.Pos = {0, 0, 200};
 	RenderScreenText("Connecting to server...", vec4(1, 1, 0, 1));
@@ -49,6 +57,9 @@ void RTSClient::Run(const IPAddress& address)
 	AtlasNetClient::Get().GetCommandBus().Subscribe<PlayerAssignStateCommand>(
 		[this](const auto& recvHeader, const auto& command)
 		{ OnPlayerAssignStateCommand(recvHeader, command); });
+	AtlasNetClient::Get().GetCommandBus().Subscribe<GameStateCommand>(
+		[this](const auto& recvHeader, const auto& command)
+		{ onGameStateCommand(recvHeader, command); });
 	AtlasNetClient::InitializeProperties properties;
 	logger.DebugFormatted("Connecting To AtlasNet at {}", address.ToString());
 	properties.AtlasNetProxyIP = address;
@@ -58,14 +69,14 @@ void RTSClient::Run(const IPAddress& address)
 	CameraDummy.Own(camera->GetID());
 	CameraDummy.transform.Rot = quat(radians(vec3(-35, -45, 0)));
 	cameraPivot = &CameraDummy;
-	std::mt19937 rng(std::random_device{}());
-	std::uniform_real_distribution<float> dist(-10.0f, 10.0f);
-
-	for (int i = 0; i < 10; i++)
-	{
-		auto& worker = World::Get().CreateEntity<Worker>();
-		worker.transform.Pos = vec3(dist(rng), 0.0f, dist(rng));
-	}
+	// std::mt19937 rng(std::random_device{}());
+	// std::uniform_real_distribution<float> dist(-10.0f, 10.0f);
+	//
+	// for (int i = 0; i < 10; i++)
+	//{
+	//	auto& worker = World::Get().CreateEntity<Worker>();
+	//	worker.transform.Pos = vec3(dist(rng), 0.0f, dist(rng));
+	//}
 	World::Get().CreateEntity<FloorEntity>().transform.Scale = vec3(100, 1, 100);
 	using clock = std::chrono::high_resolution_clock;
 
@@ -111,6 +122,31 @@ void RTSClient::Run(const IPAddress& address)
 		Update(deltaTime);	// variable rate (input, camera, etc.)
 		Render(deltaTime);	// can use alpha if interpolating
 		Window::Get().PostRender();
+
+		for (const auto& worker : WorkersToParse)
+		{
+			vec3 worldPos = worker.Position;
+			std::swap(worldPos.y, worldPos.z);
+			if (!RemoteID2LocalID.contains(worker.ID))
+			{
+				auto& newWorker = World::Get().CreateEntity<Worker>();
+				RemoteID2LocalID[worker.ID] = newWorker.GetID();
+				LocalID2RemoteID[newWorker.GetID()] = worker.ID;
+			}
+			Worker& localWorker = World::Get().GetEntity<Worker>(RemoteID2LocalID[worker.ID]);
+			// localWorker.SetColorOverride(PlayerTeamsToColor(worker.team));
+			localWorker.transform.Pos = worldPos;
+		}
+		// for (const auto& [remoteID, localID] : RemoteID2LocalID)
+		//{
+		//	if (std::none_of(WorkersToParse.begin(), WorkersToParse.end(),
+		//					 [&](const WorkerData& w) { return w.ID == remoteID; }))
+		//	{
+		//		World::Get().DeleteEntity(localID);
+		//		RemoteID2LocalID.erase(remoteID);
+		//	}
+		// }
+		WorkersToParse.clear();
 	}
 }
 
@@ -178,23 +214,96 @@ void RTSClient::OnPlayerAssignStateCommand(const NetServerStateHeader& header,
 }
 void RTSClient::InputLogic()
 {
+	if (ImGui::IsKeyReleased(ImGuiKey_P))
+	{
+		float PosRange = 100;
+		// random location within -100/100 on xz plane
+
+		std::mt19937 rng(std::random_device{}());
+		std::uniform_real_distribution<float> dist(-100.0f, 100.0f);
+		WorkerMoveCommand moveCommand;
+
+		for (const auto& wID : SelectedWorkers)
+		{
+			if (LocalID2RemoteID.contains(wID))
+			{
+				Worker& worker = World::Get().GetEntity<Worker>(wID);
+				vec3 p = vec3(dist(rng), 0, dist(rng));
+				moveCommand.Moves.push_back({LocalID2RemoteID.at(wID), p});
+			}
+		}
+		AtlasNetClient::Get().GetCommandBus().Dispatch(moveCommand);
+	}
+	static vec2 aabbStart;
 	if (ImGui::IsMouseClicked(ImGuiMouseButton_Left))
 	{
-		const auto HitEntID =
-			World::Get().Raycast(Window::Get().GetMousePosNDC(), camera->GetViewProjMat());
-		if (HitEntID.has_value())
+		aabbStart = Window::Get().GetMousePosNDC();
+	}
+	if (ImGui::IsMouseReleased(ImGuiMouseButton_Left))
+	{
+		if (!ImGui::IsKeyDown(ImGuiKey_LeftShift))
 		{
-			Worker& worker = World::Get().GetEntity<Worker>(*HitEntID);
-			worker.SetColorOverride(WorkerSelectedColor);
-			if (!ImGui::IsKeyDown(ImGuiKey_LeftShift))
+			for (EntityID wID : SelectedWorkers)
 			{
-				for (const auto& wID : SelectedWorkers)
+				Worker* worker = World::Get().TryGetEntity<Worker>(wID);
+				if (worker)
 				{
-					World::Get().GetEntity<Worker>(wID).ClearColorOVerride();
+					worker->ClearColorOVerride();
 				}
-				SelectedWorkers.clear();
 			}
-			SelectedWorkers.insert(worker.GetID());
+			SelectedWorkers.clear();
+		}
+		vec2 aabbEnd = Window::Get().GetMousePosNDC();
+		if (aabbStart.x > aabbEnd.x)
+			std::swap(aabbStart.x, aabbEnd.x);
+		if (aabbStart.y > aabbEnd.y)
+			std::swap(aabbStart.y, aabbEnd.y);
+		std::vector<glm::vec3> frustumCorners;
+		glm::mat4 VP = camera->GetViewProjMat();
+		glm::mat4 invVP = glm::inverse(VP);
+
+		for (float z : {-1.0f, 1.0f})  // near/far in NDC
+		{
+			for (float x : {aabbStart.x, aabbEnd.x})
+				for (float y : {aabbStart.y, aabbEnd.y})
+				{
+					glm::vec4 p = invVP * glm::vec4(x, y, z, 1.0f);
+					frustumCorners.push_back(glm::vec3(p));
+				}
+		}
+		Box3f selectionBox;
+		for (const auto& corner : frustumCorners)
+		{
+			bg::expand(selectionBox,
+					   bg::model::point<float, 3, bg::cs::cartesian>(corner.x, corner.y, corner.z));
+		}
+		std::vector<EntityID> Candidates;
+		std::vector<Value3f> results;
+		World::Get().GetAABBTree().query(bgi::intersects(selectionBox),
+										 std::back_inserter(results));
+		Candidates.reserve(results.size());
+		for (const auto& [box, id] : results)
+		{
+			Candidates.push_back(id);
+		}
+		for (EntityID ID : Candidates)
+		{
+			vec3 pos = World::Get().GetEntity<Entity>(ID).transform.Pos;
+			vec4 NDCPos = VP * vec4(pos, 1.0f);
+			NDCPos /= NDCPos.w;
+			if (NDCPos.x >= std::min(aabbStart.x, aabbEnd.x) &&
+				NDCPos.x <= std::max(aabbStart.x, aabbEnd.x) &&
+				NDCPos.y >= std::min(aabbStart.y, aabbEnd.y) &&
+				NDCPos.y <= std::max(aabbStart.y, aabbEnd.y))
+			{
+				Worker* worker = World::Get().TryGetEntity<Worker>(ID);
+				if (worker)
+
+				{
+					SelectedWorkers.insert(ID);
+					worker->SetColorOverride(vec3(0, 1, 0));
+				}
+			}
 		}
 	}
 
@@ -240,14 +349,17 @@ void RTSClient::InputLogic()
 		{
 			glm::vec3 startWorld = NDCToWorldXZ(RightClickStartNDC, camera->GetViewProjMat());
 			glm::vec3 endWorld = NDCToWorldXZ(mouseNDC, camera->GetViewProjMat());
-
+			WorkerMoveCommand moveCommand;
 			// Single click → move all selected workers to this point
 			if (EndWorkerPositions.empty())
 			{
 				for (auto wID : SelectedWorkers)
 				{
-					Worker& worker = World::Get().GetEntity<Worker>(wID);
-					worker.MoveTo(endWorld);  // implement MoveToXZ for world pos
+					if (LocalID2RemoteID.contains(wID))
+					{
+						Worker& worker = World::Get().GetEntity<Worker>(wID);
+						moveCommand.Moves.push_back({LocalID2RemoteID.at(wID), endWorld});
+					}
 				}
 			}
 			else
@@ -256,10 +368,15 @@ void RTSClient::InputLogic()
 				for (auto wID : SelectedWorkers)
 				{
 					Worker& worker = World::Get().GetEntity<Worker>(wID);
-					worker.MoveTo(EndWorkerPositions[i]);  // implement MoveToXZ for world pos
+					if (LocalID2RemoteID.contains(worker.GetID()))
+					{
+						moveCommand.Moves.push_back(
+							{LocalID2RemoteID.at(worker.GetID()), EndWorkerPositions[i]});
+					}
 					i++;
 				}
 			}
+			AtlasNetClient::Get().GetCommandBus().Dispatch(moveCommand);
 		}
 		bRightClickDragging = false;
 	}
@@ -291,4 +408,19 @@ void RTSClient::RenderScreenText(const std::string_view text, vec4 color)
 	drawList->AddText(nullptr, fontSize, pos,
 					  IM_COL32(intColor.r, intColor.g, intColor.b, intColor.a), text.data());
 	Window::Get().PostRender();
+}
+void RTSClient::onGameStateCommand(const NetServerStateHeader& header,
+								   const GameStateCommand& command)
+{
+	for (const auto& worker : command.Workers)
+	{
+		vec3 worldPos = worker.Position;
+		std::swap(worldPos.y, worldPos.z);
+		float WorkerSize = 1.0f;
+		// DebugDraw::Get().DrawBox(worker.Position - vec3(WorkerSize),
+		//						 worker.Position + vec3(WorkerSize),
+		//						 PlayerTeamsToColor(worker.team), false);
+
+		WorkersToParse.push_back(worker);
+	}
 }

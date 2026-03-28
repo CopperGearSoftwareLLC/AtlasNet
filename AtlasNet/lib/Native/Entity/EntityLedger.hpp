@@ -143,14 +143,16 @@ class EntityLedger : public Singleton<EntityLedger>
 	{
 		return _ReadLock([&]() { return _ExistsEntity(ID); });
 	}
-	[[nodiscard]] AtlasEntity GetAndEraseEntity(AtlasEntityID ID)
+	[[nodiscard]] std::optional<AtlasEntity> GetAndEraseEntity(AtlasEntityID ID)
 	{
 		return _WriteLock(
-			[&]()
+			[&]()->std::optional<AtlasEntity>
 			{
+				if (!_ExistsEntity(ID))
+					return std::nullopt;
 				AtlasEntity e = _GetEntity(ID);
 				_EraseEntity(ID);
-				return e;
+				return std::make_optional(e);
 			});
 	}
 

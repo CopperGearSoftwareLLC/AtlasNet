@@ -104,8 +104,8 @@ public:
             vec.resize(write); // remove dead ones
         }
 
-        logger.DebugFormatted("Dispatching {} callbacks to {}", alive.size(),
-                              pkt.GetPacketName());
+        //logger.DebugFormatted("Dispatching {} callbacks to {}", alive.size(),
+        //                      pkt.GetPacketName());
 
         // No locks here
         for (const auto& cb : alive)
