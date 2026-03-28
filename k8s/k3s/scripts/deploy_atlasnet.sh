@@ -129,10 +129,6 @@ fi
 : "${ATLASNET_HELM_RELEASE_NAME:=atlasnet}"
 : "${ATLASNET_CARTOGRAPH_INGRESS_CLASS_NAME:=nginx}"
 : "${ATLASNET_CARTOGRAPH_INGRESS_HOST:=cartograph.atlasnet.local}"
-: "${ATLASNET_INTERNAL_REDIS_CONNECT_RETRIES:=20}"
-: "${ATLASNET_INTERNAL_REDIS_RETRY_INTERVAL_MS:=500}"
-: "${ATLASNET_INTERNAL_REDIS_CONNECT_TIMEOUT_MS:=250}"
-: "${ATLASNET_INTERNAL_REDIS_SOCKET_TIMEOUT_MS:=1000}"
 : "${ATLASNET_K8S_LLM_ENABLED:=1}"
 : "${ATLASNET_LLM_IMAGE:=ghcr.io/ggml-org/llama.cpp:server}"
 : "${ATLASNET_LLM_SERVICE_PORT:=8080}"
@@ -171,10 +167,6 @@ echo " - sandbox server image: $ATLASNET_SANDBOX_SERVER_IMAGE"
 echo " - cartograph image: $ATLASNET_CARTOGRAPH_IMAGE"
 echo " - imagePullPolicy: $ATLASNET_IMAGE_PULL_POLICY"
 echo " - cartograph ingress host: $ATLASNET_CARTOGRAPH_INGRESS_HOST"
-echo " - internal redis connect retries: $ATLASNET_INTERNAL_REDIS_CONNECT_RETRIES"
-echo " - internal redis retry interval ms: $ATLASNET_INTERNAL_REDIS_RETRY_INTERVAL_MS"
-echo " - internal redis connect timeout ms: $ATLASNET_INTERNAL_REDIS_CONNECT_TIMEOUT_MS"
-echo " - internal redis socket timeout ms: $ATLASNET_INTERNAL_REDIS_SOCKET_TIMEOUT_MS"
 echo " - llm enabled: $ATLASNET_K8S_LLM_ENABLED"
 
 warn_if_mixed_arch_cluster
@@ -192,10 +184,6 @@ helm upgrade --install "$ATLASNET_HELM_RELEASE_NAME" "$CHART_DIR" \
   --set-string cartograph.mode="production" \
   --set-string cartograph.ingress.className="$ATLASNET_CARTOGRAPH_INGRESS_CLASS_NAME" \
   --set-string cartograph.ingress.host="$ATLASNET_CARTOGRAPH_INGRESS_HOST" \
-  --set-string internalRedis.connectRetries="$ATLASNET_INTERNAL_REDIS_CONNECT_RETRIES" \
-  --set-string internalRedis.retryIntervalMs="$ATLASNET_INTERNAL_REDIS_RETRY_INTERVAL_MS" \
-  --set-string internalRedis.connectTimeoutMs="$ATLASNET_INTERNAL_REDIS_CONNECT_TIMEOUT_MS" \
-  --set-string internalRedis.socketTimeoutMs="$ATLASNET_INTERNAL_REDIS_SOCKET_TIMEOUT_MS" \
   --set llm.enabled="$ATLASNET_K8S_LLM_ENABLED" \
   --set-string llm.image="$ATLASNET_LLM_IMAGE" \
   --set-string llm.servicePort="$ATLASNET_LLM_SERVICE_PORT" \

@@ -30,14 +30,10 @@ class Redis : public Singleton<Redis>
 	std::map<Options, std::weak_ptr<RedisConnection>> redis_connections;
 	std::mutex connections_mutex; 
 
-	   public:
-		std::shared_ptr<RedisConnection> Connect(const Options& options, uint32_t max_retries = 0,
-												 uint32_t retry_interval_ms = 0,
-												 uint32_t connect_timeout_ms = 0,
-												 uint32_t socket_timeout_ms = 0);
-		std::shared_ptr<RedisConnection> ConnectNonCluster(const std::string& address, int32_t port,
-														   uint32_t max_retries = 0,
-														   uint32_t retry_interval_ms = 0,
-														   uint32_t connect_timeout_ms = 0,
-														   uint32_t socket_timeout_ms = 0);
-	};
+   public:
+	std::shared_ptr<RedisConnection> Connect(const Options& options, uint32_t max_retries = 0,
+											 uint32_t retry_interval_ms = 0);
+	std::shared_ptr<RedisConnection> ConnectNonCluster(const std::string& address, int32_t port,
+													   uint32_t max_retries = 0,
+													   uint32_t retry_interval_ms = 0);
+};

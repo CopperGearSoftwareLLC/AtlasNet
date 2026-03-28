@@ -9,12 +9,6 @@ images:
   cartograph: cartograph:latest
   internaldb: valkey/valkey-bundle:latest
 
-internalRedis:
-  connectRetries: 20
-  retryIntervalMs: 500
-  connectTimeoutMs: 250
-  socketTimeoutMs: 1000
-
 cartograph:
   mode: development
   ingress:

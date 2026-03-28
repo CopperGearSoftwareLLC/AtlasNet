@@ -1,9 +1,5 @@
 {{- $serverNodeName := required "values.serverNodeName is required" .Values.serverNodeName -}}
 {{- $imagePullPolicy := default "IfNotPresent" .Values.imagePullPolicy -}}
-{{- $internalRedisConnectRetries := default 20 .Values.internalRedis.connectRetries -}}
-{{- $internalRedisRetryIntervalMs := default 500 .Values.internalRedis.retryIntervalMs -}}
-{{- $internalRedisConnectTimeoutMs := default 250 .Values.internalRedis.connectTimeoutMs -}}
-{{- $internalRedisSocketTimeoutMs := default 1000 .Values.internalRedis.socketTimeoutMs -}}
 {{- $watchdogImage := required "values.images.watchdog is required" .Values.images.watchdog -}}
 {{- $proxyImage := required "values.images.proxy is required" .Values.images.proxy -}}
 {{- $shardImage := required "values.images.shard is required" .Values.images.shard -}}
@@ -188,14 +184,6 @@ spec:
               value: "$(INTERNALDB_SERVICE_HOST)"
             - name: INTERNAL_REDIS_PORT
               value: "$(INTERNALDB_SERVICE_PORT)"
-            - name: INTERNAL_REDIS_CONNECT_RETRIES
-              value: {{ printf "%v" $internalRedisConnectRetries | quote }}
-            - name: INTERNAL_REDIS_RETRY_INTERVAL_MS
-              value: {{ printf "%v" $internalRedisRetryIntervalMs | quote }}
-            - name: INTERNAL_REDIS_CONNECT_TIMEOUT_MS
-              value: {{ printf "%v" $internalRedisConnectTimeoutMs | quote }}
-            - name: INTERNAL_REDIS_SOCKET_TIMEOUT_MS
-              value: {{ printf "%v" $internalRedisSocketTimeoutMs | quote }}
             {{- if or $llmEnabled $llmEndpoint }}
             - name: ATLASNET_LLM_ENDPOINT
               value: {{ default (printf "http://atlasnet-llm:%d/v1/chat/completions" $llmServicePort) $llmEndpoint | quote }}
@@ -292,14 +280,6 @@ spec:
               value: "$(INTERNALDB_SERVICE_HOST)"
             - name: INTERNAL_REDIS_PORT
               value: "$(INTERNALDB_SERVICE_PORT)"
-            - name: INTERNAL_REDIS_CONNECT_RETRIES
-              value: {{ printf "%v" $internalRedisConnectRetries | quote }}
-            - name: INTERNAL_REDIS_RETRY_INTERVAL_MS
-              value: {{ printf "%v" $internalRedisRetryIntervalMs | quote }}
-            - name: INTERNAL_REDIS_CONNECT_TIMEOUT_MS
-              value: {{ printf "%v" $internalRedisConnectTimeoutMs | quote }}
-            - name: INTERNAL_REDIS_SOCKET_TIMEOUT_MS
-              value: {{ printf "%v" $internalRedisSocketTimeoutMs | quote }}
           ports:
             - name: interlink
               containerPort: 25555
@@ -481,14 +461,6 @@ spec:
               value: "$(INTERNALDB_SERVICE_HOST)"
             - name: INTERNAL_REDIS_PORT
               value: "$(INTERNALDB_SERVICE_PORT)"
-            - name: INTERNAL_REDIS_CONNECT_RETRIES
-              value: {{ printf "%v" $internalRedisConnectRetries | quote }}
-            - name: INTERNAL_REDIS_RETRY_INTERVAL_MS
-              value: {{ printf "%v" $internalRedisRetryIntervalMs | quote }}
-            - name: INTERNAL_REDIS_CONNECT_TIMEOUT_MS
-              value: {{ printf "%v" $internalRedisConnectTimeoutMs | quote }}
-            - name: INTERNAL_REDIS_SOCKET_TIMEOUT_MS
-              value: {{ printf "%v" $internalRedisSocketTimeoutMs | quote }}
           ports:
             - name: http
               containerPort: 3000
@@ -612,14 +584,6 @@ spec:
               value: "$(INTERNALDB_SERVICE_HOST)"
             - name: INTERNAL_REDIS_PORT
               value: "$(INTERNALDB_SERVICE_PORT)"
-            - name: INTERNAL_REDIS_CONNECT_RETRIES
-              value: {{ printf "%v" $internalRedisConnectRetries | quote }}
-            - name: INTERNAL_REDIS_RETRY_INTERVAL_MS
-              value: {{ printf "%v" $internalRedisRetryIntervalMs | quote }}
-            - name: INTERNAL_REDIS_CONNECT_TIMEOUT_MS
-              value: {{ printf "%v" $internalRedisConnectTimeoutMs | quote }}
-            - name: INTERNAL_REDIS_SOCKET_TIMEOUT_MS
-              value: {{ printf "%v" $internalRedisSocketTimeoutMs | quote }}
           ports:
             - name: interlink
               containerPort: 25555
