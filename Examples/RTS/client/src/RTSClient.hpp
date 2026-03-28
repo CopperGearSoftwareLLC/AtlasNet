@@ -1,6 +1,7 @@
 #pragma once
 
 #include <atomic>
+#include <unordered_map>
 #include <unordered_set>
 
 #include "Client/Client.hpp"
@@ -12,6 +13,7 @@
 #include "EntityID.hpp"
 #include "Global/Misc/Singleton.hpp"
 #include "PlayerColors.hpp"
+#include "commands/GameStateCommand.hpp"
 #include "commands/PlayerAssignStateCommand.hpp"
 class RTSClient : public Singleton<RTSClient>
 {
@@ -24,6 +26,9 @@ class RTSClient : public Singleton<RTSClient>
 	std::unordered_set<EntityID> SelectedWorkers;
 
 	std::optional<PlayerTeams> myAssignedTeam;
+	std::unordered_map<EntityID, EntityID> RemoteID2LocalID;
+	std::unordered_map<EntityID, EntityID> LocalID2RemoteID;
+	std::vector<WorkerData> WorkersToParse;
    public:
 	void Run(const IPAddress& address);
 
@@ -38,4 +43,5 @@ class RTSClient : public Singleton<RTSClient>
 	void RenderScreenText(const std::string_view text, vec4 color);
 	void OnPlayerAssignStateCommand(const NetServerStateHeader& header,
 									const PlayerAssignStateCommand& command);
+	void onGameStateCommand(const NetServerStateHeader& header, const GameStateCommand& command);
 };

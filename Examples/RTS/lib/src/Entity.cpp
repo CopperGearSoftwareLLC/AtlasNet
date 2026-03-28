@@ -1,5 +1,6 @@
 #include "Entity.hpp"
 
+#include "Global/Misc/UUID.hpp"
 #include "World.hpp"
 void Entity::UpdateTransforms(const mat4& parent)
 {
@@ -40,9 +41,9 @@ void Entity::RemoveChild(EntityID childID)
 void Entity::DebugTree()
 {
 	// Make the label show ID (and optionally parent)
-	std::string label = "Entity " + std::to_string(ID);
+	std::string label = "Entity " + UUIDGen::ToString(ID);
 	if (Parent.has_value())
-		label += " (Parent: " + std::to_string(*Parent) + ")";
+		label += " (Parent: " + UUIDGen::ToString(*Parent) + ")";
 
 	// ImGui tree node
 	if (ImGui::TreeNode(label.c_str()))

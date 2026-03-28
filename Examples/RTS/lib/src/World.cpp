@@ -7,6 +7,7 @@
 #include "Ray.hpp"
 void World::UpdateAllTransforms()
 {
+	std::unique_lock<std::mutex> lock(entityMutex);
 	// Start from all root entities (no parent)
 	for (auto& [ID, en] : entities)
 	{
@@ -19,6 +20,7 @@ void World::UpdateAllTransforms()
 #ifdef RTS_CLIENT
 void World::DebugMenu()
 {
+	std::unique_lock<std::mutex> lock(entityMutex);
 	ImGui::Begin("World Entities");
 	static bool DrawAABB = false;
 
@@ -64,6 +66,7 @@ void World::RenderEntityRecursive(Entity& entity)
 
 void World::RenderAll()
 {
+	std::unique_lock<std::mutex> lock(entityMutex);
 	for (auto& [ID, en] : entities)
 	{
 		// Only render root entities
@@ -74,6 +77,8 @@ void World::RenderAll()
 #endif
 void World::UpdateAll(float deltaTime)
 {
+	std::unique_lock<std::mutex> lock(entityMutex);
+
 	// 1. Update all entities recursively
 	for (auto& [ID, en] : entities)
 	{
@@ -120,6 +125,8 @@ void World::UpdateAll(float deltaTime)
 #ifdef RTS_CLIENT
 void World::DebugDrawAABBTree()
 {
+	std::unique_lock<std::mutex> lock(entityMutex);
+
 	if (aabbTree.size() == 0)
 		return;
 	glm::vec3 color = glm::vec3(0.2f + 0.1f,   // R
@@ -145,6 +152,7 @@ void World::DebugDrawAABBTree()
 #endif
 std::optional<EntityID> World::Raycast(const glm::vec2& ndc, const glm::mat4& viewProj)
 {
+	std::unique_lock<std::mutex> lock(entityMutex);
 	Ray ray = BuildRayFromNDC(ndc, viewProj);
 
 	glm::vec3 rayEnd = ray.origin + ray.dir * 10000.0f;
@@ -182,4 +190,15 @@ std::optional<EntityID> World::Raycast(const glm::vec2& ndc, const glm::mat4& vi
 	}
 
 	return result;
+}
+bool World::QueryBox(const Box3f& box, std::vector<EntityID>& outEntities) const
+
+{
+	std::vector<Value3f> queryResults;
+	aabbTree.query(bgi::intersects(box), std::back_inserter(queryResults));
+	for (const auto& [b, id] : queryResults)
+	{
+		outEntities.push_back(id);
+	}
+	return !queryResults.empty();
 }

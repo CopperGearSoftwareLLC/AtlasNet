@@ -7,6 +7,7 @@
 #include <glm/ext/scalar_constants.hpp>
 #include <iostream>
 #include <iterator>
+#include <mutex>
 #include <numbers>
 #include <thread>
 
@@ -19,13 +20,21 @@
 #include "Entity/Transform.hpp"
 #include "GameData.hpp"
 #include "Global/Misc/UUID.hpp"
+#include "Global/Serialize/ByteReader.hpp"
 #include "Global/Serialize/ByteWriter.hpp"
 #include "Global/pch.hpp"
 #include "Heuristic/BoundLeaser.hpp"
+#include "Interlink/Database/ServerRegistry.hpp"
+#include "Interlink/Interlink.hpp"
+#include "Network/NetworkEnums.hpp"
+#include "Network/NetworkIdentity.hpp"
+#include "Packet/WorkerMoveNotify.hpp"
+#include "Packet/WorkerRequestPacket.hpp"
 #include "PlayerData.hpp"
 #include "commands/GameStateCommand.hpp"
 #include "commands/PlayerAssignStateCommand.hpp"
 #include "commands/PlayerCameraMoveCommand.hpp"
+#include "commands/WorkerMoveCommand.hpp"
 int main()
 {
 	RTSServer::Get().Run();
@@ -41,6 +50,13 @@ void RTSServer::Run()
 	GetCommandBus().Subscribe<PlayerCameraMoveCommand>(
 		[this](const auto& recvHeader, const auto& command)
 		{ OnClientCameraMoveCommand(recvHeader, command); });
+	GetCommandBus().Subscribe<WorkerMoveCommand>([this](const auto& recvHeader, const auto& command)
+												 { OnWorkerMoveCommand(recvHeader, command); });
+	workerRequestSubscription = Interlink::Get().GetPacketManager().Subscribe<WorkerRequestPacket>(
+		[this](const auto& packet, const auto& info) { OnWorkerRequest(packet, info); });
+
+	WorkerMoveNotifySubscription = Interlink::Get().GetPacketManager().Subscribe<WorkerMoveNotify>(
+		[this](const auto& packet, const auto& info) { OnWorkerMoveNotify(packet, info); });
 	using Clock = std::chrono::steady_clock;
 
 	auto lastTime = Clock::now();
@@ -57,11 +73,33 @@ void RTSServer::Run()
 	{
 		AtlasNet_CreateEntity(AtlasTransform{});
 	}
+	const uint32_t WorkersPerClientOnStart = 25;
+	// Random generator setup (do this once, not per frame ideally)
+	static std::mt19937 rng(std::random_device{}());
+	std::uniform_real_distribution<float> dist(-100.0f, 100.0f);
+
+	for (uint32_t i = 0; i < WorkersPerClientOnStart; i++)
+	{
+		vec3 workerPos = vec3(dist(rng),  // X in [-100, 100]
+							  dist(rng),  // Y in [-100, 100]
+							  0.0f);
+
+		AtlasTransform t;
+		t.position = workerPos;
+
+		WorkerData wd;
+		wd.Position = t.position;
+		wd.ID = UUIDGen::Gen();
+
+		ByteWriter workerPayload;
+		wd.Serialize(workerPayload);
+
+		AtlasNet_CreateEntity(t, workerPayload.bytes());
+	}
 	uint64_t frameCount = 0;
 	double accumulatedTime = 0.0;
 	while (!ShouldShutdown)
 	{
-
 		const auto frameStart = Clock::now();
 
 		const std::chrono::duration<double> delta = frameStart - lastTime;
@@ -95,6 +133,87 @@ void RTSServer::Run()
 		}
 		SendGameStateData();
 		GetCommandBus().Flush();
+
+		{
+			std::unique_lock lock(localWorkersMutex);
+			localWorkers.clear();
+			EntityLedger::Get().ForEachEntityWrite(
+				std::execution::seq,
+				[this](AtlasEntity& e)
+				{
+					if (e.IsClient)
+						return;
+					if (e.payload.empty())
+						return;
+
+					WorkerData worker;
+					ByteReader br(e.payload);
+					worker.Deserialize(br);
+
+					{
+						std::lock_guard lock(unparsedTargetsMutex);
+						if (UnparsedWorkerTargets.contains(worker.ID))
+						{
+							worker.TargetPosition = UnparsedWorkerTargets[worker.ID];
+							worker.InitialPos = worker.Position;
+							worker.InMotion = true;
+							worker.MoveProgress = 0.0f;
+							UnparsedWorkerTargets.erase(worker.ID);
+							logger.DebugFormatted(
+								"Worker {} starting move from ({:.2f}, {:.2f}) to ({:.2f}, {:.2f})",
+								UUIDGen::ToString(worker.ID), worker.Position.x, worker.Position.y,
+								worker.TargetPosition.x, worker.TargetPosition.y);
+						};
+					}
+
+					if (worker.InMotion)
+					{
+						// simple linear movement logic for demonstration
+						vec3 direction = worker.TargetPosition - worker.InitialPos;
+						float distance = glm::length(direction);
+						if (distance > 0.01f)
+						{
+							direction = glm::normalize(direction);
+							float moveStep =
+								std::min(3.0f, distance * (1.0f - worker.MoveProgress));
+							worker.Position += direction * moveStep;
+							worker.MoveProgress += moveStep / distance;
+							if (worker.MoveProgress >= 1.0f)
+							{
+								worker.Position = worker.TargetPosition;
+								worker.InMotion = false;
+							}
+						}
+						logger.DebugFormatted(
+							"Worker {} moving. Current position: ({:.2f}, {:.2f}), Progress: "
+							"{:.2f}%",
+							UUIDGen::ToString(worker.ID), worker.Position.x, worker.Position.y,
+							worker.MoveProgress * 100.0f);
+						e.transform.position = worker.Position;
+					}
+					ByteWriter bw;
+					worker.Serialize(bw);
+					e.payload.assign(bw.as_string_view().begin(), bw.as_string_view().end());
+					localWorkers.push_back(worker);
+				});
+		}
+
+		for (const auto& server : ServerRegistry::Get().GetServers())
+		{
+			if (server.second.identifier.Type == NetworkIdentityType::eShard)
+			{
+				RemoteShardData& shardData = remoteShards[server.second.identifier.ID];
+
+				if (!shardData.waitingOnResponse)
+				{
+					WorkerRequestPacket request;
+					request.state = WorkerRequestPacket::State::eRequest;
+					Interlink::Get().SendMessage(server.first, request,
+												 NetworkMessageSendFlag::eReliableBatched);
+					shardData.waitingOnResponse = true;
+				}
+			}
+		}
 	}
 }
 void RTSServer::OnClientCameraMoveCommand(const NetClientIntentHeader& header,
@@ -121,39 +240,81 @@ void RTSServer::OnClientSpawn(const ClientSpawnInfo& c, const AtlasEntityMinimal
 	PlayerAssignStateCommand assignCommand;
 	assignCommand.yourTeam = playerData.playerColor;
 	GetCommandBus().Dispatch(c.client.ID, assignCommand);
-	const uint32_t WorkersPerClientOnStart = 20;
-	float radius = 10.0f;
-
-	for (uint32_t i = 0; i < WorkersPerClientOnStart; i++)
-	{
-		float progress = (float)i / WorkersPerClientOnStart;
-		float angle = progress * 2.0f * std::numbers::pi;
-
-		vec3 workerPos = radius * vec3(cos(angle), sin(angle), 0);
-
-		AtlasTransform t;
-		t.position = entity.transform.position + workerPos;
-
-		AtlasNet_CreateEntity(t);
-	}
 }
 void RTSServer::SendGameStateData()
 {
-	std::vector<AtlasEntityHandle> allEntities;
-
-	GlobalEntityLedger::Get().GetAllEntities(std::back_inserter(allEntities));
-	logger.DebugFormatted("Sending GameState update to clients. Entity count: {}",
-						  allEntities.size());
+	/* logger.DebugFormatted("Sending GameState update to clients. Worker count: {}",
+						  localWorkers.size()); */
 	GameStateCommand command;
-
-
-	logger.DebugFormatted("Got {} Worker datas", command.Workers.size());
-	for (const auto& w : command.Workers)
+	command.Workers.assign(localWorkers.begin(), localWorkers.end());
+	for (const auto& shardData : remoteShards)
 	{
-		logger.DebugFormatted("{}", glm::to_string(w.Position));
+		if (!shardData.second.waitingOnResponse)
+		{
+			command.Workers.insert(command.Workers.end(), shardData.second.workers.begin(),
+								   shardData.second.workers.end());
+		}
 	}
-	EntityLedger::Get().ForEachClientRead(std::execution::seq,
-										  [](const AtlasEntity& e) {
+	EntityLedger::Get().ForEachClientRead(std::execution::par, [&](const AtlasEntity& c)
+										  { GetCommandBus().Dispatch(c.Client_ID, command); });
+	GetCommandBus().Flush();
+}
+void RTSServer::OnWorkerRequest(const WorkerRequestPacket& request,
+								const PacketManager::PacketInfo& info)
+{
+	RemoteShardData& shardData = remoteShards[info.sender.ID];
+	if (request.state == WorkerRequestPacket::State::eResponse)
+	{
+		shardData.workers.assign(request.Workers.begin(), request.Workers.end());
+		shardData.waitingOnResponse = false;
+		/* logger.DebugFormatted("Received Worker data response from shard {}. Worker count: {}", */
+		/* 					  UUIDGen::ToString(info.sender.ID), shardData.workers.size()); */
+	}
+	else
+	{
+		std::unique_lock lock(localWorkersMutex);
+		/* logger.DebugFormatted("Received Worker data request from shard {}.",
+							  UUIDGen::ToString(info.sender.ID)); */
 
-										  });
+		WorkerRequestPacket response;
+		response.state = WorkerRequestPacket::State::eResponse;
+		response.Workers.assign(localWorkers.begin(), localWorkers.end());
+		Interlink::Get().SendMessage(info.sender, response,
+									 NetworkMessageSendFlag::eReliableBatched);
+	}
+}
+void RTSServer::OnWorkerMoveCommand(const NetClientIntentHeader& header,
+									const WorkerMoveCommand& command)
+{
+	std::lock_guard lock(unparsedTargetsMutex);
+	logger.DebugFormatted("Received WorkerMoveCommand from client {}. Move count: {}",
+						  UUIDGen::ToString(header.clientID), command.Moves.size());
+	for (const auto& move : command.Moves)
+	{
+		vec3 newPos = move.TargetPos;
+		std::swap(newPos.y, newPos.z);	// client-server coordinate system difference
+		UnparsedWorkerTargets[move.WorkerID] = newPos;
+	}
+
+	WorkerMoveNotify ackCommand;
+	for (const auto& move : command.Moves)
+	{
+		vec3 newPos = move.TargetPos;
+		std::swap(newPos.y, newPos.z);	// client-server coordinate system difference
+		ackCommand.WorkerPositions[move.WorkerID] = newPos;
+	}
+	for (const auto& shard : remoteShards)
+	{
+		Interlink::Get().SendMessage(NetworkIdentity::MakeIDShard(shard.first), ackCommand,
+									 NetworkMessageSendFlag::eReliableBatched);
+	}
+}
+void RTSServer::OnWorkerMoveNotify(const WorkerMoveNotify& notify,
+								   const PacketManager::PacketInfo& info)
+{
+	std::lock_guard lock(unparsedTargetsMutex);
+	for (const auto& [id, pos] : notify.WorkerPositions)
+	{
+		UnparsedWorkerTargets[id] = pos;
+	}
 }

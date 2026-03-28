@@ -9,6 +9,8 @@
 #ifdef RTS_CLIENT
 #include "imgui.h"
 #endif
+
+
 class Entity
 {
 	const EntityID ID;
@@ -53,4 +55,5 @@ class Entity
 	void SetParent(EntityID parentID);
 	void AddChild(EntityID childID);
 	void RemoveChild(EntityID childID);
+	
 };

@@ -269,8 +269,11 @@ void TransferCoordinator::OnEntityTransferPacketArrival(const EntityTransferPack
 			{
 				if (!EntityLedger::Get().ExistsEntity(EntityID))
 					continue;
-				commitData.entitySnapshots.push_back(
-					{EntityLedger::Get().GetAndEraseEntity(EntityID)});
+				std::optional<AtlasEntity> entityOpt = EntityLedger::Get().GetAndEraseEntity(EntityID);
+				if (entityOpt.has_value())
+				{
+					commitData.entitySnapshots.push_back({entityOpt.value()});
+				}
 			}
 
 			EntityTransferPacket response;
@@ -468,7 +471,11 @@ void TransferCoordinator::OnClientSwitchPacketArrival(const ClientSwitchPacket& 
 			std::vector<AtlasEntity> payloads;
 			for (const auto& [clientID, entityID] : transferSnapshot.Clients)
 			{
-				payloads.push_back(EntityLedger::Get().GetAndEraseEntity(entityID));
+				const std::optional<AtlasEntity> entityOpt = EntityLedger::Get().GetAndEraseEntity(entityID);
+				if (entityOpt.has_value())
+				{
+					payloads.push_back(entityOpt.value());
+				}
 			}
 
 			ClientTransferPacket response;

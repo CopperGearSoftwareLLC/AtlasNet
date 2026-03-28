@@ -8,6 +8,7 @@
 #include "Client/Client.hpp"
 #include "Entity.hpp"
 #include "EntityID.hpp"
+#include "PlayerColors.hpp"
 	#ifdef RTS_CLIENT
 
 #include "GL/ElementBuffer.hpp"
@@ -72,22 +73,16 @@ void main()
 	ShaderProgram shader;
 	#endif
 	ClientID OwnerID;
-	glm::vec3 color = glm::vec3(1.0f, 0.7f, 0.2f);	// default color
 	std::optional<vec3> ColorOverride;
-	float MoveSpeed = 0.05;
-	tweeny::tween<float, float, float> movementTween;
-	float TweenStepPerSecond;
+	
 
+	glm::vec3 color = glm::vec3(1.0f, 0.7f, 0.2f);	// default color
    public:
 	Worker(EntityID _ID);
 	void Start() override {}
 	void Update(float deltaTime) override
 	{
-		if (!movementTween.isFinished())
-		{
-			movementTween.step(deltaTime *
-							   TweenStepPerSecond);	 // advance proportional to deltaTime
-		}
+	
 	}
 	#ifdef RTS_CLIENT
 	void Render() override;
@@ -95,22 +90,4 @@ void main()
 	void ClearColorOVerride() { ColorOverride.reset(); }
 	#endif
 	void End() override {}
-	void MoveTo(vec3 endWorldPos)
-	{
-		float len = glm::length(transform.Pos - endWorldPos);
-		float durationSec = len / MoveSpeed;  // seconds
-		int steps = 240;					  // number of steps (you can adjust for smoothness)
-
-		movementTween = tweeny::from(transform.Pos.x, transform.Pos.y, transform.Pos.z)
-							.to(endWorldPos.x, endWorldPos.y, endWorldPos.z)
-							.during(durationSec)  // duration in seconds, not steps
-							.via(tweeny::easing::sinusoidalInEasing())
-							.onStep(
-								[this](float x, float y, float z)
-								{
-									transform.Pos = vec3(x, y, z);
-									return false;
-								});
-		TweenStepPerSecond = static_cast<float>(steps) / durationSec;
-	}
 };

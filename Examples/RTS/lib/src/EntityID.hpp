@@ -1,4 +1,5 @@
 #pragma once
 
 #include <cstdint>
-using EntityID = uint32_t;
+#include "Global/Misc/UUID.hpp"
+using EntityID = UUID;

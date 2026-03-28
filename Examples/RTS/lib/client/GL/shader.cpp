@@ -42,7 +42,7 @@ void ShaderProgram::AddShader(const char* source, GLenum type)
     glGetShaderiv(shader, GL_COMPILE_STATUS, &status);
     
     // If compilation status is not OK, get and print the log message.
-    if (status != 1) {
+    if (status != GL_TRUE) {
         int length;
         glGetShaderiv(shader, GL_INFO_LOG_LENGTH, &length);
         char* buffer = new char[length];
