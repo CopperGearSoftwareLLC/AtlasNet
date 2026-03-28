@@ -21,6 +21,8 @@ warnings_file="$bundle_root/registry-warnings.txt"
 : "${INSTALL_INGRESS_NGINX:=true}"
 : "${INSTALL_CERT_MANAGER:=true}"
 : "${ATLASNET_K8S_LLM_ENABLED:=0}"
+: "${ATLASNET_LLM_HOST_PROXY_ENABLED:=1}"
+: "${ATLASNET_LLM_HOST_PROXY_IMAGE:=docker.io/alpine/socat:1.8.0.1}"
 : "${ATLASNET_LLM_MODEL_URL:=https://huggingface.co/Dannys0n/Qwen3-1.7B-seed_gen_voronoi/resolve/main/Qwen3-1.7B-seed_gen_voronoi-Q4_K_M.gguf}"
 
 record_warning() {
@@ -173,6 +175,10 @@ seed_atlasnet_registry() {
       docker buildx imagetools create -t "$(local_mirror_final_ref "$ATLASNET_LLM_MODEL_SEED_IMAGE")" "${seeded_arches[@]}" >/dev/null
     else
       record_warning "no LLM seed images were built"
+    fi
+  elif [[ "$ATLASNET_LLM_HOST_PROXY_ENABLED" == "1" || "$ATLASNET_LLM_HOST_PROXY_ENABLED" == "true" ]]; then
+    if ! mirror_source_ref "$ATLASNET_LLM_HOST_PROXY_IMAGE" "$(local_mirror_final_ref "$ATLASNET_LLM_HOST_PROXY_IMAGE")"; then
+      record_warning "failed to mirror LLM host proxy image: ${ATLASNET_LLM_HOST_PROXY_IMAGE}"
     fi
   fi
 }

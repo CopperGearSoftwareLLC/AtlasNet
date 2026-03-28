@@ -429,6 +429,8 @@ required_source_registries() {
     if [[ "${ATLASNET_K8S_LLM_ENABLED:-0}" == "1" || "${ATLASNET_K8S_LLM_ENABLED:-0}" == "true" ]]; then
       printf '%s\n' "$ATLASNET_LLM_IMAGE"
       printf '%s\n' "$ATLASNET_LLM_MODEL_SEED_IMAGE"
+    elif [[ "${ATLASNET_LLM_HOST_PROXY_ENABLED:-1}" == "1" || "${ATLASNET_LLM_HOST_PROXY_ENABLED:-1}" == "true" ]]; then
+      printf '%s\n' "${ATLASNET_LLM_HOST_PROXY_IMAGE:-docker.io/alpine/socat:1.8.0.1}"
     fi
   } | while read -r ref; do
     [[ -n "$ref" ]] || continue

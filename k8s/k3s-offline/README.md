@@ -37,7 +37,7 @@ Pin the values before building the bundle:
 - `ATLASNET_IMAGE_TAG`, `ATLASNET_IMAGE_TAG_AMD64`, `ATLASNET_IMAGE_TAG_ARM64`
 - `ATLASNET_INTERNALDB_IMAGE`
 - chart versions
-- the offline LLM model file at `./models/${ATLASNET_LLM_MODEL_FILE_NAME}` if you keep the default LLM enabled
+- if you explicitly enable the in-cluster LLM pod, the offline LLM model file at `./models/${ATLASNET_LLM_MODEL_FILE_NAME}`
 
 ## Workflow
 
@@ -74,7 +74,7 @@ make offline-bundle
 - vendors the Helm chart archives,
 - starts the local registry and seeds it with every platform and AtlasNet image the cluster will need.
 
-With the default offline LLM enabled, `make offline-bundle` also builds the model-seed image from:
+If you explicitly enable the in-cluster LLM pod, `make offline-bundle` will also build the model-seed image from:
 - `./models/Qwen3-1.7B-seed_gen_voronoi-Q4_K_M.gguf`
 
 If that file is missing during the online prep phase, `make offline-bundle` will download it from `ATLASNET_LLM_MODEL_URL` first.
@@ -87,6 +87,11 @@ make dependency-setup
 ```
 
 ### 3. Offline on the isolated work network
+On the control machine, start the host-side Docker Model Runner that watchdog will call:
+```bash
+make llm-runner
+```
+
 After bringing the control machine and seeded nodes to the offline Ethernet network:
 ```bash
 make k3s-deploy
@@ -125,9 +130,11 @@ The default bundle directory is `./offline-bundle` and contains:
 - `registry-warnings.txt` when image seeding had warnings
 
 ## Notes
+- By default, `k3s-offline` does not deploy an in-cluster LLM pod. Watchdog points at a Docker Model Runner process on the control host using the same `ATLASNET_LLM_ENDPOINT` contract as the Swarm flow.
+- To make that host-side model runner reachable from inside pods, `atlasnet-deploy` creates a small host-network proxy deployment and service (`atlasnet-llm-host-proxy`) on the control-plane node. If you change the proxy image or enable this mode for the first time, rerun `make offline-bundle` while online so the image is mirrored into the LAN registry.
 - `make atlasnet-merge-manifests` is optional for offline deployment. Registry seeding can build the final mirrored deployment tag from the per-arch tags directly.
 - A bundle can still be usable for mono-architecture testing even when another architecture's AtlasNet images are missing. Registry seeding will warn and continue for the missing architecture, but those nodes will not be able to run AtlasNet workloads until reseeded.
-- If you change any pinned version, image tag, or LLM model file, rebuild the bundle and rerun `make dependency-setup`.
+- If you change any pinned version, image tag, or, for the optional in-cluster LLM path, the LLM model file, rebuild the bundle and rerun `make dependency-setup`.
 - `cartograph.atlasnet.local` will not resolve automatically on an isolated LAN. After deploy, use the printed ingress IP and add an `/etc/hosts` entry on client machines.
 - The registry-based flow follows the K3s private-registry pattern: nodes get `/etc/rancher/k3s/registries.yaml`, and K3s is installed with `--disable-default-registry-endpoint` so an offline node will not fall back to the public internet.
 - `cert-manager` can be installed offline, but public ACME issuance is not expected to work on an isolated network.
