@@ -39,10 +39,11 @@ FetchContent_MakeAvailable(redis-plus-plus)
 
 
 # Only populate if not already done
+set(protobuf_BUILD_TESTS OFF CACHE BOOL "" FORCE)
 
 FetchContent_Declare(
     Protobuf
-    URL https://github.com/protocolbuffers/protobuf/archive/refs/tags/v34.0.tar.gz
+    URL https://github.com/protocolbuffers/protobuf/archive/refs/tags/v21.2.tar.gz
 )
 FetchContent_GetProperties(Protobuf)
 if(NOT Protobuf_POPULATED)
@@ -69,7 +70,7 @@ FetchContent_MakeAvailable(GameNetworkingSockets)
 
 message(STATUS "Fetching Boost")
 set(Boost_USE_STATIC_LIBS ON CACHE BOOL "Use static Boost libraries" FORCE)
-set(BOOST_INCLUDE_LIBRARIES bimap describe dynamic_bitset flyweight math multi_array multi_index stacktrace static_string uuid)
+set(BOOST_INCLUDE_LIBRARIES beast bimap describe dynamic_bitset flyweight math multi_array multi_index stacktrace static_string uuid)
 set(BOOST_ENABLE_MPI ON)
 set(BOOST_ENABLE_CMAKE ON)
 FetchContent_Declare(
@@ -84,4 +85,8 @@ FetchContent_MakeAvailable(Boost)
 message(STATUS "Nlohmann Json")
 FetchContent_Declare(json URL https://github.com/nlohmann/json/releases/download/v3.11.3/json.tar.xz)
 FetchContent_MakeAvailable(json)
-
+message(STATUS "TaskFlow")
+set(TF_BUILD_TESTS OFF CACHE BOOL "" FORCE)
+set(TF_BUILD_EXAMPLES OFF CACHE BOOL "" FORCE)
+FetchContent_Declare(taskflow URL https://github.com/taskflow/taskflow/archive/refs/tags/v4.0.0.tar.gz)
+FetchContent_MakeAvailable(taskflow)

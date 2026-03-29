@@ -1,12 +1,12 @@
 cmake_minimum_required(VERSION 3.10)
-include(cmake/Deps.cmake)
+
 project(AtlasNet)
 
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -O2 -fPIC")
 set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -fPIC")
-
+include(cmake/Deps.cmake)
 
 set(ATLASNET_EXAMPLES ON CACHE BOOL "Build AtlasNet examples")
 set(ATLASNET_TESTS ON CACHE BOOL "Build AtlasNet tests")
@@ -17,6 +17,7 @@ if (ATLASNET_EXAMPLES)
 endif()
 
 if (ATLASNET_TESTS)
+include(CTest)
     add_subdirectory(tests)
 endif()
 
@@ -38,8 +39,26 @@ add_library(AtlasNetCore ${_core_sources})
 target_include_directories(AtlasNetCore
   PUBLIC
     "${CMAKE_CURRENT_SOURCE_DIR}/include"
-      PRIVATE
+      PUBLIC
     "${CMAKE_CURRENT_SOURCE_DIR}/src/core"
+)
+target_link_libraries(AtlasNetCore
+GameNetworkingSockets::GameNetworkingSockets_s
+OpenSSL::SSL
+OpenSSL::Crypto
+redis++::redis++_static
+hiredis::hiredis
+Boost::headers
+Boost::beast
+Boost::bimap
+Boost::describe
+Boost::dynamic_bitset
+Boost::flyweight
+Boost::multi_array
+Boost::multi_index
+Boost::static_string
+Boost::uuid
+glm::glm
 )
 
 
@@ -85,26 +104,44 @@ add_dependencies(AtlasNetWebBackend AtlasNetCore)
 
 
 
-file(GLOB_RECURSE _API_server_sources CONFIGURE_DEPENDS
-  "${CMAKE_CURRENT_SOURCE_DIR}/src/API/server/*.cpp"
+file(GLOB_RECURSE _API_shard_sources CONFIGURE_DEPENDS
+  "${CMAKE_CURRENT_SOURCE_DIR}/src/API/shard/*.cpp"
 )
-add_library(AtlasNetServerAPI STATIC ${_API_server_sources})
-add_library(AtlasNetServerAPI_s SHARED ${_API_server_sources})
+add_library(AtlasNetShardAPI STATIC ${_API_shard_sources})
+add_library(AtlasNetShardAPI_s SHARED ${_API_shard_sources})
 # Optional, but common: local includes
-target_include_directories(AtlasNetServerAPI
+target_include_directories(AtlasNetShardAPI
       PRIVATE
-    "${CMAKE_CURRENT_SOURCE_DIR}/src/API/server"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/API/shard"
+      PUBLIC
+    "${CMAKE_CURRENT_SOURCE_DIR}/include"
 )
-add_dependencies(AtlasNetServerAPI AtlasNetCore)
+target_include_directories(AtlasNetShardAPI_s
+      PRIVATE
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/API/shard"
+      PUBLIC
+    "${CMAKE_CURRENT_SOURCE_DIR}/include"
+)
+add_dependencies(AtlasNetShardAPI AtlasNetCore)
+add_dependencies(AtlasNetShardAPI_s AtlasNetCore)
 
 file(GLOB_RECURSE _API_client_sources CONFIGURE_DEPENDS
   "${CMAKE_CURRENT_SOURCE_DIR}/src/API/client/*.cpp"
 )
-add_library(AtlasNetClientAPI STATIC ${_API_client_sources})
-add_library(AtlasNetClientAPI_s SHARED ${_API_client_sources})
+add_library(AtlasNetClientAPI_s STATIC ${_API_client_sources})
+add_library(AtlasNetClientAPI SHARED ${_API_client_sources})
 # Optional, but common: local includes
 target_include_directories(AtlasNetClientAPI
       PRIVATE
     "${CMAKE_CURRENT_SOURCE_DIR}/src/API/client"
+      PUBLIC
+    "${CMAKE_CURRENT_SOURCE_DIR}/include/atlasnet/API/client"
+)
+target_include_directories(AtlasNetClientAPI_s
+      PRIVATE
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/API/client"
+      PUBLIC
+    "${CMAKE_CURRENT_SOURCE_DIR}/include/atlasnet/API/client"
 )
 add_dependencies(AtlasNetClientAPI AtlasNetCore)
+add_dependencies(AtlasNetClientAPI_s AtlasNetCore)
