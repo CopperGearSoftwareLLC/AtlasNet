@@ -4,7 +4,6 @@
 #include "glm/fwd.hpp"
 #include "glm/gtc/epsilon.hpp"
 
-#include "gtest/gtest.h"
 #include <bitset>
 #include <cstddef>
 #include <cstdint>

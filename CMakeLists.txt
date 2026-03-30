@@ -34,7 +34,7 @@ file(GLOB_RECURSE _core_sources CONFIGURE_DEPENDS
   "${CMAKE_CURRENT_SOURCE_DIR}/src/core/*.cpp"
 )
 
-add_library(AtlasNetCore ${_core_sources})
+add_library(AtlasNetCore STATIC ${_core_sources})
 # Optional, but common: local includes
 target_include_directories(AtlasNetCore
   PUBLIC

@@ -43,6 +43,7 @@ public:
       system->Stop();
     }
   }
+
 private:
   boost::container::flat_map<std::type_index, std::unique_ptr<ISystem>>
       systemMap_;
