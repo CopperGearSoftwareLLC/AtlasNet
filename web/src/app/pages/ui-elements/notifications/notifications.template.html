@@ -1,0 +1,55 @@
+<ol class="breadcrumb">
+  <li class="breadcrumb-item">YOU ARE HERE</li>
+  <li class="breadcrumb-item active">UI Notifications</li>
+</ol>
+<h1 class="page-title">Messages - <span class="fw-semi-bold">Notifications</span></h1>
+<section widgster [reloadControl]="false" [fullscreenControl]="false">
+  <h6 *widgsterTitle>
+    Messenger
+  </h6>
+  <div class="row">
+    <div class="col-lg-4 col-12">
+      <h5 class="m-t-1">Layout options</h5>
+      <p>There are few position options available for notifications. You can click any of them
+        to change notifications position:</p>
+      <div class="location-selector">
+        <div class="bit top left" (click)="setPosition(ToastPosition.topLeft)"></div>
+        <div class="bit top right" (click)="setPosition(ToastPosition.topRight)"></div>
+        <div class="bit top" (click)="setPosition(ToastPosition.topCenter)"></div>
+        <div class="bit bottom left" (click)="setPosition(ToastPosition.bottomLeft)"></div>
+        <div class="bit bottom right" (click)="setPosition(ToastPosition.bottomRight)"></div>
+        <div class="bit bottom" (click)="setPosition(ToastPosition.bottomCenter)"></div>
+      </div>
+    </div>
+    <div class="col-lg-4 col-12">
+      <h5 class="m-t-1">Notification Types</h5>
+      <p>Different types of notifications for lost of use cases. Custom classes are also supported.</p>
+      <p><a (click)="launchTermonuclearWar($event)" class="btn btn-info" id="show-info-message" href="#">Info
+          Message</a></p>
+      <p><a class="btn btn-danger" (click)="destroyAliensWithError($event)" id="show-error-message" href="#">Error +
+          Retry Message</a></p>
+      <p><a class="btn btn-success" (click)="showSuccessMessage($event)" id="show-success-message" href="#">Success
+          Message</a></p>
+    </div>
+    <div class="col-lg-4 col-12">
+      <h5 class="m-t-1">Dead Simple Usage</h5>
+      <p>Just few lines of code to inject toastr service and use it:</p>
+      <pre style="padding: 0 0 0 0.5rem">
+<code>
+import {{'{'}} ToastrService {{'}'}} from 'ngx-toastr';
+
+@Component({{'{'}}...{{'}'}})
+export class YourComponent {{'{'}}
+  constructor(private toastr: ToastrService) {{'{'}}{{'}'}}
+
+  showSuccess() {{'{'}}
+    this.toastr.success(
+      'Hello world!', 'Toastr fun!'
+    );
+  {{'}'}}
+{{'}'}}
+</code>
+      </pre>
+    </div>
+  </div>
+</section>

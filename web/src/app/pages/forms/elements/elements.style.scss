@@ -1,0 +1,499 @@
+@import "../../../styles/helpers";
+@import "../../../../../node_modules/dropzone/dist/dropzone";
+
+/**
+ * Switchery.
+ */
+
+.switch {
+  box-sizing: content-box;
+}
+
+.switch input {
+  display: none;
+}
+
+.switch i {
+  background-color: $darkness-blue;
+  display: inline-block;
+  cursor: pointer;
+  padding-right: 20px;
+  transition: all ease 0.2s;
+  -webkit-transition: all ease 0.2s;
+  border-radius: 20px;
+  box-shadow: inset 0 0 1px rgba(0, 0, 0, 0.5);
+}
+
+.switch i:before {
+  display: block;
+  content: "";
+  width: 30px;
+  height: 30px;
+  padding: 1px;
+  border-radius: 20px;
+  background: white;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.5);
+}
+
+.switch :checked + i {
+  padding-right: 0;
+  padding-left: 20px;
+  background: rgb(100, 189, 99);
+}
+
+/**
+ * Jasny Bootstrap
+ * Fileinput.less
+ */
+
+.fileinput.fileinput-new {
+  .thumbnail {
+    padding: $thumbnail-padding;
+    line-height: $line-height-base;
+    background-color: $thumbnail-bg;
+    border: $thumbnail-border-width solid $thumbnail-border-color;
+    border-radius: $thumbnail-border-radius;
+    transition: all 0.2s ease-in-out;
+    @include box-shadow(0 1px 2px rgba(0, 0, 0, 0.075));
+    margin-bottom: 5px;
+  }
+}
+
+.fileinput .fileinput-preview.fileinput-exists {
+  border: 1px solid $input-border-color;
+  border-radius: $border-radius;
+  padding: 5px;
+}
+
+.fileinput:not(.input-group) > div > button:first-of-type {
+  margin-right: 5px;
+}
+
+.fileinput .thumbnail {
+  display: inline-block;
+  margin-bottom: 5px;
+  overflow: hidden;
+  text-align: center;
+  vertical-align: middle;
+}
+
+.fileinput.input-group {
+  display: flex;
+}
+
+.fileinput-new.input-group .btn-file,
+.fileinput-new .input-group .btn-file {
+  border-radius: 0 $border-radius $border-radius 0;
+
+  &.btn-xs,
+  &.btn-sm {
+    border-radius: 0 $border-radius-sm $border-radius-sm 0;
+  }
+
+  &.btn-lg {
+    border-radius: 0 $border-radius-lg $border-radius-lg 0;
+  }
+}
+
+.form-group.has-warning .fileinput {
+  .fileinput-preview {
+    color: theme-color("warning");
+  }
+
+  .thumbnail {
+    border-color: theme-color("warning");
+  }
+}
+
+.form-group.has-error .fileinput {
+  .fileinput-preview {
+    color: theme-color("danger");
+  }
+
+  .thumbnail {
+    border-color: theme-color("danger");
+  }
+}
+
+.form-group.has-success .fileinput {
+  .fileinput-preview {
+    color: theme-color("success");
+  }
+
+  .thumbnail {
+    border-color: theme-color("success");
+  }
+}
+
+.btn-label {
+  background: transparent;
+  left: 2px;
+  padding: 1px 6px;
+}
+
+/**
+ * Dropzone
+ */
+
+.dropzone {
+  border: 2px dashed #ccc;
+  @include border-radius($border-radius);
+}
+
+/**
+ * Markdown. converted from less files
+ */
+
+.md-editor {
+  display: block;
+  border: 1px solid $table-border-color;
+
+  > .md-header,
+  .md-footer {
+    display: block;
+    padding: 6px 4px;
+    background: $gray-light;
+  }
+
+  > .md-header {
+    margin: 0;
+  }
+
+  > .md-preview {
+    margin-left: -1px;
+    margin-right: -1px;
+    padding: $padding-base-vertical $padding-base-horizontal;
+    background: $card-bg;
+    border-top: 1px dashed $table-border-color;
+    min-height: 10px;
+  }
+
+  > textarea {
+    font-family: $font-family-monospace;
+    font-size: $font-size-base;
+    outline: 0;
+    outline: thin dotted \9;
+    /* IE6-9 */
+    margin: 0;
+    display: block;
+    width: 100%;
+    border: 0;
+    border-top: 1px dashed $table-border-color;
+    border-radius: 0;
+    box-shadow: none;
+    background: $input-disabled-bg;
+
+    &:focus {
+      box-shadow: none;
+      background: $input-bg;
+    }
+  }
+
+  // Hover state
+  $color: $input-border-focus;
+
+  &.active {
+    border-color: $color;
+    outline: 0;
+  }
+}
+
+.md-nooverflow .page-controls {
+  z-index: 0 !important;
+}
+
+/**
+ * Bootstrap slider. converted from less files
+ */
+
+$slider-line-height: 8px;
+$slider-handle-size: 26px;
+
+.slider {
+  display: inline-block;
+  vertical-align: middle;
+  position: relative;
+
+  &.slider-horizontal {
+    width: 210px;
+    height: $slider-line-height;
+
+    .slider-track {
+      height: $slider-line-height/2;
+      width: 100%;
+      margin-top: -$slider-line-height/4;
+      top: 50%;
+      left: 0;
+    }
+
+    .slider-selection {
+      height: 100%;
+      top: 0;
+      bottom: 0;
+    }
+
+    .slider-handle {
+      margin-left: -$slider-handle-size/2;
+      margin-top: -$slider-handle-size * 3/8;
+
+      &.triangle {
+        border-width: 0 $slider-line-height/2 $slider-line-height/2
+          $slider-line-height/2;
+        width: 0;
+        height: 0;
+        border-bottom-color: #0480be;
+        margin-top: 0;
+      }
+    }
+  }
+
+  &.slider-vertical {
+    height: 210px;
+    width: $slider-line-height;
+
+    .slider-track {
+      width: $slider-line-height/2;
+      height: 100%;
+      margin-left: -$slider-line-height/4;
+      left: 50%;
+      top: 0;
+    }
+
+    .slider-selection {
+      width: 100%;
+      left: 0;
+      top: 0;
+      bottom: 0;
+    }
+
+    .slider-handle {
+      margin-left: -$slider-handle-size * 3/8;
+      margin-top: -$slider-handle-size/2;
+
+      &.triangle {
+        border-width: $slider-line-height/2 0 $slider-line-height/2
+          $slider-line-height/2;
+        width: 1px;
+        height: 1px;
+        border-left-color: #0480be;
+        margin-left: 0;
+      }
+    }
+  }
+
+  &.slider-disabled {
+    .slider-handle {
+      @include gradient-y(#dfdfdf, #bebebe);
+    }
+
+    .slider-track {
+      @include gradient-y(#e5e5e5, #e9e9e9);
+      cursor: not-allowed;
+    }
+  }
+
+  input {
+    display: none;
+  }
+
+  .tooltip-inner {
+    white-space: nowrap;
+  }
+
+  .tooltip.top {
+    top: -30px;
+  }
+}
+
+.slider-track {
+  position: absolute;
+  cursor: pointer;
+  @include gradient-y(#eee, #f8f8f8);
+
+  @include box-shadow(inset 0 1px 2px rgba(0, 0, 0, 0.1));
+  border-radius: $border-radius;
+}
+
+.left-sliders .ngx-slider .ngx-slider-pointer {
+  background-color: #fff !important;
+  height: 26px !important;
+  top: -10px !important;
+}
+
+.ngx-slider .ngx-slider-selection {
+  position: absolute;
+  background-color: theme-color("primary");
+  @include box-shadow(inset 0 -1px 0 rgba(0, 0, 0, 0.15));
+  box-sizing: border-box;
+  border-radius: $border-radius;
+
+  .slider-danger & {
+    background-color: theme-color("danger");
+  }
+
+  .slider-success & {
+    background-color: theme-color("success");
+  }
+
+  .slider-warning & {
+    background-color: theme-color("warning");
+  }
+
+  .slider-info & {
+    background-color: theme-color("info");
+  }
+}
+
+.slider-handle {
+  position: absolute;
+  width: $slider-handle-size;
+  height: $slider-handle-size;
+  background-color: $white;
+  @include box-shadow(
+    inset 0 1px 0 rgba(255, 255, 255, 0.2),
+    0 1px 3px rgba(0, 0, 0, 0.5)
+  );
+  border: 0px solid transparent;
+
+  &:focus {
+    outline: 0;
+  }
+
+  &.round {
+    border-radius: 50%;
+  }
+
+  &.triangle {
+    background: transparent none;
+  }
+}
+
+/**
+*  autosize
+**/
+
+.autogrow {
+  overflow: hidden;
+  resize: none;
+}
+
+/**
+* datetime
+**/
+.input-group {
+  width: auto;
+}
+
+.fileinput .input-group-addon {
+  border-right: 1px solid $btn-default-border;
+}
+
+/* Awesome Bootstrap Checkbox */
+
+.abc-checkbox,
+.abc-radio {
+  margin-bottom: 0.5rem;
+}
+
+.dropzone .dz-message .dz-button {
+  font-size: 1rem;
+}
+
+tbody td.form-group input{
+  background: #4e6381;
+  color: white;
+  border: 0;
+
+  &:focus {
+    background: #4e6381;
+    color: white;
+  }
+}
+
+ngx-slider .ngx-slider-span.ngx-slider-bar-wrapper.ngx-slider-full-bar span {
+  background: $darkness-blue;
+}
+
+editor .tox {
+  & .tox-menubar {
+    background-color: $light-blue;
+  }
+
+  & .tox-mbtn {
+    color: white;
+  }
+
+  & .tox-toolbar__primary {
+    background-color: $light-blue;
+  }
+
+  & .tox-tbtn__select-chevron svg {
+    fill: white;
+  }
+
+  & .tox-tbtn svg {
+    fill: white;
+  }
+
+  & .tox-tbtn {
+    color: white;
+  }
+
+  & .tox-edit-area__iframe {
+    background-color: $light-blue;
+  }
+
+  & .tox-statusbar {
+    background-color: $light-blue;
+
+    & a {
+      color: white;
+    }
+  }
+
+  & .tox-statusbar__path-item {
+    color: white;
+  }
+
+  & .tox-statusbar__resize-handle svg {
+    fill: white;
+  }
+}
+
+div .md-editor-container .md-layout .tool-bar {
+  background-color: $light-blue !important;
+  border-bottom: 1px solid white !important;
+}
+
+.ace-tm .ace_gutter {
+  background-color: $light-blue;
+  color: white;
+}
+
+.ace-tm .ace_heading {
+  color: #FDD468;
+}
+
+.ace_content {
+  background-color: $light-blue;
+  color: white;
+}
+
+.ace_text-layer {
+  opacity: 0.8;
+}
+
+.md-editor-container {
+  border: 1px solid white !important;
+}
+
+.md-editor-container .md-layout .preview-container .preview-panel {
+  color: white;
+  opacity: 0.8;
+  background-color: $light-blue !important;
+}
+
+md-editor .md-editor-container .preview-container {
+  color: white;
+  background-color: $light-blue;
+}

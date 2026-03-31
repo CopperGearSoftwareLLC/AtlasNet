@@ -1,0 +1,32 @@
+{
+  "group": {
+    "default": {
+      "targets": [ "atlasnet-watchdog", "atlasnet-proxy", "atlasnet-web" ]
+    }
+  },
+  "target": {
+   
+    "atlasnet-watchdog": {
+      "context": ".",
+      "dockerfile": "dev/docker/Production.Dockerfile",
+      "target": "atlasnet-watchdog",
+      "load": true,
+      "tags": ["atlasnet-watchdog:latest"]
+    },
+    "atlasnet-proxy": {
+      "context": ".",
+      "dockerfile": "dev/docker/Production.Dockerfile",
+      "target": "atlasnet-proxy",
+      "load": true,
+      "tags": ["atlasnet-proxy:latest"]
+    },
+    "atlasnet-web": {
+      "context": ".",
+      "dockerfile": "dev/docker/Production.Dockerfile",
+      "target": "atlasnet-web",
+      "load": true,
+      "tags": ["atlasnet-web:latest"]
+    }
+  
+  }
+}

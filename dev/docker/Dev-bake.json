@@ -1,0 +1,25 @@
+{
+  "group": {
+    "default": {
+      "targets": [ "watchdog", "proxy"]
+    }
+  },
+  "target": {
+   
+    "watchdog": {
+      "context": ".",
+      "dockerfile": "dev/docker/Dev.Dockerfile",
+      "target": "watchdog",
+      "load": true,
+      "tags": ["watchdog:latest"]
+    },
+    "proxy": {
+      "context": ".",
+      "dockerfile": "dev/docker/Dev.Dockerfile",
+      "target": "proxy",
+      "load": true,
+      "tags": ["proxy:latest"]
+    }
+  
+  }
+}

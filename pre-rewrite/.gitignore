@@ -1,0 +1,12 @@
+
+/build
+flake.lock
+temp
+.cache
+imgui.ini
+logs
+k8s/k3d/.kube/
+/build-local
+k8s/k3s/.env
+/AtlasNet/.vcpkg-temp
+/AtlasNet/build/vcpkg_installed

@@ -1,0 +1,80 @@
+@import '~@fullcalendar/core/main';
+@import '~@fullcalendar/daygrid/main';
+@import '~@fullcalendar/timegrid/main';
+@import "../../../styles/helpers";
+
+/**************************/
+/* Full Calendar Override */
+/**************************/
+
+.fc-grid th{
+  text-transform: uppercase;
+}
+
+.fc-event {
+  padding: 2px 3px;
+  border: none;
+  font-weight: $font-weight-normal;
+  background-color: $gray-light;
+  color: $text-color;
+  .fc-content {
+    z-index: 0;
+  }
+}
+
+.fc-unthemed td {
+  z-index: 0;
+}
+.fc-unthemed tbody {
+  z-index: 0;
+}
+.fc-day-grid .fc-row {
+  z-index: 0;
+}
+
+a.fc-event{
+  height: auto;
+  line-height: $line-height-base;
+}
+
+/***********************************/
+/**      Full Calendar Custom     **/
+/***********************************/
+
+.full-calendar{
+  margin-top: 10px;
+}
+
+.calendar-controls{
+  margin-bottom: 35px;
+  .btn{
+    font-size: $font-size-mini;
+  }
+}
+
+.calendar-external-events{
+  margin-top: 20px;
+
+  .external-event{
+    margin: 10px 0;
+    padding: 6px;
+    font-size: $font-size-mini;
+    cursor: pointer;
+    border-radius: $border-radius;
+    background-color: transparent;
+    border: 1px solid #ccc;
+    box-shadow: var(--widget-shadow);
+  }
+}
+
+.widget-calendar{
+  @include media-breakpoint-up(xl){
+    margin-top: -100px;
+  }
+}
+.fc-view, .fc-view > table {
+  z-index: auto;
+}
+.ng-star-inserted.input-group-btn > .btn, .btn-group > .btn {
+  z-index: 0;
+}

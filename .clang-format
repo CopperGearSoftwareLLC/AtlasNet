@@ -1,14 +1,74 @@
-BasedOnStyle: Google
+---
+Language: Cpp
+BasedOnStyle: LLVM
 
-# Tabs / indentation
-IndentWidth: 4        # how many spaces one indent level is
-TabWidth: 4           # how wide a literal '\t' displays
-UseTab: Always         # Never | ForIndentation | AlignWithSpaces | Always
+# Indentation
+IndentWidth: 2
+TabWidth: 2
+UseTab: Never
+ContinuationIndentWidth: 4
+
+# Column / wrapping
+ColumnLimit: 100
+BreakBeforeBraces: Allman
+AllowShortFunctionsOnASingleLine: Empty
+AllowShortIfStatementsOnASingleLine: Never
+AllowShortLoopsOnASingleLine: false
+
+# Pointers / references
+PointerAlignment: Left
+ReferenceAlignment: Left
+
+# Spaces
+SpaceBeforeParens: ControlStatements
+SpacesInParentheses: false
+SpacesInSquareBrackets: false
+SpaceInEmptyParentheses: false
+
+# Includes
+SortIncludes: true
+IncludeBlocks: Preserve
+
+# Function / call formatting
+BinPackArguments: false
+BinPackParameters: false
+
+# Constructor initializer lists
+BreakConstructorInitializers: BeforeComma
+PackConstructorInitializers: Never
+
+# Namespace / class formatting
+NamespaceIndentation: All
+AccessModifierOffset: -2
+EmptyLineBeforeAccessModifier: LogicalBlock
+EmptyLineAfterAccessModifier: Never
+
+# Braces
+BraceWrapping:
+  AfterClass: true
+  AfterControlStatement: Always
+  AfterEnum: true
+  AfterFunction: true
+  AfterNamespace: true
+  AfterStruct: true
+  AfterUnion: true
+  BeforeCatch: true
+  BeforeElse: true
+  IndentBraces: false
+  SplitEmptyFunction: true
+  SplitEmptyRecord: true
+  SplitEmptyNamespace: true
 
 # Line breaking
-ColumnLimit: 100
+AlignAfterOpenBracket: BlockIndent
+PenaltyBreakBeforeFirstCallParameter: 1
 
-# Braces / layout (tasteful defaults)
-BreakBeforeBraces: Allman   # or Attach, Stroustrup, Linux
-AllowShortIfStatementsOnASingleLine: Never
-AllowShortFunctionsOnASingleLine: Inline
+# Comments
+ReflowComments: true
+
+# C++ specific
+Standard: c++20
+
+# Misc
+DerivePointerAlignment: false
+SortUsingDeclarations: true

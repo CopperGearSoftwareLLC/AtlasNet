@@ -1,0 +1,86 @@
+<ol class="breadcrumb">
+  <li class="breadcrumb-item">YOU ARE HERE</li>
+  <li class="breadcrumb-item active">Tables Dynamic</li>
+</ol>
+<h1 class="page-title">Dynamic - <span class="fw-semi-bold">Tables</span></h1>
+<section widgster [optionsControl]="false" [fullscreenControl]="false" [reloadControl]="false">
+  <h4 *widgsterTitle>
+    The <span class="fw-semi-bold">Angular</span> Way
+  </h4>
+  <p>
+    Column sorting, live search, pagination. Built with
+    <a href="https://github.com/swimlane/ngx-datatable" target="_blank">swimlane/ngx-datatable</a>
+  </p>
+  <div class="mt">
+    <div class="float-right mb">
+      <div class="input-group input-group-rounded">
+        <span class="input-group-addon btn-default">
+          <i class="fa fa-search"></i>
+        </span>
+        <input class="form-control input-transparent" (keyup)='updateFilter($event)' type="text"
+          placeholder="Search Table">
+      </div>
+    </div>
+    <div>
+      <ngx-datatable class="table table-striped table-hover" [rows]="people" [columnMode]="columnMode.force"
+        [headerHeight]="50" [footerHeight]="50" [rowHeight]="'auto'" [limit]="8" [scrollbarH]="true">
+        <ngx-datatable-column name="ID">
+          <ng-template let-value="value" ngx-datatable-cell-template>
+            {{value}}
+          </ng-template>
+        </ngx-datatable-column>
+        <ngx-datatable-column name="Name">
+          <ng-template let-value="value" ngx-datatable-cell-template>
+            <span class="fw-semi-bold">{{value}}</span>
+          </ng-template>
+        </ngx-datatable-column>
+        <ngx-datatable-column name="Info">
+          <ng-template let-value="value" ngx-datatable-cell-template>
+            <small>
+              <span class="fw-semi-bold">Type:</span>
+              &nbsp; {{value.type}}
+            </small>
+            <br>
+            <small>
+              <span class="fw-semi-bold">Dimensions:</span>
+              &nbsp; {{value.dimensions}}
+            </small>
+          </ng-template>
+        </ngx-datatable-column>
+        <ngx-datatable-column name="Description">
+          <ng-template let-value="value" ngx-datatable-cell-template>
+            <a href="#">{{value}}</a>
+          </ng-template>
+        </ngx-datatable-column>
+        <ngx-datatable-column name="Date">
+          <ng-template let-value="value" ngx-datatable-cell-template>
+            {{value}}
+          </ng-template>
+        </ngx-datatable-column>
+        <ngx-datatable-column name="Status">
+          <ng-template let-value="value" ngx-datatable-cell-template>
+            <div class="progress progress-sm">
+              <div class="progress-bar progress-sm bg-{{value.type}}" [ngStyle]="{ 'width': value.progress}"></div>
+            </div>
+          </ng-template>
+        </ngx-datatable-column>
+      </ngx-datatable>
+    </div>
+  </div>
+</section>
+
+<section class="easy-table" widgster [optionsControl]="false" [fullscreenControl]="false" [reloadControl]="false">
+  <h4 *widgsterTitle>
+    Angular <span class="fw-semi-bold">Tables</span>
+  </h4>
+  <p>
+    Another table built with <a href="https://github.com/ssuperczynski/ngx-easy-table" target="_blank">Ngx-easy-table</a>
+  </p>
+
+  <ngx-table
+    [configuration]="configuration"
+    [data]="ng2TableData"
+    [columns]="columns"
+  ></ngx-table>
+</section>
+
