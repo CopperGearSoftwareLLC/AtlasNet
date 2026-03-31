@@ -1,0 +1,40 @@
+@import "../../../styles/helpers";
+
+accordion {
+  .card-header {
+    background: $gray-light;
+    border-bottom: none;
+    cursor: pointer;
+
+    .fa-angle-down {
+      transition: transform 0.15s ease-in-out;
+    }
+  }
+
+  [accordion-heading] {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+
+  .panel-open {
+    .fa-angle-down {
+      transform: rotate(180deg);
+    }
+  }
+
+  .card {
+    margin-bottom: $spacer / 2;
+    background: transparent;
+  }
+}
+
+i.la.la-angle-down.float-right {
+  transform: rotate(0deg);
+  transition: transform 300ms linear;
+}
+
+i.la.la-angle-down.float-right.opened {
+  transform: rotate(180deg);
+  transition: transform 300ms linear;
+}

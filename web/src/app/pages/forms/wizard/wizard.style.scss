@@ -1,0 +1,52 @@
+@import "../../../styles/helpers";
+@import '~ng-wizard/themes/ng_wizard.min.css';
+
+/***********************************/
+/**            NG_WIZARD          **/
+/***********************************/
+
+#ngwizard {
+  box-shadow: none;
+
+  .step-content {
+    min-height: 450px;
+    padding-bottom: 40px;
+    position: relative;
+
+    .pager {
+      position: absolute;
+      right: 0;
+      bottom: 0;
+      left: 0;
+    }
+  }
+
+  .step-content,
+  .ng-wizard-container,
+  .ng-wizard-toolbar {
+    background-color: transparent;
+  }
+
+  .step-anchor {
+    display: flex;
+    justify-content: stretch;
+
+    .nav-item {
+      flex-grow: 1;
+
+      &.done,
+      &.active {
+        .nav-link {
+          color: $white-dark !important;
+        }
+      }
+    }
+  }
+
+  .error {
+    font-size: 85%;
+    padding-left: 0;
+    margin-bottom: 5px;
+    color: #FF8253;
+  }
+}

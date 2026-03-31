@@ -1,7 +1,7 @@
 {
   "group": {
     "default": {
-      "targets": [ "atlasnet-watchdog", "atlasnet-proxy"]
+      "targets": [ "atlasnet-watchdog", "atlasnet-proxy", "atlasnet-web" ]
     }
   },
   "target": {
@@ -19,6 +19,13 @@
       "target": "atlasnet-proxy",
       "load": true,
       "tags": ["atlasnet-proxy:latest"]
+    },
+    "atlasnet-web": {
+      "context": ".",
+      "dockerfile": "dev/docker/Production.Dockerfile",
+      "target": "atlasnet-web",
+      "load": true,
+      "tags": ["atlasnet-web:latest"]
     }
   
   }

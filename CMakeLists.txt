@@ -4,26 +4,31 @@ project(AtlasNet)
 
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
-set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -O2 -fPIC")
-set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -fPIC")
+set(CMAKE_CXX_EXTENSIONS OFF)
+set(CMAKE_POSITION_INDEPENDENT_CODE ON)
+set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -O2 ")
+set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -O2 ")
 include(cmake/Deps.cmake)
 
 set(ATLASNET_EXAMPLES ON CACHE BOOL "Build AtlasNet examples")
 set(ATLASNET_TESTS ON CACHE BOOL "Build AtlasNet tests")
 set(ATLASNET_DEV ON CACHE BOOL "Build AtlasNet dev")
+set(ATLASNET_WEB OFF CACHE BOOL "Build AtlasNet web interface")
 
 if (ATLASNET_EXAMPLES)
     add_subdirectory(examples)
 endif()
 
 if (ATLASNET_TESTS)
-include(CTest)
+enable_testing()
     add_subdirectory(tests)
 endif()
 
 if (ATLASNET_DEV)
     add_subdirectory(dev)
 endif()
+
 
 
 
@@ -59,6 +64,8 @@ Boost::multi_index
 Boost::static_string
 Boost::uuid
 glm::glm
+Taskflow::Taskflow
+
 )
 
 
@@ -90,6 +97,10 @@ target_include_directories(AtlasNetWatchdog
 add_dependencies(AtlasNetWatchdog AtlasNetCore)
 
 
+if (ATLASNET_WEB)
+include(cmake/WebDeps.cmake)
+    add_subdirectory(web)
+
 file(GLOB_RECURSE _web_backend_sources CONFIGURE_DEPENDS
   "${CMAKE_CURRENT_SOURCE_DIR}/src/web/backend/*.cpp"
 )
@@ -100,9 +111,11 @@ target_include_directories(AtlasNetWebBackend
       PRIVATE
     "${CMAKE_CURRENT_SOURCE_DIR}/src/web/backend"
 )
-add_dependencies(AtlasNetWebBackend AtlasNetCore)
-
-
+target_link_libraries(AtlasNetWebBackend
+AtlasNetCore
+drogon
+)
+endif()
 
 file(GLOB_RECURSE _API_shard_sources CONFIGURE_DEPENDS
   "${CMAKE_CURRENT_SOURCE_DIR}/src/API/shard/*.cpp"

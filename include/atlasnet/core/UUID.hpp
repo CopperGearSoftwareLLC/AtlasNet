@@ -40,3 +40,13 @@ public:
     size_t size() const { return sizeof(id.data); }
     
 };
+
+template <typename Tag>
+struct StrongUUID {
+  UUID value{};
+
+  StrongUUID() = default;
+  explicit StrongUUID(UUID v) : value(std::move(v)) {}
+
+  friend bool operator==(const StrongUUID&, const StrongUUID&) = default;
+};

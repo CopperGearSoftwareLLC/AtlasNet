@@ -11,10 +11,12 @@ FetchContent_Declare(
 )
 FetchContent_MakeAvailable(glm)
 
+
 # --- Fetch hiredis ---
 find_package(OpenSSL REQUIRED)
 message(STATUS "Fetching Redis-Plus-Plus")
 set(BUILD_SHARED_LIBS OFF CACHE BOOL "Build Hiredis as static" FORCE)
+set(ENABLE_SSL ON CACHE BOOL "Enable SSL support in hiredis" FORCE)
 FetchContent_Declare(
   hiredis
   URL https://github.com/redis/hiredis/archive/refs/tags/v1.3.0.tar.gz
@@ -23,9 +25,9 @@ FetchContent_Declare(
   SOURCE_DIR _deps/hiredis
   OVERRIDE_FIND_PACKAGE
 )
-#FetchContent_MakeAvailable(hiredis)
+FetchContent_MakeAvailable(hiredis)
 
-
+set(REDIS_PLUS_PLUS_BUILD_ASYNC "libuv")
 set(REDIS_PLUS_PLUS_BUILD_STATIC ON CACHE BOOL "Build Redis-Plus-Plus static" FORCE)
 #set(REDIS_PLUS_PLUS_BUILD_ASYNC "libuv")
 set(REDIS_PLUS_PLUS_BUILD_TEST OFF CACHE BOOL "" FORCE)
@@ -81,12 +83,19 @@ FetchContent_Declare(
       )
 FetchContent_MakeAvailable(Boost)
 
-
-message(STATUS "Nlohmann Json")
-FetchContent_Declare(json URL https://github.com/nlohmann/json/releases/download/v3.11.3/json.tar.xz)
-FetchContent_MakeAvailable(json)
 message(STATUS "TaskFlow")
 set(TF_BUILD_TESTS OFF CACHE BOOL "" FORCE)
 set(TF_BUILD_EXAMPLES OFF CACHE BOOL "" FORCE)
-FetchContent_Declare(taskflow URL https://github.com/taskflow/taskflow/archive/refs/tags/v4.0.0.tar.gz)
+FetchContent_Declare(taskflow 
+URL https://github.com/taskflow/taskflow/archive/refs/tags/v4.0.0.tar.gz
+)
 FetchContent_MakeAvailable(taskflow)
+
+
+# Fetch Kokkos
+FetchContent_Declare(
+    kokkos
+    URL https://github.com/kokkos/kokkos/archive/refs/tags/5.1.0.tar.gz
+)
+
+FetchContent_MakeAvailable(kokkos)

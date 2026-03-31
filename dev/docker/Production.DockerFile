@@ -16,7 +16,7 @@ COPY CMakeLists.txt CMakeLists.txt
 COPY cmake/ cmake/
 
 RUN cmake -S . -B build -DCMAKE_BUILD_TYPE=Release -DATLASNET_DEV=OFF -DATLASNET_EXAMPLES=OFF -DATLASNET_TESTS=OFF
-RUN cmake --build build --target AtlasNetWatchdog AtlasNetProxy AtlasNetWebBackend
+RUN cmake --build build --parallel --target AtlasNetWatchdog AtlasNetProxy AtlasNetWebBackend
 
 FROM debian:bookworm-slim AS runner
 WORKDIR /atlasnet
@@ -29,3 +29,13 @@ ENTRYPOINT ["/atlasnet/AtlasNetWatchdog"]
 FROM runner AS atlasnet-proxy
 COPY --from=builder /atlasnet/build/AtlasNetProxy /atlasnet/
 ENTRYPOINT ["/atlasnet/AtlasNetProxy"]
+
+
+FROM runner AS atlasnet-web
+#COPY --from=builder /atlasnet/build/AtlasNetWebBackend /atlasnet/
+#COPY web/ /atlasnet/frontend/
+#WORKDIR /atlasnet/frontend
+#RUN npm install
+#RUN npm run build
+#ENTRYPOINT ["/atlasnet/AtlasNetWebBackend"]
+
