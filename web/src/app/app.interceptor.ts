@@ -14,7 +14,9 @@ export class AppInterceptor implements HttpInterceptor {
   }
 
   intercept(req: HttpRequest<any>, next: HttpHandler): Observable<HttpEvent<any>> {
-    req = req.clone({ url: this.config.baseURLApi + req.url });
+    if (!/^https?:\/\//i.test(req.url)) {
+      req = req.clone({ url: this.config.baseURLApi + req.url });
+    }
 
     const token: string = localStorage.getItem('token');
     if (token) {

@@ -1,0 +1,76 @@
+<h1 class="page-title">Map <small><small>Cartograph Voxel Terrain</small></small></h1>
+
+<div class="row">
+  <div class="col-lg-9 col-12">
+    <section widgster [optionsControl]="false" [reloadControl]="false" [fullscreenControl]="false"
+      [collapseControl]="false" [closeControl]="false">
+      <h5 *widgsterTitle>World View <span class="fw-semi-bold">Height Map Renderer</span></h5>
+      <p class="map-dashboard__copy">
+        This panel loads topology from the repo-level <code>cartograph-map</code> directory and renders it as a voxel
+        height map for the control plane.
+      </p>
+      <div *ngIf="!errorMessage" #canvasHost class="map-dashboard__stage"></div>
+      <div *ngIf="errorMessage" class="map-dashboard__empty">
+        <h6 class="mb-2">Map Data Not Ready</h6>
+        <p class="mb-0">{{ errorMessage }}</p>
+      </div>
+    </section>
+  </div>
+
+  <div class="col-lg-3 col-12">
+    <section widgster [optionsControl]="false" [reloadControl]="false" [fullscreenControl]="false"
+      [collapseControl]="false" [closeControl]="false">
+      <h5 *widgsterTitle>Source <span class="fw-semi-bold">Contract</span></h5>
+      <div class="map-dashboard__meta" *ngIf="mapResponse as response">
+        <p><strong>Status:</strong> {{ response.status }}</p>
+        <p><strong>Directory:</strong> {{ response.source?.directory || 'cartograph-map' }}</p>
+        <p><strong>Topology:</strong> {{ response.source?.topologyFile || 'map.json or topology.json' }}</p>
+        <p><strong>Source:</strong> {{ response.source?.transport || 'backend' }}</p>
+      </div>
+      <div class="map-dashboard__meta" *ngIf="mapStats as stats">
+        <p><strong>Format:</strong> {{ stats.format }}</p>
+        <p><strong>Grid:</strong> {{ stats.width }} x {{ stats.depth }}</p>
+        <p><strong>Tiles:</strong> {{ stats.tileCount }}</p>
+        <p><strong>Max Height:</strong> {{ stats.maxHeight }}</p>
+      </div>
+      <div class="map-dashboard__controls">
+        <label class="map-dashboard__control">
+          <span>Light Brightness</span>
+          <strong>{{ lightBrightness | number:'1.2-2' }}</strong>
+          <input
+            type="range"
+            min="0.2"
+            max="100"
+            step="0.05"
+            [value]="lightBrightness"
+            (input)="onLightBrightnessChange($any($event.target).value)">
+        </label>
+        <label class="map-dashboard__control">
+          <span>Light Rotation</span>
+          <strong>{{ lightRotation }} deg</strong>
+          <input
+            type="range"
+            min="-180"
+            max="180"
+            step="1"
+            [value]="lightRotation"
+            (input)="onLightRotationChange($any($event.target).value)">
+        </label>
+        <label class="map-dashboard__toggle">
+          <input
+            type="checkbox"
+            [checked]="terrainColorEnabled"
+            (change)="onTerrainColorToggle($any($event.target).checked)">
+          <span>Terrain Color</span>
+        </label>
+      </div>
+      <p class="map-dashboard__hint">
+        Drop a <code>map.json</code> file into <code>cartograph-map/</code>. The renderer builds the voxel terrain
+        directly from the tiled JSON topology during local UI development or through the web backend.
+      </p>
+      <p class="map-dashboard__hint">
+        Drag to orbit, scroll to zoom, and right-drag to pan.
+      </p>
+    </section>
+  </div>
+</div>

@@ -15,6 +15,7 @@ import { AnalyticsComponent } from './analytics/analytics.component';
 import { BigStatComponent } from './analytics/components/big-stat/big-stat.component';
 import { TaskContainerComponent } from './analytics/components/task-container/task-container.component';
 import { TaskComponent } from './analytics/components/task/task';
+import { MapComponent } from './map/map.component';
 import { VisitsComponent } from './visits/visits.component';
 import { MarketStatsWidgetComponent } from './visits/market-stats-widget/market-stats-widget.component';
 import { WidgetsComponent } from './widgets/widgets.component';
@@ -29,7 +30,8 @@ import { WidgsterModule } from '../../components/widgster/widgster.module';
 import { UtilsModule } from '../../utils/utils-module/utils.module';
 
 export const routes = [
-  { path: '', redirectTo: 'visits', pathMatch: 'full' },
+  { path: '', redirectTo: 'map', pathMatch: 'full' },
+  { path: 'map', component: MapComponent, pathMatch: 'full' },
   { path: 'analytics', component: AnalyticsComponent, pathMatch: 'full' },
   { path: 'visits', component: VisitsComponent, pathMatch: 'full' },
   { path: 'widgets', component: WidgetsComponent, pathMatch: 'full' }
@@ -47,6 +49,7 @@ const DEFAULT_SWIPER_CONFIG: SwiperConfigInterface = {
     BigStatComponent,
     TaskContainerComponent,
     TaskComponent,
+    MapComponent,
     VisitsComponent,
     MarketStatsWidgetComponent,
     WidgetsComponent,

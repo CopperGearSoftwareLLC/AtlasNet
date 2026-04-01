@@ -10,6 +10,7 @@
     </a>
     <ul id="main-collapse" class="accordion-body" [attr.aria-expanded]="sidebarState.dashboardCollapsed"
       [collapse]="sidebarState.dashboardCollapsed" [isAnimated]="true">
+      <li [routerLinkActive]="['active']"><a routerLink="main/map">Map</a></li>
       <li [routerLinkActive]="['active']"><a routerLink="main/visits">Visits</a></li>
       <li [routerLinkActive]="['active']"><a routerLink="main/analytics">Analytics</a></li>
       <li [routerLinkActive]="['active']"><a routerLink="main/widgets">Widgets</a></li>
