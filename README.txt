@@ -27,7 +27,8 @@ AtlasNet has enviroment variables that control how it functions
 
 | Variable | Description | Default | Example |
 |----------|-------------|---------|---------|
-| 
+| ATLASNET_TICK_RATE | Controls the tick rate per second of the system | 20 | 10 |
+| ATLASNET_RPC_PORT | Internal RPC port for inter-service communication | 41001 | 3000 |
 
 ---
 ## 🏗 Architecture Overview

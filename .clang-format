@@ -9,7 +9,7 @@ UseTab: Never
 ContinuationIndentWidth: 4
 
 # Column / wrapping
-ColumnLimit: 100
+ColumnLimit: 80
 BreakBeforeBraces: Allman
 AllowShortFunctionsOnASingleLine: Empty
 AllowShortIfStatementsOnASingleLine: Never
@@ -18,57 +18,3 @@ AllowShortLoopsOnASingleLine: false
 # Pointers / references
 PointerAlignment: Left
 ReferenceAlignment: Left
-
-# Spaces
-SpaceBeforeParens: ControlStatements
-SpacesInParentheses: false
-SpacesInSquareBrackets: false
-SpaceInEmptyParentheses: false
-
-# Includes
-SortIncludes: true
-IncludeBlocks: Preserve
-
-# Function / call formatting
-BinPackArguments: false
-BinPackParameters: false
-
-# Constructor initializer lists
-BreakConstructorInitializers: BeforeComma
-PackConstructorInitializers: Never
-
-# Namespace / class formatting
-NamespaceIndentation: All
-AccessModifierOffset: -2
-EmptyLineBeforeAccessModifier: LogicalBlock
-EmptyLineAfterAccessModifier: Never
-
-# Braces
-BraceWrapping:
-  AfterClass: true
-  AfterControlStatement: Always
-  AfterEnum: true
-  AfterFunction: true
-  AfterNamespace: true
-  AfterStruct: true
-  AfterUnion: true
-  BeforeCatch: true
-  BeforeElse: true
-  IndentBraces: false
-  SplitEmptyFunction: true
-  SplitEmptyRecord: true
-  SplitEmptyNamespace: true
-
-# Line breaking
-AlignAfterOpenBracket: BlockIndent
-PenaltyBreakBeforeFirstCallParameter: 1
-
-# Comments
-ReflowComments: true
-
-# C++ specific
-Standard: c++20
-
-# Misc
-DerivePointerAlignment: false
-SortUsingDeclarations: true

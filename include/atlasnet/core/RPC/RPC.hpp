@@ -1,117 +1,228 @@
 #pragma once
 
+#include "atlasnet/core/RPC/RPCMessage.hpp"
 #include "atlasnet/core/System.hpp"
-#include "atlasnet/core/container/Container.hpp"
 #include "atlasnet/core/database/RedisConn.hpp"
-#include "atlasnet/core/message/MessageSystem.hpp"
-#include <cstdint>
+
+#include "RPCConcepts.hpp"
+#include "atlasnet/core/messages/MessageSystem.hpp"
+#include "atlasnet/core/serialize/ByteReader.hpp"
+#include "atlasnet/core/serialize/ByteWriter.hpp"
+#include "steam/steamtypes.h"
+#include <any>
+#include <functional>
 #include <future>
-#include <string>
-#include <string_view>
 #include <tuple>
-#include <type_traits>
+#include <unordered_map>
+#define ATLASNET_RPC_METHOD(Name, ReturnType, ...)                             \
+  struct Name : AtlasNet::RPC_Internal::Method<                                \
+                    AtlasNet::RPC_Internal::Fnv1a32(#Name),                    \
+                    ReturnType(__VA_ARGS__)>                                   \
+  {                                                                            \
+    static constexpr const char* GetName()                                     \
+    {                                                                          \
+      return #Name;                                                            \
+    }                                                                          \
+  };
+
+#define ATLASNET_RPC(ServiceName, ...)                                         \
+  struct ServiceName                                                           \
+  {                                                                            \
+    __VA_ARGS__                                                                \
+  };
+
 namespace AtlasNet
 {
-  namespace RPC_Internal
-  {
 
-    template <typename Signature> struct MethodTraits;
-
-    template <typename R, typename... Args> struct MethodTraits<R(Args...)>
-    {
-      using ReturnType = R;
-      using ArgsTuple = std::tuple<std::decay_t<Args>...>;
-      static constexpr bool IsVoid = std::is_void_v<R>;
-    };
-
-    template <uint32_t IdValue, typename Signature> struct Method : MethodTraits<Signature>
-    {
-      static constexpr uint32_t Id = IdValue;
-    };
-    template <typename ReturnType, typename Func, typename Tuple> struct IsInvocableFromTuple;
-
-    template <typename ReturnType, typename Func, typename... Args>
-    struct IsInvocableFromTuple<ReturnType, Func, std::tuple<Args...>>
-        : std::bool_constant<std::is_invocable_r_v<ReturnType, Func, Args...>>
-    {
-    };
-
-    template <typename MethodType, typename Func>
-    concept BindableRpcHandler = IsInvocableFromTuple<
-        typename MethodType::ReturnType,
-        Func,
-        typename MethodType::ArgsTuple>::value;
-  } // namespace RPC_Internal
-  using RPCTarget = std::variant<ContainerID, EndPointAddress>;
+  using RPCTarget = EndPointAddress;
   class RPC : public System<RPC>
   {
 
   public:
-    RPC()
+    struct Settings
     {
-      // Initialize RPC system resources here
-    }
+      PortType port;
+    } _settings;
+
+    RPC(const Settings& settings);
+    ~RPC() {}
+    /**
+     * @brief Hello
+     *
+     * @tparam MethodType
+     * @tparam Func
+     * @param func
+     * @return requires
+     */
     template <typename MethodType, typename Func>
-    requires RPC_Internal::BindableRpcHandler<MethodType, Func>
-        // Bind the method to the RPC system
-        static void Bind(Func&& func)
-    {
-    }
+      requires RPC_Internal::BindableRpcHandler<MethodType, Func>
+    // Bind the method to the RPC system
+    void Bind(Func&& func);
     template <typename MethodType, typename... Args>
-    requires(!std::is_void_v<typename MethodType::ReturnType>) [[nodiscard]]
-    static std::future<typename MethodType::ReturnType> Call(
-        const RPCTarget& target, Args&&... args
-    )
-    {
-      // non-void RPC result must be used
-    }
+      requires(!std::is_void_v<typename MethodType::ReturnType>)
+    [[nodiscard]]
+    std::future<typename MethodType::ReturnType>
+    Call(const RPCTarget& target, Args&&... args);
 
     template <typename MethodType, typename... Args>
-    requires(std::is_void_v<typename MethodType::ReturnType>) static std::future<
-        typename MethodType::ReturnType> Call(const RPCTarget& target, Args&&... args)
+      requires(std::is_void_v<typename MethodType::ReturnType>)
+    void Call(const RPCTarget& target, Args&&... args);
+
+  private:
+    void Shutdown() override;
+    template <typename MethodType, typename... Args>
+    std::pair<RPC_Internal::MethodID, RPC_Internal::CallID>
+    SendRequest(const RPCTarget& target, Args&&... args);
+    template <typename MethodType>
+    void SendResponse(
+        const RPCTarget& target,
+        RPC_Internal::CallID callID,
+        const typename MethodType::Return& ret
+    );
+    void
+    OnRPCRequest(const RpcRequestMessage& msg, const EndPointAddress& address);
+    void OnRPCResponse(
+        const RpcResponseMessage& msg, const EndPointAddress& address
+    );
+    void OnRPCError(const RpcErrorMessage& msg, const EndPointAddress& address);
+    RPC_Internal::CallID GetNextCallID(RPC_Internal::MethodID methodId)
     {
-      // void RPC result may be ignored
+      if (!NextCallID.contains(methodId))
+      {
+        NextCallID[methodId] = 0; // Start call IDs at 0 for each method
+      }
+      return NextCallID[methodId]++;
     }
+    using BindFunc = std::function<
+        void(const RPCTarget&, RPC_Internal::CallID, std::span<const uint8_t>)>;
+    std::unordered_map<RPC_Internal::MethodID, BindFunc> _methodHandlers;
+    std::unordered_map<RPC_Internal::MethodID, RPC_Internal::CallID> NextCallID;
+    struct PendingPromiseKey
+    {
+      RPC_Internal::MethodID methodId;
+      RPC_Internal::CallID callId;
+
+      bool operator==(const PendingPromiseKey& other) const noexcept
+      {
+        return methodId == other.methodId && callId == other.callId;
+      }
+    };
+
+    struct PendingPromiseKeyHash
+    {
+      std::size_t operator()(const PendingPromiseKey& k) const noexcept
+      {
+        std::size_t h1 = std::hash<RPC_Internal::MethodID>{}(k.methodId);
+        std::size_t h2 = std::hash<RPC_Internal::CallID>{}(k.callId);
+        return h1 ^ (h2 + 0x9e3779b9 + (h1 << 6) + (h1 >> 2));
+      }
+    };
+
+    std::unordered_map<PendingPromiseKey, std::any, PendingPromiseKeyHash>
+        _pendingPromises;
   };
 
 } // namespace AtlasNet
-#define ATLASNET_RPC_METHOD(Name, Id, ReturnType, ...)                                             \
-  struct Name : AtlasNet::RPC_Internal::Method<Id, ReturnType(__VA_ARGS__)>                        \
-  {                                                                                                \
-    static constexpr const char* GetName()                                                         \
-    {                                                                                              \
-      return #Name;                                                                                \
-    }                                                                                              \
-  };
 
-#define ATLASNET_RPC(ServiceName, ...)                                                             \
-  struct ServiceName                                                                               \
-  {                                                                                                \
-    __VA_ARGS__                                                                                    \
-  };
-
-namespace AtlasNet
+template <typename MethodType, typename... Args>
+inline std::
+    pair<AtlasNet::RPC_Internal::MethodID, AtlasNet::RPC_Internal::CallID>
+    AtlasNet::RPC::SendRequest(const RPCTarget& target, Args&&... args)
 {
-
-  ATLASNET_RPC(
-      TESTRpc,
-      ATLASNET_RPC_METHOD(TestMethod, 1, void, int, float)
-          ATLASNET_RPC_METHOD(SecondTestMethod, 2, int, std::string)
+  ByteWriter writeArgs;
+  writeArgs(std::forward<Args>(args)...);
+  RpcRequestMessage request{
+      .methodId = MethodType::Id,
+      .callID = GetNextCallID(MethodType::Id),
+      .payload = std::vector<uint8_t>(
+          writeArgs.bytes().begin(), writeArgs.bytes().end()
+      )
+  };
+  MessageSystem::Get().SendMessage(
+      request, target, MessageSendMode::eReliableBatched
   );
-  void Test()
+  return std::make_pair(request.methodId, request.callID);
+}
+
+template <typename MethodType>
+inline void AtlasNet::RPC::SendResponse(
+    const RPCTarget& target,
+    RPC_Internal::CallID callID,
+    const MethodType::Return& ret
+)
+{
+  ByteWriter writeArgs;
+  writeArgs(ret);
+  RpcResponseMessage request{
+      .methodId = MethodType::Id,
+      .callID = GetNextCallID(MethodType::Id),
+      .payload = std::vector<uint8_t>(
+          writeArgs.bytes().begin(), writeArgs.bytes().end()
+      )
+  };
+  MessageSystem::Get().SendMessage(
+      request, target, MessageSendMode::eReliableBatched
+  );
+}
+
+template <typename MethodType, typename... Args>
+  requires(std::is_void_v<typename MethodType::ReturnType>)
+inline void AtlasNet::RPC::Call(const RPCTarget& target, Args&&... args)
+{
+  SendRequest<MethodType>(target, std::forward<Args>(args)...);
+}
+
+template <typename MethodType, typename... Args>
+  requires(!std::is_void_v<typename MethodType::ReturnType>)
+inline std::future<typename MethodType::ReturnType>
+AtlasNet::RPC::Call(const RPCTarget& target, Args&&... args)
+{
+  auto [methodId, callID] =
+      SendRequest<MethodType>(target, std::forward<Args>(args)...);
+  PendingPromiseKey key = std::make_pair(methodId, callID);
+  _pendingPromises.emplace(
+      key, std::promise<std::optional<typename MethodType::ReturnType>>()
+  );
+  return std::any_cast<
+             std::promise<std::optional<typename MethodType::ReturnType>>&>(
+             _pendingPromises.at(key)
+  )
+      .get_future();
+}
+
+template <typename MethodType, typename Func>
+  requires AtlasNet::RPC_Internal::BindableRpcHandler<MethodType, Func>
+inline void AtlasNet::RPC::Bind(Func&& func)
+{
+  using ReturnType = typename MethodType::ReturnType;
+  using ArgsTuple = typename MethodType::ArgsTuple;
+
+  _methodHandlers[MethodType::Id] = [f = std::forward<Func>(func), this](
+                                        const RPCTarget& caller,
+                                        RPC_Internal::CallID CallId,
+                                        std::span<const uint8_t> payload
+                                    ) mutable
   {
-    auto test_method_bind = [](int a, float b) {};
-    auto second_test_method_bind = [](const std::string_view) { return 1; };
+    ByteReader reader(payload);
 
-    RPC::Bind<TESTRpc::TestMethod>(test_method_bind);
-    RPC::Bind<TESTRpc::SecondTestMethod>(second_test_method_bind);
+    ArgsTuple args;
+    std::apply([&](auto&... arg) { (reader(arg), ...); }, args);
 
-    RPCTarget target = EndPointAddress(IPv4Address(127, 0, 0, 1), 8080);
-    RPCTarget target2 = ContainerID();
-
-    RPC::Call<TESTRpc::TestMethod>(target, 42, 3.14f);
-    std::future<int> second_result = RPC::Call<TESTRpc::SecondTestMethod>(target, "Hello");
-
-    int result = second_result.get();
-  }
-} // namespace AtlasNet
+    if constexpr (std::is_void_v<ReturnType>)
+    {
+      std::apply(f, args);
+      // SendVoidResponse(sender, MethodType::Id, callId);
+    }
+    else
+    {
+      ReturnType result = std::apply(f, args);
+      /* RpcResponseMessage response;
+       response.methodId = MethodType::Id;
+       response.callID = CallId;
+       ByteWriter bw;
+       bw(result);
+       response.payload.assign(bw.bytes().begin(), bw.bytes().end()); */
+      SendResponse<MethodType>(caller, CallId, result);
+    }
+  };
+}

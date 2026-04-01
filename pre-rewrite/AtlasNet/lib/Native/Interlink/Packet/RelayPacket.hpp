@@ -42,19 +42,3 @@ class RelayPacket : public TPacket<RelayPacket, "RelayPacket">
 			   sub_Packet->Validate();
 	}
 };
-
-void Test()
-{
-	uint32 BoundId = 52;
-	CommandPacket cmdPacket;
-	cmdPacket
-    .SetCommandType(CommandPacket::Type::eFetchNewBounds)
-		.WriteArgs(
-            [BoundId = BoundId](ByteWriter& bw)
-             { bw.write_scalar(BoundId); });
-
-	RelayPacket relayPacket;
-	relayPacket
-    .SetFinalTarget(NetworkIdentity::MakeIDWatchDog())
-    .SetSubPacket(cmdPacket);
-}

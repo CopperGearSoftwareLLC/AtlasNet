@@ -7,7 +7,7 @@ add_executable(SerializationTests ${CMAKE_CURRENT_SOURCE_DIR}/Serialization.cpp)
 # Optional, but common: local includes
 
 target_link_libraries(SerializationTests
-AtlasNetCore
+AtlasNetTestUtils
 gtest
 )
 

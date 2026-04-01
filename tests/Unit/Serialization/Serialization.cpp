@@ -1,3 +1,4 @@
+#include "TestUtils.hpp"
 #include "atlasnet/core/serialize/ByteReader.hpp"
 #include "atlasnet/core/serialize/ByteWriter.hpp"
 #include "glm/ext/quaternion_relational.hpp"
@@ -28,7 +29,7 @@ TEST(SERIALIZATION, BasicOps) {
   const glm::mat4 mat4_val(1.0f);
   const std::vector<uint8_t> blob_val = {0xDE, 0xAD, 0xBE, 0xEF};
 
-  ByteWriter writer;
+  AtlasNet::ByteWriter writer;
   writer.u8(u8_val)
       .u16(u16_val)
       .u32(u32_val)
@@ -63,7 +64,7 @@ TEST(SERIALIZATION, BasicOps) {
   glm::mat4 mat4_out;
   std::span<const uint8_t> blob_out;
 
-  ByteReader reader(writer.bytes());
+  AtlasNet::ByteReader reader(writer.bytes());
   reader.u8(u8_out)
       .u16(u16_out)
       .u32(u32_out)
@@ -136,7 +137,7 @@ struct Object {
     ar(blob_val);
   }
 };
-TEST(SERIALIZATION, archive) {
+TEST(SERIALIZATION, archivetest) {
 
     std::vector<uint8_t> blob = {0xDE, 0xAD, 0xBE, 0xEF};
   Object in{
@@ -158,11 +159,11 @@ TEST(SERIALIZATION, archive) {
       blob,
   };
 
-  ByteWriter writer;
+  AtlasNet::ByteWriter writer;
   in.serialize(writer);
 
   Object out;
-  ByteReader reader(writer.bytes());
+  AtlasNet::ByteReader reader(writer.bytes());
   out.serialize(reader);
   EXPECT_EQ(out.u8_val, in.u8_val);
   EXPECT_EQ(out.u16_val, in.u16_val);

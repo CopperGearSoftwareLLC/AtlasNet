@@ -1,5 +1,5 @@
 #pragma once
-#include "atlasnet/core/message/MessageSystem.hpp"
+#include "atlasnet/core/messages/MessageSystem.hpp"
 namespace AtlasNet {
 class ServerMessageSystem : public MessageSystem {
 

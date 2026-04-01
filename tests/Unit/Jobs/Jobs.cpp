@@ -12,7 +12,7 @@ using namespace std::chrono_literals;
 TEST(JobsTests, JobExecutesCallable) {
   std::atomic<int> calls{0};
 
-  AtlasNet::Job job([&](AtlasNet::Job::JobHandle &) { ++calls; });
+  AtlasNet::Job job([&](AtlasNet::Job::JobContext &) { ++calls; });
   job();
 
   EXPECT_EQ(calls.load(), 1);
@@ -21,32 +21,32 @@ TEST(JobsTests, JobExecutesCallable) {
 TEST(JobsTests, PriorityQueueReturnsHighestPriorityFirst) {
   std::priority_queue<AtlasNet::Job, std::vector<AtlasNet::Job>> q;
 
-  AtlasNet::Job low([](AtlasNet::Job::JobHandle &) {});
-  low.set_priority(AtlasNet::eLow);
+  AtlasNet::Job low([](AtlasNet::Job::JobContext &) {});
+  low.set_priority(AtlasNet::JobPriority::eLow);
 
-  AtlasNet::Job high([](AtlasNet::Job::JobHandle &) {});
-  high.set_priority(AtlasNet::eHigh);
+  AtlasNet::Job high([](AtlasNet::Job::JobContext &) {});
+  high.set_priority(AtlasNet::JobPriority::eHigh);
 
   q.push(low);
   q.push(high);
 
-  EXPECT_EQ(q.top().get_priority(), AtlasNet::eHigh);
+  EXPECT_EQ(q.top().get_priority(), AtlasNet::JobPriority::eHigh);
 }
 
 TEST(JobsTests, HandleCanRequestRepeatAndChangePriority) {
-  AtlasNet::Job job([](AtlasNet::Job::JobHandle &h) {
-    h.set_priority(AtlasNet::eVeryHigh).repeat_once(25ms);
+  AtlasNet::Job job([](AtlasNet::Job::JobContext &h) {
+    h.set_priority(AtlasNet::JobPriority::eVeryHigh).repeat_once(25ms);
   });
 
   job();
 
-  EXPECT_EQ(job.get_priority(), AtlasNet::eVeryHigh);
+  EXPECT_EQ(job.get_priority(), AtlasNet::JobPriority::eVeryHigh);
   EXPECT_TRUE(job.should_repeat());
   EXPECT_EQ(job.get_repeat_interval(), 25ms);
 }
 
 TEST(JobsTests, RepeatingPresetRequestsRepeatOnRun) {
-  AtlasNet::Job job([](AtlasNet::Job::JobHandle &) {});
+  AtlasNet::Job job([](AtlasNet::Job::JobContext &) {});
   job.repeating(15ms);
 
   job();
@@ -56,12 +56,12 @@ TEST(JobsTests, RepeatingPresetRequestsRepeatOnRun) {
 }
 
 TEST(JobsTests, JobSystemRunsPushedJob) {
-  AtlasNet::Jobflow::JobSystem system;
+  AtlasNet::JobSystem system;
 
   std::promise<void> done;
   auto doneFuture = done.get_future();
 
-  AtlasNet::Job job([&](AtlasNet::Job::JobHandle &) { done.set_value(); });
+  AtlasNet::Job job([&](AtlasNet::Job::JobContext &) { done.set_value(); });
   system.PushJob(job);
 
   EXPECT_EQ(doneFuture.wait_for(1s), std::future_status::ready);
@@ -70,7 +70,7 @@ TEST(JobsTests, JobSystemRunsPushedJob) {
 }
 
 TEST(JobsTests, JobSystemRepeatingJobRunsMoreThanOnce) {
-  AtlasNet::Jobflow::JobSystem system;
+  AtlasNet::JobSystem system;
 
   std::atomic<int> calls{0};
   std::atomic<bool> signaled{false};
@@ -78,7 +78,7 @@ TEST(JobsTests, JobSystemRepeatingJobRunsMoreThanOnce) {
   std::promise<void> done;
   auto doneFuture = done.get_future();
 
-  AtlasNet::Job repeatingJob([&](AtlasNet::Job::JobHandle &) {
+  AtlasNet::Job repeatingJob([&](AtlasNet::Job::JobContext &) {
     const int n = ++calls;
     if (n >= 2 && !signaled.exchange(true)) {
       done.set_value();
@@ -95,7 +95,7 @@ TEST(JobsTests, JobSystemRepeatingJobRunsMoreThanOnce) {
 }
 
 TEST(JobsTests, JobSystemBruteForceManyJobsAllExecute) {
-  AtlasNet::Jobflow::JobSystem system;
+  AtlasNet::JobSystem system;
 
   constexpr int kJobCount = 20000;
   std::atomic<int> completed{0};
@@ -105,7 +105,7 @@ TEST(JobsTests, JobSystemBruteForceManyJobsAllExecute) {
   auto doneFuture = done.get_future();
 
   for (int i = 0; i < kJobCount; ++i) {
-    AtlasNet::Job job([&](AtlasNet::Job::JobHandle &) {
+    AtlasNet::Job job([&](AtlasNet::Job::JobContext &) {
       const int n = completed.fetch_add(1, std::memory_order_relaxed) + 1;
       if (n == kJobCount && !doneSignaled.exchange(true)) {
         done.set_value();
@@ -114,11 +114,11 @@ TEST(JobsTests, JobSystemBruteForceManyJobsAllExecute) {
 
     // Optional small priority variation to exercise queue ordering paths
     if ((i % 3) == 0) {
-      job.set_priority(AtlasNet::eHigh);
+      job.set_priority(AtlasNet::JobPriority::eHigh);
     } else if ((i % 3) == 1) {
-      job.set_priority(AtlasNet::eMedium);
+      job.set_priority(AtlasNet::JobPriority::eMedium);
     } else {
-      job.set_priority(AtlasNet::eLow);
+      job.set_priority(AtlasNet::JobPriority::eLow);
     }
 
     system.PushJob(job);
