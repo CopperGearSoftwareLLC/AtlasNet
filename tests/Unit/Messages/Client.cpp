@@ -6,19 +6,22 @@
 #include "atlasnet/core/job/Job.hpp"
 #include "atlasnet/core/job/JobSystem.hpp"
 #include "atlasnet/core/messages/MessageSystem.hpp"
-
+ std::optional<EndPointAddress> serverAddr;
 int test0()
 {
-  EndPointAddress serverAddr("127.0.0.1:12345");
+
   AtlasNet::JobSystem::Init();
   AtlasNet::MessageSystem::Init();
 
-  AtlasNet::MessageSystem::Get().Connect(serverAddr);
+  std::cout << "Connecting to server at " << serverAddr->to_string() << std::endl;
+  AtlasNet::MessageSystem::Get().Connect(serverAddr.value());
+
+  std::this_thread::sleep_for(std::chrono::seconds(2));
   return 0;
 }
 int test1()
 {
-  EndPointAddress serverAddr("127.0.0.1:12345");
+
 
   AtlasNet::JobSystem::Init();
   AtlasNet::MessageSystem::Init();
@@ -26,7 +29,7 @@ int test1()
   msg.aNumber = 42;
   msg.str = "Hello from client!";
   AtlasNet::MessageSystem::Get().SendMessage(
-      msg, serverAddr, AtlasNet::MessageSendMode::eReliable);
+      msg, serverAddr.value(), AtlasNet::MessageSendMode::eReliable);
   std::this_thread::sleep_for(std::chrono::seconds(2));
   return 0;
 }
@@ -34,9 +37,16 @@ const static inline std::unordered_map<int, std::function<int()>> tests = {
     {0, test0}, {1, test1}};
 int main(int argc, char** argv)
 {
+
   TestUtils::Init();
   // Look for --server-addr and --test-num in args
 
+  std::cerr << "Running Client with args: ";
+  for (int i = 1; i < argc; ++i)
+  {
+    std::cerr << argv[i] << " ";
+  }
+  std::cerr << std::endl;
   std::optional<int> testNum = 0;
   for (int i = 1; i < argc; ++i)
   {
@@ -45,6 +55,10 @@ int main(int argc, char** argv)
     if (arg == "--test-num" && i + 1 < argc)
     {
       testNum = std::stoi(argv[++i]);
+    }
+    else if (arg == "--server-addr" && i + 1 < argc)
+    {
+      serverAddr = EndPointAddress(argv[++i]);
     }
   }
 

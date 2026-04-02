@@ -18,6 +18,13 @@ FetchContent_Declare(
 FetchContent_MakeAvailable(gtest)
 endif()
 
+if (NOT TARGET raylib)
+FetchContent_Declare(
+  raylib
+  URL https://github.com/raysan5/raylib/archive/refs/tags/5.5.tar.gz
+)
+FetchContent_MakeAvailable(raylib)
+endif()
 
 
 set(VENV_DIR "${CMAKE_CURRENT_SOURCE_DIR}/.venv" CACHE PATH "Path to Python virtual environment for tests")

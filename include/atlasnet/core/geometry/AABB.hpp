@@ -1,6 +1,6 @@
 #pragma once
 
-#include "atlasnet/core/pch.hpp"
+#include "Vec.hpp"
 #include "atlasnet/core/serialize/ByteReader.hpp"
 #include "atlasnet/core/serialize/ByteWriter.hpp"
 #include <algorithm>

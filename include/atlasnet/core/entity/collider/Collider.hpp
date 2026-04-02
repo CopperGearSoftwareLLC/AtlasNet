@@ -1,7 +1,7 @@
 #pragma once
 
 #include "atlasnet/core/geometry/AABB.hpp"
-#include "atlasnet/core/pch.hpp"
+#include "atlasnet/core/geometry/Vec.hpp"
 class ICollider {
 public:
   virtual ~ICollider() = default;

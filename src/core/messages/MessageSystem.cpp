@@ -190,9 +190,8 @@ AtlasNet::MessageSystem::Connect(const EndPointAddress& address)
               {
                 char errMsg[1024];
                 steamAddr.ToString(errMsg, sizeof(errMsg), true);
-                
-                std::cerr << "Failed to connect to " << errMsg
-                          << std::endl;
+
+                std::cerr << "Failed to connect to " << errMsg << std::endl;
                 return;
               }
               GNS().SetConnectionPollGroup(con, _pollGroup);

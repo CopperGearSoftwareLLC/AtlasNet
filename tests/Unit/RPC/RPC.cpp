@@ -11,11 +11,14 @@ int main(int argc, char** argv)
   ::testing::InitGoogleTest(&argc, argv);
   return RUN_ALL_TESTS();
 }
+
 ATLASNET_RPC(
     TESTRpc, ATLASNET_RPC_METHOD(TestMethod, void, int, float);
     ATLASNET_RPC_METHOD(TestMethod_Ret, int);
     ATLASNET_RPC_METHOD(TestMethod_Ret_String, std::string, std::string_view);
 );
+
+
 TEST(RPC, SelfTest)
 {
   AtlasNet::JobSystem::Init();

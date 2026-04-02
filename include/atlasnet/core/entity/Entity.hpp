@@ -1,7 +1,7 @@
 #pragma once
 #include "atlasnet/core/UUID.hpp"
 #include "atlasnet/core/entity/collider/Collider.hpp"
-#include "atlasnet/core/pch.hpp"
+#include "atlasnet/core/geometry/Vec.hpp"
 #include <variant>
 namespace AtlasNet {
 

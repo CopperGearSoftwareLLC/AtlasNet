@@ -1,7 +1,9 @@
 import os
 import time
+import uuid
 from dataclasses import dataclass
 
+import docker
 import pytest
 from testcontainers.core.container import DockerContainer
 
@@ -9,6 +11,8 @@ from testcontainers.core.container import DockerContainer
 IMAGE = "ubuntu:24.04"
 SERVER_STARTUP_SECONDS = float(os.environ.get("SERVER_STARTUP_SECONDS", "1.0"))
 PROCESS_TIMEOUT_SECONDS = int(os.environ.get("PROCESS_TIMEOUT_SECONDS", "60"))
+SERVER_PORT = 12345
+SERVER_HOSTNAME = "server"
 
 
 @dataclass
@@ -29,6 +33,21 @@ def _container_binary_path(host_binary: str, mount_dir: str) -> str:
     return f"{mount_dir}/{os.path.basename(host_binary)}"
 
 
+def _create_network(test_num: int):
+    client = docker.from_env()
+    network_name = f"message-test-net-{test_num}-{uuid.uuid4().hex[:8]}"
+    return client.networks.create(name=network_name, driver="bridge")
+
+
+def _remove_network_quietly(network) -> None:
+    if network is None:
+        return
+    try:
+        network.remove()
+    except Exception:
+        pass
+
+
 def _start_binary_container(
     *,
     image: str,
@@ -36,21 +55,32 @@ def _start_binary_container(
     mount_dir: str,
     test_num: int,
     name: str,
+    network: docker.models.networks.Network | None = None,
+    container_name: str | None = None,
+    extra_args: str = "",
 ) -> DockerContainer:
     container_binary = _container_binary_path(host_binary, mount_dir)
 
+    command = (
+        f"/bin/sh -lc "
+        f"\"'{container_binary}' --test-num {test_num} {extra_args}\""
+    )
+
+    actual_name = container_name or f"{name.lower()}-test-{test_num}-{uuid.uuid4().hex[:6]}"
+
     container = (
-        DockerContainer(image) 
+        DockerContainer(image)
+        .with_name(actual_name)
         .with_volume_mapping(
             os.path.dirname(host_binary),
             mount_dir,
             mode="ro",
         )
-        .with_command(
-            f'/bin/sh -lc " '
-            f'\'{container_binary}\' --test-num {test_num}"'
-        )
+        .with_command(command)
     )
+
+    if network is not None:
+        container = container.with_network(network)
 
     container.start()
     return container
@@ -83,19 +113,27 @@ def _run_server_client_test(test_num: int) -> tuple[ContainerRunResult, Containe
     server_binary = _require_env("SERVER_BINARY")
     client_binary = _require_env("CLIENT_BINARY")
 
+    network = None
     server_container = None
     client_container = None
 
     server_result = ContainerRunResult(name="Server", exit_code=None, logs="")
     client_result = ContainerRunResult(name="Client", exit_code=None, logs="")
 
+    # unique server name per test run, but predictable for the client
+    server_name = f"server-{test_num}-{uuid.uuid4().hex[:6]}"
+
     try:
+        network = _create_network(test_num)
+
         server_container = _start_binary_container(
             image=IMAGE,
             host_binary=server_binary,
             mount_dir="/opt/serverbin",
             test_num=test_num,
             name="Server",
+            network=network,
+            container_name=server_name,
         )
 
         time.sleep(SERVER_STARTUP_SECONDS)
@@ -106,6 +144,8 @@ def _run_server_client_test(test_num: int) -> tuple[ContainerRunResult, Containe
             mount_dir="/opt/clientbin",
             test_num=test_num,
             name="Client",
+            network=network,
+            extra_args=f"--server-addr {server_name}:{SERVER_PORT}",
         )
 
         client_result.exit_code = _wait_for_container(client_container, PROCESS_TIMEOUT_SECONDS)
@@ -131,6 +171,7 @@ def _run_server_client_test(test_num: int) -> tuple[ContainerRunResult, Containe
 
         _stop_container_quietly(client_container)
         _stop_container_quietly(server_container)
+        _remove_network_quietly(network)
 
 
 def _assert_results(test_num: int, server_result: ContainerRunResult, client_result: ContainerRunResult) -> None:

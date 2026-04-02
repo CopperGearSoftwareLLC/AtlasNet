@@ -3,7 +3,7 @@
 #include "atlasnet/core/System.hpp"
 #include "atlasnet/core/assert.hpp"
 #include "atlasnet/core/container/Container.hpp"
-#include "atlasnet/core/database/RedisConn.hpp"
+#include "atlasnet/core/EndPoint.hpp"
 #include "atlasnet/core/job/Job.hpp"
 #include "atlasnet/core/job/JobEnums.hpp"
 #include "atlasnet/core/job/JobHandle.hpp"
