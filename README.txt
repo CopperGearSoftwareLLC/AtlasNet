@@ -7,6 +7,7 @@ Distributed Spatial Networking Framework
 
 - [About](#about)
 - [Features](#features)
+- [Build](#build)
 - [Usage](#usage)
 - [Configuration](#configuration)
 - [Contributing](#contributing)
@@ -21,6 +22,12 @@ Explain why it exists, what problems it solves, and who it’s for.
 
 ---
 ## Features
+---
+## Build
+requires build packages
+- libssl-dev
+- python3.13-venv
+- libuv1-dev
 ---
 ## Usage
 AtlasNet has enviroment variables that control how it functions
