@@ -6,6 +6,7 @@
 
 #include "atlasnet/core/job/JobContext.hpp"
 #include "atlasnet/core/job/JobEnums.hpp"
+#include "atlasnet/core/job/JobOptions.hpp"
 #include "atlasnet/core/job/JobSystem.hpp"
 #include "atlasnet/core/messages/Message.hpp"
 #include "atlasnet/core/serialize/ByteReader.hpp"
@@ -14,6 +15,7 @@
 #include "steam/steamnetworkingsockets.h"
 #include "steam/steamnetworkingtypes.h"
 
+#include <cstdint>
 #include <format>
 #include <iostream>
 #include <mutex>
@@ -60,7 +62,7 @@ AtlasNet::MessageSystem::MessageSystem()
         }
 
         GNS().RunCallbacks();
-        
+
         _Parse_Incoming_Messages();
       },
 
@@ -422,7 +424,7 @@ void AtlasNet::MessageSystem::MessageSystem::_Parse_Incoming_Messages()
     ISteamNetworkingMessage* msg = pIncomingMessages[i];
     if (!msg)
       continue;
-    
+
     SteamNetConnectionInfo_t info;
     if (!GNS().GetConnectionInfo(msg->m_conn, &info))
     {
@@ -458,12 +460,10 @@ void AtlasNet::MessageSystem::MessageSystem::_Parse_Incoming_Messages()
     const MessageIDHash typeIdHash = IMessage::DeserializeTypeIdHash(readerID);
     std::cout << std::format("Message of type hash: {}", typeIdHash)
               << std::endl;
-    ByteReader readerFull(std::span(static_cast<const uint8_t*>(msg->m_pData),
-                                    static_cast<std::size_t>(msg->m_cbSize)));
 
     // Copy dispatcher out while holding the lock, then invoke
     // unlocked.
-    decltype(_dispatchTable.begin()->second) dispatcher;
+    DispatchFunc dispatcher;
     bool found = false;
     {
       std::shared_lock lock(_mutex);
@@ -477,7 +477,22 @@ void AtlasNet::MessageSystem::MessageSystem::_Parse_Incoming_Messages()
 
     if (found)
     {
-      dispatcher(readerFull, *addressRemote,listenAddr.m_port);
+      std::vector<uint8_t> bytes;
+      bytes.assign(static_cast<const uint8_t*>(msg->m_pData),
+                   static_cast<const uint8_t*>(msg->m_pData) +
+                       static_cast<std::size_t>(msg->m_cbSize));
+      PortType port_received_on = listenAddr.m_port;
+      JobSystem::Get().Submit(
+          [this, dispatcher, bytes = std::move(bytes),
+           addressRemote = *addressRemote, port_received_on](JobContext&)
+          {
+            ByteReader readerFull(bytes);
+            dispatcher(readerFull, addressRemote, port_received_on);
+          },
+          JobOpts::Name(
+              std::format("MessageSystem::HandleMessage typeHash {} from {}",
+                          typeIdHash, addressRemote->to_string())),
+          JobOpts::Priority<JobPriority::eHigh>{});
     }
 
     msg->Release();
