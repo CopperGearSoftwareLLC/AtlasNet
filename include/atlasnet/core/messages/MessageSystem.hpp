@@ -1,6 +1,6 @@
 #pragma once
 #include "Message.hpp"
-#include "atlasnet/core/EndPoint.hpp"
+#include "atlasnet/core/SocketAddress.hpp"
 #include "atlasnet/core/assert.hpp"
 #include "atlasnet/core/job/JobEnums.hpp"
 #include "atlasnet/core/job/JobHandle.hpp"
@@ -73,16 +73,16 @@ public:
     std::shared_mutex socket_mutex;
     PortType port;
     using HandlerFunc =
-        std::function<void(const IMessage&, const EndPointAddress&)>;
+        std::function<void(const IMessage&, const SocketAddress&)>;
     std::unordered_map<MessageIDHash, HandlerFunc> _handlers;
     // using DispatchFunc = std::function<void(const IMessage&, MessageIDHash,
-    //                                         const EndPointAddress&)>;
+    //                                         const SocketAddress&)>;
     // std::unordered_map<MessageIDHash, DispatchFunc> _dispatchTable;
     friend class MessageSystem;
 
   protected:
     void DispatchCallbacks(const IMessage& message, MessageIDHash typeIdHash,
-                           const EndPointAddress& caller_address);
+                           const SocketAddress& caller_address);
 
   public:
     ListenSocketHandle(MessageSystem& system, HSteamListenSocket handle,
@@ -90,7 +90,7 @@ public:
     template <typename MessageType>
       requires std::is_base_of_v<IMessage, MessageType>
     ListenSocketHandle&
-    On(std::function<void(const MessageType&, const EndPointAddress&)> func);
+    On(std::function<void(const MessageType&, const SocketAddress&)> func);
 
   private:
     /*  template <typename MsgType>
@@ -108,18 +108,18 @@ public:
   ~MessageSystem();
   void Shutdown();
 
-  JobHandle Connect(const EndPointAddress& address);
+  JobHandle Connect(const SocketAddress& address);
   template <typename MessageType>
     requires std::is_base_of_v<IMessage, MessageType>
   [[nodiscard]] JobHandle
-  SendMessage(const MessageType& message, const EndPointAddress& address,
+  SendMessage(const MessageType& message, const SocketAddress& address,
               MessageSendMode mode,
               MessagePriority priority = MessagePriority::eMedium);
 
   template <typename MessageType>
     requires std::is_base_of_v<IMessage, MessageType>
   MessageSystem&
-  On(std::function<void(const MessageType&, const EndPointAddress&)> handler);
+  On(std::function<void(const MessageType&, const SocketAddress&)> handler);
 
   ListenSocketHandle& OpenListenSocket(PortType port);
   ListenSocketHandle& GetListenSocket(PortType port);
@@ -127,25 +127,25 @@ public:
   void SteamNetConnectionStatusChanged(
       SteamNetConnectionStatusChangedCallback_t* pInfo);
 
-  ConnectionState GetConnectionState(const EndPointAddress& address) const;
+  ConnectionState GetConnectionState(const SocketAddress& address) const;
 
-  bool IsConnectingTo(const EndPointAddress& address) const;
-  bool IsConnectedTo(const EndPointAddress& address) const;
+  bool IsConnectingTo(const SocketAddress& address) const;
+  bool IsConnectedTo(const SocketAddress& address) const;
 
   size_t GetNumConnections() const;
   void GetConnections(
-      std::unordered_map<EndPointAddress, Connection>& connections) const;
-  std::optional<Connection> GetConnection(const EndPointAddress& address) const;
+      std::unordered_map<SocketAddress, Connection>& connections) const;
+  std::optional<Connection> GetConnection(const SocketAddress& address) const;
 
 private:
-  void _Connect_to_job(JobContext& handle, const EndPointAddress& address);
+  void _Connect_to_job(JobContext& handle, const SocketAddress& address);
   void _Parse_Incoming_Messages();
   ISteamNetworkingSockets& GNS() const
   {
     AN_ASSERT(_GNS, "GNS is null");
     return *_GNS;
   }
-  HSteamNetConnection GetConnectionHandle(const EndPointAddress& address) const;
+  HSteamNetConnection GetConnectionHandle(const SocketAddress& address) const;
   template <typename MsgType>
     requires std::is_base_of_v<IMessage, MsgType>
   void _ensure_message_dispatcher();
@@ -156,12 +156,12 @@ private:
   mutable std::shared_mutex _mutex;
   std::unordered_map<PortType, std::unique_ptr<ListenSocketHandle>>
       _listenSockets;
-  std::unordered_map<EndPointAddress, Connection> _connections;
-  std::unordered_map<EndPointAddress, JobHandle> _connectJobs;
+  std::unordered_map<SocketAddress, Connection> _connections;
+  std::unordered_map<SocketAddress, JobHandle> _connectJobs;
   using HandlerFunc =
-      std::function<void(const IMessage&, const EndPointAddress&)>;
+      std::function<void(const IMessage&, const SocketAddress&)>;
   std::unordered_map<MessageIDHash, HandlerFunc> _handlers;
-  using DispatchFunc = std::function<void(ByteReader&, const EndPointAddress&,
+  using DispatchFunc = std::function<void(ByteReader&, const SocketAddress&,
                                           std::optional<PortType>)>;
   std::unordered_map<MessageIDHash, DispatchFunc> _dispatchTable;
   std::optional<JobHandle> _pollJobHandle;
@@ -170,7 +170,7 @@ private:
 template <typename MessageType>
   requires std::is_base_of_v<IMessage, MessageType>
 inline MessageSystem::ListenSocketHandle& MessageSystem::ListenSocketHandle::On(
-    std::function<void(const MessageType&, const EndPointAddress&)> func)
+    std::function<void(const MessageType&, const SocketAddress&)> func)
 {
   system._ensure_message_dispatcher<MessageType>();
   //_ensure_socket_message_dispatcher<MessageType>();
@@ -185,7 +185,7 @@ inline MessageSystem::ListenSocketHandle& MessageSystem::ListenSocketHandle::On(
       std::format("Handler already registered for message type with hash {}",
                   typeIdHash));
   _handlers[typeIdHash] =
-      [h = std::move(func)](const IMessage& msg, const EndPointAddress& address)
+      [h = std::move(func)](const IMessage& msg, const SocketAddress& address)
   { h(static_cast<const MessageType&>(msg), address); };
 
   return *this;
@@ -209,7 +209,7 @@ MessageSystem::ListenSocketHandle::_ensure_socket_message_dispatcher()
   {
     _handlers[typeIdHash] = [&](const IMessage& message,
 
-                                     const EndPointAddress& caller_address)
+                                     const SocketAddress& caller_address)
     {
 
       if (_handlers.contains(typeIdHash))
@@ -230,7 +230,7 @@ MessageSystem::ListenSocketHandle::_ensure_socket_message_dispatcher()
 template <typename MessageType>
   requires std::is_base_of_v<IMessage, MessageType>
 inline MessageSystem& MessageSystem::On(
-    std::function<void(const MessageType&, const EndPointAddress&)> handler)
+    std::function<void(const MessageType&, const SocketAddress&)> handler)
 {
   _ensure_message_dispatcher<MessageType>();
   std::cout << std::format("Registered handler for message type with hash {} "
@@ -245,7 +245,7 @@ inline MessageSystem& MessageSystem::On(
                   typeIdHash));
   _handlers[typeIdHash] =
       [h = std::move(handler)](const IMessage& msg,
-                               const EndPointAddress& address)
+                               const SocketAddress& address)
   { h(static_cast<const MessageType&>(msg), address); };
 
   return *this;
@@ -267,7 +267,7 @@ inline void MessageSystem::_ensure_message_dispatcher()
   if (!_dispatchTable.contains(typeIdHash))
   {
     _dispatchTable[typeIdHash] =
-        [this](ByteReader& reader, const EndPointAddress& address,
+        [this](ByteReader& reader, const SocketAddress& address,
                std::optional<PortType> port_received_on)
     {
       MessageIDHash typeIdHash = MsgType::TypeIdHash;
@@ -316,7 +316,7 @@ inline void MessageSystem::_ensure_message_dispatcher()
 template <typename MessageType>
   requires std::is_base_of_v<IMessage, MessageType>
 inline JobHandle MessageSystem::SendMessage(const MessageType& message,
-                                            const EndPointAddress& address,
+                                            const SocketAddress& address,
                                             MessageSendMode mode,
                                             MessagePriority priority)
 {

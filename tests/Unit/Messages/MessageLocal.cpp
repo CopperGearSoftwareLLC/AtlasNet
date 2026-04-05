@@ -1,5 +1,5 @@
 #include "atlasnet/core/Address.hpp"
-#include "atlasnet/core/EndPoint.hpp"
+#include "atlasnet/core/SocketAddress.hpp"
 
 #include "atlasnet/core/job/JobSystem.hpp"
 #include "atlasnet/core/messages/Message.hpp"
@@ -97,8 +97,8 @@ TEST(MessageLocal, Connect)
   MessageSystem msgsys(MessageSystem::Config{.jobSystem = &jobsys});
 
   const PortType port = pick_available_port();
-  const DNSAddress dnsAddr("localhost");
-  EndPointAddress serverAddr(dnsAddr, port);
+  const HostName dnsAddr("localhost");
+  SocketAddress serverAddr(dnsAddr, port);
   msgsys.OpenListenSocket(port);
   msgsys.Connect(serverAddr);
 
@@ -135,12 +135,12 @@ TEST(MessageLocal, SendMessage)
   std::mutex mtx;
   std::condition_variable cv;
   const PortType port = pick_available_port();
-  const DNSAddress dnsAddr("localhost");
-  EndPointAddress serverAddr(dnsAddr, port);
+  const HostName dnsAddr("localhost");
+  SocketAddress serverAddr(dnsAddr, port);
   msgsys.OpenListenSocket(port);
   msgsys.Connect(serverAddr);
   msgsys.On<TestMessage>(
-      [&](const TestMessage& msg, const EndPointAddress& address)
+      [&](const TestMessage& msg, const SocketAddress& address)
       {
         EXPECT_EQ(msg.u8_val, 42);
         EXPECT_EQ(msg.str, "Hello, AtlasNet!");
@@ -171,11 +171,11 @@ TEST(MessageLocal, SendMessageWithoutConnecting)
   JobSystem jobsys(JobSystem::Config{});
   MessageSystem msgsys(MessageSystem::Config{.jobSystem = &jobsys});
   const PortType port = pick_available_port();
-  const DNSAddress dnsAddr("localhost");
-  EndPointAddress serverAddr(dnsAddr, port);
+  const HostName dnsAddr("localhost");
+  SocketAddress serverAddr(dnsAddr, port);
   msgsys.OpenListenSocket(port);
   msgsys.On<TestMessage>(
-      [&](const TestMessage& msg, const EndPointAddress& address)
+      [&](const TestMessage& msg, const SocketAddress& address)
       {
         EXPECT_EQ(msg.u8_val, 42);
         EXPECT_EQ(msg.str, "Hello, AtlasNet!");
@@ -207,15 +207,14 @@ TEST(MessageLocal, ListenMessagePort)
   JobSystem jobsys(JobSystem::Config{});
   MessageSystem msgsys(MessageSystem::Config{.jobSystem = &jobsys});
   const PortType port1 = pick_available_port();
-
-  EndPointAddress serverAddr(DNSAddress("localhost"), port1);
+  SocketAddress serverAddr(HostName("localhost"), port1);
   msgsys.OpenListenSocket(port1);
 
   const PortType port2 = pick_available_port();
   EXPECT_NE(port1, port2);
-  EndPointAddress serverAddr2(DNSAddress("localhost"), port2);
+  SocketAddress serverAddr2(HostName("localhost"), port2);
   msgsys.OpenListenSocket(port2).On<TestMessage>(
-    [&](const TestMessage& msg, const EndPointAddress& address)
+    [&](const TestMessage& msg, const SocketAddress& address)
     {
       PortCount++;
       std::lock_guard lock(mtx);
@@ -223,7 +222,7 @@ TEST(MessageLocal, ListenMessagePort)
     });
 
   msgsys.On<TestMessage>(
-      [&](const TestMessage& msg, const EndPointAddress& address)
+      [&](const TestMessage& msg, const SocketAddress& address)
       {
         AllCount++;
         std::lock_guard lock(mtx);
@@ -273,12 +272,12 @@ TEST(MessageLocal, BigMessage)
   std::vector<uint8_t> receivedData;
 
   const PortType port = pick_available_port();
-  EndPointAddress addr("127.0.0.1:" + std::to_string(port));
+  SocketAddress addr("127.0.0.1:" + std::to_string(port));
 
   msgsys.OpenListenSocket(port);
 
   msgsys.On<BigMessageTestMessage>(
-      [&](const BigMessageTestMessage& msg, const EndPointAddress&)
+      [&](const BigMessageTestMessage& msg, const SocketAddress&)
       {
         {
           std::lock_guard lock(mtx);

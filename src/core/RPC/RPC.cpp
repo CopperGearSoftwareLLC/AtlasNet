@@ -1,7 +1,6 @@
 #include "atlasnet/core/RPC/RPC.hpp"
 #include "atlasnet/core/RPC/RPCMessage.hpp"
 #include "atlasnet/core/assert.hpp"
-#include "atlasnet/core/database/RedisConn.hpp"
 #include "atlasnet/core/job/JobHandle.hpp"
 #include "atlasnet/core/messages/Message.hpp"
 #include "atlasnet/core/messages/MessageSystem.hpp"
@@ -16,7 +15,7 @@ AtlasNet::RPC::RPC(const Config& config) : config_(config)
 
   config_.messageSystem->OpenListenSocket(config.port)
       .On<RpcRequestMessage>(
-          [this](const RpcRequestMessage& msg, const EndPointAddress& address)
+          [this](const RpcRequestMessage& msg, const SocketAddress& address)
           {
             OnRPCRequest(msg, address);
           }); // requests should be handled by the listen socket callback to
@@ -25,15 +24,15 @@ AtlasNet::RPC::RPC(const Config& config) : config_(config)
 
   config_.messageSystem
       ->On<RpcResponseMessage>(
-          [this](const RpcResponseMessage& msg, const EndPointAddress& address)
+          [this](const RpcResponseMessage& msg, const SocketAddress& address)
           { OnRPCResponse(msg, address); })
       .On<RpcErrorMessage>(
-          [this](const RpcErrorMessage& msg, const EndPointAddress& address)
+          [this](const RpcErrorMessage& msg, const SocketAddress& address)
           { OnRPCError(msg, address); });
 }
 
 void AtlasNet::RPC::OnRPCRequest(const RpcRequestMessage& msg,
-                                 const EndPointAddress& address)
+                                 const SocketAddress& address)
 {
     std::cerr << std::format("Received RPC request for methodId {} callId {} from {}",
                              msg.methodId, msg.callID, address.to_string())
@@ -68,7 +67,7 @@ void AtlasNet::RPC::SendError(const RPCTarget& target,
 }
 
 void AtlasNet::RPC::OnRPCError(const RpcErrorMessage& msg,
-                               const EndPointAddress& address)
+                               const SocketAddress& address)
 {
     std::cerr << std::format("Received RPC error for methodId {} callId {} from {}: {}",
                              msg.methodId, msg.callID, address.to_string(), msg.ErrorMsg)
@@ -96,7 +95,7 @@ void AtlasNet::RPC::OnRPCError(const RpcErrorMessage& msg,
 }
 
 void AtlasNet::RPC::OnRPCResponse(const RpcResponseMessage& msg,
-                                  const EndPointAddress& address)
+                                  const SocketAddress& address)
 {
     std::cerr << std::format("Received RPC response for methodId {} callId {} from {}",
                              msg.methodId, msg.callID, address.to_string())

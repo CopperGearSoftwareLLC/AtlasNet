@@ -11,7 +11,7 @@
 #include <gtest/gtest.h>
 #include <string>
 
-TEST(SERIALIZATION, BasicOps) {
+TEST(Serialization, BasicOps) {
   const uint8_t u8_val = 255;
   const uint16_t u16_val = 65535;
   const uint32_t u32_val = 4294967295;
@@ -137,7 +137,7 @@ struct Object {
     ar(blob_val);
   }
 };
-TEST(SERIALIZATION, archivetest) {
+TEST(Serialization, archivetest) {
 
     std::vector<uint8_t> blob = {0xDE, 0xAD, 0xBE, 0xEF};
   Object in{

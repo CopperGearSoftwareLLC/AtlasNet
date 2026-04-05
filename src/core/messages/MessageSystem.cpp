@@ -1,9 +1,7 @@
 #include "atlasnet/core/messages/MessageSystem.hpp"
 #include "atlasnet/core/Address.hpp"
-#include "atlasnet/core/EndPoint.hpp"
+#include "atlasnet/core/SocketAddress.hpp"
 #include "atlasnet/core/assert.hpp"
-#include "atlasnet/core/database/RedisConn.hpp"
-
 #include "atlasnet/core/job/JobContext.hpp"
 #include "atlasnet/core/job/JobEnums.hpp"
 #include "atlasnet/core/job/JobOptions.hpp"
@@ -128,7 +126,7 @@ void AtlasNet::MessageSystem::SteamNetConnectionStatusChanged(
   if (!pInfo)
     return;
 
-  EndPointAddress address(pInfo->m_info.m_addrRemote);
+  SocketAddress address(pInfo->m_info.m_addrRemote);
 
   switch (pInfo->m_info.m_eState)
   {
@@ -250,7 +248,7 @@ void AtlasNet::MessageSystem::SteamNetConnectionStatusChanged(
 }
 
 AtlasNet::ConnectionState AtlasNet::MessageSystem::GetConnectionState(
-    const EndPointAddress& address) const
+    const SocketAddress& address) const
 {
   std::shared_lock lock(_mutex);
 
@@ -270,19 +268,19 @@ AtlasNet::ConnectionState AtlasNet::MessageSystem::GetConnectionState(
 }
 
 bool AtlasNet::MessageSystem::IsConnectingTo(
-    const EndPointAddress& address) const
+    const SocketAddress& address) const
 {
   return GetConnectionState(address) == ConnectionState::eConnecting;
 }
 
 bool AtlasNet::MessageSystem::IsConnectedTo(
-    const EndPointAddress& address) const
+    const SocketAddress& address) const
 {
   return GetConnectionState(address) == ConnectionState::eConnected;
 }
 
 AtlasNet::JobHandle
-AtlasNet::MessageSystem::Connect(const EndPointAddress& address)
+AtlasNet::MessageSystem::Connect(const SocketAddress& address)
 {
 
   {
@@ -443,7 +441,7 @@ void AtlasNet::MessageSystem::SetIdentity(
 
 void AtlasNet::MessageSystem::ListenSocketHandle::DispatchCallbacks(
     const IMessage& message, MessageIDHash typeIdHash,
-    const EndPointAddress& caller_address)
+    const SocketAddress& caller_address)
 {
   HandlerFunc dispatcher;
   bool found = false;
@@ -511,16 +509,16 @@ void AtlasNet::MessageSystem::MessageSystem::_Parse_Incoming_Messages()
       }
     }
 
-    std::optional<EndPointAddress> addressRemote;
+    std::optional<SocketAddress> addressRemote;
     if (info.m_addrRemote.IsIPv4())
     {
       const uint32 ip4Packed = info.m_addrRemote.GetIPv4();
       const uint16 port = info.m_addrRemote.m_port;
-      addressRemote = EndPointAddress(IPv4Address(ip4Packed), port);
+      addressRemote = SocketAddress(IPv4(ip4Packed), port);
     }
     else
     {
-      addressRemote = EndPointAddress(IPv6Address(info.m_addrRemote.m_ipv6),
+      addressRemote = SocketAddress(IPv6(info.m_addrRemote.m_ipv6),
                                       info.m_addrRemote.m_port);
     }
     std::cout << std::format("Incoming message from {}",
@@ -583,7 +581,7 @@ void AtlasNet::MessageSystem::MessageSystem::_Parse_Incoming_Messages()
   }
 }
 HSteamNetConnection AtlasNet::MessageSystem::GetConnectionHandle(
-    const EndPointAddress& address) const
+    const SocketAddress& address) const
 {
   std::shared_lock lock(_mutex);
 
@@ -601,7 +599,7 @@ HSteamNetConnection AtlasNet::MessageSystem::GetConnectionHandle(
   throw std::runtime_error("Connection not found");
 }
 void AtlasNet::MessageSystem::_Connect_to_job(JobContext& handle,
-                                              const EndPointAddress& address)
+                                              const SocketAddress& address)
 {
 
   if (shutdown.load(std::memory_order_acquire))
@@ -668,7 +666,7 @@ void AtlasNet::MessageSystem::_Connect_to_job(JobContext& handle,
   }
 }
 std::optional<AtlasNet::MessageSystem::Connection>
-AtlasNet::MessageSystem::GetConnection(const EndPointAddress& address) const
+AtlasNet::MessageSystem::GetConnection(const SocketAddress& address) const
 {
   std::shared_lock lock(_mutex);
   if (_connections.contains(address))
@@ -678,7 +676,7 @@ AtlasNet::MessageSystem::GetConnection(const EndPointAddress& address) const
   return std::nullopt;
 }
 void AtlasNet::MessageSystem::GetConnections(
-    std::unordered_map<EndPointAddress, Connection>& connections) const
+    std::unordered_map<SocketAddress, Connection>& connections) const
 {
   std::shared_lock lock(_mutex);
   connections = _connections;

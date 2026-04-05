@@ -433,7 +433,27 @@ TEST(Jobs, CancelPendingJob)
 
   system.Shutdown();
 }
+TEST(Jobs, FinishJobsBeforeQuitting)
+{
+  using namespace AtlasNet;
+  JobSystem system(JobSystem::Config{});
 
+  std::atomic<int> calls{0};
+  constexpr int desiredRuns = 2000;
+  for (int i = 0; i < desiredRuns; ++i)
+  {
+    system.Submit(
+        [&](AtlasNet::JobContext& ctx)
+        {
+          ++calls;
+        },
+        JobOpts::Name(std::format("Job {}", i)),
+        JobOpts::TPriority<JobPriority::eLow>{});
+  }
+
+  system.Shutdown();
+  EXPECT_GE(calls.load(), desiredRuns );
+}
 int main(int argc, char** argv)
 {
   ::testing::InitGoogleTest(&argc, argv);

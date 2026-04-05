@@ -1,11 +1,13 @@
 
 
 #include "atlasnet/core/Address.hpp"
-#include "atlasnet/core/database/RedisConn.hpp"
+#include "atlasnet/core/SocketAddress.hpp"
+#include "atlasnet/core/database/Redis.hpp"
 #include <cstdlib>
 #include <iostream>
 #include <string>
-
+using namespace AtlasNet;
+using namespace AtlasNet::Database;
 bool KeyValTest(RedisConn& conn)
 {
   for (int i = 0; i < 100; i++)
@@ -16,8 +18,9 @@ bool KeyValTest(RedisConn& conn)
       ranKey += static_cast<char>('a' + rand() % 26);
       ranVal += static_cast<char>('a' + rand() % 26);
     }
-    conn.Set(ranKey, ranVal);
-    auto value = conn.Get(ranKey);
+
+    conn.KeyVal().GetSet().Set(ranKey, ranVal);
+    auto value = conn.KeyVal().GetSet().Get(ranKey);
     if (value)
     {
       std::cout << std::format("Successfully got value: {}", *value)
@@ -44,28 +47,27 @@ bool KeyValTest(RedisConn& conn)
 }
 int main(int argc, char** argv)
 {
-  RedisConn::Settings settings;
-#ifdef VALKEY_CLUSTER
-  settings.Mode = RedisConn::RedisMode::eCluster;
-#else
-  settings.Mode = RedisConn::RedisMode::eStandalone;
-#endif
-  settings.ExceptionOnFailure = true;
-  settings.MaxConnectRetries = 5;
   std::string host =
       std::getenv("VALKEY_HOST") ? std::getenv("VALKEY_HOST") : "INVALID";
   std::string port =
       std::getenv("VALKEY_PORT") ? std::getenv("VALKEY_PORT") : "INVALID";
+  RedisConn::Settings settings;
+  HostName address(host);
+  const bool clusterMode =
+      std::getenv("VALKEY_CLUSTER") &&
+      std::string_view(std::getenv("VALKEY_CLUSTER")) == "1";
+
+  settings.Mode = clusterMode ? RedisConn::RedisMode::eCluster
+                              : RedisConn::RedisMode::eStandalone;
+  std::cout << "Running in " << (clusterMode ? "Cluster" : "Standalone")
+            << " mode" << std::endl;
+  settings.ExceptionOnFailure = true;
+  settings.MaxConnectRetries = 5;
+
   std::cout << "Connecting to Redis at " << host << ":" << port << std::endl;
 
-  auto resolvedip = DNSAddress(host).resolve();
-  if (!resolvedip)
-  {
-    std::cerr << "Failed to resolve host: " << host << std::endl;
-    return 1;
-  }
-  settings.host = *resolvedip;
-  settings.Port = std::atoi(port.c_str());
+  settings.host = address;
+  settings.port = static_cast<PortType>(std::atoi(port.c_str()));
 
   std::unique_ptr<RedisConn> conn = RedisConn::Connect(settings);
 

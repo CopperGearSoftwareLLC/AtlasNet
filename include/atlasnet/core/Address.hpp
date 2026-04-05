@@ -2,6 +2,8 @@
 #include "steam/steamclientpublic.h"
 #include "steam/steamnetworkingtypes.h"
 #include "steam/steamtypes.h"
+#include <array>
+#include <cctype>
 #include <concepts>
 #include <cstddef>
 #include <cstdint>
@@ -16,7 +18,75 @@
 #include <string>
 #include <sys/types.h>
 #include <variant>
+namespace AtlasNet
+{
 
+namespace Detail
+{
+inline bool looks_like_ipv4(std::string_view s)
+{
+  if (s.empty())
+    return false;
+
+  bool saw_dot = false;
+
+  for (unsigned char c : s)
+  {
+    if (std::isdigit(c))
+      continue;
+
+    if (c == '.')
+    {
+      saw_dot = true;
+      continue;
+    }
+
+    return false;
+  }
+
+  return saw_dot;
+}
+
+inline bool looks_like_ipv6(std::string_view s)
+{
+  if (s.empty())
+    return false;
+
+  bool saw_colon = false;
+
+  for (unsigned char c : s)
+  {
+    if (std::isxdigit(c))
+      continue;
+
+    if (c == ':')
+    {
+      saw_colon = true;
+      continue;
+    }
+
+    return false;
+  }
+
+  return saw_colon;
+}
+
+inline bool looks_like_hostname(std::string_view s)
+{
+  if (s.empty())
+    return false;
+
+  for (unsigned char c : s)
+  {
+    if (std::isalnum(c) || c == '-' || c == '.')
+      continue;
+
+    return false;
+  }
+
+  return true;
+}
+} // namespace Detail
 class IAddress
 {
 public:
@@ -26,45 +96,79 @@ public:
   virtual std::size_t hash() const noexcept = 0;
 };
 
-class IPv4Address : public IAddress
+class IPv4 : public IAddress
 {
-  uint8_t octets[4];
+  std::array<uint8_t, 4> octets{};
 
 public:
-  IPv4Address(uint32_t packed)
+  IPv4() = default;
+
+  explicit IPv4(uint32_t packed)
   {
-    octets[0] = (packed >> 24) & 0xFF;
-    octets[1] = (packed >> 16) & 0xFF;
-    octets[2] = (packed >> 8) & 0xFF;
-    octets[3] = packed & 0xFF;
+    octets[0] = static_cast<uint8_t>((packed >> 24) & 0xFF);
+    octets[1] = static_cast<uint8_t>((packed >> 16) & 0xFF);
+    octets[2] = static_cast<uint8_t>((packed >> 8) & 0xFF);
+    octets[3] = static_cast<uint8_t>(packed & 0xFF);
   }
-  IPv4Address(uint8_t o1, uint8_t o2, uint8_t o3, uint8_t o4)
+
+  IPv4(uint8_t o1, uint8_t o2, uint8_t o3, uint8_t o4)
   {
     octets[0] = o1;
     octets[1] = o2;
     octets[2] = o3;
     octets[3] = o4;
   }
-  explicit IPv4Address(const std::string& str)
+
+  explicit IPv4(const std::string& str)
   {
     parse_string(str);
   }
+
   void parse_string(const std::string& str) override
   {
+    if (str.empty())
+      throw std::invalid_argument("IPv4 string is empty");
 
-    size_t start = 0;
+    std::array<uint8_t, 4> bytes{};
+    size_t pos = 0;
+
     for (int i = 0; i < 4; ++i)
     {
-      size_t dot = str.find('.', start);
-      if (dot == std::string::npos && i < 3)
-        throw std::invalid_argument("Invalid IPv4 address: " + str);
-      std::string octet_str = str.substr(start, dot - start);
-      int val = std::stoi(octet_str);
-      if (val < 0 || val > 255)
-        throw std::out_of_range("Octet out of range: " + octet_str);
-      octets[i] = static_cast<uint8_t>(val);
-      start = dot + 1;
+      if (pos >= str.size())
+        throw std::invalid_argument("IPv4 has too few octets");
+
+      size_t start = pos;
+      while (pos < str.size() && str[pos] != '.')
+        ++pos;
+
+      if (start == pos)
+        throw std::invalid_argument("IPv4 has empty octet");
+
+      unsigned value = 0;
+      for (size_t j = start; j < pos; ++j)
+      {
+        if (!std::isdigit(static_cast<unsigned char>(str[j])))
+          throw std::invalid_argument("IPv4 octet is not numeric");
+
+        value = value * 10 + (str[j] - '0');
+        if (value > 255)
+          throw std::out_of_range("IPv4 octet out of range");
+      }
+
+      bytes[i] = static_cast<uint8_t>(value);
+
+      if (i < 3)
+      {
+        if (pos >= str.size() || str[pos] != '.')
+          throw std::invalid_argument("IPv4 has too few octets");
+        ++pos;
+      }
     }
+
+    if (pos != str.size())
+      throw std::invalid_argument("IPv4 has trailing characters");
+
+    octets = bytes;
   }
 
   std::string to_string() const override
@@ -72,10 +176,12 @@ public:
     return std::to_string(octets[0]) + "." + std::to_string(octets[1]) + "." +
            std::to_string(octets[2]) + "." + std::to_string(octets[3]);
   }
-  bool operator==(const IPv4Address& other) const
+
+  bool operator==(const IPv4& other) const
   {
-    return std::memcmp(octets, other.octets, 4) == 0;
+    return std::memcmp(octets.data(), other.octets.data(), 4) == 0;
   }
+
   std::size_t hash() const noexcept override
   {
     const uint32_t packed = (static_cast<uint32_t>(octets[0]) << 24) |
@@ -91,26 +197,29 @@ public:
       throw std::out_of_range("Index out of range: " + std::to_string(index));
     return octets[index];
   }
+
   uint8_t& operator[](size_t index)
   {
     if (index >= 4)
       throw std::out_of_range("Index out of range: " + std::to_string(index));
     return octets[index];
   }
+
   size_t size() const
   {
     return 4;
   }
 };
-class IPv6Address : public IAddress
+
+class IPv6 : public IAddress
 {
   std::array<uint8_t, 16> bytes{};
 
 public:
-  IPv6Address() = default;
+  IPv6() = default;
 
-  IPv6Address(uint16_t s1, uint16_t s2, uint16_t s3, uint16_t s4, uint16_t s5,
-              uint16_t s6, uint16_t s7, uint16_t s8)
+  IPv6(uint16_t s1, uint16_t s2, uint16_t s3, uint16_t s4, uint16_t s5,
+       uint16_t s6, uint16_t s7, uint16_t s8)
   {
     set_segment(0, s1);
     set_segment(1, s2);
@@ -121,10 +230,11 @@ public:
     set_segment(6, s7);
     set_segment(7, s8);
   }
-  IPv6Address(uint8 s1_0, uint8 s1_1, uint8 s2_0, uint8 s2_1, uint8 s3_0,
-              uint8 s3_1, uint8 s4_0, uint8 s4_1, uint8 s5_0, uint8 s5_1,
-              uint8 s6_0, uint8 s6_1, uint8 s7_0, uint8 s7_1, uint8 s8_0,
-              uint8 s8_1)
+
+  IPv6(uint8_t s1_0, uint8_t s1_1, uint8_t s2_0, uint8_t s2_1, uint8_t s3_0,
+       uint8_t s3_1, uint8_t s4_0, uint8_t s4_1, uint8_t s5_0, uint8_t s5_1,
+       uint8_t s6_0, uint8_t s6_1, uint8_t s7_0, uint8_t s7_1, uint8_t s8_0,
+       uint8_t s8_1)
   {
     bytes[0] = s1_0;
     bytes[1] = s1_1;
@@ -143,21 +253,20 @@ public:
     bytes[14] = s8_0;
     bytes[15] = s8_1;
   }
-  IPv6Address(const uint8_t bytes_[16])
+
+  explicit IPv6(const uint8_t bytes_[16])
   {
     for (size_t i = 0; i < 16; ++i)
-    {
       bytes[i] = bytes_[i];
-    }
   }
-  IPv6Address(const uint16_t segments[8])
+
+  explicit IPv6(const uint16_t segments[8])
   {
     for (size_t i = 0; i < 8; ++i)
-    {
       set_segment(i, segments[i]);
-    }
   }
-  explicit IPv6Address(const std::string& str)
+
+  explicit IPv6(const std::string& str)
   {
     parse_string(str);
   }
@@ -178,12 +287,12 @@ public:
         colon = str.size();
       }
 
-      std::string segment_str = str.substr(start, colon - start);
+      const std::string segment_str = str.substr(start, colon - start);
       if (segment_str.empty())
         throw std::invalid_argument("Invalid IPv6 address: " + str);
 
       size_t parsed_chars = 0;
-      unsigned long value = std::stoul(segment_str, &parsed_chars, 16);
+      const unsigned long value = std::stoul(segment_str, &parsed_chars, 16);
 
       if (parsed_chars != segment_str.size())
         throw std::invalid_argument("Invalid IPv6 segment: " + segment_str);
@@ -209,14 +318,13 @@ public:
     {
       if (i > 0)
         oss << ":";
-
       oss << std::setw(4) << static_cast<unsigned>(segment(i));
     }
 
     return oss.str();
   }
 
-  bool operator==(const IPv6Address& other) const
+  bool operator==(const IPv6& other) const
   {
     return bytes == other.bytes;
   }
@@ -271,20 +379,25 @@ private:
         static_cast<uint16_t>(bytes[index * 2 + 1]));
   }
 };
+
 class SteamIDAddress : public IAddress
 {
-  SteamNetworkingIdentity identity;
+  SteamNetworkingIdentity identity{};
 
 public:
+  SteamIDAddress() = default;
+
   void parse_string(const std::string& str) override
   {
     throw std::runtime_error(
-        "Parsing SteamIDAddress from string not implemented");
+        "Parsing SteamIDAddress from string not implemented: " + str);
   }
+
   explicit SteamIDAddress(CSteamID steamID)
   {
     identity.SetSteamID(steamID);
   }
+
   explicit SteamIDAddress(uint64_t steamID)
   {
     identity.SetSteamID64(steamID);
@@ -293,15 +406,12 @@ public:
   std::string to_string() const override
   {
     if (CSteamID steamID = identity.GetSteamID(); steamID.IsValid())
-    {
       return std::to_string(steamID.ConvertToUint64());
-    }
-    else if (uint64_t steamID64 = identity.GetSteamID64(); steamID64 != 0)
-    {
+
+    if (uint64_t steamID64 = identity.GetSteamID64(); steamID64 != 0)
       return std::to_string(steamID64);
-    }
-    throw std::runtime_error("Invalid SteamIDAddress: " +
-                             std::to_string(identity.m_eType));
+
+    throw std::runtime_error("Invalid SteamIDAddress");
   }
 
   CSteamID get_steam_id() const
@@ -310,6 +420,7 @@ public:
       throw std::runtime_error("Not a SteamIDAddress");
     return identity.GetSteamID();
   }
+
   uint64_t get_steam_id64() const
   {
     if (identity.m_eType != k_ESteamNetworkingIdentityType_SteamID)
@@ -321,21 +432,23 @@ public:
   {
     return std::hash<uint64_t>{}(identity.GetSteamID64());
   }
+
   bool operator==(const SteamIDAddress& other) const
   {
     return identity.GetSteamID64() == other.identity.GetSteamID64();
   }
 };
-class DNSAddress : public IAddress
+
+class HostName : public IAddress
 {
   std::string hostname;
-  mutable std::optional<std::variant<IPv4Address, IPv6Address>>
-      resolved_ip;           // optional cache of resolved IP address
-  mutable bool dirty = true; // whether resolved_ip needs to be refreshed
-public:
-  DNSAddress() = default;
+  mutable std::optional<std::variant<IPv4, IPv6>> resolved_ip;
+  mutable bool dirty = true;
 
-  explicit DNSAddress(std::string host) : hostname(std::move(host))
+public:
+  HostName() = default;
+
+  explicit HostName(std::string host) : hostname(std::move(host))
   {
     set_hostname(hostname);
   }
@@ -343,9 +456,12 @@ public:
   void parse_string(const std::string& str) override
   {
     if (str.empty())
-      throw std::invalid_argument("DNS hostname cannot be empty");
+      throw std::invalid_argument("Hostname cannot be empty");
 
-    // This class stores only the hostname, not host:port
+    if (str.size() > 253)
+      throw std::invalid_argument(
+          "Hostname cannot be longer than 253 characters by RFC 1034");
+
     hostname = str;
     dirty = true;
   }
@@ -368,16 +484,19 @@ public:
   void set_hostname(std::string host)
   {
     if (!IsValidHostname(host))
-      throw std::invalid_argument("Invalid DNS hostname: " + host);
+      throw std::invalid_argument("Invalid hostname: " + host);
+
     hostname = std::move(host);
     dirty = true;
   }
-  std::optional<std::variant<IPv4Address, IPv6Address>> resolve() const;
 
-  bool operator==(const DNSAddress& other) const noexcept
+  std::optional<std::variant<IPv4, IPv6>> resolve() const;
+
+  bool operator==(const HostName& other) const noexcept
   {
     return hostname == other.hostname;
   }
+
   static bool IsValidHostname(const std::string& host)
   {
     if (host.empty() || host.size() > 253)
@@ -386,12 +505,11 @@ public:
     std::size_t start = 0;
     std::size_t end = host.size();
 
-    // Allow trailing dot for FQDN, like "example.com."
     if (host.back() == '.')
     {
       if (host.size() == 1)
         return false;
-      end--;
+      --end;
     }
 
     while (start < end)
@@ -400,7 +518,7 @@ public:
       if (dot == std::string::npos || dot > end)
         dot = end;
 
-      std::size_t label_len = dot - start;
+      const std::size_t label_len = dot - start;
       if (label_len == 0 || label_len > 63)
         return false;
 
@@ -409,7 +527,7 @@ public:
 
       for (std::size_t i = start; i < dot; ++i)
       {
-        unsigned char c = static_cast<unsigned char>(host[i]);
+        const unsigned char c = static_cast<unsigned char>(host[i]);
         if (!(std::isalnum(c) || c == '-'))
           return false;
       }
@@ -421,34 +539,190 @@ public:
   }
 };
 
-// Specializations must exist before EndPointAddress::hash() is defined,
-// because that definition uses std::hash<IPv4Address> etc. via std::visit.
+class HostAddress : public IAddress
+{
+  std::variant<std::monostate, IPv4, IPv6, HostName, SteamIDAddress> address;
+
+public:
+  HostAddress() = default;
+  explicit HostAddress(const std::string& str)
+  {
+    parse_string(str);
+  }
+  HostAddress(const IPv4& ipv4) : address(ipv4) {}
+  HostAddress(const IPv6& ipv6) : address(ipv6) {}
+  HostAddress(const HostName& hostName) : address(hostName) {}
+  HostAddress(const SteamIDAddress& steamID) : address(steamID) {}
+
+  bool IsIPv4() const
+  {
+    return std::holds_alternative<IPv4>(address);
+  }
+  bool IsIPv6() const
+  {
+    return std::holds_alternative<IPv6>(address);
+  }
+  bool IsHostName() const
+  {
+    return std::holds_alternative<HostName>(address);
+  }
+  bool IsSteamID() const
+  {
+    return std::holds_alternative<SteamIDAddress>(address);
+  }
+  bool IsValid() const
+  {
+    return !std::holds_alternative<std::monostate>(address);
+  }
+
+  const IPv4& get_ipv4() const
+  {
+    if (!IsIPv4())
+      throw std::bad_variant_access();
+    return std::get<IPv4>(address);
+  }
+
+  const IPv6& get_ipv6() const
+  {
+    if (!IsIPv6())
+      throw std::bad_variant_access();
+    return std::get<IPv6>(address);
+  }
+
+  const HostName& get_hostname() const
+  {
+    if (!IsHostName())
+      throw std::bad_variant_access();
+    return std::get<HostName>(address);
+  }
+
+  const SteamIDAddress& get_steam_id() const
+  {
+    if (!IsSteamID())
+      throw std::bad_variant_access();
+    return std::get<SteamIDAddress>(address);
+  }
+
+  std::string to_string() const override
+  {
+    return std::visit(
+        [](const auto& addr) -> std::string
+        {
+          using T = std::decay_t<decltype(addr)>;
+          if constexpr (std::is_same_v<T, std::monostate>)
+            throw std::runtime_error("HostAddress is not initialized");
+          else
+            return addr.to_string();
+        },
+        address);
+  }
+
+  void parse_string(const std::string& str) override
+  {
+    if (Detail::looks_like_ipv4(str))
+    {
+      address = IPv4(str);
+      return;
+    }
+    if (Detail::looks_like_ipv6(str))
+    {
+      address = IPv6(str);
+      return;
+    }
+    if (Detail::looks_like_hostname(str))
+    {
+      address = HostName(str);
+      return;
+    }
+    throw std::invalid_argument("Invalid HostAddress: " + str);
+  }
+
+  std::size_t hash() const noexcept override
+  {
+    return std::visit(
+        [](const auto& addr) -> std::size_t
+        {
+          using T = std::decay_t<decltype(addr)>;
+          if constexpr (std::is_same_v<T, std::monostate>)
+            return 0u;
+          else
+            return addr.hash();
+        },
+        address);
+  }
+
+  template <typename T>
+    requires std::derived_from<T, IAddress>
+  T get_address() const
+  {
+    if (const auto* ptr = std::get_if<T>(&address))
+      return *ptr;
+    throw std::runtime_error("Address type mismatch");
+  }
+
+  template <typename T>
+    requires std::derived_from<T, IAddress>
+  void set_address(const T& addr)
+  {
+    address = addr;
+  }
+
+  bool operator==(const HostAddress& other) const
+  {
+    if (address.index() != other.address.index())
+      return false;
+
+    if (const auto* a = std::get_if<IPv4>(&address))
+      return *a == std::get<IPv4>(other.address);
+    if (const auto* a = std::get_if<IPv6>(&address))
+      return *a == std::get<IPv6>(other.address);
+    if (const auto* a = std::get_if<HostName>(&address))
+      return *a == std::get<HostName>(other.address);
+    if (const auto* a = std::get_if<SteamIDAddress>(&address))
+      return *a == std::get<SteamIDAddress>(other.address);
+
+    return std::holds_alternative<std::monostate>(address) &&
+           std::holds_alternative<std::monostate>(other.address);
+  }
+};
+} // namespace AtlasNet
 namespace std
 {
-template <> struct hash<IPv4Address>
+template <> struct hash<AtlasNet::IPv4>
 {
-  std::size_t operator()(const IPv4Address& a) const noexcept
+  std::size_t operator()(const AtlasNet::IPv4& a) const noexcept
   {
     return a.hash();
   }
 };
-template <> struct hash<IPv6Address>
+
+template <> struct hash<AtlasNet::IPv6>
 {
-  std::size_t operator()(const IPv6Address& a) const noexcept
+  std::size_t operator()(const AtlasNet::IPv6& a) const noexcept
   {
     return a.hash();
   }
 };
-template <> struct hash<SteamIDAddress>
+
+template <> struct hash<AtlasNet::SteamIDAddress>
 {
-  std::size_t operator()(const SteamIDAddress& a) const noexcept
+  std::size_t operator()(const AtlasNet::SteamIDAddress& a) const noexcept
   {
     return a.hash();
   }
 };
-template <> struct hash<DNSAddress>
+
+template <> struct hash<AtlasNet::HostName>
 {
-  std::size_t operator()(const DNSAddress& a) const noexcept
+  std::size_t operator()(const AtlasNet::HostName& a) const noexcept
+  {
+    return a.hash();
+  }
+};
+
+template <> struct hash<AtlasNet::HostAddress>
+{
+  std::size_t operator()(const AtlasNet::HostAddress& a) const noexcept
   {
     return a.hash();
   }

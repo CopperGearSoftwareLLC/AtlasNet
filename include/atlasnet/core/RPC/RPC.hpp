@@ -41,7 +41,7 @@
 namespace AtlasNet
 {
 
-using RPCTarget = EndPointAddress;
+using RPCTarget = SocketAddress;
 class RPC
 {
 public:
@@ -106,10 +106,10 @@ private:
                  RPC_Internal::CallID callID, std::string errorMsg);
 
   void OnRPCRequest(const RpcRequestMessage& msg,
-                    const EndPointAddress& address);
+                    const SocketAddress& address);
   void OnRPCResponse(const RpcResponseMessage& msg,
-                     const EndPointAddress& address);
-  void OnRPCError(const RpcErrorMessage& msg, const EndPointAddress& address);
+                     const SocketAddress& address);
+  void OnRPCError(const RpcErrorMessage& msg, const SocketAddress& address);
 
   RPC_Internal::CallID GetNextCallID(RPC_Internal::MethodID methodId)
   {

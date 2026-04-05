@@ -66,7 +66,6 @@ int SceneView::run()
 int SceneView::run()
 {
 
-
   InitWindow(screenWidth, screenHeight,
              "raylib [core] example - 3d camera mode");
   SetTargetFPS(60); // Set our game to run at 60 frames-per-second
@@ -90,7 +89,7 @@ void SceneView::_run_2d_scene()
 
   camera.target = {0.0f, 0.0f};
   camera.offset = {screenWidth * 0.5f, screenHeight * 0.5f};
-  camera.zoom = screenWidth / ( settings.SceneScale);
+  camera.zoom = screenWidth / (settings.SceneScale);
   camera.rotation = 0.0f;
 
   float dt = 1.0f / 60.0f;
@@ -152,7 +151,7 @@ void SceneView::_run_2d_scene()
     BeginMode2D(camera);
 
     totalTime_ += dt;
-      // Draw axes
+    // Draw axes
     DrawLineEx({0.0f, 0.0f}, {settings.SceneScale, 0.0f}, 1.0f, RED);
     DrawLineEx({0.0f, 0.0f}, {0.0f, settings.SceneScale}, 1.0f, GREEN);
     if (updateFunc)
@@ -166,8 +165,6 @@ void SceneView::_run_2d_scene()
         break;
       }
     }
-
-  
 
     EndMode2D();
 
@@ -252,7 +249,7 @@ void SceneView::_run_3d_scene()
     UpdateCamera(&camera, CAMERA_THIRD_PERSON);
     BeginMode3D(camera);
     totalTime_ += dt;
-      float mid_scale = settings.SceneScale * 0.5f;
+    float mid_scale = settings.SceneScale * 0.5f;
     float axis_width = settings.SceneScale * 0.001f;
     DrawCubeV(Vector3(mid_scale, 0, 0),
               Vector3(settings.SceneScale, axis_width, axis_width), RED);
@@ -260,24 +257,27 @@ void SceneView::_run_3d_scene()
               Vector3(axis_width, settings.SceneScale, axis_width), GREEN);
     DrawCubeV(Vector3(0, 0, mid_scale),
               Vector3(axis_width, axis_width, settings.SceneScale), BLUE);
-    DrawGrid(settings.SceneScale, 1.0f);
+    // grid spacing is base 10 magnitude of scenee scale.
+    float spacing =
+        std::pow(10.0f, std::floor(std::log10(settings.SceneScale)) - 1);
+
+    DrawGrid(10, spacing);
     if (updateFunc)
     {
-      Context ctx(*this, dt, totalTime_,camera);
+      Context ctx(*this, dt, totalTime_, camera);
       updateFunc(ctx);
       if (ctx.ShouldShutdown())
       {
         break;
       }
     }
-    
 
     EndMode3D();
-    
+
     // Draw the axis
     if (UpdatePost3DFunc)
     {
-      Context ctx(*this, dt, totalTime_,camera);
+      Context ctx(*this, dt, totalTime_, camera);
       UpdatePost3DFunc(ctx);
       if (ctx.ShouldShutdown())
       {

@@ -1,8 +1,7 @@
 #pragma once
 #include "atlasnet/core/RPC/RPC.hpp"
-#include "atlasnet/core/EndPoint.hpp"
+#include "atlasnet/core/SocketAddress.hpp"
 #include "atlasnet/core/RPC/RPCMessage.hpp"
-#include "atlasnet/core/database/RedisConn.hpp"
 #include "atlasnet/core/job/JobSystem.hpp"
 #include "atlasnet/core/messages/MessageSystem.hpp"
 
@@ -13,6 +12,7 @@
 #include <sys/wait.h>
 #include <thread>
 #include <unistd.h>
+using namespace AtlasNet;
 int main(int argc, char** argv)
 {
   ::testing::InitGoogleTest(&argc, argv);
@@ -25,9 +25,9 @@ ATLASNET_RPC(TESTRpc, ATLASNET_RPC_METHOD(TestMethod, void, int, float);
                                  std::string_view););
 TEST(RPC, BaseMessage)
 {
-  AtlasNet::JobSystem jobsystem(AtlasNet::JobSystem::Config{});
-  AtlasNet::MessageSystem msgSystem(
-      AtlasNet::MessageSystem::Config{.jobSystem = &jobsystem});
+  JobSystem jobsystem(JobSystem::Config{});
+  MessageSystem msgSystem(
+      MessageSystem::Config{.jobSystem = &jobsystem});
   const PortType port = 41001;
   std::mutex mutex;
   bool success = false;
@@ -39,18 +39,18 @@ TEST(RPC, BaseMessage)
             << std::endl;
   msgSystem.OpenListenSocket(port)
       .On<RpcRequestMessage>(
-          [&](const RpcRequestMessage& msg, const EndPointAddress&)
+          [&](const RpcRequestMessage& msg, const SocketAddress&)
           {
             RpcResponseMessage response{
                 .callID = msg.callID,
                 .payload = std::vector<uint8_t>{1, 2, 3, 4, 5},
             };
             msgSystem.SendMessage(
-                response, EndPointAddress(IPv4Address(127, 0, 0, 1), port),
-                AtlasNet::MessageSendMode::eReliableBatched);
+                response, SocketAddress(IPv4(127, 0, 0, 1), port),
+                MessageSendMode::eReliableBatched);
           })
       .On<RpcResponseMessage>(
-          [&](const RpcResponseMessage& msg, const EndPointAddress&)
+          [&](const RpcResponseMessage& msg, const SocketAddress&)
           {
             success = true;
             cv.notify_one();
@@ -62,21 +62,21 @@ TEST(RPC, BaseMessage)
       .payload = std::vector<uint8_t>{10, 20, 30},
   };
   msgSystem.SendMessage(request,
-                        EndPointAddress(IPv4Address(127, 0, 0, 1), port),
-                        AtlasNet::MessageSendMode::eReliableBatched);
+                        SocketAddress(IPv4(127, 0, 0, 1), port),
+                        MessageSendMode::eReliableBatched);
   std::unique_lock lock(mutex);
   cv.wait_for(lock, std::chrono::seconds(5), [&success] { return success; });
   EXPECT_TRUE(success);
 }
 TEST(RPC, SelfReceive)
 {
-  AtlasNet::JobSystem jobSystem(AtlasNet::JobSystem::Config{});
+  JobSystem jobSystem(JobSystem::Config{});
   const PortType port = 41001;
 
-  AtlasNet::MessageSystem msgSystem(
-      AtlasNet::MessageSystem::Config{.jobSystem = &jobSystem});
-  AtlasNet::RPC rpc(
-      AtlasNet::RPC::Config{.port = port, .messageSystem = &msgSystem});
+  MessageSystem msgSystem(
+      MessageSystem::Config{.jobSystem = &jobSystem});
+  RPC rpc(
+      RPC::Config{.port = port, .messageSystem = &msgSystem});
 
   bool success = false;
   std::mutex mutex;
@@ -90,7 +90,7 @@ TEST(RPC, SelfReceive)
         cv.notify_one();
       });
   rpc.Call<TESTRpc::TestMethod>(
-      EndPointAddress(IPv4Address(127, 0, 0, 1), port), 42, 3.14f);
+      SocketAddress(IPv4(127, 0, 0, 1), port), 42, 3.14f);
 
   std::unique_lock lock(mutex);
   cv.wait_for(lock, std::chrono::seconds(5), [&success] { return success; });
@@ -98,13 +98,13 @@ TEST(RPC, SelfReceive)
 }
 TEST(RPC, SelfReceiveAndReply)
 {
-  AtlasNet::JobSystem jobSystem(AtlasNet::JobSystem::Config{});
+  JobSystem jobSystem(JobSystem::Config{});
 
-  AtlasNet::MessageSystem msgSystem(
-      AtlasNet::MessageSystem::Config{.jobSystem = &jobSystem});
+  MessageSystem msgSystem(
+      MessageSystem::Config{.jobSystem = &jobSystem});
   const PortType port = 41001;
-  AtlasNet::RPC rpc(
-      AtlasNet::RPC::Config{.port = port, .messageSystem = &msgSystem});
+  RPC rpc(
+      RPC::Config{.port = port, .messageSystem = &msgSystem});
   bool success = false;
 
   rpc.Bind<TESTRpc::TestMethod_Ret_String>(
@@ -123,7 +123,7 @@ TEST(RPC, SelfReceiveAndReply)
                            RpcResponseMessage::TypeIdHash)
             << std::endl;
   std::future<std::string> result = rpc.Call<TESTRpc::TestMethod_Ret_String>(
-      EndPointAddress(IPv4Address(127, 0, 0, 1), port), "Hello");
+      SocketAddress(IPv4(127, 0, 0, 1), port), "Hello");
 
   auto status = result.wait_for(std::chrono::seconds(5));
   if (status == std::future_status::ready)
@@ -140,13 +140,13 @@ TEST(RPC, SelfReceiveAndReply)
 }
 TEST(RPC, SelfReceiveWrongPort)
 {
-  AtlasNet::JobSystem jobSystem(AtlasNet::JobSystem::Config{});
+  JobSystem jobSystem(JobSystem::Config{});
   const PortType port = 41001;
 
-  AtlasNet::MessageSystem msgSystem(
-      AtlasNet::MessageSystem::Config{.jobSystem = &jobSystem});
-  AtlasNet::RPC rpc(
-      AtlasNet::RPC::Config{.port = port, .messageSystem = &msgSystem});
+  MessageSystem msgSystem(
+      MessageSystem::Config{.jobSystem = &jobSystem});
+  RPC rpc(
+      RPC::Config{.port = port, .messageSystem = &msgSystem});
 
   bool success = false;
   std::mutex mutex;
@@ -160,7 +160,7 @@ TEST(RPC, SelfReceiveWrongPort)
         cv.notify_one();
       });
   rpc.Call<TESTRpc::TestMethod>(
-      EndPointAddress(IPv4Address(127, 0, 0, 1), port+1), 42, 3.14f);
+      SocketAddress(IPv4(127, 0, 0, 1), port+1), 42, 3.14f);
 
   std::unique_lock lock(mutex);
   cv.wait_for(lock, std::chrono::seconds(5), [&success] { return success; });
@@ -183,11 +183,11 @@ TEST(RPC, ForkParentCallsChildAndGetsResult)
     // Child process: hosts RPC server on childPort.
     close(readyPipe[0]);
 
-    AtlasNet::JobSystem childJobSystem(AtlasNet::JobSystem::Config{});
-    AtlasNet::MessageSystem childMsgSystem(
-        AtlasNet::MessageSystem::Config{.jobSystem = &childJobSystem});
-    AtlasNet::RPC childRpc(
-        AtlasNet::RPC::Config{.port = childPort, .messageSystem = &childMsgSystem});
+    JobSystem childJobSystem(JobSystem::Config{});
+    MessageSystem childMsgSystem(
+        MessageSystem::Config{.jobSystem = &childJobSystem});
+    RPC childRpc(
+        RPC::Config{.port = childPort, .messageSystem = &childMsgSystem});
 
     std::mutex mutex;
     std::condition_variable cv;
@@ -226,14 +226,14 @@ TEST(RPC, ForkParentCallsChildAndGetsResult)
   ASSERT_EQ(read(readyPipe[0], &ready, 1), 1) << "Parent failed waiting for child readiness";
   close(readyPipe[0]);
 
-  AtlasNet::JobSystem parentJobSystem(AtlasNet::JobSystem::Config{});
-  AtlasNet::MessageSystem parentMsgSystem(
-      AtlasNet::MessageSystem::Config{.jobSystem = &parentJobSystem});
-  AtlasNet::RPC parentRpc(
-      AtlasNet::RPC::Config{.port = parentPort, .messageSystem = &parentMsgSystem});
+  JobSystem parentJobSystem(JobSystem::Config{});
+  MessageSystem parentMsgSystem(
+      MessageSystem::Config{.jobSystem = &parentJobSystem});
+  RPC parentRpc(
+      RPC::Config{.port = parentPort, .messageSystem = &parentMsgSystem});
 
   std::future<int> result = parentRpc.Call<TESTRpc::TestMethod_Ret>(
-      EndPointAddress(IPv4Address(127, 0, 0, 1), childPort));
+      SocketAddress(IPv4(127, 0, 0, 1), childPort));
 
   auto status = result.wait_for(std::chrono::seconds(10));
   ASSERT_EQ(status, std::future_status::ready) << "RPC future not ready in time";

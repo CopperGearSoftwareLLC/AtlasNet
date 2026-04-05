@@ -1,22 +1,35 @@
-name: CI
+name: Build and Deploy Doxygen
 
 on:
-  pull_request:
   push:
-    branches: [main,Development]
+    branches: [ main ]
+
+permissions:
+  contents: write
 
 jobs:
-  test:
+  doxygen:
     runs-on: ubuntu-latest
 
     steps:
-      - uses: actions/checkout@v4
+      - name: Check out repository
+        uses: actions/checkout@v4
 
-      - name: Configure
-        run: cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
+      - name: Install Doxygen and Graphviz
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y doxygen graphviz
+      - name: Erase old docs
+        run: rm -rf docs/html
 
-      - name: Build
-        run: cmake --build build --config Release -j
+      - name: Generate docs
+        run: doxygen docs/Doxyfile
 
-      - name: Run tests
-        run: ctest --test-dir build --output-on-failure
+      #- name: Add .nojekyll
+      #  run: touch docs/html/.nojekyll
+
+     # - name: Deploy to GitHub Pages
+     #   uses: peaceiris/actions-gh-pages@v3
+     #   with:
+     #     github_token: ${{ secrets.GITHUB_TOKEN }}
+     #     publish_dir: ./docs/html

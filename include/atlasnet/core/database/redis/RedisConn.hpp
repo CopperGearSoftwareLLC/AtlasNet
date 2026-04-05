@@ -1,24 +1,47 @@
 #pragma once
 
 #include "atlasnet/core/Address.hpp"
+#include "atlasnet/core/SocketAddress.hpp"
+#include "sw/redis++/command_options.h"
 #include "sw/redis++/connection.h"
 #include "sw/redis++/connection_pool.h"
 #include "sw/redis++/redis.h"
 #include "sw/redis++/redis_cluster.h"
 #include <chrono>
 #include <functional>
+#include <initializer_list>
 #include <memory>
 #include <optional>
 #include <sw/redis++/redis++.h>
 #include <sys/types.h>
 #include <variant>
-class RedisConn {
+namespace AtlasNet::Database
+{
+  namespace Redis
+  {
+    class KeyValWrapper;
+    class HashMapWrapper;
+    class SetWrapper;
+    class SortedSetWrapper;
+  }
+
+class RedisConn
+{
+  friend class Redis::KeyValWrapper;
+  friend class Redis::HashMapWrapper;
+  friend class Redis::SetWrapper;
+  friend class Redis::SortedSetWrapper;
 public:
-  enum RedisMode { eCluster, eStandalone };
-  struct Settings {
-    Settings() : host(IPv4Address(127, 0, 0, 1)), Port(6379) {}
-    std::variant<IPv4Address, IPv6Address> host;
-    uint16_t Port;
+  enum RedisMode
+  {
+    eCluster,
+    eStandalone
+  };
+  struct Settings
+  {
+
+    HostAddress host;
+    PortType port;
     RedisMode Mode;
     bool ExceptionOnFailure;
     uint32_t MaxConnectRetries;
@@ -40,9 +63,11 @@ public:
 private:
   std::variant<sw::redis::Redis, sw::redis::RedisCluster> HandleVariant;
 
-  template <typename Func> decltype(auto) RedisFunc(Func &&func) {
+  template <typename Func> decltype(auto) RedisFunc(Func&& func)
+  {
     return std::visit(
-        [&](auto &&handle) -> decltype(auto) {
+        [&](auto&& handle) -> decltype(auto)
+        {
           return std::invoke(std::forward<Func>(func),
                              std::forward<decltype(handle)>(handle));
         },
@@ -50,21 +75,23 @@ private:
   }
 
 public:
-  RedisConn(sw::redis::Redis redis, const Settings &settings)
-      : settings(settings), HandleVariant(std::move(redis)) {}
+  RedisConn(sw::redis::Redis redis, const Settings& settings);
 
-  RedisConn(sw::redis::RedisCluster redis, const Settings &settings)
-      : settings(settings), HandleVariant(std::move(redis)) {}
+  RedisConn(sw::redis::RedisCluster redis, const Settings& settings);
+  ~RedisConn();
 
-  static std::unique_ptr<RedisConn> Connect(const Settings &settings);
+  static std::unique_ptr<RedisConn> Connect(const Settings& settings);
 
-  bool Set(const std::string_view key, const std::string_view value) {
-    return RedisFunc(
-        [&](auto &&handle) -> bool { return handle.set(key, value); });
-  }
-  std::optional<std::string> Get(const std::string_view key) {
-    return RedisFunc([&](auto &&handle) -> std::optional<std::string> {
-      return handle.get(key);
-    });
-  }
+  Redis::KeyValWrapper& KeyVal();
+  Redis::HashMapWrapper& HashMap();
+  Redis::SetWrapper& Set();
+  Redis::SortedSetWrapper& SortedSet();
+
+private:
+std::unique_ptr<Redis::KeyValWrapper> keyValWrapper;
+std::unique_ptr<Redis::HashMapWrapper> hashMapWrapper;
+std::unique_ptr<Redis::SetWrapper> setWrapper;
+std::unique_ptr<Redis::SortedSetWrapper> sortedSetWrapper;
 };
+
+} // namespace AtlasNet::Database
