@@ -100,11 +100,7 @@ void AtlasNet::RPC::OnRPCResponse(const RpcResponseMessage& msg,
     std::cerr << std::format("Received RPC response for methodId {} callId {} from {}",
                              msg.methodId, msg.callID, address.to_string())
               << std::endl;
-  (void)address;
 
-  std::cerr << std::format("Received RPC response for methodId {} callId {}",
-                           msg.methodId, msg.callID)
-            << std::endl;
   PendingRequest pending;
   {
     std::unique_lock<std::shared_mutex> lock(_mutex);

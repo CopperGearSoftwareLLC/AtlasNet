@@ -8,6 +8,8 @@
 #include <variant>
 namespace AtlasNet
 {
+namespace Entity
+{
 
 struct EntityIDTag
 {
@@ -29,24 +31,32 @@ struct Location
   WorldID worldId;
   Transform transform;
 };
-struct EntityInfo
+namespace Components
+{
+  struct EntityComponent {};
+struct EntityInfo : public EntityComponent
 {
   EntityID id;
   Location location;
 };
-struct ActorInfo
+struct ActorInfo : public EntityComponent
 {
-  //Data is not required because we dont store, we serialize on transform from IAtlasNetShard
-  //boost::container::small_vector<uint8_t, 256> payload;
+  int pad;
+  // Data is not required because we dont store, we serialize on transform from
+  // IAtlasNetShard boost::container::small_vector<uint8_t, 256> payload;
 };
-struct ClientInfo
+struct ClientInfo : public EntityComponent
 {
   ClientID id;
 };
-struct Collider
+struct Collider : public EntityComponent
 {
-  std::variant< BoxCollider, SphereCollider> collider;
+  std::variant<BoxCollider, SphereCollider> collider;
 };
 
+} // namespace Components
+
+// using EntityTabl2 = entt::basic_registry<Entitye>;
 using EntityTable = entt::registry;
+} // namespace Entity
 } // namespace AtlasNet

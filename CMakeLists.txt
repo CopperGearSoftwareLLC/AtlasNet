@@ -84,18 +84,29 @@ target_link_libraries(AtlasNetProxy AtlasNetCore)
 
 
 
-file(GLOB_RECURSE _watchdog_sources CONFIGURE_DEPENDS
-  "${CMAKE_CURRENT_SOURCE_DIR}/src/watchdog/*.cpp"
+file(GLOB_RECURSE _controller_sources CONFIGURE_DEPENDS
+  "${CMAKE_CURRENT_SOURCE_DIR}/src/controller/*.cpp"
 )
 
-add_executable(AtlasNetWatchdog ${_watchdog_sources})
+add_executable(AtlasNetController ${_controller_sources})
 # Optional, but common: local includes
-target_include_directories(AtlasNetWatchdog
+target_include_directories(AtlasNetController
       PRIVATE
-    "${CMAKE_CURRENT_SOURCE_DIR}/src/watchdog"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/controller"
 )
-target_link_libraries(AtlasNetWatchdog AtlasNetCore)
+target_link_libraries(AtlasNetController AtlasNetCore)
 
+file(GLOB_RECURSE _agent_sources CONFIGURE_DEPENDS
+  "${CMAKE_CURRENT_SOURCE_DIR}/src/agent/*.cpp"
+)
+
+add_executable(AtlasNetAgent ${_agent_sources})
+# Optional, but common: local includes
+target_include_directories(AtlasNetAgent
+      PRIVATE
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/agent"
+)
+target_link_libraries(AtlasNetAgent AtlasNetCore)
 
 if (ATLASNET_WEB)
 include(cmake/WebDeps.cmake)
