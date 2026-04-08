@@ -18,6 +18,7 @@ KEY_DIR="$(dirname "$SSH_KEY")"
 
 need_cmd ssh
 need_cmd ssh-keygen
+need_cmd ssh-keyscan
 need_cmd ssh-copy-id
 
 mkdir -p "$KEY_DIR"
@@ -32,17 +33,28 @@ ensure_key_access() {
   local user="$1"
   local ip="$2"
   local label="$3"
+  local ssh_output
 
   echo "Ensuring key access to ${label}: ${user}@${ip}"
-  if ssh -i "$SSH_KEY" \
+  ssh_output="$(
+    ssh -i "$SSH_KEY" \
     -o BatchMode=yes \
     -o StrictHostKeyChecking=accept-new \
     -o ConnectTimeout=5 \
-    "${user}@${ip}" true >/dev/null 2>&1; then
+    "${user}@${ip}" true 2>&1
+  )" && {
     echo " - ${label} key auth already works"
-  else
-    ssh-copy-id -i "${SSH_KEY}.pub" -o StrictHostKeyChecking=accept-new "${user}@${ip}"
+    return
+  }
+
+  if grep -q "REMOTE HOST IDENTIFICATION HAS CHANGED" <<<"$ssh_output"; then
+    echo " - ${label} host key changed; refreshing ~/.ssh/known_hosts entry"
+    ssh-keygen -R "$ip" >/dev/null
+    ssh-keygen -R "[$ip]:22" >/dev/null 2>&1 || true
+    ssh-keyscan -H "$ip" >> "$HOME/.ssh/known_hosts" 2>/dev/null || true
   fi
+
+  ssh-copy-id -i "${SSH_KEY}.pub" -o StrictHostKeyChecking=accept-new "${user}@${ip}"
 }
 
 for entry in $SERVER_IPS; do

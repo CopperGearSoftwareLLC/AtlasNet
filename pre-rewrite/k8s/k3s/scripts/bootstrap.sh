@@ -16,6 +16,7 @@ CLI_WORKER_SSH_USER=""
 CLI_K3S_API_ENDPOINT=""
 CLI_WORKER_IPS=""
 CLI_K3S_EXTRA_ARGS=""
+CLI_K3S_AGENT_EXTRA_ARGS=""
 CLI_K3S_VERSION=""
 CLI_K3SUP_VERSION=""
 CLI_K3SUP_USE_SUDO=""
@@ -67,6 +68,11 @@ while [[ $# -gt 0 ]]; do
       CLI_K3S_EXTRA_ARGS="$2"
       shift 2
       ;;
+    --k3s-agent-extra-args)
+      [[ $# -ge 2 ]] || die "--k3s-agent-extra-args requires a value"
+      CLI_K3S_AGENT_EXTRA_ARGS="$2"
+      shift 2
+      ;;
     --k3s-version)
       [[ $# -ge 2 ]] || die "--k3s-version requires a value"
       CLI_K3S_VERSION="$2"
@@ -90,6 +96,7 @@ done
 [[ -n "$CLI_WORKER_IPS" ]] && WORKER_IPS="$CLI_WORKER_IPS"
 [[ -n "$CLI_K3S_API_ENDPOINT" ]] && K3S_API_ENDPOINT="$CLI_K3S_API_ENDPOINT"
 [[ -n "$CLI_K3S_EXTRA_ARGS" ]] && K3S_EXTRA_ARGS="$CLI_K3S_EXTRA_ARGS"
+[[ -n "$CLI_K3S_AGENT_EXTRA_ARGS" ]] && K3S_AGENT_EXTRA_ARGS="$CLI_K3S_AGENT_EXTRA_ARGS"
 [[ -n "$CLI_K3S_VERSION" ]] && K3S_VERSION="$CLI_K3S_VERSION"
 [[ -n "$CLI_K3SUP_VERSION" ]] && K3SUP_VERSION="$CLI_K3SUP_VERSION"
 [[ -n "$CLI_K3SUP_USE_SUDO" ]] && K3SUP_USE_SUDO="$CLI_K3SUP_USE_SUDO"
@@ -101,6 +108,7 @@ done
 : "${WORKER_SSH_USER:=pi}"
 : "${WORKER_IPS:=}"
 : "${K3S_EXTRA_ARGS:=}"
+: "${K3S_AGENT_EXTRA_ARGS:=}"
 : "${K3S_VERSION:=}"
 : "${K3SUP_VERSION:=}"
 : "${K3SUP_USE_SUDO:=true}"
@@ -493,13 +501,22 @@ else
       worker_host="$entry"
     fi
     echo " - worker: $worker_user@$worker_host"
-    k3sup_retry join \
+    worker_join_args=(
+      join
       --server-ip "$PRIMARY_SERVER_IP" \
       --server-user "$PRIMARY_SERVER_USER_DEFAULT" \
       --ip "$worker_host" \
       --user "$worker_user" \
       --sudo "$K3SUP_USE_SUDO" \
-      --ssh-key "$SSH_KEY" &
+      --ssh-key "$SSH_KEY"
+    )
+    if [[ -n "$K3S_AGENT_EXTRA_ARGS" ]]; then
+      worker_join_args+=(--k3s-extra-args "$K3S_AGENT_EXTRA_ARGS")
+    fi
+    if [[ -n "$K3S_VERSION" ]]; then
+      worker_join_args+=(--k3s-version "$K3S_VERSION")
+    fi
+    k3sup_retry "${worker_join_args[@]}" &
     worker_pids+=($!)
     worker_labels+=("worker $worker_user@$worker_host")
   done

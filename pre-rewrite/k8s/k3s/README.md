@@ -26,6 +26,25 @@ Edit `.env`:
 - `WORKER_SSH_USER` — SSH username on worker node(s)
 - `SSH_KEY` (default is usually fine)
 - `K3SUP_USE_SUDO=true` (default)
+- Optional `K3S_EXTRA_ARGS` for the first server install
+- Optional `K3S_AGENT_EXTRA_ARGS` for worker joins
+
+If a worker is multi-homed and flannel picks the wrong NIC after a reconnect, pin it explicitly:
+```bash
+K3S_AGENT_EXTRA_ARGS="--flannel-iface=<wired-nic>"
+```
+
+Only add `--node-ip=<worker-lan-ip>` when that address is static and guaranteed to be present
+before `k3s-agent` starts. On DHCP or reconnect-prone USB Ethernet adapters, pinning `--node-ip`
+can make agent startup fail if the address is not attached yet.
+
+If flannel still fails to recover after the NIC comes back, install the worker recovery hook:
+```bash
+make k3s-install-recovery-hook
+```
+
+The hook watches the worker's NetworkManager events and restarts `k3s-agent` when the watched
+interface regains connectivity but `flannel.1` is still missing.
 
 ## 2) Run cluster setup
 ```bash

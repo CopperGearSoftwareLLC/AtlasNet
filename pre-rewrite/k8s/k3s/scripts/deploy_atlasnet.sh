@@ -181,6 +181,7 @@ helm upgrade --install "$ATLASNET_HELM_RELEASE_NAME" "$CHART_DIR" \
   --set-string images.proxy="$ATLASNET_PROXY_IMAGE" \
   --set-string images.shard="$ATLASNET_SANDBOX_SERVER_IMAGE" \
   --set-string images.cartograph="$ATLASNET_CARTOGRAPH_IMAGE" \
+  --set-string cartograph.mode="production" \
   --set-string cartograph.ingress.className="$ATLASNET_CARTOGRAPH_INGRESS_CLASS_NAME" \
   --set-string cartograph.ingress.host="$ATLASNET_CARTOGRAPH_INGRESS_HOST" \
   --set llm.enabled="$ATLASNET_K8S_LLM_ENABLED" \

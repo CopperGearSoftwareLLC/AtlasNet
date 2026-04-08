@@ -5,6 +5,7 @@
 {{- $shardImage := required "values.images.shard is required" .Values.images.shard -}}
 {{- $cartographImage := required "values.images.cartograph is required" .Values.images.cartograph -}}
 {{- $internaldbImage := required "values.images.internaldb is required" .Values.images.internaldb -}}
+{{- $cartographMode := default "development" .Values.cartograph.mode -}}
 {{- $llmEnabled := default false .Values.llm.enabled -}}
 {{- $llmImage := default "ghcr.io/ggml-org/llama.cpp:server" .Values.llm.image -}}
 {{- $llmServicePort := int (default 8080 .Values.llm.servicePort) -}}
@@ -12,6 +13,8 @@
 {{- $llmApiFormat := default "openai" .Values.llm.apiFormat -}}
 {{- $llmModelId := default "huggingface.co/dannys0n/qwen3-1.7b-seed_gen_voronoi:Q4_K_M" .Values.llm.modelId -}}
 {{- $llmModelFileName := default "model.gguf" .Values.llm.modelFileName -}}
+{{- $llmOfflineEnabled := default false .Values.llm.offline.enabled -}}
+{{- $llmModelSeedImage := default "" .Values.llm.offline.modelSeedImage -}}
 {{- $llmPvcSize := default "8Gi" .Values.llm.pvcSize -}}
 {{- $llmContextSize := int (default 4096 .Values.llm.contextSize) -}}
 {{- $llmThreads := int (default 4 .Values.llm.threads) -}}
@@ -141,6 +144,7 @@ spec:
         atlasnet.role: watchdog
     spec:
       serviceAccountName: atlasnet-watchdog
+      enableServiceLinks: true
       affinity:
         nodeAffinity:
           requiredDuringSchedulingIgnoredDuringExecution:
@@ -179,9 +183,9 @@ spec:
                 fieldRef:
                   fieldPath: status.podIP
             - name: INTERNAL_REDIS_SERVICE_NAME
-              value: internaldb
+              value: "$(INTERNALDB_SERVICE_HOST)"
             - name: INTERNAL_REDIS_PORT
-              value: "6379"
+              value: "$(INTERNALDB_SERVICE_PORT)"
             {{- if or $llmEnabled $llmEndpoint }}
             - name: ATLASNET_LLM_ENDPOINT
               value: {{ default (printf "http://atlasnet-llm:%d/v1/chat/completions" $llmServicePort) $llmEndpoint | quote }}
@@ -209,6 +213,11 @@ metadata:
     atlasnet.role: shard
 spec:
   replicas: 0
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 0
+      maxUnavailable: 1
   selector:
     matchLabels:
       app: atlasnet-shard
@@ -218,6 +227,8 @@ spec:
         app: atlasnet-shard
         atlasnet.role: shard
     spec:
+      terminationGracePeriodSeconds: 5
+      enableServiceLinks: true
       affinity:
         podAntiAffinity:
           preferredDuringSchedulingIgnoredDuringExecution:
@@ -238,6 +249,22 @@ spec:
         - name: shard
           image: {{ $shardImage | quote }}
           imagePullPolicy: {{ $imagePullPolicy | quote }}
+          lifecycle:
+            preStop:
+              exec:
+                command:
+                  - /bin/sh
+                  - -c
+                  - |
+                    kill -TERM 1 2>/dev/null || true
+                    i=0
+                    while kill -0 1 2>/dev/null; do
+                      i=$((i + 1))
+                      if [ "$i" -ge 4 ]; then
+                        break
+                      fi
+                      sleep 1
+                    done
           env:
             - name: POD_NAME
               valueFrom:
@@ -252,9 +279,9 @@ spec:
                 fieldRef:
                   fieldPath: status.podIP
             - name: INTERNAL_REDIS_SERVICE_NAME
-              value: internaldb
+              value: "$(INTERNALDB_SERVICE_HOST)"
             - name: INTERNAL_REDIS_PORT
-              value: "6379"
+              value: "$(INTERNALDB_SERVICE_PORT)"
           ports:
             - name: interlink
               containerPort: 25555
@@ -279,6 +306,29 @@ spec:
       labels:
         app: atlasnet-internaldb
     spec:
+      enableServiceLinks: true
+      affinity:
+        nodeAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            nodeSelectorTerms:
+              - matchExpressions:
+                  - key: node-role.kubernetes.io/control-plane
+                    operator: Exists
+              - matchExpressions:
+                  - key: node-role.kubernetes.io/master
+                    operator: Exists
+              - matchExpressions:
+                  - key: kubernetes.io/hostname
+                    operator: In
+                    values:
+                      - {{ $serverNodeName | quote }}
+      tolerations:
+        - key: node-role.kubernetes.io/control-plane
+          operator: Exists
+          effect: NoSchedule
+        - key: node-role.kubernetes.io/master
+          operator: Exists
+          effect: NoSchedule
       containers:
         - name: internaldb
           image: {{ $internaldbImage | quote }}
@@ -347,6 +397,7 @@ spec:
         app: atlasnet-cartograph
     spec:
       serviceAccountName: atlasnet-cartograph
+      enableServiceLinks: true
       affinity:
         nodeAffinity:
           requiredDuringSchedulingIgnoredDuringExecution:
@@ -373,6 +424,32 @@ spec:
         - name: cartograph
           image: {{ $cartographImage | quote }}
           imagePullPolicy: {{ $imagePullPolicy | quote }}
+          {{- if eq $cartographMode "production" }}
+          command:
+            - /bin/sh
+            - -c
+            - |
+              set -eu
+              sed -i 's/retryStrategy: null/retryStrategy: () => null/' \
+                src/app/api/heuristic-control/route.ts \
+                src/app/api/recompute-snapshots/route.ts
+              cat > next.config.ts <<'EOF'
+              /** @type {import('next').NextConfig} */
+              const nextConfig = {
+                eslint: {
+                  ignoreDuringBuilds: true,
+                },
+                typescript: {
+                  ignoreBuildErrors: true,
+                },
+              }
+
+              module.exports = nextConfig;
+              EOF
+              npm run build
+              node native-server/native-server.js &
+              exec npm run start -- --hostname 0.0.0.0
+          {{- end }}
           env:
             - name: POD_NAMESPACE
               valueFrom:
@@ -383,9 +460,9 @@ spec:
                 fieldRef:
                   fieldPath: status.podIP
             - name: INTERNAL_REDIS_SERVICE_NAME
-              value: internaldb
+              value: "$(INTERNALDB_SERVICE_HOST)"
             - name: INTERNAL_REDIS_PORT
-              value: "6379"
+              value: "$(INTERNALDB_SERVICE_PORT)"
           ports:
             - name: http
               containerPort: 3000
@@ -393,6 +470,24 @@ spec:
             - name: inspect
               containerPort: 9229
               protocol: TCP
+          startupProbe:
+            httpGet:
+              path: /
+              port: http
+            failureThreshold: 60
+            periodSeconds: 5
+          readinessProbe:
+            httpGet:
+              path: /
+              port: http
+            periodSeconds: 10
+            failureThreshold: 3
+          livenessProbe:
+            httpGet:
+              path: /
+              port: http
+            periodSeconds: 20
+            failureThreshold: 3
 ---
 apiVersion: v1
 kind: Service
@@ -453,21 +548,29 @@ spec:
       labels:
         app: atlasnet-proxy
     spec:
+      enableServiceLinks: true
       affinity:
         nodeAffinity:
           requiredDuringSchedulingIgnoredDuringExecution:
             nodeSelectorTerms:
               - matchExpressions:
                   - key: node-role.kubernetes.io/control-plane
-                    operator: DoesNotExist
+                    operator: Exists
               - matchExpressions:
                   - key: node-role.kubernetes.io/master
-                    operator: DoesNotExist
+                    operator: Exists
               - matchExpressions:
                   - key: kubernetes.io/hostname
-                    operator: NotIn
+                    operator: In
                     values:
                       - {{ $serverNodeName | quote }}
+      tolerations:
+        - key: node-role.kubernetes.io/control-plane
+          operator: Exists
+          effect: NoSchedule
+        - key: node-role.kubernetes.io/master
+          operator: Exists
+          effect: NoSchedule
       containers:
         - name: proxy
           image: {{ $proxyImage | quote }}
@@ -480,9 +583,9 @@ spec:
                 fieldRef:
                   fieldPath: status.podIP
             - name: INTERNAL_REDIS_SERVICE_NAME
-              value: internaldb
+              value: "$(INTERNALDB_SERVICE_HOST)"
             - name: INTERNAL_REDIS_PORT
-              value: "6379"
+              value: "$(INTERNALDB_SERVICE_PORT)"
           ports:
             - name: interlink
               containerPort: 25555
@@ -566,7 +669,47 @@ spec:
         app: atlasnet-llm
         atlasnet.role: llm
     spec:
+      enableServiceLinks: true
+      affinity:
+        nodeAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            nodeSelectorTerms:
+              - matchExpressions:
+                  - key: node-role.kubernetes.io/control-plane
+                    operator: Exists
+              - matchExpressions:
+                  - key: node-role.kubernetes.io/master
+                    operator: Exists
+              - matchExpressions:
+                  - key: kubernetes.io/hostname
+                    operator: In
+                    values:
+                      - {{ $serverNodeName | quote }}
+      tolerations:
+        - key: node-role.kubernetes.io/control-plane
+          operator: Exists
+          effect: NoSchedule
+        - key: node-role.kubernetes.io/master
+          operator: Exists
+          effect: NoSchedule
       initContainers:
+        {{- if $llmOfflineEnabled }}
+        - name: model-seed
+          image: {{ required "values.llm.offline.modelSeedImage is required when llm.offline.enabled=true" $llmModelSeedImage | quote }}
+          imagePullPolicy: {{ $imagePullPolicy | quote }}
+          command:
+            - sh
+            - -c
+            - |
+              set -eu
+              mkdir -p /models
+              if [ ! -s "/models/{{ $llmModelFileName }}" ]; then
+                cp /seed/model.gguf "/models/{{ $llmModelFileName }}"
+              fi
+          volumeMounts:
+            - name: model-cache
+              mountPath: /models
+        {{- else }}
         - name: model-download
           image: curlimages/curl:8.12.1
           imagePullPolicy: IfNotPresent
@@ -582,6 +725,7 @@ spec:
           volumeMounts:
             - name: model-cache
               mountPath: /models
+        {{- end }}
       containers:
         - name: llm
           image: {{ $llmImage | quote }}

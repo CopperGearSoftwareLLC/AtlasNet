@@ -10,6 +10,7 @@ images:
   internaldb: valkey/valkey-bundle:latest
 
 cartograph:
+  mode: development
   ingress:
     className: nginx
     host: cartograph.atlasnet.local
@@ -28,3 +29,6 @@ llm:
   pvcSize: 8Gi
   contextSize: 4096
   threads: 4
+  offline:
+    enabled: false
+    modelSeedImage: ""
